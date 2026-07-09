@@ -10,17 +10,24 @@ import { GCD_MS, MERCS, PARTY, REWARDS, TRASH } from '../data/constants';
 import type {
   BossCastState,
   CastState,
+  CombatEngineOptions,
   CombatEvent,
   CombatState,
   CombatStatus,
   EncounterDef,
+  MissingHealthBonusRule,
   SpellDef,
+  SynergyRule,
   Unit,
 } from './types';
 
 export class CombatEngine {
   private readonly encounter: EncounterDef;
   private readonly spells: SpellDef[];
+
+  /** Synergy rules with mutable per-entry armed state (constructor-cloned; never shared with the caller). */
+  private readonly synergies: (SynergyRule & { armed: boolean })[];
+  private readonly missingHealthBonuses: MissingHealthBonusRule[];
 
   private party: Unit[] = [];
   private activeEnemies: Unit[] = [];
@@ -47,13 +54,18 @@ export class CombatEngine {
   /** Events produced synchronously by commands (castSpell), flushed on the next advance(). */
   private pending: CombatEvent[] = [];
 
-  constructor(encounter: EncounterDef, spells: SpellDef[], options?: { bonusMaxMana?: number }) {
+  constructor(encounter: EncounterDef, spells: SpellDef[], options?: CombatEngineOptions) {
     this.encounter = encounter;
     this.spells = spells;
 
     // Authorized Chunk 3 extension: a spell-tree node (e.g. Deep Reserves) can grant
     // the healer bonus max mana, applied to both max and starting mana here.
     const healerMana = PARTY.startingMana + (options?.bonusMaxMana ?? 0);
+
+    // Chunk 1 (phase-2-handoff): synergy + missing-health bonus rules, cloned so the
+    // engine's mutable `armed` state never touches the caller's arrays.
+    this.synergies = (options?.synergies ?? []).map((s) => ({ ...s, armed: false }));
+    this.missingHealthBonuses = (options?.missingHealthBonuses ?? []).map((m) => ({ ...m }));
 
     this.party = [
       { id: 'tank', name: 'Tank', role: 'tank', hp: PARTY.tankMaxHp, maxHp: PARTY.tankMaxHp, mana: 0, maxMana: 0, alive: true },
@@ -228,10 +240,39 @@ export class CombatEngine {
     events.push({ type: 'castFinished', spellId: cast.spellId });
 
     const target = this.getUnit(cast.targetId);
+
+    // Consume-then-arm (locked order, phase-2-handoff): a spell that is both a
+    // trigger and a buffed target consumes any already-armed bonus for itself
+    // first, then arms fresh from this same completed cast.
+    let synergyBonus = 0;
+    if (target && target.alive) {
+      // Buffed cast on a dead target has no heal event, so nothing to add the
+      // bonus to — armed entries are kept, not consumed, in that case.
+      for (const syn of this.synergies) {
+        if (syn.buffedSpellId === spell.id && syn.armed) {
+          synergyBonus += syn.bonusHeal;
+          syn.armed = false;
+        }
+      }
+    }
+    // Arming happens regardless of target aliveness (mana was spent; a trigger
+    // cast on a target that died mid-cast still arms). Re-arming replaces
+    // (boolean flag), never stacks.
+    for (const syn of this.synergies) {
+      if (syn.triggerSpellId === spell.id) syn.armed = true;
+    }
+
     if (target && target.alive) {
       const missing = Math.max(0, target.maxHp - target.hp);
-      const applied = Math.min(spell.heal, missing);
-      const overheal = spell.heal - applied;
+      let missingHealthBonus = 0;
+      for (const mh of this.missingHealthBonuses) {
+        if (mh.spellId === spell.id) {
+          missingHealthBonus += mh.healPer10PctMissing * Math.floor((missing * 10) / target.maxHp);
+        }
+      }
+      const raw = spell.heal + synergyBonus + missingHealthBonus;
+      const applied = Math.min(raw, missing);
+      const overheal = raw - applied;
       target.hp += applied;
       events.push({ type: 'heal', targetId: target.id, amount: applied, overheal, spellId: spell.id });
     }

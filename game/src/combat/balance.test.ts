@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { CombatEngine } from './engine';
 import { ASH_GATE, THE_MAW } from '../data/encounters';
-import { ALL_SPELLS } from '../data/spells';
 import { SPELLS } from '../data/constants';
-import type { EncounterDef, SpellDef, Unit } from './types';
+import { buildLoadout } from '../meta/progression';
+import type { SaveData } from '../save/save';
+import type { CombatEngineOptions, EncounterDef, SpellDef, Unit } from './types';
 
 /**
  * Balance gates for poc-spec §4.1 ("threat is mana, not raw HPS") and §7
@@ -18,20 +19,55 @@ import type { EncounterDef, SpellDef, Unit } from './types';
  *      comfortable clear: either a wipe, or a pyrrhic win (healer fully OOM,
  *      at most 2 party members standing). Perfect play may scrape through;
  *      it must never cruise.
- *   4. Ash Gate, disciplined healing, full PoC kit (both spells + Deep
- *      Reserves' +5 mana) → victory with at least 3 party members alive
- *      (the journey's step 6 must be reachable and progression must be felt).
- *   5. Bonehowl actually lands at least once in the winning run (the 10s
- *      telegraph is part of the PoC experience).
- *   6. The Maw with the full kit and disciplined healing → wipe (sandbox).
+ *   4. Ash Gate, disciplined healing, BOTH maxed subclass builds (Vigil and
+ *      Zealot — phase-2-handoff) → victory with at least 3 party members
+ *      alive (the journey's step 6 must be reachable and progression felt,
+ *      regardless of which subclass the player picked).
+ *   5. Bonehowl actually lands at least once in a winning run (the 10s
+ *      telegraph is part of the PoC experience) — checked on either build.
+ *   6. The Maw with either maxed subclass build and disciplined healing →
+ *      wipe (sandbox).
  */
 
 const STEP_MS = 250;
 const MAX_MS = 10 * 60 * 1000;
 
 const BASE_KIT: SpellDef[] = [SPELLS.solemnMend];
-const FULL_KIT: SpellDef[] = ALL_SPELLS;
-const DEEP_RESERVES_BONUS = 5;
+
+/** Minimal synthetic SaveData for buildLoadout — only the fields the two maxed builds below need. */
+function makeSave(overrides: Partial<SaveData>): SaveData {
+  return {
+    version: 2,
+    tutorialDone: true,
+    gold: 0,
+    xp: 0,
+    rubies: 0,
+    unlockedSpells: [],
+    treeRanks: {},
+    subclass: null,
+    clearedDungeons: [],
+    ...overrides,
+  };
+}
+
+/** Maxed Vigil build (phase-2-handoff Chunk 1 brief): Deep Reserves x5, Vigil oath + Patient Vow
+ * x3 (Mend->Vigil synergy) + Measured Devotion (Solemn Vigil slower/cheaper). */
+const VIGIL_SAVE: SaveData = makeSave({
+  unlockedSpells: ['solemn-mend', 'zealous-mending'],
+  treeRanks: { 'deep-reserves': 5, 'vigil-oath': 1, 'vigil-patient-vow': 3, 'vigil-measured-devotion': 1 },
+  subclass: 'vigil',
+});
+
+/** Maxed Zealot build: Deep Reserves x5, Zealot oath + Fervent Chain x3 (Mending->Flare synergy)
+ * + Desperate Zeal (Zealous Flare's missing-health bonus). */
+const ZEALOT_SAVE: SaveData = makeSave({
+  unlockedSpells: ['solemn-mend', 'zealous-mending'],
+  treeRanks: { 'deep-reserves': 5, 'zealot-oath': 1, 'zealot-fervent-chain': 3, 'zealot-desperate-zeal': 1 },
+  subclass: 'zealot',
+});
+
+const VIGIL_LOADOUT = buildLoadout(VIGIL_SAVE);
+const ZEALOT_LOADOUT = buildLoadout(ZEALOT_SAVE);
 
 interface BotRun {
   status: 'victory' | 'wipe';
@@ -52,18 +88,27 @@ type BotStyle = 'none' | 'naive' | 'disciplined';
  *   real threat, so this should lose.
  * - 'disciplined': ceiling play — only casts when free (never queues blind),
  *   heals the most-injured living ally, and only for full-value heals (zero
- *   overheal). Prefers efficient Solemn; uses Zealous Mending only when the
- *   tank is about to die and the faster cast can beat the next swing.
+ *   overheal) outside emergencies. Tank-critical is the one overheal-allowed
+ *   emergency: it grabs the fastest available cast — Zealous Flare (Zealot,
+ *   500ms, and the target it most wants Desperate Zeal's bonus on), else
+ *   Zealous Mending (base kit, 1000ms), else Solemn Mend (2000ms fallback).
+ *   Outside emergencies it prefers Solemn Vigil (Vigil) at full value — the
+ *   efficient big heal, arming/consuming the Mend<->Vigil synergy cadence —
+ *   then falls back to Solemn Mend (which also arms both subclasses'
+ *   synergies) and finally Zealous Mending. Solemn Vigil's 4s cast is never
+ *   used as the emergency button — far too slow.
  */
 function runBot(
   encounter: EncounterDef,
   spells: SpellDef[],
-  bonusMaxMana: number,
+  options: CombatEngineOptions,
   style: BotStyle,
 ): BotRun {
-  const engine = new CombatEngine(encounter, spells, { bonusMaxMana });
-  const hasSolemn = spells.some((s) => s.id === SPELLS.solemnMend.id);
-  const hasZealous = spells.some((s) => s.id === SPELLS.zealousMending.id);
+  const engine = new CombatEngine(encounter, spells, options);
+  const solemnMend = spells.find((s) => s.id === SPELLS.solemnMend.id);
+  const zealousMending = spells.find((s) => s.id === SPELLS.zealousMending.id);
+  const solemnVigil = spells.find((s) => s.id === SPELLS.solemnVigil.id);
+  const zealousFlare = spells.find((s) => s.id === SPELLS.zealousFlare.id);
   let elapsed = 0;
   let bonehowlLandings = 0;
   let healsCast = 0;
@@ -75,13 +120,13 @@ function runBot(
     const healer = state.party.find((u) => u.role === 'healer');
     const free = state.playerCast === null && state.gcdRemainingMs === 0;
 
-    if (style === 'naive' && healer && free && hasSolemn) {
+    if (style === 'naive' && healer && free && solemnMend) {
       const tank = state.party.find((u) => u.role === 'tank');
       const anyAlly = state.party.find((u) => u.alive);
       const target = tank?.alive ? tank : anyAlly;
-      if (target && healer.mana >= SPELLS.solemnMend.mana) {
+      if (target && healer.mana >= solemnMend.mana) {
         engine.setTarget(target.id);
-        engine.castSpell(SPELLS.solemnMend.id);
+        engine.castSpell(solemnMend.id);
         healsCast += 1;
       }
     }
@@ -94,15 +139,21 @@ function runBot(
       if (target) {
         const missing = target.maxHp - target.hp;
         const tankCritical = target.role === 'tank' && target.hp <= 6;
-        const useZealous =
-          hasZealous && tankCritical && healer.mana >= SPELLS.zealousMending.mana;
-        const spell = useZealous
-          ? SPELLS.zealousMending
-          : hasSolemn
-            ? SPELLS.solemnMend
-            : undefined;
-        const fullValue = spell !== undefined && missing >= spell.heal;
-        if (spell && (fullValue || tankCritical) && healer.mana >= spell.mana) {
+
+        let spell: SpellDef | undefined;
+        if (tankCritical) {
+          if (zealousFlare && healer.mana >= zealousFlare.mana) spell = zealousFlare;
+          else if (zealousMending && healer.mana >= zealousMending.mana) spell = zealousMending;
+          else if (solemnMend && healer.mana >= solemnMend.mana) spell = solemnMend;
+        } else if (solemnVigil && missing >= solemnVigil.heal && healer.mana >= solemnVigil.mana) {
+          spell = solemnVigil;
+        } else if (solemnMend && missing >= solemnMend.heal && healer.mana >= solemnMend.mana) {
+          spell = solemnMend;
+        } else if (zealousMending && missing >= zealousMending.heal && healer.mana >= zealousMending.mana) {
+          spell = zealousMending;
+        }
+
+        if (spell) {
           engine.setTarget(target.id);
           engine.castSpell(spell.id);
           healsCast += 1;
@@ -129,41 +180,60 @@ function runBot(
   };
 }
 
+function runBuildBot(encounter: EncounterDef, loadout: ReturnType<typeof buildLoadout>, style: BotStyle): BotRun {
+  return runBot(
+    encounter,
+    loadout.spells,
+    {
+      bonusMaxMana: loadout.bonusMaxMana,
+      synergies: loadout.synergies,
+      missingHealthBonuses: loadout.missingHealthBonuses,
+    },
+    style,
+  );
+}
+
 describe('Ash Gate difficulty shape (poc-spec §4.1)', () => {
   it('wipes with no healing at all — the healer must matter', () => {
-    const run = runBot(ASH_GATE, BASE_KIT, 0, 'none');
+    const run = runBot(ASH_GATE, BASE_KIT, {}, 'none');
     expect(run.status).toBe('wipe');
   });
 
   it('wipes with naive spam-healing on the starting kit — the expected first run; overheal loses', () => {
-    const run = runBot(ASH_GATE, BASE_KIT, 0, 'naive');
+    const run = runBot(ASH_GATE, BASE_KIT, {}, 'naive');
     expect(run.status).toBe('wipe');
   });
 
   it('never cruises with perfect discipline on the starting kit — wipe or pyrrhic OOM scrape at best', () => {
-    const run = runBot(ASH_GATE, BASE_KIT, 0, 'disciplined');
+    const run = runBot(ASH_GATE, BASE_KIT, {}, 'disciplined');
     if (run.status === 'victory') {
       expect(run.healerManaLeft).toBeLessThan(SPELLS.solemnMend.mana);
       expect(run.survivors).toBeLessThanOrEqual(2);
     }
   });
 
-  it('is cleared with disciplined healing on the full PoC kit, most of the party standing', () => {
-    const run = runBot(ASH_GATE, FULL_KIT, DEEP_RESERVES_BONUS, 'disciplined');
-    expect(run.status).toBe('victory');
-    expect(run.healsCast).toBeGreaterThan(0);
-    expect(run.survivors).toBeGreaterThanOrEqual(3);
+  it('is cleared with disciplined healing on both maxed subclass builds, most of the party standing', () => {
+    const vigilRun = runBuildBot(ASH_GATE, VIGIL_LOADOUT, 'disciplined');
+    expect(vigilRun.status).toBe('victory');
+    expect(vigilRun.healsCast).toBeGreaterThan(0);
+    expect(vigilRun.survivors).toBeGreaterThanOrEqual(3);
+
+    const zealotRun = runBuildBot(ASH_GATE, ZEALOT_LOADOUT, 'disciplined');
+    expect(zealotRun.status).toBe('victory');
+    expect(zealotRun.healsCast).toBeGreaterThan(0);
+    expect(zealotRun.survivors).toBeGreaterThanOrEqual(3);
   });
 
-  it('the Bonehowl telegraph lands at least once in the winning run', () => {
-    const run = runBot(ASH_GATE, FULL_KIT, DEEP_RESERVES_BONUS, 'disciplined');
-    expect(run.bonehowlLandings).toBeGreaterThanOrEqual(1);
+  it('the Bonehowl telegraph lands at least once in a winning run (either subclass build)', () => {
+    const vigilRun = runBuildBot(ASH_GATE, VIGIL_LOADOUT, 'disciplined');
+    const zealotRun = runBuildBot(ASH_GATE, ZEALOT_LOADOUT, 'disciplined');
+    expect(vigilRun.bonehowlLandings >= 1 || zealotRun.bonehowlLandings >= 1).toBe(true);
   });
 });
 
 describe('The Maw is an unwinnable sandbox (poc-spec §7)', () => {
-  it('wipes even with the full kit and disciplined healing', () => {
-    const run = runBot(THE_MAW, FULL_KIT, DEEP_RESERVES_BONUS, 'disciplined');
-    expect(run.status).toBe('wipe');
+  it('wipes even with either maxed subclass build and disciplined healing', () => {
+    expect(runBuildBot(THE_MAW, VIGIL_LOADOUT, 'disciplined').status).toBe('wipe');
+    expect(runBuildBot(THE_MAW, ZEALOT_LOADOUT, 'disciplined').status).toBe('wipe');
   });
 });

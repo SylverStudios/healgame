@@ -25,6 +25,36 @@ export interface SpellDef {
   castMs: number;
 }
 
+/**
+ * A completed cast of `triggerSpellId` arms this rule; the next completed
+ * cast of `buffedSpellId` consumes it, adding `bonusHeal` to that heal's raw
+ * value (phase-2-handoff "Engine"). Structurally identical to
+ * `Loadout['synergies'][number]` in meta/progression.ts — combat/ never
+ * imports meta/, so this is redefined here.
+ */
+export interface SynergyRule {
+  triggerSpellId: string;
+  buffedSpellId: string;
+  bonusHeal: number;
+}
+
+/**
+ * On a completed cast of `spellId`, adds `healPer10PctMissing` per full 10%
+ * of the target's HP missing (computed before the heal lands). Structurally
+ * identical to `Loadout['missingHealthBonuses'][number]`.
+ */
+export interface MissingHealthBonusRule {
+  spellId: string;
+  healPer10PctMissing: number;
+}
+
+export interface CombatEngineOptions {
+  /** Adds to the healer's max AND starting mana (e.g. Deep Reserves). */
+  bonusMaxMana?: number;
+  synergies?: SynergyRule[];
+  missingHealthBonuses?: MissingHealthBonusRule[];
+}
+
 export interface CastState {
   spellId: string;
   targetId: string;
