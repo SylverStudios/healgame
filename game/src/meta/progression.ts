@@ -5,8 +5,8 @@
  */
 
 import { levelForXp, REWARDS, SPELLS } from '../data/constants';
-import { treeNodeById } from '../data/tree';
-import type { SaveData } from '../save/save';
+import { TREE_NODES, treeNodeById, type TreeNode } from '../data/tree';
+import type { SaveData, SubclassId } from '../save/save';
 import type { CombatResult } from '../scenes/CombatScene';
 
 export interface HubNotice {
@@ -75,4 +75,33 @@ export function purchaseNode(save: SaveData, nodeId: string): boolean {
   save.gold -= node.cost;
   save.treeNodes.push(nodeId);
   return true;
+}
+
+/**
+ * Spends the ruby subclass sink (poc-spec §6). Valid only when no subclass
+ * has been chosen yet and the player has at least 1 ruby; spends exactly 1
+ * ruby and records the choice. No respec — once set, subsequent calls
+ * (even for the same subclass) fail without mutating `save`.
+ */
+export function chooseSubclass(save: SaveData, subclass: SubclassId): boolean {
+  if (save.subclass !== null) return false;
+  if (save.rubies < 1) return false;
+
+  save.rubies -= 1;
+  save.subclass = subclass;
+  return true;
+}
+
+/**
+ * Tree nodes visible to the player right now: base (branchless) nodes
+ * always, plus a branch node only once save.subclass matches that branch.
+ * The unchosen branch never appears (poc-spec §6: commit blind, no respec).
+ */
+export function visibleTreeNodes(save: SaveData): TreeNode[] {
+  return TREE_NODES.filter((node) => node.branch === undefined || node.branch === save.subclass);
+}
+
+/** Dungeon 2 ("The Maw") unlocks after Ash Gate's first clear (poc-spec §7). */
+export function isDungeon2Unlocked(save: SaveData): boolean {
+  return save.clearedDungeons.includes('ash-gate');
 }

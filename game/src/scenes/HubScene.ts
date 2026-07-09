@@ -1,16 +1,17 @@
 /**
  * Hub (poc-spec §3, §5): shows currencies/level, applies the result of the
- * combat run that just ended (if any), and is the launch point for Ash Gate
- * and the spell tree. Temp art only — panels + text buttons, dark palette,
- * monospace.
+ * combat run that just ended (if any), and is the launch point for Ash Gate,
+ * the spell tree, the ruby subclass split (§6, once affordable), and
+ * Dungeon 2 / The Maw (§7, once Ash Gate is cleared). Temp art only —
+ * panels + text buttons, dark palette, monospace.
  */
 
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { loadSave, resetSave, saveGame, type SaveData } from '../save/save';
-import { applyCombatResult, buildLoadout, type HubNotice } from '../meta/progression';
+import { applyCombatResult, buildLoadout, isDungeon2Unlocked, type HubNotice } from '../meta/progression';
 import { levelForXp } from '../data/constants';
-import { ASH_GATE } from '../data/encounters';
+import { ASH_GATE, THE_MAW } from '../data/encounters';
 import type { CombatResult, CombatSceneData } from './CombatScene';
 
 interface HubSceneData {
@@ -98,11 +99,38 @@ export class HubScene extends Phaser.Scene {
       this.scene.start(SceneKeys.Tree);
     });
 
-    // Chunk 4 placeholder: once Ash Gate has a first clear and the ruby subclass
-    // split (poc-spec §6) exists, add "Choose Subclass" here; once Dungeon 2
-    // unlocks, add "Dungeon 2" alongside it. No dead UI until those land.
+    this.buildSubclassControl(save, centerX, height / 2 + 115);
+
+    if (isDungeon2Unlocked(save)) {
+      this.makeButton(centerX, height / 2 + 180, 300, 52, 'Enter The Maw (Dungeon 2)', () => {
+        const loadout = buildLoadout(save);
+        const combatData: CombatSceneData = {
+          encounterId: THE_MAW.id,
+          spellIds: loadout.spellIds,
+          returnTo: SceneKeys.Hub,
+          bonusMaxMana: loadout.bonusMaxMana,
+        };
+        this.scene.start(SceneKeys.Combat, combatData);
+      });
+    }
 
     this.buildRestartControl(centerX, height - 36);
+  }
+
+  private buildSubclassControl(save: SaveData, x: number, y: number): void {
+    if (save.subclass !== null) {
+      const label = save.subclass === 'vigil' ? 'Path of the Vigil' : 'Path of the Zealot';
+      this.add
+        .text(x, y, `Oath: ${label}`, { fontFamily: FONT, fontSize: '16px', color: ACCENT_COLOR })
+        .setOrigin(0.5);
+      return;
+    }
+
+    if (save.rubies >= 1) {
+      this.makeButton(x, y, 300, 52, 'Choose Subclass', () => {
+        this.scene.start(SceneKeys.Subclass);
+      });
+    }
   }
 
   private buildRestartControl(x: number, y: number): void {

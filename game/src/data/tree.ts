@@ -5,6 +5,11 @@
  *
  * Locked micro-choice (poc-spec §10, task brief): the one PoC gold node is
  * 'max-mana-1' ("Deep Reserves"), +5 max mana, cost 5 gold.
+ *
+ * Chunk 4 (poc-spec §6): each subclass branch gets exactly one follow-up
+ * node, gated behind `branch` — meta/progression.ts#visibleTreeNodes only
+ * surfaces a branch node once save.subclass matches it, and the unchosen
+ * branch stays hidden forever (no respec).
  */
 
 /** Typed so future nodes (Chunk 4 subclass branches) can add new effect kinds. */
@@ -16,6 +21,8 @@ export interface TreeNode {
   description: string;
   cost: number;
   effect: TreeNodeEffect;
+  /** Present only for subclass branch nodes; gates visibility to save.subclass. */
+  branch?: 'vigil' | 'zealot';
 }
 
 export const TREE_NODES: TreeNode[] = [
@@ -25,6 +32,22 @@ export const TREE_NODES: TreeNode[] = [
     description: '+5 max mana',
     cost: 5,
     effect: { kind: 'bonusMaxMana', amount: 5 },
+  },
+  {
+    id: 'vigil-deep-focus',
+    name: 'Deep Focus',
+    description: 'Patient, efficient discipline steadies your reserves. +5 max mana',
+    cost: 5,
+    effect: { kind: 'bonusMaxMana', amount: 5 },
+    branch: 'vigil',
+  },
+  {
+    id: 'zealot-battle-fervor',
+    name: 'Battle Fervor',
+    description: 'Reckless zeal burns hotter, longer. +5 max mana',
+    cost: 5,
+    effect: { kind: 'bonusMaxMana', amount: 5 },
+    branch: 'zealot',
   },
 ];
 

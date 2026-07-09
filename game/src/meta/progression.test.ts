@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { applyCombatResult, buildLoadout, purchaseNode } from './progression';
+import {
+  applyCombatResult,
+  buildLoadout,
+  chooseSubclass,
+  isDungeon2Unlocked,
+  purchaseNode,
+  visibleTreeNodes,
+} from './progression';
 import { newSaveData, type SaveData } from '../save/save';
 import { SPELLS, XP_LEVEL_2_THRESHOLD } from '../data/constants';
+import { THE_MAW } from '../data/encounters';
 import type { CombatResult } from '../scenes/CombatScene';
 
 function save(overrides: Partial<SaveData> = {}): SaveData {
@@ -140,5 +148,98 @@ describe('purchaseNode', () => {
     const s = save({ gold: 100 });
     expect(purchaseNode(s, 'not-a-real-node')).toBe(false);
     expect(s.gold).toBe(100);
+  });
+});
+
+describe('chooseSubclass', () => {
+  it('spends exactly one ruby and sets the subclass on the happy path', () => {
+    const s = save({ rubies: 1 });
+    expect(chooseSubclass(s, 'vigil')).toBe(true);
+    expect(s.subclass).toBe('vigil');
+    expect(s.rubies).toBe(0);
+  });
+
+  it('spends only one ruby even if the player somehow has more', () => {
+    const s = save({ rubies: 3 });
+    expect(chooseSubclass(s, 'zealot')).toBe(true);
+    expect(s.rubies).toBe(2);
+  });
+
+  it('is rejected with 0 rubies, without mutating the save', () => {
+    const s = save({ rubies: 0 });
+    expect(chooseSubclass(s, 'vigil')).toBe(false);
+    expect(s.subclass).toBeNull();
+    expect(s.rubies).toBe(0);
+  });
+
+  it('is rejected when a subclass is already chosen — no double-spend, no switch', () => {
+    const s = save({ rubies: 1, subclass: 'vigil' });
+    expect(chooseSubclass(s, 'zealot')).toBe(false);
+    expect(s.subclass).toBe('vigil');
+    expect(s.rubies).toBe(1);
+  });
+
+  it('rejects re-choosing the same subclass once already set (no re-spend)', () => {
+    const s = save({ rubies: 1, subclass: 'vigil' });
+    expect(chooseSubclass(s, 'vigil')).toBe(false);
+    expect(s.rubies).toBe(1);
+  });
+});
+
+describe('visibleTreeNodes', () => {
+  it('hides both subclass branches before a subclass is chosen', () => {
+    const s = save({ subclass: null });
+    const ids = visibleTreeNodes(s).map((n) => n.id);
+    expect(ids).toContain('max-mana-1');
+    expect(ids).not.toContain('vigil-deep-focus');
+    expect(ids).not.toContain('zealot-battle-fervor');
+  });
+
+  it('shows exactly the chosen branch (vigil) and never the other', () => {
+    const s = save({ subclass: 'vigil' });
+    const ids = visibleTreeNodes(s).map((n) => n.id);
+    expect(ids).toContain('vigil-deep-focus');
+    expect(ids).not.toContain('zealot-battle-fervor');
+  });
+
+  it('shows exactly the chosen branch (zealot) and never the other', () => {
+    const s = save({ subclass: 'zealot' });
+    const ids = visibleTreeNodes(s).map((n) => n.id);
+    expect(ids).toContain('zealot-battle-fervor');
+    expect(ids).not.toContain('vigil-deep-focus');
+  });
+});
+
+describe('isDungeon2Unlocked', () => {
+  it('is false on a fresh save', () => {
+    const s = save();
+    expect(isDungeon2Unlocked(s)).toBe(false);
+  });
+
+  it('is true once ash-gate has been cleared', () => {
+    const s = save({ clearedDungeons: ['ash-gate'] });
+    expect(isDungeon2Unlocked(s)).toBe(true);
+  });
+
+  it('is false if other dungeons are cleared but not ash-gate', () => {
+    const s = save({ clearedDungeons: ['the-maw'] });
+    expect(isDungeon2Unlocked(s)).toBe(false);
+  });
+});
+
+describe('THE_MAW data sanity', () => {
+  it('has a boss with overwhelming hp', () => {
+    expect(THE_MAW.boss.hp).toBe(999);
+  });
+
+  it('has a named party-wide cast (Extinction) defined', () => {
+    expect(THE_MAW.boss.cast?.name).toBe('Extinction');
+    expect(THE_MAW.boss.cast?.partyDamage).toBeGreaterThan(0);
+    expect(THE_MAW.boss.cast?.castMs).toBe(10_000);
+  });
+
+  it('includes a light trash wave so grinding still pays gold/xp', () => {
+    expect(THE_MAW.waves).toHaveLength(1);
+    expect(THE_MAW.waves[0]?.enemies[0]?.count).toBe(2);
   });
 });

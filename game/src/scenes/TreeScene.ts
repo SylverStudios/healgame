@@ -7,8 +7,7 @@
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { loadSave, saveGame, type SaveData } from '../save/save';
-import { purchaseNode } from '../meta/progression';
-import { TREE_NODES } from '../data/tree';
+import { purchaseNode, visibleTreeNodes } from '../meta/progression';
 
 const BG_COLOR = 0x1a1210;
 const NODE_BG_LOCKED = 0x241a15;
@@ -60,7 +59,7 @@ export class TreeScene extends Phaser.Scene {
 
     const centerX = this.scale.width / 2;
 
-    TREE_NODES.forEach((node, i) => {
+    visibleTreeNodes(this.save).forEach((node, i) => {
       const y = NODE_START_Y + i * NODE_ROW_GAP;
       const owned = this.save.treeNodes.includes(node.id);
       const affordable = !owned && this.save.gold >= node.cost;

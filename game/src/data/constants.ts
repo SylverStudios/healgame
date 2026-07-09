@@ -26,6 +26,20 @@ export const GATE_WARDEN = {
   bonehowlPartyDamage: 4,
 } as const;
 
+/**
+ * Dungeon 2 boss (poc-spec §1 item 8, §7): "insanely overpowered" on purpose
+ * — the party cannot win with PoC power. Auto damage 3 per 3s; Extinction is
+ * a 10s named cast dealing 10 damage to every living party member, first at
+ * 15s into the boss fight then every 25s thereafter.
+ */
+export const HOLLOW_KING = {
+  hp: 999,
+  autoDamage: 3,
+  swingIntervalMs: 3000,
+  extinctionCastMs: 10_000,
+  extinctionPartyDamage: 10,
+} as const;
+
 /** Mercs (tank + 2 DPS) auto-attack only (poc-spec §2 row 10). Draft damage, tunable. */
 export const MERCS = {
   tankAutoDamage: 1,

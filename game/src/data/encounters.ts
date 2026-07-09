@@ -6,7 +6,7 @@
  * Chunk 1 task brief) meant to be tuned later; kept as data, not code.
  */
 
-import { GATE_WARDEN } from './constants';
+import { GATE_WARDEN, HOLLOW_KING } from './constants';
 import type { EncounterDef } from '../combat/types';
 
 export const ASH_GATE: EncounterDef = {
@@ -34,4 +34,33 @@ export const ASH_GATE: EncounterDef = {
   },
 };
 
-export const ENCOUNTERS: EncounterDef[] = [ASH_GATE];
+/**
+ * The Maw (Dungeon 2, poc-spec §1 item 8, §7): unlocks after Ash Gate's
+ * first clear. One light trash wave (same stats as Ash Gate wave 1) so
+ * grind attempts still pay a little gold/XP, then Hollow King — a boss
+ * intentionally sized far beyond PoC power. Cannot be cleared; it's an
+ * endless sandbox, not a "no further dungeons" content wall.
+ */
+export const THE_MAW: EncounterDef = {
+  id: 'the-maw',
+  name: 'The Maw',
+  waves: [{ enemies: [{ name: 'Ash Husk', hp: 4, count: 2 }] }],
+  boss: {
+    id: 'hollow-king',
+    name: 'Hollow King',
+    hp: HOLLOW_KING.hp,
+    autoDamage: HOLLOW_KING.autoDamage,
+    swingIntervalMs: HOLLOW_KING.swingIntervalMs,
+    cast: {
+      name: 'Extinction',
+      castMs: HOLLOW_KING.extinctionCastMs,
+      // First cast at 15s after the boss wave starts, then every 25s
+      // (start-to-start cadence — see combat/README.md).
+      firstCastAtMs: 15_000,
+      intervalMs: 25_000,
+      partyDamage: HOLLOW_KING.extinctionPartyDamage,
+    },
+  },
+};
+
+export const ENCOUNTERS: EncounterDef[] = [ASH_GATE, THE_MAW];
