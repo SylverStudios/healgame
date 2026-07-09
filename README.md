@@ -1,31 +1,26 @@
-# Healgame
+# healgame
 
-A healer-focused indie game inspired by *Master Healer Kale with useless party*, rebuilt around exclusive builds, readable combos, and old-school MMO casting.
+A healer-focused indie game inspired by *Master Healer Kale with useless party*, rebuilt around exclusive builds, readable casting, and old-school MMO healing — in a heavy-metal dark fantasy skin.
 
-You keep a mercenary warband alive on a single battle line — no movement, party auto-attacks — while you triage heals, mana, and cooldowns. Between runs you spend scarce rubies and theorycraft archetype trees that actually lock out other paths.
+You keep a mercenary warband alive on a single battle line while you triage heals and mana. Between runs you spend gold and scarce rubies on trees that lock out other paths.
 
-**Tone:** heavy-metal dark fantasy (*The Last Spell* energy, old-school dragon / panel-van attitude).
+## Art / vibe (for concept art)
+
+You are the only healer that matters: a grim warband stands on a single horizontal battle line facing monsters — nobody moves, steel and spells fire on cooldown, while you click targets and cast under a glowing cast bar like old-school MMO healing. The mood is heavy-metal dark fantasy (*The Last Spell* dread meets panel-van dragon swagger): ash, iron, blood-red rubies, mythic beasts, and last-stand grit — not cute, not comedy-useless. Visually, sell the silhouette of **healer in the backline keeping killers alive**, scarce crimson gems as power, and a world that looks loud, cursed, and cool enough to airbrush on a van.
 
 ## Status
 
-Design phase. No playable build yet.
+**PoC spec locked.** Next: tech choice + vertical-slice tasks. UI/art is a separate later slice.
 
 ## Docs
 
-| Doc | What it is |
-|-----|------------|
-| [Game Design Document](docs/GDD.md) | Pitch, pillars, loops, locked decisions, archetypes |
-| [Kale research](docs/research/master-healer-kale.md) | Systems breakdown of the inspiration game |
-| [Design direction](docs/research/design-direction.md) | Keep/change map and decision log |
+| Doc | Authority |
+|-----|-----------|
+| [**PoC Spec**](docs/poc-spec.md) | **What we build first** — wins on PoC conflicts |
+| [Game Design Document](docs/GDD.md) | Long-term design + decision log |
+| [Kale research](docs/research/master-healer-kale.md) | Inspiration breakdown |
+| [Design direction](docs/research/design-direction.md) | Short keep/change + PoC snapshot |
 
-## Locked so far
+## PoC in one breath
 
-- **3 healer archetypes:** Oathbound (Holy Pal triad), Aegis (Disc shields), Wildbloom (Resto HoT extend/expend)
-- **Shared GCD** + major “oh shit” cooldowns per archetype
-- **Target → spell** casting with a target marker and ~0.5s end-of-cast queue
-- **Scarce rubies**, productive failure (XP/gold on wipes)
-- Cross-archetype multiclass and achievement-unlocked archetypes are planned later, not MVP
-
-## Next
-
-Same-dungeon archetype vignettes → ruby economy → tech choice → vertical slice.
+Oathbound only · tutorial one heal · expected wipe · XP skill + tree skill + ruby subclass split · Ash Gate · unwinnable Dungeon 2 sandbox · no procs/major CDs/hub buffs · single local save · restart only

@@ -1,9 +1,9 @@
-# Healgame — Game Design Document (v0.2)
+# Healgame — Game Design Document (v0.4)
 
-**Status:** Living draft — pillars locked; archetype kits sketched from WoW healer fantasies. Not implementation-ready.  
-**Working title:** Healgame (TBD)  
+**Status:** Living draft. **PoC implementation details live in [`poc-spec.md`](./poc-spec.md)** — that file wins on PoC conflicts.  
+**Working title:** healgame  
 **Date:** 2026-07-08  
-**Related:** [`research/master-healer-kale.md`](./research/master-healer-kale.md) · [`research/design-direction.md`](./research/design-direction.md)
+**Related:** [`poc-spec.md`](./poc-spec.md) · [`research/master-healer-kale.md`](./research/master-healer-kale.md) · [`research/design-direction.md`](./research/design-direction.md)
 
 ---
 
@@ -116,14 +116,20 @@ Select dungeon
 
 ```
 Attempt dungeon
-  → Always earn XP + gold (even on failure)
-  → First clear / boss → ruby(s) (scarce)
-  → Hub: spend into archetype tree + merc forks
-  → XP unlocks baseline skills over time
+  → Always earn XP + gold per enemy killed (even on failure)
+  → First clear of a dungeon → 1 ruby
+  → Hub:
+       • Spell / perk tree (gold)
+       • (Later) permanent hub buffs
+       • Ruby subclass splits / keystones
+  → XP auto-unlocks some skills on level-up
   → Unlock new dungeons on success
-  → Respec freely to try another build within rules
-  → (Later) Achievement milestones unlock additional archetypes
+  → (Later) Respec / more archetypes / achievement unlocks
 ```
+
+**Roguelite / incremental layer:** power bought in the hub **persists between attempts and dungeons**. Wipes are progress. Replay cleared dungeons for gold + XP.
+
+**PoC subset:** see [`poc-spec.md`](./poc-spec.md) — Oathbound only; no hub buffs; no respec (restart only); ruby = subclass split.
 
 ---
 
@@ -164,14 +170,14 @@ Mercenaries are **competent but autonomous** — dangerous people with bad habit
 
 **Proc feedback:** when a combo/proc window is active (e.g. “next B is free after A”), indicators **float around the healer**, not as a detached WoW-style buff strip as the primary read.
 
-**Cast timing model (leaning — D9):**
+**Cast timing model (D9 / PoC):**
 
-- Spells share a **global cooldown (GCD)** so the run has a readable rhythm (unlike Kale’s “press tools independently / Cast All” feel).
-- Individual spells may also have their own cooldowns.
-- Each archetype has **major cooldowns** — intentional “pop this before the spike” buttons (Wings / Tree / Pain Suppression energy), not just another heal on the bar.
-- Kale’s late-game *Cast All* is **not** our primary CD fantasy; we want distinct, identity-defining CDs per archetype.
+- Spells share a **global cooldown (GCD)**. PoC: **1s GCD**; everything on GCD for simplicity.
+- **Spell queue** allows back-to-back casts.
+- Longer-term: major cooldowns per archetype (Wings / Tree / Pain Suppression energy). **Not in PoC.**
+- Boss telegraphs use long named cast bars (PoC: **~10s**) so the player can prepare.
 
-**Still open:** exact GCD length; max simultaneous floating indicators before declutter rules kick in.
+**Still open long-term:** off-GCD major CDs; max simultaneous floating proc indicators.
 
 ---
 
@@ -181,11 +187,17 @@ Mercenaries are **competent but autonomous** — dangerous people with bad habit
 
 | Currency | Earn | Spend | Role |
 |----------|------|-------|------|
-| **XP / levels** | Combat progress (incl. wipes) | Unlocks baseline skills over time | Breadth of kit |
-| **Gold** | Combat progress (incl. wipes) | Smaller tree nodes, merc path steps | Steady growth |
-| **Rubies** | First dungeon clears / bosses (exact rules TBD) | Keystones, contested merc path picks, rare unlocks | Scarce choice |
+| **XP / levels** | Per enemy (incl. wipes) | Auto-unlock skills on level-up | Breadth of kit |
+| **Gold** | Fixed amount per enemy | Spell tree nodes; (later) hub buffs, merc paths | Steady growth |
+| **Rubies** | **1 per dungeon first completion** | Subclass splits / keystones; contested unlocks | Scarce choice |
 
-Rubies remain the **primary limiting resource**. Gold should not eventually buy everything that matters.
+Rubies remain the **primary limiting resource**. Replay cleared dungeons for gold + XP only.
+
+### 7.1b Permanent hub buffs (later — D11)
+
+Roguelite-style **permanent upgrades** (HP, mana, +heal, etc.) that persist across runs.
+
+**Deferred past PoC.** Still desired for full game; not in the first vertical slice. See [`poc-spec.md`](./poc-spec.md).
 
 ### 7.2 Healer archetypes (locked — D1)
 
@@ -194,8 +206,10 @@ Rubies remain the **primary limiting resource**. Gold should not eventually buy 
 - Player picks **one** archetype for a build.
 - Within an archetype, the tree supports **hybridization between that archetype’s branches**.
 - You **cannot** take everything; branches and keystones create lockouts.
-- **Respec** is free/cheap so theorycraft is encouraged.
-- Every archetype has a **core spell rhythm**, **combo/proc identity**, and at least one **major cooldown** (“oh shit” / pop-before-spike).
+- **Respec** is a long-term goal for theorycraft; **PoC has no respec** (restart only).
+- Every archetype has a **core spell rhythm**, **combo/proc identity**, and at least one **major cooldown** long-term. **PoC (Oathbound):** no procs, no major CD — see [`poc-spec.md`](./poc-spec.md).
+
+**PoC builds Oathbound only.** Aegis / Wildbloom remain design targets for after PoC.
 
 | Archetype | WoW analog | Core fantasy | Feel in a run |
 |-----------|------------|--------------|---------------|
@@ -243,11 +257,12 @@ Spell names below are **working placeholders**. Numbers are illustrative, not ba
 | Spell (placeholder) | Role | Notes |
 |---------------------|------|-------|
 | **Bulwark Word** | Primary shield | Main GCD spender; applies absorb + light heal-adjacent effect |
-| **Radiant Veil** | AoE / multi shield or atonement-spread analog | Pre-load the party before a wave |
-| **Penitent Mend** | Real direct heal | Required — Disc still needs heals when absorbs fail |
-| **Smite Bond** *(optional identity spice)* | Optional damage→heal link | Only if we want atonement-lite; can defer |
+| **Radiant Veil** | AoE / multi shield | Pre-load the party before a wave |
+| **Penitent Mend** | Real direct heal | Required — still need heals when absorbs fail |
 
 **Combo identity:** Shielding builds stacks or “aegis charge” that empower the next Penitent Mend, or overshield converts to a short HoT/mitigation. Breaking a shield may grant a floating “breach” proc for an instant patch heal. Indicators show shield-ramp and save-CD availability.
+
+**PoC scope:** **No damage→heal / atonement loop.** Cool idea; defer past PoC. Aegis is shields + real heals + save CDs only.
 
 **Major cooldowns**
 
@@ -345,82 +360,127 @@ As players hit **achievement milestones** (campaign clears, challenge dungeons, 
 
 ## 8. Content structure
 
-### Dungeons
+### Dungeons (general)
 
 - Selectable from a hub after unlock.
 - Multi-stage fights ending in a boss.
-- **Modifiers** that demand specific tools (silence-like constraints, mana pressure, timers, heavy spikes, cleanses, etc.).
+- Later dungeons add **modifiers** that demand specific tools (silence-like constraints, mana pressure, timers, cleanses, etc.).
 - First clear rewards a **ruby** (confirm exact economy in balancing pass).
+
+### PoC / first dungeon shape (locked — D12)
+
+Keep early content **Kale-simple**: nondescript trash with no fancy effects is fine.
+
+| Beat | Content |
+|------|---------|
+| **Waves 1–2** | Generic mobs. Auto-attacks only. |
+| **Boss** | After the waves. **One named move** with a **~10s visible cast bar**. |
+| **Phase transitions** | Out of PoC. |
+
+Full PoC script, numbers, and Dungeon 2 sandbox: [`poc-spec.md`](./poc-spec.md).
 
 ### Campaign shape (open — D7)
 
-Targeting a **complete short-to-medium campaign** in the spirit of Kale’s “finished in an evening or two,” with room to grow. Exact length undecided.
+Targeting a complete short-to-medium campaign later. PoC = Ash Gate + unwinnable Dungeon 2 only.
 
 ### Post-game (open — D8)
 
-Nightmare-style replay / infinite facilities are optional later. Not required for MVP fantasy.
+Deferred.
 
 ---
 
-## 9. MVP vs later
+## 9. Archetype vignettes (design reference)
 
-### MVP (vertical product)
+Long-term “same dungeon, three brains” writeups. **PoC implements a trimmed Oathbound path only** (no procs, no Wrath) — see [`poc-spec.md`](./poc-spec.md).
 
-- One playable healer with **3 archetypes** (Oathbound / Aegis / Wildbloom), hybridize **within** archetype only
-- Shared **GCD** + target → spell casting, target marker icon, ~0.5s queue
-- At least **one major cooldown per archetype**
-- Floating proc indicators (at least one real combo wired per archetype)
-- 3 mercs with simple path forks (~3 abilities each)
-- Gold + XP + rubies
-- A small set of dungeons (enough for a loop: fail → upgrade → succeed → new dungeon)
-- Hub / tavern for spending and respec
-- Tone pass: metal dark fantasy direction in UI/audio placeholders even if art is temp
+**Shared stage (design):** *The Ash Gate* — waves of trash → **Gate Warden** with **Bonehowl** (~10s cast).
 
-### Explicitly not MVP
+### Vignette A — Oathbound (full fantasy; not all in PoC)
 
-- Cross-archetype multiclass
-- Achievement-unlocked additional archetypes
-- Full spell list / full campaign length
-- Post-game infinite scaling
-- Final art/audio production
-- Cloud saves, platforms, etc.
+**Full kit:** Solemn Mend · Zealous Mending · Vowstrike · Wrath Ascendant  
+**PoC kit:** Solemn Mend → XP unlock Zealous → gold tree node → ruby subclass split. No Vowstrike/Wrath/procs yet.
+
+| Beat | Full fantasy | PoC |
+|------|--------------|-----|
+| Waves | Triad weave, bank mana | Solemn Mend only at first; avoid overheal |
+| Bonehowl | Pop Wrath, dump fast heals | Pre-heal / top off during 10s cast; mana matters |
+| Fail | OOM from Zealous spam | OOM / overheal waste |
+
+### Vignette B — Aegis (post-PoC)
+
+Shields first, Penitent Mend for leaks, Painbind on Bonehowl. No atonement.
+
+### Vignette C — Wildbloom (post-PoC)
+
+**Ashwood Form** = Tree-style window (HoTs stronger for a duration).  
+**Wild Expenditure** = consume/cash HoTs for emergency burst.  
+Choose extend vs expend on Bonehowl — irrelevant until Wildbloom is built.
 
 ---
 
-## 10. Decision log
+## 10. MVP / PoC vs later
+
+### PoC (authoritative: [`poc-spec.md`](./poc-spec.md))
+
+- Title **healgame**; **Oathbound only**
+- Tutorial → Solemn Mend → expected wipe → hub
+- XP auto-skill + gold tree skill + **ruby subclass split**
+- Ash Gate clear; Dungeon 2 overpowered sandbox
+- GCD 1s, all on GCD, queue, click-to-target, ~10s boss casts
+- No procs, no major CD, no hub buffs, no respec (restart only)
+- Single local save; UI/art = **separate slice**
+
+### Full MVP (after PoC)
+
+- All three archetypes; procs; major CDs; hub buffs; merc forks; more dungeons
+- Respec when theorycraft needs it
+
+### Explicitly later
+
+- Boss phases; atonement; multiclass; achievement archetypes; polished UI/art; post-game
+
+---
+
+## 11. Decision log
 
 | ID | Topic | Decision | Date |
 |----|-------|----------|------|
-| D1 | Healer path model | **3 archetypes for MVP**; hybridize within archetype; cross-archetype multiclass later; achievement-unlocked archetypes in GDD only | 2026-07-08 |
-| D2 | Skill unlock source | **Hybrid** — XP unlocks skills; tree = big perks (+ some unlocks) | 2026-07-08 |
-| D3 | Party complexity | **~3 abilities + simple path forks** | 2026-07-08 |
-| D4 | Ruby sinks | TBD — keystones / merc paths / rare spells | — |
-| D5 | Cast UX | **Target → hotkey/click spell**; target marked with icon; manual spell click still requires selected target | 2026-07-08 |
-| D6 | Tone | **Heavy-metal dark fantasy** (*The Last Spell* + panel-van dragon attitude); not comedy-useless | 2026-07-08 |
-| D7 | Campaign length | TBD | — |
+| D1 | Healer path model | 3 archetypes long-term; **PoC = Oathbound only** | 2026-07-08 |
+| D2 | Skill unlock source | Hybrid — XP auto-skills + gold tree | 2026-07-08 |
+| D3 | Party complexity | ~3 abilities + forks long-term; **PoC = autos only** | 2026-07-08 |
+| D4 | Ruby sinks | **PoC: subclass split** (opens one branch, hides other) | 2026-07-08 |
+| D5 | Cast UX | Target → spell; **PoC: click-to-target only** | 2026-07-08 |
+| D6 | Tone | Heavy-metal dark fantasy | 2026-07-08 |
+| D7 | Campaign length | PoC: 2 dungeons (D2 unwinnable); full length TBD | 2026-07-08 |
 | D8 | Post-game | TBD | — |
-| D9 | Combat cadence | **Shared GCD** + per-spell CDs + **major pop cooldowns** per archetype (not Kale Cast All as primary fantasy) | 2026-07-08 |
-| D10 | Archetype identities | **Oathbound** (Holy Pal triad), **Aegis** (Disc shields), **Wildbloom** (Resto HoT extend/expend) | 2026-07-08 |
+| D9 | Combat cadence | **GCD 1s**; all on GCD in PoC; queue; boss casts ~10s | 2026-07-08 |
+| D10 | Archetype identities | Oathbound / Aegis / Wildbloom | 2026-07-08 |
+| D11 | Permanent hub buffs | Desired later; **out of PoC** | 2026-07-08 |
+| D12 | PoC dungeon | Ash Gate waves + Bonehowl; no phases; D2 sandbox | 2026-07-08 |
+| D13 | Aegis atonement | Deferred | 2026-07-08 |
+| D14 | PoC success bar | No procs/major CD; XP+tree+ruby subclass; wipe→hub; clear Ash Gate; D2 sandbox | 2026-07-08 |
+| D15 | Save / respec | Single local save; **no respec**; restart only | 2026-07-08 |
+| D16 | Rewards | Gold+XP per enemy; 1 ruby per dungeon first clear; replay OK | 2026-07-08 |
+| D17 | Product name | **healgame** | 2026-07-08 |
 
 ---
 
-## 11. Open questions (next)
+## 12. Open questions (post-PoC / micro)
 
-1. Finalize **fantasy names** for Oathbound / Aegis / Wildbloom (or keep working titles).
-2. **D4 — Ruby sinks:** what exactly do rubies buy in MVP?
-3. Exact **GCD length** and whether major CDs are off-GCD.
-4. Party-slot hotkeys (1–3) in addition to click-to-target?
-5. Working title / protagonist name / setting one-pager.
-6. Does Aegis include an atonement-lite (damage→heal) loop, or stay pure shields + heals?
-7. D7/D8 scope once kits are playable on paper.
+PoC is locked. Remaining are either **tasking micro-choices** (see poc-spec §10) or **post-PoC**:
+
+1. Fantasy rename pass for spells/archetypes  
+2. When to reintroduce hub buffs, procs, major CDs  
+3. Wildbloom: teach Ashwood Form vs Wild Expenditure first  
+4. Full D7/D8 scope  
 
 ---
 
-## 12. Next design steps
+## 13. Next steps
 
-1. Write a **same-dungeon vignette** for each archetype (what you press for wave → spike → recover).
-2. Resolve **D4** (ruby economy).
-3. Choose **tech** and cut a **vertical-slice task list** (one dungeon, GCD+target+cast+queue, one proc float, one major CD, hub stub).
+1. Pick **tech**  
+2. Cut **vertical-slice tasks** from [`poc-spec.md`](./poc-spec.md)  
+3. UI/art slice = separate track later  
 
 ---
 
@@ -428,5 +488,7 @@ Nightmare-style replay / infinite facilities are optional later. Not required fo
 
 | Version | Date | Notes |
 |---------|------|-------|
-| v0.2 | 2026-07-08 | Archetype kits (Pal/Disc/Resto), GCD + major CDs; README + git init |
-| v0.1 | 2026-07-08 | First GDD from Kale research + D1/D5/D6 lock-in |
+| v0.4 | 2026-07-08 | PoC Q&A locked; pointer to poc-spec.md |
+| v0.3 | 2026-07-08 | PoC vignettes; hub buffs; simple waves + boss move |
+| v0.2 | 2026-07-08 | Archetype kits, GCD + major CDs |
+| v0.1 | 2026-07-08 | First GDD from Kale research + D1/D5/D6 |
