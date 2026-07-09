@@ -26,6 +26,13 @@ export const GATE_WARDEN = {
   bonehowlPartyDamage: 4,
 } as const;
 
+/** Mercs (tank + 2 DPS) auto-attack only (poc-spec §2 row 10). Draft damage, tunable. */
+export const MERCS = {
+  tankAutoDamage: 1,
+  dpsAutoDamage: 2,
+  swingIntervalMs: 3000,
+} as const;
+
 export const SPELLS = {
   solemnMend: { id: 'solemn-mend', name: 'Solemn Mend', heal: 5, mana: 5, castMs: 2000 },
   zealousMending: { id: 'zealous-mending', name: 'Zealous Mending', heal: 5, mana: 8, castMs: 1000 },
