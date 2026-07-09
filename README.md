@@ -29,6 +29,7 @@ UI/art remains a separate later slice.
 |-----|-----------|
 | [**PoC Spec**](docs/poc-spec.md) | **What we build first** — wins on PoC conflicts |
 | [PoC QA](docs/poc-qa.md) | Journey checklist results, balance gates, tuning log |
+| [Phase 1 outcome](docs/phase-1-poc-outcome.md) | Retrospective: what was built, lessons, deferred scope |
 | [Tech options](docs/tech-options.md) | Stack comparison + PoC recommendation |
 | [Agent handoff](docs/agent-handoff-poc.md) | Prompt + chunks for a central agent to delegate |
 | [Game Design Document](docs/GDD.md) | Long-term design + decision log |
