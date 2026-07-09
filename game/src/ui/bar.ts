@@ -44,6 +44,11 @@ export class Bar {
     this.fill.setPosition(x, y);
   }
 
+  /** Re-parents both rectangles into `container` (their x/y become local offsets). */
+  addToContainer(container: Phaser.GameObjects.Container): void {
+    container.add([this.bg, this.fill]);
+  }
+
   setDepth(depth: number): this {
     this.bg.setDepth(depth);
     this.fill.setDepth(depth);

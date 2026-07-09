@@ -6,6 +6,8 @@
 
 import Phaser from 'phaser';
 import type { SpellDef } from '../combat/types';
+import type { Loadout } from '../meta/progression';
+import { SpellTooltip, buildTooltipLines } from './spellTooltip';
 
 const BUTTON_WIDTH = 160;
 const BUTTON_HEIGHT = 52;
@@ -24,6 +26,8 @@ const HOTKEY_COLOR = '#8a7868';
 class SpellButton {
   readonly spellId: string;
   readonly mana: number;
+  readonly centerX: number;
+  readonly topY: number;
 
   private readonly bg: Phaser.GameObjects.Rectangle;
   private readonly nameText: Phaser.GameObjects.Text;
@@ -38,9 +42,13 @@ class SpellButton {
     spell: SpellDef,
     hotkeyLabel: string,
     onClick: (spellId: string) => void,
+    onHoverStart: (spellId: string, centerX: number, topY: number) => void,
+    onHoverEnd: () => void,
   ) {
     this.spellId = spell.id;
     this.mana = spell.mana;
+    this.centerX = x;
+    this.topY = y - BUTTON_HEIGHT / 2;
 
     this.bg = scene.add
       .rectangle(x, y, BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_BG_COLOR)
@@ -49,6 +57,8 @@ class SpellButton {
     this.bg.on('pointerdown', () => {
       if (this.enabled) onClick(this.spellId);
     });
+    this.bg.on('pointerover', () => onHoverStart(this.spellId, this.centerX, this.topY));
+    this.bg.on('pointerout', () => onHoverEnd());
 
     this.nameText = scene.add
       .text(x, y - 8, spell.name, { fontFamily: NAME_FONT, color: NAME_COLOR })
@@ -84,19 +94,31 @@ class SpellButton {
 /** A centered row of spell buttons; index order also drives 1..N hotkeys. */
 export class SpellBar {
   private readonly buttons: SpellButton[] = [];
+  private readonly tooltip: SpellTooltip;
 
   constructor(
     scene: Phaser.Scene,
     centerX: number,
     y: number,
     spells: SpellDef[],
+    loadout: Loadout,
     onCast: (spellId: string) => void,
+    screenWidth = 960,
   ) {
+    this.tooltip = new SpellTooltip(scene, screenWidth);
+
+    const showTooltip = (spellId: string, buttonCenterX: number, buttonTopY: number): void => {
+      const spell = spells.find((s) => s.id === spellId);
+      if (!spell) return;
+      this.tooltip.show(buttonCenterX, buttonTopY, buildTooltipLines(spell, loadout));
+    };
+    const hideTooltip = (): void => this.tooltip.hide();
+
     const totalWidth = spells.length * BUTTON_WIDTH + Math.max(0, spells.length - 1) * BUTTON_GAP;
     const startX = centerX - totalWidth / 2 + BUTTON_WIDTH / 2;
     spells.forEach((spell, i) => {
       const x = startX + i * (BUTTON_WIDTH + BUTTON_GAP);
-      this.buttons.push(new SpellButton(scene, x, y, spell, `${i + 1}`, onCast));
+      this.buttons.push(new SpellButton(scene, x, y, spell, `${i + 1}`, onCast, showTooltip, hideTooltip));
     });
   }
 
@@ -109,5 +131,6 @@ export class SpellBar {
 
   destroy(): void {
     for (const button of this.buttons) button.destroy();
+    this.tooltip.destroy();
   }
 }

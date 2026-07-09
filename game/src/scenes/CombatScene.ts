@@ -152,7 +152,15 @@ export class CombatScene extends Phaser.Scene {
     this.buildHud();
     this.buildCastBars();
 
-    this.spellBar = new SpellBar(this, VIEW_WIDTH / 2, SPELL_BAR_Y, spells, (spellId) => this.onSpellCast(spellId));
+    this.spellBar = new SpellBar(
+      this,
+      VIEW_WIDTH / 2,
+      SPELL_BAR_Y,
+      spells,
+      this.sceneData.loadout,
+      (spellId) => this.onSpellCast(spellId),
+      VIEW_WIDTH,
+    );
     this.registerHotkeys(spells);
 
     this.syncView();
@@ -286,12 +294,23 @@ export class CombatScene extends Phaser.Scene {
   private handleEvents(events: CombatEvent[]): void {
     for (const event of events) {
       switch (event.type) {
-        case 'damage':
-          this.findSprite(event.targetId)?.flashDamage();
+        case 'damage': {
+          const victim = this.findSprite(event.targetId);
+          victim?.flashDamage();
+          victim?.spawnHitMarker();
+          // Guard: the attacker (and/or victim) may already be dead this tick — sprites persist
+          // until the next rebuildEnemies(), so the lookup is safe, but the sprite may be absent
+          // if it belongs to a roster already replaced by a same-tick waveStarted rebuild.
+          const attacker = this.findSprite(event.sourceId);
+          if (attacker) attacker.lunge(victim?.getHomeX() ?? attacker.getHomeX());
           break;
-        case 'heal':
-          this.findSprite(event.targetId)?.flashHeal();
+        }
+        case 'heal': {
+          const target = this.findSprite(event.targetId);
+          target?.flashHeal();
+          target?.spawnHealFloat(event.amount);
           break;
+        }
         case 'waveStarted':
           this.rebuildEnemies(this.engine.state.enemies);
           break;
