@@ -1,5 +1,7 @@
 # healgame
 
+![healgame concept art — healer and warband on a battle line](assets/healer-game.png)
+
 A healer-focused indie game inspired by *Master Healer Kale with useless party*, rebuilt around exclusive builds, readable casting, and old-school MMO healing — in a heavy-metal dark fantasy skin.
 
 You keep a mercenary warband alive on a single battle line while you triage heals and mana. Between runs you spend gold and scarce rubies on trees that lock out other paths.
@@ -18,10 +20,11 @@ You are the only healer that matters: a grim warband stands on a single horizont
 |-----|-----------|
 | [**PoC Spec**](docs/poc-spec.md) | **What we build first** — wins on PoC conflicts |
 | [Tech options](docs/tech-options.md) | Stack comparison + PoC recommendation |
+| [Agent handoff](docs/agent-handoff-poc.md) | Prompt + chunks for a central agent to delegate |
 | [Game Design Document](docs/GDD.md) | Long-term design + decision log |
 | [Kale research](docs/research/master-healer-kale.md) | Inspiration breakdown |
 | [Design direction](docs/research/design-direction.md) | Short keep/change + PoC snapshot |
 
 ## PoC in one breath
 
-Oathbound only · tutorial one heal · expected wipe · XP skill + tree skill + ruby subclass split · Ash Gate · unwinnable Dungeon 2 sandbox · no procs/major CDs/hub buffs · single local save · restart only
+Oathbound only · tutorial one heal · expected wipe · XP skill + tree skill · ruby subclass split · Ash Gate · unwinnable Dungeon 2 sandbox · no procs/major CDs/hub buffs · single local save · restart only
