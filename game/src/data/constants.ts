@@ -52,6 +52,10 @@ export const MERCS = {
 export const SPELLS = {
   solemnMend: { id: 'solemn-mend', name: 'Solemn Mend', heal: 5, mana: 5, castMs: 2000 },
   zealousMending: { id: 'zealous-mending', name: 'Zealous Mending', heal: 5, mana: 8, castMs: 1000 },
+  /** Vigil subclass spell (phase-2-handoff): slow, efficient. Granted by the vigil-oath tree node. */
+  solemnVigil: { id: 'solemn-vigil', name: 'Solemn Vigil', heal: 9, mana: 7, castMs: 3000 },
+  /** Zealot subclass spell (phase-2-handoff): fast, pricey per point. Granted by the zealot-oath tree node. */
+  zealousFlare: { id: 'zealous-flare', name: 'Zealous Flare', heal: 3, mana: 4, castMs: 500 },
 } as const;
 
 export const REWARDS = {

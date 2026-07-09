@@ -7,7 +7,12 @@
 import type { SpellDef } from '../combat/types';
 import { SPELLS } from './constants';
 
-export const ALL_SPELLS: SpellDef[] = [SPELLS.solemnMend, SPELLS.zealousMending];
+export const ALL_SPELLS: SpellDef[] = [
+  SPELLS.solemnMend,
+  SPELLS.zealousMending,
+  SPELLS.solemnVigil,
+  SPELLS.zealousFlare,
+];
 
 export function spellById(id: string): SpellDef | undefined {
   return ALL_SPELLS.find((s) => s.id === id);

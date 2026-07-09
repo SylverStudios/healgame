@@ -1,12 +1,14 @@
 /**
- * Pure meta-progression logic (poc-spec §5, §8) — no Phaser. Scenes call these
- * functions and immediately persist the mutated SaveData via saveGame(); this
- * module never touches storage itself.
+ * Pure meta-progression logic (poc-spec §5/§8, phase-2-handoff "Loadout") —
+ * no Phaser. Scenes call these functions and immediately persist the mutated
+ * SaveData via saveGame(); this module never touches storage itself.
  */
 
 import { levelForXp, REWARDS, SPELLS } from '../data/constants';
-import { TREE_NODES, treeNodeById, type TreeNode } from '../data/tree';
-import type { SaveData, SubclassId } from '../save/save';
+import { spellById } from '../data/spells';
+import { TREE_NODES, treeNodeById } from '../data/tree';
+import type { SpellDef } from '../combat/types';
+import type { SaveData } from '../save/save';
 import type { CombatResult } from '../scenes/CombatScene';
 
 export interface HubNotice {
@@ -51,54 +53,134 @@ export function applyCombatResult(save: SaveData, result: CombatResult): HubNoti
   return notices;
 }
 
-/** The spell list + tree bonuses to hand CombatScene/CombatEngine for the current save. */
-export function buildLoadout(save: SaveData): { spellIds: string[]; bonusMaxMana: number } {
-  const bonusMaxMana = save.treeNodes.reduce((sum, nodeId) => {
-    const node = treeNodeById(nodeId);
-    return node && node.effect.kind === 'bonusMaxMana' ? sum + node.effect.amount : sum;
-  }, 0);
+/**
+ * The cross-boundary loadout type (phase-2-handoff, pinned). `spells` are
+ * RESOLVED defs — castMod tree nodes are already applied to castMs/mana, so
+ * neither the engine nor the combat view ever sees castMod.
+ */
+export interface Loadout {
+  spells: SpellDef[];
+  bonusMaxMana: number;
+  synergies: { triggerSpellId: string; buffedSpellId: string; bonusHeal: number }[];
+  missingHealthBonuses: { spellId: string; healPer10PctMissing: number }[];
+}
 
-  return { spellIds: [...save.unlockedSpells], bonusMaxMana };
+function ranksOf(save: SaveData, nodeId: string): number {
+  return save.treeRanks[nodeId] ?? 0;
+}
+
+/** Builds the resolved Loadout for the current save (unlocked + tree-granted spells, effects applied). */
+export function buildLoadout(save: SaveData): Loadout {
+  const loadout: Loadout = { spells: [], bonusMaxMana: 0, synergies: [], missingHealthBonuses: [] };
+
+  // Base list: XP-unlocked spells in unlock order, then tree-granted spells in
+  // tree order. Cloned so castMod resolution never mutates the data catalog.
+  const spellIds = [...save.unlockedSpells];
+  for (const node of TREE_NODES) {
+    if (node.effect.kind === 'grantSpell' && ranksOf(save, node.id) > 0 && !spellIds.includes(node.effect.spellId)) {
+      spellIds.push(node.effect.spellId);
+    }
+  }
+  loadout.spells = spellIds
+    .map((id) => spellById(id))
+    .filter((spell): spell is SpellDef => spell !== undefined)
+    .map((spell) => ({ ...spell }));
+
+  for (const node of TREE_NODES) {
+    const ranks = ranksOf(save, node.id);
+    if (ranks <= 0) continue;
+    const effect = node.effect;
+    switch (effect.kind) {
+      case 'bonusMaxMana':
+        loadout.bonusMaxMana += effect.amountPerRank * ranks;
+        break;
+      case 'synergy':
+        loadout.synergies.push({
+          triggerSpellId: effect.triggerSpellId,
+          buffedSpellId: effect.buffedSpellId,
+          bonusHeal: effect.bonusHealPerRank * ranks,
+        });
+        break;
+      case 'missingHealthBonus':
+        loadout.missingHealthBonuses.push({
+          spellId: effect.spellId,
+          healPer10PctMissing: effect.healPer10PctMissingPerRank * ranks,
+        });
+        break;
+      case 'castMod': {
+        const spell = loadout.spells.find((sp) => sp.id === effect.spellId);
+        if (spell) {
+          spell.castMs = Math.max(0, spell.castMs + effect.castMsDelta * ranks);
+          spell.mana = Math.max(0, spell.mana + effect.manaDelta * ranks);
+        }
+        break;
+      }
+      case 'grantSpell':
+        break; // already handled above
+    }
+  }
+
+  return loadout;
+}
+
+/** Everything a scene needs to render one node's state. All derived, no mutation. */
+export interface TreeNodeStatus {
+  ranks: number;
+  maxed: boolean;
+  /** Every `requires` node owned at rank ≥1. */
+  requirementsMet: boolean;
+  /** A rival node in the same exclusiveGroup is owned — permanently locked. */
+  lockedByExclusive: boolean;
+  /** Can afford the next rank in the node's currency. */
+  affordable: boolean;
+  /** All of the above pass: purchaseNode would succeed right now. */
+  purchasable: boolean;
+}
+
+export function nodeStatus(save: SaveData, nodeId: string): TreeNodeStatus | undefined {
+  const node = treeNodeById(nodeId);
+  if (!node) return undefined;
+
+  const ranks = ranksOf(save, nodeId);
+  const maxed = ranks >= node.maxRanks;
+  const requirementsMet = node.requires.every((id) => ranksOf(save, id) >= 1);
+  const lockedByExclusive =
+    node.exclusiveGroup !== undefined &&
+    TREE_NODES.some(
+      (n) => n.id !== node.id && n.exclusiveGroup === node.exclusiveGroup && ranksOf(save, n.id) > 0,
+    );
+  const wallet = node.cost.currency === 'gold' ? save.gold : save.rubies;
+  const affordable = wallet >= node.cost.amount;
+
+  return {
+    ranks,
+    maxed,
+    requirementsMet,
+    lockedByExclusive,
+    affordable,
+    purchasable: !maxed && requirementsMet && !lockedByExclusive && affordable,
+  };
 }
 
 /**
- * Buys a spell-tree node with gold. Fails (returns false, no mutation) if the
- * node is unknown, already owned, or unaffordable. On success, mutates
- * `save` (gold spent, node recorded) and returns true; caller saveGame()s.
+ * Buys one rank of a spell-tree node. Fails (returns false, no mutation) if
+ * the node is unknown, maxed, prereq-gated, exclusive-locked, or
+ * unaffordable in its currency. On success, mutates `save` (currency spent,
+ * rank recorded; a subclass oath node also sets save.subclass) and returns
+ * true; caller saveGame()s.
  */
 export function purchaseNode(save: SaveData, nodeId: string): boolean {
-  if (save.treeNodes.includes(nodeId)) return false;
   const node = treeNodeById(nodeId);
-  if (!node) return false;
-  if (save.gold < node.cost) return false;
+  const status = nodeStatus(save, nodeId);
+  if (!node || !status?.purchasable) return false;
 
-  save.gold -= node.cost;
-  save.treeNodes.push(nodeId);
+  if (node.cost.currency === 'gold') save.gold -= node.cost.amount;
+  else save.rubies -= node.cost.amount;
+  save.treeRanks[nodeId] = status.ranks + 1;
+  if (node.exclusiveGroup === 'subclass' && node.subclass !== undefined) {
+    save.subclass = node.subclass;
+  }
   return true;
-}
-
-/**
- * Spends the ruby subclass sink (poc-spec §6). Valid only when no subclass
- * has been chosen yet and the player has at least 1 ruby; spends exactly 1
- * ruby and records the choice. No respec — once set, subsequent calls
- * (even for the same subclass) fail without mutating `save`.
- */
-export function chooseSubclass(save: SaveData, subclass: SubclassId): boolean {
-  if (save.subclass !== null) return false;
-  if (save.rubies < 1) return false;
-
-  save.rubies -= 1;
-  save.subclass = subclass;
-  return true;
-}
-
-/**
- * Tree nodes visible to the player right now: base (branchless) nodes
- * always, plus a branch node only once save.subclass matches that branch.
- * The unchosen branch never appears (poc-spec §6: commit blind, no respec).
- */
-export function visibleTreeNodes(save: SaveData): TreeNode[] {
-  return TREE_NODES.filter((node) => node.branch === undefined || node.branch === save.subclass);
 }
 
 /** Dungeon 2 ("The Maw") unlocks after Ash Gate's first clear (poc-spec §7). */

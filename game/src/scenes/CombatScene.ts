@@ -19,19 +19,17 @@ import type {
   UnitRole,
 } from '../combat/types';
 import { ENCOUNTERS } from '../data/encounters';
-import { spellById } from '../data/spells';
 import { GCD_MS } from '../data/constants';
 import { Bar } from '../ui/bar';
 import { UnitSprite } from '../ui/unitSprite';
 import { SpellBar } from '../ui/spellBar';
+import type { Loadout } from '../meta/progression';
 
-/** Chunk 3 calls this scene with exactly this data shape (see task brief). */
+/** Pinned contract (phase-2-handoff): callers pass a fully resolved Loadout. */
 export interface CombatSceneData {
   encounterId: string;
-  spellIds: string[];
+  loadout: Loadout;
   returnTo: string;
-  /** From tree nodes (meta/progression buildLoadout); applied to the healer. */
-  bonusMaxMana?: number;
 }
 
 /** Passed back to `returnTo` as `{ combatResult }` when the player clicks "Return". */
@@ -143,12 +141,10 @@ export class CombatScene extends Phaser.Scene {
     if (!encounter) throw new Error('CombatScene: no encounters configured');
     this.encounter = encounter;
 
-    const spells = this.sceneData.spellIds
-      .map((id) => spellById(id))
-      .filter((s): s is SpellDef => s !== undefined);
+    const spells = this.sceneData.loadout.spells;
 
     this.engine = new CombatEngine(encounter, spells, {
-      bonusMaxMana: this.sceneData.bonusMaxMana ?? 0,
+      bonusMaxMana: this.sceneData.loadout.bonusMaxMana,
     });
 
     this.buildPartySprites();
@@ -342,7 +338,8 @@ export class CombatScene extends Phaser.Scene {
     if (cast) {
       this.playerCastBar.setRatio(1 - cast.remainingMs / cast.totalMs);
       this.playerCastBar.setVisible(true);
-      this.playerCastLabel.setText(spellById(cast.spellId)?.name ?? cast.spellId).setVisible(true);
+      const spell = this.sceneData.loadout.spells.find((s) => s.id === cast.spellId);
+      this.playerCastLabel.setText(spell?.name ?? cast.spellId).setVisible(true);
     } else {
       this.playerCastBar.setVisible(false);
       this.playerCastLabel.setVisible(false);

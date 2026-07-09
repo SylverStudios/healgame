@@ -85,12 +85,10 @@ export class HubScene extends Phaser.Scene {
     const centerX = width / 2;
 
     this.makeButton(centerX, height / 2 - 15, 300, 52, 'Enter Ash Gate', () => {
-      const loadout = buildLoadout(save);
       const combatData: CombatSceneData = {
         encounterId: ASH_GATE.id,
-        spellIds: loadout.spellIds,
+        loadout: buildLoadout(save),
         returnTo: SceneKeys.Hub,
-        bonusMaxMana: loadout.bonusMaxMana,
       };
       this.scene.start(SceneKeys.Combat, combatData);
     });
@@ -103,12 +101,10 @@ export class HubScene extends Phaser.Scene {
 
     if (isDungeon2Unlocked(save)) {
       this.makeButton(centerX, height / 2 + 180, 300, 52, 'Enter The Maw (Dungeon 2)', () => {
-        const loadout = buildLoadout(save);
         const combatData: CombatSceneData = {
           encounterId: THE_MAW.id,
-          spellIds: loadout.spellIds,
+          loadout: buildLoadout(save),
           returnTo: SceneKeys.Hub,
-          bonusMaxMana: loadout.bonusMaxMana,
         };
         this.scene.start(SceneKeys.Combat, combatData);
       });

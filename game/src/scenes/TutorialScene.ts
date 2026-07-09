@@ -78,12 +78,10 @@ export class TutorialScene extends Phaser.Scene {
     save.tutorialDone = true;
     saveGame(save);
 
-    const loadout = buildLoadout(save);
     const combatData: CombatSceneData = {
       encounterId: ASH_GATE.id,
-      spellIds: loadout.spellIds,
+      loadout: buildLoadout(save),
       returnTo: SceneKeys.Hub,
-      bonusMaxMana: loadout.bonusMaxMana,
     };
     this.scene.start(SceneKeys.Combat, combatData);
   }

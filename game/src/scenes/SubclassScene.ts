@@ -10,7 +10,7 @@
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { loadSave, saveGame, type SubclassId } from '../save/save';
-import { chooseSubclass } from '../meta/progression';
+import { purchaseNode } from '../meta/progression';
 
 const BG_COLOR = 0x1a1210;
 const CARD_BG_COLOR = 0x241a15;
@@ -146,8 +146,10 @@ export class SubclassScene extends Phaser.Scene {
     }
 
     // Second click on the already-armed card: seal it.
+    // Interim shim: subclass now lives in the tree ('<id>-oath' nodes); this
+    // scene is deleted in Chunk 3.
     const save = loadSave();
-    const ok = chooseSubclass(save, card.id);
+    const ok = purchaseNode(save, `${card.id}-oath`);
     if (!ok) {
       // Shouldn't happen from a freshly-loaded valid scene, but stay safe.
       this.showBlocked('Something changed — this choice is no longer available.');

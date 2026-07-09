@@ -7,7 +7,8 @@
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { loadSave, saveGame, type SaveData } from '../save/save';
-import { purchaseNode, visibleTreeNodes } from '../meta/progression';
+import { nodeStatus, purchaseNode } from '../meta/progression';
+import { TREE_NODES } from '../data/tree';
 
 const BG_COLOR = 0x1a1210;
 const NODE_BG_LOCKED = 0x241a15;
@@ -59,35 +60,46 @@ export class TreeScene extends Phaser.Scene {
 
     const centerX = this.scale.width / 2;
 
-    visibleTreeNodes(this.save).forEach((node, i) => {
+    TREE_NODES.forEach((node, i) => {
+      const status = nodeStatus(this.save, node.id);
+      if (!status) return;
       const y = NODE_START_Y + i * NODE_ROW_GAP;
-      const owned = this.save.treeNodes.includes(node.id);
-      const affordable = !owned && this.save.gold >= node.cost;
-      const bgColor = owned ? NODE_BG_OWNED : affordable ? NODE_BG_AFFORDABLE : NODE_BG_LOCKED;
+      const owned = status.ranks > 0;
+      const bgColor = owned ? NODE_BG_OWNED : status.purchasable ? NODE_BG_AFFORDABLE : NODE_BG_LOCKED;
 
       const bg = this.add.rectangle(centerX, y, NODE_WIDTH, NODE_HEIGHT, bgColor).setStrokeStyle(2, BORDER_COLOR);
 
-      const nameText = this.add.text(centerX - NODE_WIDTH / 2 + 16, y - 22, node.name, {
+      const rankSuffix = node.maxRanks > 1 ? ` ${status.ranks}/${node.maxRanks}` : '';
+      const nameText = this.add.text(centerX - NODE_WIDTH / 2 + 16, y - 22, `${node.name}${rankSuffix}`, {
         fontFamily: FONT,
         fontSize: '18px',
         color: TEXT_COLOR,
       });
+      const costLabel = `${node.cost.amount}${node.cost.currency === 'gold' ? 'g' : ' ruby'}`;
       const descText = this.add.text(
         centerX - NODE_WIDTH / 2 + 16,
         y + 4,
-        `${node.description} — cost ${node.cost}g`,
+        `${node.description} — cost ${costLabel}`,
         { fontFamily: FONT, fontSize: '13px', color: DIM_COLOR },
       );
 
-      const stateLabel = owned ? 'OWNED' : affordable ? 'BUY' : 'TOO EXPENSIVE';
-      const stateColor = owned ? OWNED_COLOR : affordable ? ACCENT_COLOR : LOCKED_COLOR;
+      const stateLabel = status.lockedByExclusive
+        ? 'LOCKED'
+        : status.maxed
+          ? 'OWNED'
+          : status.purchasable
+            ? 'BUY'
+            : owned || status.requirementsMet
+              ? 'TOO EXPENSIVE'
+              : 'REQUIRES PREREQ';
+      const stateColor = status.maxed ? OWNED_COLOR : status.purchasable ? ACCENT_COLOR : LOCKED_COLOR;
       const stateText = this.add
         .text(centerX + NODE_WIDTH / 2 - 16, y, stateLabel, { fontFamily: FONT, fontSize: '14px', color: stateColor })
         .setOrigin(1, 0.5);
 
       this.nodesContainer.add([bg, nameText, descText, stateText]);
 
-      if (affordable) {
+      if (status.purchasable) {
         bg.setInteractive({ useHandCursor: true });
         bg.on('pointerdown', () => {
           const bought = purchaseNode(this.save, node.id);
