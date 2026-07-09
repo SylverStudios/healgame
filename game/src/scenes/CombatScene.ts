@@ -49,8 +49,8 @@ const VIEW_HEIGHT = 540;
 
 const PARTY_X = 170;
 const ENEMY_X = 730;
-const ROSTER_TOP_Y = 120;
-const ROSTER_BOTTOM_Y = 400;
+const ROSTER_TOP_Y = 95;
+const ROSTER_BOTTOM_Y = 415;
 
 const PARTY_UNIT_WIDTH = 64;
 const PARTY_UNIT_HEIGHT = 64;

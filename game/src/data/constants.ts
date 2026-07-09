@@ -20,7 +20,9 @@ export const TRASH = {
 } as const;
 
 export const GATE_WARDEN = {
-  autoDamage: 2,
+  // QA-tuned from the §4.2 draft (auto 2): with 2 the party out-heals the
+  // fight for free and a no-heal party still wins — see balance.test.ts gates.
+  autoDamage: 3,
   swingIntervalMs: 3000,
   bonehowlCastMs: 10_000,
   bonehowlPartyDamage: 4,

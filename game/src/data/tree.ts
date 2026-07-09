@@ -36,7 +36,7 @@ export const TREE_NODES: TreeNode[] = [
   {
     id: 'vigil-deep-focus',
     name: 'Deep Focus',
-    description: 'Patient, efficient discipline steadies your reserves. +5 max mana',
+    description: 'Steady discipline. +5 max mana',
     cost: 5,
     effect: { kind: 'bonusMaxMana', amount: 5 },
     branch: 'vigil',
@@ -44,7 +44,7 @@ export const TREE_NODES: TreeNode[] = [
   {
     id: 'zealot-battle-fervor',
     name: 'Battle Fervor',
-    description: 'Reckless zeal burns hotter, longer. +5 max mana',
+    description: 'Zeal burns hotter. +5 max mana',
     cost: 5,
     effect: { kind: 'bonusMaxMana', amount: 5 },
     branch: 'zealot',

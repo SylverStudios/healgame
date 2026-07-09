@@ -13,8 +13,9 @@ const HP_BAR_HEIGHT = 8;
 const HP_BAR_OFFSET_Y = 10;
 const MANA_BAR_HEIGHT = 6;
 const MANA_BAR_GAP = 4;
-const NAME_LABEL_GAP = 8;
 const HP_TEXT_GAP = 2;
+/** Room reserved for the HP number line so the mana bar stacks above it. */
+const HP_TEXT_HEIGHT = 14;
 
 const HP_FILL_COLOR = 0x4caf50;
 const MANA_FILL_COLOR = 0x3b82f6;
@@ -32,9 +33,9 @@ const HEAL_FLASH_COLOR = 0x3ce06a;
 const FLASH_ALPHA = 0.65;
 const FLASH_DURATION_MS = 260;
 
-const TARGET_MARKER_WIDTH = 14;
-const TARGET_MARKER_HEIGHT = 10;
-const TARGET_MARKER_GAP = 6;
+const TARGET_MARKER_WIDTH = 10;
+const TARGET_MARKER_HEIGHT = 14;
+const TARGET_MARKER_GAP = 8;
 const TARGET_MARKER_COLOR = 0xf2c14e;
 
 export interface UnitSpriteConfig {
@@ -88,9 +89,13 @@ export class UnitSprite {
       });
     }
 
+    // Name lives inside the rect: rosters are packed tightly enough that a
+    // below-the-rect label collides with the next unit's HP text.
     this.nameText = scene.add
-      .text(x, y + height / 2 + NAME_LABEL_GAP, unit.name, { fontFamily: NAME_FONT, color: NAME_COLOR })
-      .setOrigin(0.5, 0);
+      .text(x, y, unit.name, { fontFamily: NAME_FONT, color: NAME_COLOR })
+      .setStroke('#0a0605', 3)
+      .setOrigin(0.5)
+      .setDepth(1);
 
     const hpY = y - height / 2 - HP_BAR_OFFSET_Y;
     this.hpBar = new Bar(scene, x - width / 2, hpY, width, HP_BAR_HEIGHT, HP_FILL_COLOR);
@@ -99,7 +104,8 @@ export class UnitSprite {
       .setOrigin(0.5, 1);
 
     if (showMana) {
-      const manaY = hpY - HP_BAR_HEIGHT / 2 - MANA_BAR_GAP - MANA_BAR_HEIGHT / 2;
+      const manaY =
+        hpY - HP_BAR_HEIGHT / 2 - HP_TEXT_HEIGHT - MANA_BAR_GAP - MANA_BAR_HEIGHT / 2;
       this.manaBar = new Bar(scene, x - width / 2, manaY, width, MANA_BAR_HEIGHT, MANA_FILL_COLOR);
       this.manaText = scene.add
         .text(x, manaY - MANA_BAR_HEIGHT / 2 - HP_TEXT_GAP, '', { fontFamily: HP_FONT, color: '#a8c8f0' })
@@ -109,16 +115,17 @@ export class UnitSprite {
       this.manaText = null;
     }
 
-    const markerTop = hpY - HP_BAR_HEIGHT / 2 - (showMana ? MANA_BAR_HEIGHT + MANA_BAR_GAP : 0) - TARGET_MARKER_GAP;
+    // Chevron sits to the LEFT of the rect pointing at it — above the rect it
+    // reads as belonging to the unit above in a tightly packed roster.
     this.targetMarker = scene.add
       .triangle(
-        x,
-        markerTop,
-        -TARGET_MARKER_WIDTH / 2,
-        -TARGET_MARKER_HEIGHT,
-        TARGET_MARKER_WIDTH / 2,
-        -TARGET_MARKER_HEIGHT,
+        x - width / 2 - TARGET_MARKER_GAP,
+        y,
         0,
+        -TARGET_MARKER_HEIGHT / 2,
+        0,
+        TARGET_MARKER_HEIGHT / 2,
+        TARGET_MARKER_WIDTH,
         0,
         TARGET_MARKER_COLOR,
       )

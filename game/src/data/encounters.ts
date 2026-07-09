@@ -19,16 +19,19 @@ export const ASH_GATE: EncounterDef = {
   boss: {
     id: 'gate-warden',
     name: 'Gate Warden',
-    hp: 15,
+    // QA-tuned (was 15): the boss must outlive at least one full Bonehowl
+    // telegraph and outlast a no-heal party — see balance.test.ts gates.
+    hp: 55,
     autoDamage: GATE_WARDEN.autoDamage,
     swingIntervalMs: GATE_WARDEN.swingIntervalMs,
     cast: {
       name: 'Bonehowl',
       castMs: GATE_WARDEN.bonehowlCastMs,
-      // First cast at 5s after the boss wave starts, then every 15s
-      // (start-to-start cadence — see combat/README.md).
-      firstCastAtMs: 5000,
-      intervalMs: 15_000,
+      // First cast at 3s after the boss wave starts, then every 12s
+      // (start-to-start cadence — see combat/README.md), so the 10s telegraph
+      // lands at ~13s/25s into a ~30s boss fight.
+      firstCastAtMs: 3000,
+      intervalMs: 12_000,
       partyDamage: GATE_WARDEN.bonehowlPartyDamage,
     },
   },
