@@ -5,7 +5,9 @@ entirely by `advance(dtMs)`. Chunk 2 builds the Phaser view against exactly
 this surface (`engine.ts` + `types.ts`).
 
 ```ts
-new CombatEngine(encounter: EncounterDef, spells: SpellDef[]) // spells = player's unlocked list
+new CombatEngine(encounter: EncounterDef, spells: SpellDef[], options?: { bonusMaxMana?: number })
+// spells = player's unlocked list; options.bonusMaxMana (Chunk 3: spell-tree nodes) adds to the
+// healer's max AND starting mana. Omit options for the pre-Chunk-3 default (no bonus).
 engine.advance(dtMs): CombatEvent[]   // steps the sim; safe for any dt (sub-steps internally)
 engine.setTarget(unitId): void        // click-to-target an ally; ignored if unknown/dead/enemy
 engine.castSpell(spellId): void       // starts, queues, or is silently dropped — see below

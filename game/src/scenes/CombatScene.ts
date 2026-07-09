@@ -30,6 +30,8 @@ export interface CombatSceneData {
   encounterId: string;
   spellIds: string[];
   returnTo: string;
+  /** From tree nodes (meta/progression buildLoadout); applied to the healer. */
+  bonusMaxMana?: number;
 }
 
 /** Passed back to `returnTo` as `{ combatResult }` when the player clicks "Return". */
@@ -145,7 +147,9 @@ export class CombatScene extends Phaser.Scene {
       .map((id) => spellById(id))
       .filter((s): s is SpellDef => s !== undefined);
 
-    this.engine = new CombatEngine(encounter, spells);
+    this.engine = new CombatEngine(encounter, spells, {
+      bonusMaxMana: this.sceneData.bonusMaxMana ?? 0,
+    });
 
     this.buildPartySprites();
     this.rebuildEnemies(this.engine.state.enemies);

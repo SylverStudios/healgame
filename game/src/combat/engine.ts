@@ -47,9 +47,13 @@ export class CombatEngine {
   /** Events produced synchronously by commands (castSpell), flushed on the next advance(). */
   private pending: CombatEvent[] = [];
 
-  constructor(encounter: EncounterDef, spells: SpellDef[]) {
+  constructor(encounter: EncounterDef, spells: SpellDef[], options?: { bonusMaxMana?: number }) {
     this.encounter = encounter;
     this.spells = spells;
+
+    // Authorized Chunk 3 extension: a spell-tree node (e.g. Deep Reserves) can grant
+    // the healer bonus max mana, applied to both max and starting mana here.
+    const healerMana = PARTY.startingMana + (options?.bonusMaxMana ?? 0);
 
     this.party = [
       { id: 'tank', name: 'Tank', role: 'tank', hp: PARTY.tankMaxHp, maxHp: PARTY.tankMaxHp, mana: 0, maxMana: 0, alive: true },
@@ -61,8 +65,8 @@ export class CombatEngine {
         role: 'healer',
         hp: PARTY.healerMaxHp,
         maxHp: PARTY.healerMaxHp,
-        mana: PARTY.startingMana,
-        maxMana: PARTY.startingMana,
+        mana: healerMana,
+        maxMana: healerMana,
         alive: true,
       },
     ];
