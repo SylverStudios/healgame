@@ -12,13 +12,23 @@ You are the only healer that matters: a grim warband stands on a single horizont
 
 ## Status
 
-**PoC spec locked.** Next: tech choice + vertical-slice tasks. UI/art is a separate later slice.
+**PoC playable.** Phaser 3 + TypeScript + Vite under [`game/`](game/):
+
+```bash
+cd game && npm install && npm run dev   # → http://localhost:5173
+```
+
+Verification: `npm run check` (types + lint + 75 tests + build), `npm run smoke`
+(headless boot), `node scripts/journey.mjs` (full player journey in headless
+Chromium). Results + tuning notes: [docs/poc-qa.md](docs/poc-qa.md).
+UI/art remains a separate later slice.
 
 ## Docs
 
 | Doc | Authority |
 |-----|-----------|
 | [**PoC Spec**](docs/poc-spec.md) | **What we build first** — wins on PoC conflicts |
+| [PoC QA](docs/poc-qa.md) | Journey checklist results, balance gates, tuning log |
 | [Tech options](docs/tech-options.md) | Stack comparison + PoC recommendation |
 | [Agent handoff](docs/agent-handoff-poc.md) | Prompt + chunks for a central agent to delegate |
 | [Game Design Document](docs/GDD.md) | Long-term design + decision log |
