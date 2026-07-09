@@ -1,0 +1,45 @@
+/**
+ * Draft numbers from poc-spec §4.2 — tunable, all integers, keep roughly 1–10.
+ * poc-spec.md wins any conflict.
+ */
+
+export const GCD_MS = 1000;
+
+export const PARTY = {
+  tankMaxHp: 20,
+  dpsMaxHp: 10,
+  healerMaxHp: 15,
+  startingMana: 20,
+  /** Harsh: no mana regen in combat for the first dungeon. */
+  manaRegenPer5s: 0,
+} as const;
+
+export const TRASH = {
+  autoDamage: 1,
+  swingIntervalMs: 3000,
+} as const;
+
+export const GATE_WARDEN = {
+  autoDamage: 2,
+  swingIntervalMs: 3000,
+  bonehowlCastMs: 10_000,
+  bonehowlPartyDamage: 4,
+} as const;
+
+export const SPELLS = {
+  solemnMend: { id: 'solemn-mend', name: 'Solemn Mend', heal: 5, mana: 5, castMs: 2000 },
+  zealousMending: { id: 'zealous-mending', name: 'Zealous Mending', heal: 5, mana: 8, castMs: 1000 },
+} as const;
+
+export const REWARDS = {
+  goldPerEnemy: 1,
+  xpPerEnemy: 1,
+  rubyPerFirstClear: 1,
+} as const;
+
+/** Micro-choice (poc-spec §10.1): level 2 at 10 XP; only level 2 matters for PoC. */
+export const XP_LEVEL_2_THRESHOLD = 10;
+
+export function levelForXp(xp: number): number {
+  return xp >= XP_LEVEL_2_THRESHOLD ? 2 : 1;
+}
