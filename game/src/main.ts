@@ -4,7 +4,6 @@ import { TutorialScene } from './scenes/TutorialScene';
 import { CombatScene } from './scenes/CombatScene';
 import { HubScene } from './scenes/HubScene';
 import { TreeScene } from './scenes/TreeScene';
-import { SubclassScene } from './scenes/SubclassScene';
 
 new Phaser.Game({
   type: Phaser.AUTO,
@@ -16,5 +15,5 @@ new Phaser.Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [BootScene, TutorialScene, CombatScene, HubScene, TreeScene, SubclassScene],
+  scene: [BootScene, TutorialScene, CombatScene, HubScene, TreeScene],
 });

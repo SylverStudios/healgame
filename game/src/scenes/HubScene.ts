@@ -97,7 +97,12 @@ export class HubScene extends Phaser.Scene {
       this.scene.start(SceneKeys.Tree);
     });
 
-    this.buildSubclassControl(save, centerX, height / 2 + 115);
+    if (save.subclass !== null) {
+      const label = save.subclass === 'vigil' ? 'Path of the Vigil' : 'Path of the Zealot';
+      this.add
+        .text(centerX, height / 2 + 115, `Oath: ${label}`, { fontFamily: FONT, fontSize: '16px', color: ACCENT_COLOR })
+        .setOrigin(0.5);
+    }
 
     if (isDungeon2Unlocked(save)) {
       this.makeButton(centerX, height / 2 + 180, 300, 52, 'Enter The Maw (Dungeon 2)', () => {
@@ -111,22 +116,6 @@ export class HubScene extends Phaser.Scene {
     }
 
     this.buildRestartControl(centerX, height - 36);
-  }
-
-  private buildSubclassControl(save: SaveData, x: number, y: number): void {
-    if (save.subclass !== null) {
-      const label = save.subclass === 'vigil' ? 'Path of the Vigil' : 'Path of the Zealot';
-      this.add
-        .text(x, y, `Oath: ${label}`, { fontFamily: FONT, fontSize: '16px', color: ACCENT_COLOR })
-        .setOrigin(0.5);
-      return;
-    }
-
-    if (save.rubies >= 1) {
-      this.makeButton(x, y, 300, 52, 'Choose Subclass', () => {
-        this.scene.start(SceneKeys.Subclass);
-      });
-    }
   }
 
   private buildRestartControl(x: number, y: number): void {
