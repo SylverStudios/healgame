@@ -17,6 +17,7 @@ You are the only healer that matters: a grim warband stands on a single horizont
 | Doc | Authority |
 |-----|-----------|
 | [**PoC Spec**](docs/poc-spec.md) | **What we build first** — wins on PoC conflicts |
+| [Tech options](docs/tech-options.md) | Stack comparison + PoC recommendation |
 | [Game Design Document](docs/GDD.md) | Long-term design + decision log |
 | [Kale research](docs/research/master-healer-kale.md) | Inspiration breakdown |
 | [Design direction](docs/research/design-direction.md) | Short keep/change + PoC snapshot |
