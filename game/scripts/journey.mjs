@@ -1,15 +1,21 @@
 /**
- * End-to-end PoC journey test (poc-spec §1) in headless Chromium.
+ * End-to-end player journey test (poc-spec §1 + phase-2-handoff) in headless
+ * Chromium.
  *
  * Drives the real game with mouse/keyboard, asserts on the localStorage save
  * between stages, screenshots every scene, and fails on any console error.
  *
  * Stages:
  *   A  fresh save → tutorial → learn Solemn Mend → Ash Gate → naive-heal to a
- *      wipe → hub applies gold/XP
+ *      wipe → hub applies gold/XP (save is v2 from birth)
  *   A2 seeded 8 XP → one more run crosses level 2 (Zealous auto-grant ribbon)
- *   B  seeded post-first-clear save → buy tree node → choose Vigil subclass
- *      (blind, 1 ruby) → oath shown, branch node visible
+ *   M  seeded RAW v1 payload → boot migrates to v2 (deep-reserves rank,
+ *      retired-node refund, subclass → oath node) with no progress lost
+ *   B  seeded post-first-clear v2 save → tree graph: buy Deep Reserves ranks,
+ *      arm + swear the Vigil oath in-tree (ruby spent, Zealot locked), buy a
+ *      follow-up node → hub shows the oath
+ *   B2 combat with the Vigil kit → hover the Solemn Vigil button → tooltip
+ *      screenshot (modifier lines from the tree) + mid-fight feedback shot
  *   C  enter The Maw → unwinnable sandbox → wipe → back to hub
  *
  * Ash Gate victory itself is proven deterministically at engine level
@@ -36,13 +42,17 @@ const UI = {
   tutorialLearn: { x: 480, y: 430 },
   combatTank: { x: 170, y: 95 },
   combatReturn: { x: 480, y: 330 },
+  // Spell bar: buttons 160w + 14 gap centered on 480, y 502; slot i of n.
+  combatSpellSlot: (i, n) => ({ x: 480 - ((n - 1) * 174) / 2 + i * 174, y: 502 }),
   hubAshGate: { x: 480, y: 255 },
   hubTree: { x: 480, y: 320 },
-  hubSubclass: { x: 480, y: 385 },
   hubMaw: { x: 480, y: 450 },
-  treeFirstNode: { x: 480, y: 150 },
-  treeBack: { x: 480, y: 504 },
-  subclassVigil: { x: 260, y: 280 },
+  // TreeScene node graph (NODE_POSITIONS in TreeScene.ts)
+  treeDeepReserves: { x: 480, y: 130 },
+  treeVigilOath: { x: 260, y: 260 },
+  treeZealotOath: { x: 700, y: 260 },
+  treePatientVow: { x: 150, y: 400 },
+  treeBack: { x: 120, y: 504 },
 };
 
 function startPreview() {
@@ -106,13 +116,13 @@ async function seedSave(page, save) {
 
 function baseSave(overrides) {
   return {
-    version: 1,
+    version: 2,
     tutorialDone: true,
     gold: 0,
     xp: 0,
     rubies: 0,
     unlockedSpells: ['solemn-mend'],
-    treeNodes: [],
+    treeRanks: {},
     subclass: null,
     clearedDungeons: [],
     ...overrides,
@@ -160,9 +170,11 @@ try {
   await page.mouse.click(UI.tutorialLearn.x, UI.tutorialLearn.y);
   await page.waitForTimeout(800);
   let save = await readSave(page);
+  check(save?.version === 2, 'new saves are written as v2');
   check(save?.tutorialDone === true, 'tutorial click sets tutorialDone');
   check(save?.unlockedSpells.includes('solemn-mend') === true, 'Solemn Mend unlocked via tutorial');
-  await shot(page, 'ash-gate-first-run');
+  await page.waitForTimeout(3500); // let autos land so lunge/'*' feedback is in frame
+  await shot(page, 'ash-gate-first-run-feedback');
 
   save = await playCombat(page, (s) => s.xp > 0);
   check(save.gold > 0 && save.xp > 0, `first run banked gold+XP through the wipe (gold=${save.gold}, xp=${save.xp})`);
@@ -181,12 +193,34 @@ try {
   check(save.unlockedSpells.includes('zealous-mending'), 'level 2 auto-granted Zealous Mending (no spend UI)');
   await shot(page, 'hub-level-up-ribbon');
 
-  // ---- Stage B: post-first-clear → tree buy → subclass split -----------------
-  console.log('Stage B: seeded post-first-clear → tree node → Vigil oath');
+  // ---- Stage M: v1 save migrates to v2 with no progress lost -----------------
+  console.log('Stage M: raw v1 payload → boot → migrated v2 save');
+  await seedSave(page, {
+    version: 1,
+    tutorialDone: true,
+    gold: 3,
+    xp: 12,
+    rubies: 0,
+    unlockedSpells: ['solemn-mend', 'zealous-mending'],
+    treeNodes: ['max-mana-1', 'vigil-deep-focus'],
+    subclass: 'vigil',
+    clearedDungeons: ['ash-gate'],
+  });
+  save = await readSave(page);
+  check(save?.version === 2, 'v1 payload migrated to version 2 on boot');
+  check(save?.treeRanks?.['deep-reserves'] === 1, "migration: 'max-mana-1' → deep-reserves rank 1");
+  check(save?.gold === 8, `migration: retired vigil-deep-focus refunded 5g (gold=${save?.gold}, expected 8)`);
+  check(save?.treeRanks?.['vigil-oath'] === 1, 'migration: existing subclass owns vigil-oath at rank 1');
+  check(save?.subclass === 'vigil' && save?.rubies === 0, 'migration: subclass kept, no ruby charged');
+  check(save?.xp === 12 && save?.clearedDungeons?.includes('ash-gate'), 'migration: xp + clears carried over');
+  await shot(page, 'hub-after-migration');
+
+  // ---- Stage B: post-first-clear → tree graph → oath in-tree -----------------
+  console.log('Stage B: seeded post-first-clear → Deep Reserves ranks → Vigil oath in-tree');
   await seedSave(
     page,
     baseSave({
-      gold: 9,
+      gold: 13,
       xp: 12,
       rubies: 1,
       unlockedSpells: ['solemn-mend', 'zealous-mending'],
@@ -197,37 +231,72 @@ try {
 
   await page.mouse.click(UI.hubTree.x, UI.hubTree.y);
   await page.waitForTimeout(600);
-  await shot(page, 'tree-before-buy');
-  await page.mouse.click(UI.treeFirstNode.x, UI.treeFirstNode.y);
-  await page.waitForTimeout(600);
+  await shot(page, 'tree-graph-before-buy');
+
+  // Multi-rank root: two ranks of Deep Reserves (5g each).
+  await page.mouse.click(UI.treeDeepReserves.x, UI.treeDeepReserves.y);
+  await page.waitForTimeout(400);
   save = await readSave(page);
-  check(save.treeNodes.includes('max-mana-1'), 'bought Deep Reserves (gold tree node)');
-  check(save.gold === 4, `gold spent on node (gold=${save.gold}, expected 4)`);
-  await shot(page, 'tree-after-buy');
+  check(save.treeRanks['deep-reserves'] === 1, 'bought Deep Reserves rank 1');
+  await page.mouse.click(UI.treeDeepReserves.x, UI.treeDeepReserves.y);
+  await page.waitForTimeout(400);
+  save = await readSave(page);
+  check(save.treeRanks['deep-reserves'] === 2, 'bought Deep Reserves rank 2 (multi-rank node)');
+  check(save.gold === 3, `gold spent per rank (gold=${save.gold}, expected 3)`);
+
+  // Oath is two-click: first click only ARMS (no purchase yet).
+  await page.mouse.click(UI.treeVigilOath.x, UI.treeVigilOath.y);
+  await page.waitForTimeout(400);
+  save = await readSave(page);
+  check(!save.treeRanks['vigil-oath'] && save.rubies === 1, 'first oath click arms only — nothing bought');
+  await shot(page, 'tree-vigil-oath-armed');
+  await page.mouse.click(UI.treeVigilOath.x, UI.treeVigilOath.y);
+  await page.waitForTimeout(400);
+  save = await readSave(page);
+  check(save.treeRanks['vigil-oath'] === 1, 'second click swears the Vigil oath in-tree');
+  check(save.subclass === 'vigil', 'oath purchase set subclass = vigil');
+  check(save.rubies === 0, 'ruby spent on the oath');
+  check(save.unlockedSpells.includes('solemn-vigil') === false, 'granted spell comes from the tree, not unlockedSpells');
+  await shot(page, 'tree-zealot-locked');
+
+  // Zealot oath must now be permanently locked: clicks do nothing.
+  await page.mouse.click(UI.treeZealotOath.x, UI.treeZealotOath.y);
+  await page.mouse.click(UI.treeZealotOath.x, UI.treeZealotOath.y);
+  await page.waitForTimeout(400);
+  save = await readSave(page);
+  check(!save.treeRanks['zealot-oath'] && save.subclass === 'vigil', 'rival oath is locked — clicks are inert');
+
+  // Follow-up branch node (3g) unlocked by the oath.
+  await page.mouse.click(UI.treePatientVow.x, UI.treePatientVow.y);
+  await page.waitForTimeout(400);
+  save = await readSave(page);
+  check(save.treeRanks['vigil-patient-vow'] === 1, 'bought Patient Vow rank 1 behind the oath');
+  check(save.gold === 0, `gold spent on follow-up (gold=${save.gold}, expected 0)`);
+  await shot(page, 'tree-vigil-branch-owned');
+
   await page.mouse.click(UI.treeBack.x, UI.treeBack.y);
   await page.waitForTimeout(600);
-
-  await page.mouse.click(UI.hubSubclass.x, UI.hubSubclass.y);
-  await page.waitForTimeout(600);
-  await shot(page, 'subclass-cards-blind');
-  await page.mouse.click(UI.subclassVigil.x, UI.subclassVigil.y);
-  await page.waitForTimeout(400);
-  await shot(page, 'subclass-vigil-armed');
-  await page.mouse.click(UI.subclassVigil.x, UI.subclassVigil.y);
-  await page.waitForTimeout(2000); // sealed confirmation auto-returns to hub
-  save = await readSave(page);
-  check(save.subclass === 'vigil', 'oath sealed: subclass = vigil');
-  check(save.rubies === 0, 'ruby spent on the oath');
   await shot(page, 'hub-with-oath');
 
-  await page.mouse.click(UI.hubTree.x, UI.hubTree.y);
-  await page.waitForTimeout(600);
-  await shot(page, 'tree-vigil-branch-visible');
-  await page.mouse.click(UI.treeBack.x, UI.treeBack.y);
-  await page.waitForTimeout(600);
+  // ---- Stage B2: Vigil kit in combat — tooltip reflects tree modifiers -------
+  console.log('Stage B2: combat with the Vigil kit → Solemn Vigil tooltip + feedback');
+  await page.mouse.click(UI.hubAshGate.x, UI.hubAshGate.y);
+  await page.waitForTimeout(1200);
+  const vigilSlot = UI.combatSpellSlot(2, 3); // solemn-mend, zealous-mending, solemn-vigil
+  await page.mouse.move(vigilSlot.x, vigilSlot.y);
+  await page.waitForTimeout(400);
+  await shot(page, 'combat-solemn-vigil-tooltip');
+  await page.mouse.move(480, 270); // off the button
+  await page.waitForTimeout(4000); // let autos land for feedback frame
+  await shot(page, 'combat-feedback-midfight');
+  save = await playCombat(page, (s) => s.xp > 12);
+  check(save.xp > 12, 'Vigil-kit run banked XP');
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForTimeout(800);
 
   // ---- Stage C: The Maw (unwinnable sandbox) --------------------------------
   console.log('Stage C: The Maw — enter, get flattened, return');
+  save = await readSave(page);
   const xpBeforeMaw = save.xp;
   await page.mouse.click(UI.hubMaw.x, UI.hubMaw.y);
   await page.waitForTimeout(1000);
@@ -251,4 +320,4 @@ if (failures.length > 0) {
   for (const f of failures) console.error(`  - ${f}`);
   process.exit(1);
 }
-console.log('\nJOURNEY PASS: full PoC player journey verified in-browser');
+console.log('\nJOURNEY PASS: full Phase-2 player journey verified in-browser');

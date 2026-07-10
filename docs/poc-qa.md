@@ -78,3 +78,79 @@ Scripted bots run the real engine deterministically:
   retune freely; the tests fail if the difficulty shape breaks.
 - `scripts/journey.mjs` clicks by scene-layout coordinates; if a scene's
   layout constants change, update the `UI` table at the top of that script.
+
+---
+
+# Phase 2 QA — combat feedback, tooltips, real spell tree (2026-07-09)
+
+Everything below was verified against the Phase 2 handoff's "Done means"
+list by the central agent, per chunk and again end-to-end after integration.
+
+## How to run (unchanged commands, from `game/`)
+
+| Command | Purpose |
+|---|---|
+| `npm run check` | typecheck + ESLint + all Vitest tests + build |
+| `npm run smoke` | headless boot, fails on any console error |
+| `node scripts/journey.mjs [--shots DIR]` | full Phase-2 player journey (~5 min) |
+
+## Journey rewrite
+
+`scripts/journey.mjs` now drives the Phase-2 flow. Stage list: A (fresh →
+tutorial → wipe), A2 (level-2 Zealous auto-grant), **M (new: raw v1 payload
+boots into a migrated v2 save — deep-reserves rank, 5g retired-node refund,
+subclass → oath node, no ruby charged)**, B (tree graph: two Deep Reserves
+ranks, two-click Vigil oath, rival-lock inertness, follow-up node behind the
+oath), **B2 (new: Vigil kit in combat — Solemn Vigil tooltip screenshot with
+the Patient Vow synergy line, mid-fight feedback shot)**, C (The Maw wipe).
+The `UI` click-coordinate table was rebuilt for the node-graph TreeScene
+(root 480,130; vigil oath 260,260; zealot oath 700,260; patient vow 150,400;
+Back moved to 120,504) and the spell-bar slot helper.
+
+## Checklist results (all green)
+
+1. **Combat feedback at real speed** — burst-capture frames show the attacker
+   lunge (unit visibly displaced toward its target, home slot empty behind
+   it), `*` hit markers, and green `+N` floats; one frame shows `*` fading on
+   **all four party members at once** from a Bonehowl landing. Full-overheal
+   casts correctly show no float.
+2. **Tooltips reflect tree modifiers** — journey shot: Solemn Vigil tooltip
+   reads `Heals 9 / Costs 7 mana / Cast: 3.0s / +1 heal when armed by Solemn
+   Mend` with Patient Vow rank 1 owned; healer mana in the same shot is 24/24
+   (20 base + 2 Deep Reserves ranks × 2).
+3. **Node-graph tree** — edges colored by state (green owned / accent
+   available / dim locked), `n/N` rank pips, oath details visible on hover
+   before buying, two-click oath purchase, rival oath greyed LOCKED and
+   click-inert afterwards. SubclassScene is deleted (file, key, registration).
+4. **Branch effects live in combat** — engine options (synergies,
+   missing-health) unit-tested in `engine.effects.test.ts` (11 tests);
+   balance gates run both maxed subclass builds through `buildLoadout`.
+5. **v1 migration** — save unit tests + journey stage M in a real browser.
+6. **Gates** — `check` (99 tests), `smoke`, and `journey.mjs` all pass.
+7. **Research doc** — `docs/research/pixel-art-pipeline.md` delivered.
+
+## Decisions made during Phase 2 (beyond the handoff's locked list)
+
+- **Synergy edge semantics** (pinned for the engine): consume-then-arm order
+  on the same cast; a trigger cast whose target died mid-cast still arms; a
+  buffed cast on a dead target does NOT consume (no heal event to carry the
+  bonus); independent armed slot per synergy entry, all matching entries
+  consumed and summed on one cast.
+- **Missing-health formula**: `healPer10PctMissing * floor((maxHp-hp)*10/maxHp)`,
+  integer math, computed on pre-heal HP.
+- **Balance gate shape widened, not weakened**: the old single "full kit"
+  clear gate now requires BOTH maxed subclass builds to clear Ash Gate with
+  ≥3 alive and BOTH to wipe in The Maw. Gates 1–3 (base kit) untouched.
+- **Oath purchase UX**: two-click arm/confirm in the tree (permanent choice
+  deserves friction); gold nodes buy on a single click.
+- **Migration persists immediately**: loadSave writes the migrated v2 back to
+  storage on first load of a v1 payload.
+- **buildLoadout spell order**: XP-unlocked spells first (hotkeys 1/2 stay
+  stable), tree-granted spells appended after.
+
+## Retunes
+
+**None needed.** Both maxed builds cleared Ash Gate 4/4-up with ≤1 mana left
+(Vigil: 48s, 6 heals; Zealot: 48s, 6 heals) and both wiped in The Maw —
+inside the gate envelope on first try, so all handoff draft numbers shipped
+unchanged.
