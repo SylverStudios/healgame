@@ -29,6 +29,7 @@ export type {
 export {
   canPurchase,
   create,
+  ownedContents,
   ownedOf,
   restore,
   snapshot,

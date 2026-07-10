@@ -34,6 +34,11 @@ export interface NodeDef {
    * Exactly one such node is allowed per config.
    */
   requires?: NodeRequires;
+  /**
+   * Mutual exclusion: owning any node in this group permanently locks the
+   * rest (e.g. subclass oaths). Omitted = no exclusivity.
+   */
+  exclusiveGroup?: string;
 }
 
 /**
@@ -60,6 +65,7 @@ export type RejectReason =
   | 'spot-complete'
   | 'requirements-unmet'
   | 'cannot-afford'
+  | 'exclusive-locked'
   | 'invalid-config';
 
 export type UpdateOk = { ok: true; state: TreeState };
@@ -77,6 +83,8 @@ export type TreeState = { readonly __treeState: unique symbol };
 export type SpotStatus =
   /** Next node exists but its prerequisites are not met. */
   | 'locked'
+  /** A rival in the next node's exclusiveGroup is already owned. */
+  | 'exclusive-locked'
   /** Next node is purchasable right now. */
   | 'affordable'
   /** Next node is unlocked but the wallet cannot pay. */

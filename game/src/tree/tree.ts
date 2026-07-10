@@ -11,6 +11,7 @@
 
 import type {
   ConfigError,
+  NodeContent,
   NodeDef,
   NodeView,
   SpotDef,
@@ -181,6 +182,21 @@ function requirementsMet(node: NodeDef, owned: ReadonlySet<string>): boolean {
   return mode === 'all' ? nodes.every((id) => owned.has(id)) : nodes.some((id) => owned.has(id));
 }
 
+/** True when another owned node shares this node's exclusiveGroup. */
+function exclusiveLocked(
+  node: NodeDef,
+  owned: ReadonlySet<string>,
+  nodesById: ReadonlyMap<string, NodeDef>,
+): boolean {
+  if (node.exclusiveGroup === undefined) return false;
+  for (const id of owned) {
+    if (id === node.id) continue;
+    const other = nodesById.get(id);
+    if (other?.exclusiveGroup === node.exclusiveGroup) return true;
+  }
+  return false;
+}
+
 function nextInChain(spot: SpotDef, owned: ReadonlySet<string>): string | null {
   for (const nodeId of spot.chain) {
     if (!owned.has(nodeId)) return nodeId;
@@ -194,7 +210,13 @@ function toNodeView(node: NodeDef): NodeView {
 
 function reject(
   state: TreeState,
-  reason: 'unknown-spot' | 'spot-complete' | 'requirements-unmet' | 'cannot-afford' | 'invalid-config',
+  reason:
+    | 'unknown-spot'
+    | 'spot-complete'
+    | 'requirements-unmet'
+    | 'cannot-afford'
+    | 'exclusive-locked'
+    | 'invalid-config',
   message: string,
 ): UpdateResult {
   return { ok: false, state, reason, message };
@@ -286,6 +308,14 @@ export function update(config: TreeConfig, state: TreeState, action: TreeAction)
     );
   }
 
+  if (exclusiveLocked(node, internal.owned, compiled.nodesById)) {
+    return reject(
+      state,
+      'exclusive-locked',
+      `Node "${node.id}" is locked by exclusive group "${node.exclusiveGroup}"`,
+    );
+  }
+
   const balance = internal.wallet[node.cost.currency] ?? 0;
   if (balance < node.cost.amount) {
     return reject(
@@ -309,9 +339,11 @@ function spotStatus(
   next: NodeDef | null,
   owned: ReadonlySet<string>,
   wallet: Readonly<Record<string, number>>,
+  nodesById: ReadonlyMap<string, NodeDef>,
 ): SpotStatus {
   if (next === null) return 'complete';
   if (!requirementsMet(next, owned)) return 'locked';
+  if (exclusiveLocked(next, owned, nodesById)) return 'exclusive-locked';
   const balance = wallet[next.cost.currency] ?? 0;
   return balance >= next.cost.amount ? 'affordable' : 'unaffordable';
 }
@@ -345,7 +377,7 @@ export function view(config: TreeConfig, state: TreeState): TreeView {
     const nextNode = nextId === null ? null : compiled.nodesById.get(nextId)!;
     return {
       id: spot.id,
-      status: spotStatus(nextNode, internal.owned, internal.wallet),
+      status: spotStatus(nextNode, internal.owned, internal.wallet, compiled.nodesById),
       owned: ownedViews,
       next: nextNode ? toNodeView(nextNode) : null,
       parentSpotIds: parentSpotIdsFor(spot, compiled),
@@ -364,4 +396,17 @@ export function view(config: TreeConfig, state: TreeState): TreeView {
 export function canPurchase(config: TreeConfig, state: TreeState, spotId: string): boolean {
   const result = update(config, state, { type: 'purchase', spotId });
   return result.ok;
+}
+
+/**
+ * Flat list of owned node contents in config node order. Combat / loadout
+ * reducers use this — they never need spot layout or purchase rules.
+ */
+export function ownedContents<C = NodeContent>(config: TreeConfig, state: TreeState): C[] {
+  const owned = asInternal(state).owned;
+  const out: C[] = [];
+  for (const node of config.nodes) {
+    if (owned.has(node.id)) out.push(node.content as C);
+  }
+  return out;
 }
