@@ -154,3 +154,24 @@ Back moved to 120,504) and the spell-bar slot helper.
 (Vigil: 48s, 6 heals; Zealot: 48s, 6 heals) and both wiped in The Maw —
 inside the gate envelope on first try, so all handoff draft numbers shipped
 unchanged.
+
+## Art swap: Kenney Tiny Dungeon units (post-Phase 2)
+
+Combat unit rects replaced with tiles from the CC0 **Kenney Tiny Dungeon**
+pack (source pack lives untracked at repo root; the packed 12×11 tilesheet +
+license are committed under `game/public/assets/`). Decisions:
+
+- **Unit→tile mapping** (in `game/src/ui/sprites.ts`, frame = row*12+col,
+  same order as Kenney's `tile_XXXX` files): tank→96 knight, dps1→98 fighter,
+  dps2→112 ranger, healer→84 purple wizard, Ash Husk→121 ghost, Gate
+  Warden→109 brute, Hollow King→110 demon. Unknown ids fall back to
+  fighter/demon.
+- **Rendering**: sheet preloaded once in BootScene; `pixelArt: true` gives
+  nearest-neighbor scaling game-wide; units scale via `setDisplaySize`
+  (party 4×, trash 3×). Boss rect nudged 110→112 so it's an integer 7× of
+  the 16px tile (flagged in docs/research/pixel-art-pipeline.md). Death
+  state = dark tint + alpha + shrink, same as the old rects.
+- **No layout changes**: unit home positions and clickable bounds are
+  unchanged, so the journey.mjs UI table needed no edits. Verified: check
+  (99 tests) + smoke + full journey PASS; sprites visually confirmed in
+  journey shots (wave, Maw boss, dead-unit tint).

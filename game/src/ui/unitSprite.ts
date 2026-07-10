@@ -1,8 +1,9 @@
 /**
- * A single combat unit rendered as a colored rectangle + name label + HP bar
- * (+ mana bar for the healer) + optional click-to-target marker. Temp art
- * only (poc-spec §4, tech-options.md "Temp art plan"): geometric placeholders,
- * dark palette, readability over beauty.
+ * A single combat unit rendered as a Tiny Dungeon tile (see ui/sprites.ts)
+ * + name label + HP bar (+ mana bar for the healer) + optional
+ * click-to-target marker. Bars/labels keep the temp-art style (flat bars,
+ * monospace, dark palette); the unit body is a 16×16 pixel-art frame scaled
+ * up with nearest-neighbor filtering (`pixelArt: true` in main.ts).
  *
  * Chunk 2 (phase-2-handoff): all visuals live inside a Phaser Container
  * anchored at the unit's fixed "home" position, so a single tween on the
@@ -16,6 +17,7 @@
 import Phaser from 'phaser';
 import type { Unit } from '../combat/types';
 import { Bar } from './bar';
+import { UNIT_TEXTURE_KEY } from './sprites';
 
 const HP_BAR_HEIGHT = 8;
 const HP_BAR_OFFSET_Y = 10;
@@ -71,13 +73,14 @@ export interface UnitSpriteConfig {
   y: number;
   width: number;
   height: number;
-  color: number;
+  /** Tile index into the Tiny Dungeon sheet — see ui/sprites.ts frameForUnit(). */
+  frame: number;
   showMana: boolean;
   clickable: boolean;
   onClick?: (unitId: string) => void;
 }
 
-/** Colored-rect placeholder for one combat unit, with bars/labels/marker layered above it. */
+/** Pixel-art tile for one combat unit, with bars/labels/marker layered above it. */
 export class UnitSprite {
   readonly id: string;
 
@@ -86,10 +89,9 @@ export class UnitSprite {
   private readonly homeY: number;
   private readonly width: number;
   private readonly height: number;
-  private readonly baseColor: number;
 
   private readonly container: Phaser.GameObjects.Container;
-  private readonly rect: Phaser.GameObjects.Rectangle;
+  private readonly body: Phaser.GameObjects.Image;
   private readonly nameText: Phaser.GameObjects.Text;
   private readonly hpBar: Bar;
   private readonly hpText: Phaser.GameObjects.Text;
@@ -103,27 +105,28 @@ export class UnitSprite {
   private alive = true;
 
   constructor(unit: Unit, config: UnitSpriteConfig) {
-    const { scene, x, y, width, height, color, showMana, clickable, onClick } = config;
+    const { scene, x, y, width, height, frame, showMana, clickable, onClick } = config;
     this.id = unit.id;
     this.scene = scene;
     this.homeX = x;
     this.homeY = y;
     this.width = width;
     this.height = height;
-    this.baseColor = color;
 
     this.container = scene.add.container(x, y);
 
     // All children below use coordinates LOCAL to the container (relative to
     // the unit's home position, i.e. as if x=y=0).
-    this.rect = scene.add.rectangle(0, 0, width, height, color).setStrokeStyle(1, 0x0a0605);
+    this.body = scene.add.image(0, 0, UNIT_TEXTURE_KEY, frame).setDisplaySize(width, height);
     if (clickable) {
-      this.rect.setInteractive({ useHandCursor: true });
-      this.rect.on('pointerdown', () => {
+      // Hit area is the full frame bounds (including transparent pixels) —
+      // same clickable box the old rect gave, so journey.mjs targets hold.
+      this.body.setInteractive({ useHandCursor: true });
+      this.body.on('pointerdown', () => {
         if (this.alive) onClick?.(this.id);
       });
     }
-    this.container.add(this.rect);
+    this.container.add(this.body);
 
     // Name lives inside the rect: rosters are packed tightly enough that a
     // below-the-rect label collides with the next unit's HP text.
@@ -186,15 +189,17 @@ export class UnitSprite {
     }
 
     if (unit.alive) {
-      this.rect.setFillStyle(this.baseColor);
-      this.rect.setAlpha(1);
-      this.rect.setScale(1);
+      this.body.clearTint();
+      this.body.setAlpha(1);
+      // setDisplaySize (not setScale) — the image is already scaled up from
+      // its 16×16 source frame, so raw scale values would shrink it to tile size.
+      this.body.setDisplaySize(this.width, this.height);
       this.hpBar.setVisible(true);
       this.manaBar?.setVisible(true);
     } else {
-      this.rect.setFillStyle(DEAD_TINT);
-      this.rect.setAlpha(DEAD_ALPHA);
-      this.rect.setScale(DEAD_SCALE);
+      this.body.setTint(DEAD_TINT);
+      this.body.setAlpha(DEAD_ALPHA);
+      this.body.setDisplaySize(this.width * DEAD_SCALE, this.height * DEAD_SCALE);
       this.hpBar.setVisible(false);
       this.manaBar?.setVisible(false);
       this.targetMarker.setVisible(false);

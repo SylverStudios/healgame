@@ -16,12 +16,12 @@ import type {
   EncounterDef,
   SpellDef,
   Unit,
-  UnitRole,
 } from '../combat/types';
 import { ENCOUNTERS } from '../data/encounters';
 import { GCD_MS } from '../data/constants';
 import { Bar } from '../ui/bar';
 import { UnitSprite } from '../ui/unitSprite';
+import { frameForUnit } from '../ui/sprites';
 import { SpellBar } from '../ui/spellBar';
 import type { Loadout } from '../meta/progression';
 
@@ -50,20 +50,14 @@ const ENEMY_X = 730;
 const ROSTER_TOP_Y = 95;
 const ROSTER_BOTTOM_Y = 415;
 
+// Unit sizes are multiples of the 16px tile so pixels scale evenly
+// (party 4×, trash 3×, boss 7× — see docs/research/pixel-art-pipeline.md).
 const PARTY_UNIT_WIDTH = 64;
 const PARTY_UNIT_HEIGHT = 64;
 const TRASH_UNIT_WIDTH = 48;
 const TRASH_UNIT_HEIGHT = 48;
-const BOSS_UNIT_WIDTH = 110;
-const BOSS_UNIT_HEIGHT = 110;
-
-const ROLE_COLORS: Record<UnitRole, number> = {
-  tank: 0x4d6a99,
-  dps: 0xb5533c,
-  healer: 0x4caf82,
-  enemy: 0x7a3a3a,
-  boss: 0x6a2b6a,
-};
+const BOSS_UNIT_WIDTH = 112;
+const BOSS_UNIT_HEIGHT = 112;
 
 const WAVE_TEXT_Y = 20;
 const REWARDS_X = 14;
@@ -184,7 +178,7 @@ export class CombatScene extends Phaser.Scene {
         y,
         width: PARTY_UNIT_WIDTH,
         height: PARTY_UNIT_HEIGHT,
-        color: ROLE_COLORS[unit.role],
+        frame: frameForUnit(unit),
         showMana: unit.role === 'healer',
         clickable: true,
         onClick: (id) => this.onAllyClick(id),
@@ -210,7 +204,7 @@ export class CombatScene extends Phaser.Scene {
         y,
         width,
         height,
-        color: ROLE_COLORS[unit.role],
+        frame: frameForUnit(unit),
         showMana: false,
         clickable: false,
       });

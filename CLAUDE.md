@@ -52,8 +52,10 @@ game/src/
 - **Pure logic first**: meta/combat behavior lives in tested pure functions;
   scenes are thin wiring that call them and `saveGame()` immediately after
   any mutation. New logic gets colocated `*.test.ts` (Vitest).
-- **Temp art only**: rects, bars, monospace text, dark palette (`#1a1210` bg).
-  Real UI/art is a separate future slice — reject polish creep.
+- **Temp art only, one exception**: combat units render Kenney Tiny Dungeon
+  16×16 tiles (CC0; sheet in `game/public/assets/`, unit→tile mapping in
+  `game/src/ui/sprites.ts`, `pixelArt: true`). Everything else stays rects,
+  bars, monospace text, dark palette (`#1a1210` bg) — reject polish creep.
 - **Scope discipline**: poc-spec §9 lists what stays out (procs, major CDs,
   hub buffs, respec, Aegis/Wildbloom, party hotkeys, networking…). Reject
   additions unless the user explicitly reopens scope.

@@ -11,6 +11,9 @@ new Phaser.Game({
   width: 960,
   height: 540,
   backgroundColor: '#1a1210',
+  // Nearest-neighbor texture filtering game-wide — 16×16 tiles stay crisp at
+  // any display size (docs/research/pixel-art-pipeline.md).
+  pixelArt: true,
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
