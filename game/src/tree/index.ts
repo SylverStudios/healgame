@@ -1,8 +1,9 @@
 /**
  * Config-driven skill-tree service.
  *
- * Public API: validateConfig, create, update, view, withWallet, snapshot/restore,
- * walletOf, ownedOf, canPurchase. See types.ts for the Model / Action / View shapes.
+ * Public API: validateConfig, create, update, view, layoutSpots, withWallet,
+ * snapshot/restore, walletOf, ownedOf, canPurchase, ownedContents.
+ * See types.ts for the Model / Action / View shapes.
  */
 
 export type {
@@ -26,6 +27,8 @@ export type {
   UpdateResult,
 } from './types';
 
+export type { LayoutOptions, SpotPosition } from './layout';
+
 export {
   canPurchase,
   create,
@@ -39,3 +42,5 @@ export {
   walletOf,
   withWallet,
 } from './tree';
+
+export { layoutSpots } from './layout';

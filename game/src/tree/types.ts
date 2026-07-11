@@ -96,6 +96,8 @@ export interface NodeView {
   id: string;
   content: NodeContent;
   cost: NodeCost;
+  /** Present when this node participates in mutual exclusion. */
+  exclusiveGroup?: string;
 }
 
 export interface SpotView {
@@ -105,6 +107,8 @@ export interface SpotView {
   owned: NodeView[];
   /** Next purchase candidate, or null when complete. */
   next: NodeView | null;
+  /** Total nodes in this spot's chain (for rank pips). */
+  chainLength: number;
   /**
    * Spots that contain prerequisite nodes of this spot's *first* chain node.
    * Used to draw edges; independent of runtime ownership.

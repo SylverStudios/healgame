@@ -16,6 +16,7 @@ import type { SubclassId } from '../save/save';
 import {
   create,
   ownedContents,
+  snapshot,
   validateConfig,
   type NodeDef,
   type SpotDef,
@@ -332,4 +333,54 @@ export function treeStateFromLegacy(
   wallet: { gold: number; ruby: number },
 ): TreeState {
   return create(SPELL_TREE, wallet, ownedIdsFromLegacyRanks(treeRanks));
+}
+
+const MULTI_RANK_PREFIXES: { prefix: string; max: number }[] = [
+  { prefix: 'deep-reserves', max: 5 },
+  { prefix: 'vigil-patient-vow', max: 3 },
+  { prefix: 'zealot-fervent-chain', max: 3 },
+];
+
+const SINGLE_NODES = [
+  'vigil-oath',
+  'zealot-oath',
+  'vigil-measured-devotion',
+  'zealot-desperate-zeal',
+] as const;
+
+/**
+ * Inverse of `ownedIdsFromLegacyRanks` — write tree service owned ids back into
+ * the save's `treeRanks` shape so combat can keep using `buildLoadout` until
+ * that path is migrated.
+ */
+export function legacyRanksFromOwned(owned: readonly string[]): Record<string, number> {
+  const ranks: Record<string, number> = {};
+  const ownedSet = new Set(owned);
+
+  for (const { prefix, max } of MULTI_RANK_PREFIXES) {
+    let n = 0;
+    for (let i = 1; i <= max; i++) {
+      if (ownedSet.has(`${prefix}-${i}`)) n = i;
+    }
+    if (n > 0) ranks[prefix] = n;
+  }
+  for (const id of SINGLE_NODES) {
+    if (ownedSet.has(id)) ranks[id] = 1;
+  }
+  return ranks;
+}
+
+/** Push opaque tree state into SaveData currencies + treeRanks + subclass. */
+export function applyTreeStateToSave(
+  save: { gold: number; rubies: number; treeRanks: Record<string, number>; subclass: SubclassId | null },
+  state: TreeState,
+): void {
+  const snap = snapshot(state);
+  save.gold = snap.wallet['gold'] ?? 0;
+  save.rubies = snap.wallet['ruby'] ?? 0;
+  save.treeRanks = legacyRanksFromOwned(snap.owned);
+
+  if (snap.owned.includes('vigil-oath')) save.subclass = 'vigil';
+  else if (snap.owned.includes('zealot-oath')) save.subclass = 'zealot';
+  else save.subclass = null;
 }

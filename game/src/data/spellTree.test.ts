@@ -9,6 +9,7 @@ import { SPELLS } from './constants';
 import {
   SPELL_TREE,
   combatModsFromTree,
+  legacyRanksFromOwned,
   ownedIdsFromLegacyRanks,
   resolveCombatMods,
   treeStateFromLegacy,
@@ -191,6 +192,16 @@ describe('parity with buildLoadout', () => {
       'deep-reserves-3',
       'vigil-oath',
     ]);
+  });
+
+  it('legacyRanksFromOwned round-trips with ownedIdsFromLegacyRanks', () => {
+    const ranks = {
+      'deep-reserves': 5,
+      'vigil-oath': 1,
+      'vigil-patient-vow': 2,
+      'vigil-measured-devotion': 1,
+    };
+    expect(legacyRanksFromOwned(ownedIdsFromLegacyRanks(ranks))).toEqual(ranks);
   });
 
   it('ownedContents is a flat bag combat can reduce (no layout)', () => {

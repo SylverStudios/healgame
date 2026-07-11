@@ -205,7 +205,9 @@ function nextInChain(spot: SpotDef, owned: ReadonlySet<string>): string | null {
 }
 
 function toNodeView(node: NodeDef): NodeView {
-  return { id: node.id, content: node.content, cost: { ...node.cost } };
+  const view: NodeView = { id: node.id, content: node.content, cost: { ...node.cost } };
+  if (node.exclusiveGroup !== undefined) view.exclusiveGroup = node.exclusiveGroup;
+  return view;
 }
 
 function reject(
@@ -380,6 +382,7 @@ export function view(config: TreeConfig, state: TreeState): TreeView {
       status: spotStatus(nextNode, internal.owned, internal.wallet, compiled.nodesById),
       owned: ownedViews,
       next: nextNode ? toNodeView(nextNode) : null,
+      chainLength: spot.chain.length,
       parentSpotIds: parentSpotIdsFor(spot, compiled),
     };
   });
