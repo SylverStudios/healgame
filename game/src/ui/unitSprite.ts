@@ -44,8 +44,11 @@ const FLASH_ALPHA = 0.65;
 const FLASH_DURATION_MS = 260;
 
 const TARGET_MARKER_WIDTH = 10;
-const TARGET_MARKER_HEIGHT = 14;
+const TARGET_MARKER_HEIGHT = 8;
+/** Gap between the topmost bar's number line and the marker's tip. */
 const TARGET_MARKER_GAP = 8;
+/** Extra clearance for the number-line text glyphs above the topmost bar (10px font). */
+const TARGET_MARKER_TEXT_CLEARANCE = 12;
 const TARGET_MARKER_COLOR = 0xf2c14e;
 
 /** Locked visual decisions (phase-2-handoff): lunge 12px, out 90ms / back 120ms. */
@@ -53,16 +56,16 @@ const LUNGE_DISTANCE = 12;
 const LUNGE_OUT_MS = 90;
 const LUNGE_BACK_MS = 120;
 
-/** Locked visual decisions: `*`/`+N` rise 14px and fade over 400ms. */
-const FLOAT_RISE_DISTANCE = 14;
-const FLOAT_DURATION_MS = 400;
+/** `-N`/`+N` floats: modest rise + fade (tuned post–Phase 3 for readability). */
+const FLOAT_RISE_DISTANCE = 20;
+const FLOAT_DURATION_MS = 550;
 const FLOAT_FONT = 'monospace';
 const FLOAT_DEPTH = 50;
 
 const DAMAGE_FLOAT_COLOR = '#e05a4e';
-const DAMAGE_FLOAT_FONT_SIZE = '18px';
+const DAMAGE_FLOAT_FONT_SIZE = '22px';
 const HEAL_FLOAT_COLOR = '#7ad67a';
-const HEAL_FLOAT_FONT_SIZE = '16px';
+const HEAL_FLOAT_FONT_SIZE = '20px';
 const FLOAT_STROKE_COLOR = '#0a0605';
 const FLOAT_STROKE_WIDTH = 3;
 
@@ -77,6 +80,10 @@ export interface UnitSpriteConfig {
   showMana: boolean;
   clickable: boolean;
   onClick?: (unitId: string) => void;
+  /** Side-view facing line (side-view-layout-handoff §A): party faces right, enemies face
+   *  left. Kenney Tiny Dungeon tiles are front-facing portraits (no true native direction),
+   *  so this is a stopgap flipX applied per side, not a correction of an inherent facing. */
+  facing: 'left' | 'right';
 }
 
 /** Pixel-art tile for one combat unit, with bars/labels/marker layered above it. */
@@ -104,7 +111,7 @@ export class UnitSprite {
   private alive = true;
 
   constructor(unit: Unit, config: UnitSpriteConfig) {
-    const { scene, x, y, width, height, frame, showMana, clickable, onClick } = config;
+    const { scene, x, y, width, height, frame, showMana, clickable, onClick, facing } = config;
     this.id = unit.id;
     this.scene = scene;
     this.homeX = x;
@@ -116,7 +123,10 @@ export class UnitSprite {
 
     // All children below use coordinates LOCAL to the container (relative to
     // the unit's home position, i.e. as if x=y=0).
-    this.body = scene.add.image(0, 0, UNIT_TEXTURE_KEY, frame).setDisplaySize(width, height);
+    this.body = scene.add
+      .image(0, 0, UNIT_TEXTURE_KEY, frame)
+      .setDisplaySize(width, height)
+      .setFlipX(facing === 'left');
     if (clickable) {
       // Hit area is the full frame bounds (including transparent pixels) —
       // same clickable box the old rect gave, so journey.mjs targets hold.
@@ -127,8 +137,9 @@ export class UnitSprite {
     }
     this.container.add(this.body);
 
-    // Name lives inside the rect: rosters are packed tightly enough that a
-    // below-the-rect label collides with the next unit's HP text.
+    // Name stays centered on the body: units now sit side-by-side on the ground
+    // line with room between slots, and the front-facing Tiny Dungeon portraits
+    // read fine with text overlaid (unchanged from the pre–side-view layout).
     this.nameText = scene.add
       .text(0, 0, unit.name, { fontFamily: NAME_FONT, color: NAME_COLOR })
       .setStroke('#0a0605', 3)
@@ -157,17 +168,28 @@ export class UnitSprite {
       this.manaText = null;
     }
 
-    // Chevron sits to the LEFT of the rect pointing at it — above the rect it
-    // reads as belonging to the unit above in a tightly packed roster.
+    // Downward-pointing chevron centered above the topmost bar (mana bar + its
+    // number line when present, else the HP bar + its number line) — in the old
+    // vertical roster a left-of-rect chevron pointed unambiguously at one row,
+    // but in a horizontal facing line it reads as pointing at whichever
+    // neighbor sits to its left. Above-the-bars is unambiguous at any spacing.
+    const topBarTextY = showMana
+      ? hpY - HP_BAR_HEIGHT / 2 - HP_TEXT_HEIGHT - MANA_BAR_GAP - MANA_BAR_HEIGHT - HP_TEXT_GAP
+      : hpY - HP_BAR_HEIGHT / 2 - HP_TEXT_GAP;
+    const markerTipY = topBarTextY - TARGET_MARKER_TEXT_CLEARANCE - TARGET_MARKER_GAP;
+    // Position (0, markerTipY) places the shape's local origin; the 3 points below are
+    // relative to THAT origin (0,0), matching the pre-side-view marker's pattern — they
+    // must not also carry markerTipY, or the offset compounds through Phaser's own
+    // bounding-box-based origin math into a much larger on-screen gap than intended.
     this.targetMarker = scene.add
       .triangle(
-        -width / 2 - TARGET_MARKER_GAP,
         0,
+        markerTipY,
+        -TARGET_MARKER_WIDTH / 2,
+        -TARGET_MARKER_HEIGHT,
+        TARGET_MARKER_WIDTH / 2,
+        -TARGET_MARKER_HEIGHT,
         0,
-        -TARGET_MARKER_HEIGHT / 2,
-        0,
-        TARGET_MARKER_HEIGHT / 2,
-        TARGET_MARKER_WIDTH,
         0,
         TARGET_MARKER_COLOR,
       )

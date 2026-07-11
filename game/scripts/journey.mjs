@@ -40,7 +40,9 @@ const SAVE_KEY = 'healgame-save-v1';
 // Scene layout constants (must match the scenes' layout constants; 960x540 viewport = 1:1 mapping)
 const UI = {
   tutorialLearn: { x: 480, y: 430 },
-  combatTank: { x: 170, y: 95 },
+  // Side-view facing line: tank is the rightmost party unit; 64px body is
+  // bottom-aligned to GROUND_Y=340 (body spans y 276-340, centered on x 380).
+  combatTank: { x: 380, y: 308 },
   combatReturn: { x: 480, y: 330 },
   // Spell bar: buttons 160w + 14 gap centered on 480, y 502; slot i of n.
   combatSpellSlot: (i, n) => ({ x: 480 - ((n - 1) * 174) / 2 + i * 174, y: 502 }),
