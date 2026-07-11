@@ -8,10 +8,10 @@
  * Chunk 2 (phase-2-handoff): all visuals live inside a Phaser Container
  * anchored at the unit's fixed "home" position, so a single tween on the
  * container can lunge the whole unit toward its target and back without ever
- * drifting from its resting spot. Hit markers (`*`) and heal floats (`+N`)
- * are independent, short-lived objects positioned at the home coordinates —
- * they never move with the container so they read correctly even on a unit
- * that both attacks and is hit in the same tick.
+ * drifting from its resting spot. Damage floats (`-N`) and heal floats
+ * (`+N`) are independent, short-lived objects positioned at the home
+ * coordinates — they never move with the container so they read correctly
+ * even on a unit that both attacks and is hit in the same tick.
  */
 
 import Phaser from 'phaser';
@@ -59,9 +59,8 @@ const FLOAT_DURATION_MS = 400;
 const FLOAT_FONT = 'monospace';
 const FLOAT_DEPTH = 50;
 
-const HIT_MARKER_TEXT = '*';
-const HIT_MARKER_COLOR = '#e05a4e';
-const HIT_MARKER_FONT_SIZE = '18px';
+const DAMAGE_FLOAT_COLOR = '#e05a4e';
+const DAMAGE_FLOAT_FONT_SIZE = '18px';
 const HEAL_FLOAT_COLOR = '#7ad67a';
 const HEAL_FLOAT_FONT_SIZE = '16px';
 const FLOAT_STROKE_COLOR = '#0a0605';
@@ -244,9 +243,10 @@ export class UnitSprite {
     });
   }
 
-  /** Spawns a `*` marker at this unit's home position for a `damage` event on it. */
-  spawnHitMarker(): void {
-    this.spawnFloatText(HIT_MARKER_TEXT, HIT_MARKER_COLOR, HIT_MARKER_FONT_SIZE);
+  /** Spawns a `-N` float at this unit's home position for a `damage` event on it. Always
+   *  shown — including 0 and overkill raw amounts (handoff §A: no clamping to remaining HP). */
+  spawnDamageFloat(amount: number): void {
+    this.spawnFloatText(`-${amount}`, DAMAGE_FLOAT_COLOR, DAMAGE_FLOAT_FONT_SIZE);
   }
 
   /** Spawns a `+N` float at this unit's home position for an effective (`amount > 0`) heal. */

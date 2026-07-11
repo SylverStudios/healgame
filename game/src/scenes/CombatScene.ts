@@ -23,6 +23,7 @@ import { Bar } from '../ui/bar';
 import { UnitSprite } from '../ui/unitSprite';
 import { frameForUnit } from '../ui/sprites';
 import { SpellBar } from '../ui/spellBar';
+import { CombatLog } from '../ui/combatLog';
 import type { CombatMods } from '../data/spellTree';
 
 /** Pinned contract: callers pass fully resolved CombatMods (from loadoutFromSave). */
@@ -78,6 +79,13 @@ const BOSS_CAST_FILL_COLOR = 0xe05a4e;
 
 const SPELL_BAR_Y = 502;
 
+/** Cast-cancel toast (handoff §D UI row): short-lived line near the player cast bar. */
+const TOAST_Y = 420;
+const TOAST_FONT = 'monospace';
+const TOAST_FONT_SIZE = '14px';
+const TOAST_COLOR = '#e8d8c8';
+const TOAST_FADE_MS = 1500;
+
 const OVERLAY_DEPTH = 1000;
 const OVERLAY_ALPHA = 0.85;
 
@@ -117,6 +125,12 @@ export class CombatScene extends Phaser.Scene {
   private waveText!: Phaser.GameObjects.Text;
   private rewardsText!: Phaser.GameObjects.Text;
 
+  private combatLog!: CombatLog;
+  private toastText!: Phaser.GameObjects.Text;
+  /** Scene-side elapsed-ms accumulator (sum of update deltas since combat start) — the engine
+   *  has no clock field, so the combat log's [12.3s] timestamps are derived here. */
+  private elapsedMs = 0;
+
   private resultShown = false;
 
   constructor() {
@@ -128,6 +142,7 @@ export class CombatScene extends Phaser.Scene {
     this.resultShown = false;
     this.partySprites = new Map();
     this.enemySprites = new Map();
+    this.elapsedMs = 0;
   }
 
   create(): void {
@@ -158,11 +173,16 @@ export class CombatScene extends Phaser.Scene {
       VIEW_WIDTH,
     );
     this.registerHotkeys(spells);
+    this.registerEscapeKey();
+
+    this.combatLog = new CombatLog(this, VIEW_WIDTH);
+    this.buildToast();
 
     this.syncView();
   }
 
   update(_time: number, delta: number): void {
+    this.elapsedMs += delta;
     const events = this.engine.advance(delta);
     this.handleEvents(events);
     this.syncView();
@@ -261,6 +281,20 @@ export class CombatScene extends Phaser.Scene {
       .setVisible(false);
   }
 
+  /** Short-lived status line for castCancelled (handoff §D) — only toast source in the scene. */
+  private buildToast(): void {
+    this.toastText = this.add
+      .text(VIEW_WIDTH / 2, TOAST_Y, '', { fontFamily: TOAST_FONT, fontSize: TOAST_FONT_SIZE, color: TOAST_COLOR })
+      .setOrigin(0.5)
+      .setAlpha(0);
+  }
+
+  private showToast(text: string): void {
+    this.tweens.killTweensOf(this.toastText);
+    this.toastText.setText(text).setAlpha(1);
+    this.tweens.add({ targets: this.toastText, alpha: 0, duration: TOAST_FADE_MS });
+  }
+
   private registerHotkeys(spells: SpellDef[]): void {
     const keyboard = this.input.keyboard;
     if (!keyboard) return;
@@ -268,6 +302,17 @@ export class CombatScene extends Phaser.Scene {
       const keyName = DIGIT_KEY_NAMES[i];
       if (!keyName) return;
       keyboard.on(`keydown-${keyName}`, () => this.onSpellCast(spell.id));
+    });
+  }
+
+  /** Escape cancels the active cast + queue (handoff §D); the castCancelled event it emits on
+   *  the next advance() drives the toast + log line in handleEvents(). */
+  private registerEscapeKey(): void {
+    const keyboard = this.input.keyboard;
+    if (!keyboard) return;
+    keyboard.on('keydown-ESC', () => {
+      if (this.engine.state.status !== 'running') return;
+      this.engine.cancelCast();
     });
   }
 
@@ -293,18 +338,36 @@ export class CombatScene extends Phaser.Scene {
         case 'damage': {
           const victim = this.findSprite(event.targetId);
           victim?.flashDamage();
-          victim?.spawnHitMarker();
+          victim?.spawnDamageFloat(event.amount);
           // Guard: the attacker (and/or victim) may already be dead this tick — sprites persist
           // until the next rebuildEnemies(), so the lookup is safe, but the sprite may be absent
           // if it belongs to a roster already replaced by a same-tick waveStarted rebuild.
           const attacker = this.findSprite(event.sourceId);
           if (attacker) attacker.lunge(victim?.getHomeX() ?? attacker.getHomeX());
+          this.combatLog.push(
+            `${this.formatTimestamp()} ${this.resolveUnitName(event.sourceId)} hits ${this.resolveUnitName(event.targetId)} -${event.amount}`,
+          );
           break;
         }
         case 'heal': {
           const target = this.findSprite(event.targetId);
           target?.flashHeal();
           target?.spawnHealFloat(event.amount);
+          const overheal = event.overheal > 0 ? ` (${event.overheal} over)` : '';
+          this.combatLog.push(
+            `${this.formatTimestamp()} ${this.resolveSpellName(event.spellId)} heals ${this.resolveUnitName(event.targetId)} +${event.amount}${overheal}`,
+          );
+          break;
+        }
+        case 'castCancelled': {
+          const spellName = this.resolveSpellName(event.spellId);
+          if (event.reason === 'escape') {
+            this.showToast('Cast cancelled');
+            this.combatLog.push(`${this.formatTimestamp()} Cast cancelled: ${spellName} (escape)`);
+          } else {
+            this.showToast('Cast failed: target died');
+            this.combatLog.push(`${this.formatTimestamp()} Cast cancelled: ${spellName} (target died)`);
+          }
           break;
         }
         case 'waveStarted':
@@ -323,6 +386,24 @@ export class CombatScene extends Phaser.Scene {
     return this.partySprites.get(unitId) ?? this.enemySprites.get(unitId);
   }
 
+  /** Resolves a unit id to its display name from the live engine snapshot; falls back to the raw id. */
+  private resolveUnitName(unitId: string): string {
+    const state = this.engine.state;
+    return (
+      state.party.find((u) => u.id === unitId)?.name ?? state.enemies.find((u) => u.id === unitId)?.name ?? unitId
+    );
+  }
+
+  /** Resolves a spell id to its display name from the player's loadout; falls back to the raw id. */
+  private resolveSpellName(spellId: string): string {
+    return this.sceneData.loadout.spells.find((s) => s.id === spellId)?.name ?? spellId;
+  }
+
+  /** Combat-log timestamp from the scene-side elapsed-ms accumulator, e.g. `[12.3s]`. */
+  private formatTimestamp(): string {
+    return `[${(this.elapsedMs / 1000).toFixed(1)}s]`;
+  }
+
   // ---- per-frame sync ---------------------------------------------------------
 
   private syncView(): void {
@@ -337,6 +418,7 @@ export class CombatScene extends Phaser.Scene {
 
     const healer = state.party.find((u) => u.role === 'healer');
     this.spellBar.setState(healer?.mana ?? 0, state.targetId !== null, state.status === 'running');
+    this.spellBar.setArmedSpellIds(state.armedBuffedSpellIds);
 
     this.waveText.setText(
       state.waveIndex < this.encounter.waves.length
