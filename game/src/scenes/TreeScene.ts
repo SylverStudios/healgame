@@ -45,6 +45,13 @@ const FONT = 'monospace';
 const NODE_WIDTH = 200;
 const NODE_HEIGHT = 70;
 
+const TOOLTIP_BG = 0x241a15;
+const TOOLTIP_BORDER = 0x0a0605;
+const TOOLTIP_PADDING = 8;
+const TOOLTIP_GAP = 8;
+const TOOLTIP_MAX_WIDTH = 280;
+const TOOLTIP_DEPTH = 300;
+
 /**
  * Presentation overrides for the live SPELL_TREE (journey click targets).
  * Any other config falls through to layoutSpots auto-placement.
@@ -104,9 +111,14 @@ export class TreeScene extends Phaser.Scene {
   private save!: SaveData;
   private treeState!: TreeState;
   private headerText!: Phaser.GameObjects.Text;
-  private descriptionText!: Phaser.GameObjects.Text;
+  /** Arm-confirmation status line only (e.g. "CLICK AGAIN TO SWEAR"); node
+   *  descriptions moved to the node-anchored tooltip below. */
+  private statusText!: Phaser.GameObjects.Text;
   private feedbackText!: Phaser.GameObjects.Text;
   private nodesContainer!: Phaser.GameObjects.Container;
+  private tooltipContainer!: Phaser.GameObjects.Container;
+  private tooltipBg!: Phaser.GameObjects.Rectangle;
+  private tooltipText!: Phaser.GameObjects.Text;
   /** In-memory only: exclusive-group spot armed for confirm click. */
   private armedSpotId: string | null = null;
   private feedback = '';
@@ -139,7 +151,7 @@ export class TreeScene extends Phaser.Scene {
       .text(width / 2, 64, '', { fontFamily: FONT, fontSize: '15px', color: ACCENT_COLOR })
       .setOrigin(0.5);
 
-    this.descriptionText = this.add
+    this.statusText = this.add
       .text(width / 2, 470, '', {
         fontFamily: FONT,
         fontSize: '12px',
@@ -159,6 +171,22 @@ export class TreeScene extends Phaser.Scene {
       .setOrigin(0.5, 0);
 
     this.nodesContainer = this.add.container(0, 0);
+
+    this.tooltipBg = this.add
+      .rectangle(0, 0, 10, 10, TOOLTIP_BG)
+      .setOrigin(0, 0)
+      .setStrokeStyle(1, TOOLTIP_BORDER);
+    this.tooltipText = this.add.text(TOOLTIP_PADDING, TOOLTIP_PADDING, '', {
+      fontFamily: FONT,
+      fontSize: '12px',
+      color: TEXT_COLOR,
+      align: 'left',
+      wordWrap: { width: TOOLTIP_MAX_WIDTH - TOOLTIP_PADDING * 2 },
+    });
+    this.tooltipContainer = this.add
+      .container(0, 0, [this.tooltipBg, this.tooltipText])
+      .setDepth(TOOLTIP_DEPTH)
+      .setVisible(false);
 
     this.buildBackButton(120, 504);
     this.render();
@@ -181,12 +209,13 @@ export class TreeScene extends Phaser.Scene {
   }
 
   private render(): void {
+    this.hideTooltip();
     this.nodesContainer.removeAll(true);
     const treeView = view(SPELL_TREE, this.treeState);
     const gold = treeView.wallet['gold'] ?? 0;
     const ruby = treeView.wallet['ruby'] ?? 0;
     this.headerText.setText(`Gold: ${gold}    Rubies: ${ruby}`);
-    this.descriptionText.setText(this.armMessage());
+    this.statusText.setText(this.armMessage());
     this.feedbackText.setText(this.feedback);
 
     const positions = layoutSpots(treeView, {
@@ -257,8 +286,8 @@ export class TreeScene extends Phaser.Scene {
       .setAlpha(alpha)
       .setInteractive({ useHandCursor: purchasable });
 
-    bg.on('pointerover', () => this.descriptionText.setText(spotDescription(spot)));
-    bg.on('pointerout', () => this.descriptionText.setText(this.armMessage()));
+    bg.on('pointerover', () => this.showTooltip(spot, pos));
+    bg.on('pointerout', () => this.hideTooltip());
     bg.on('pointerdown', () => this.onSpotClicked(spot));
 
     const nameText = this.add
@@ -267,10 +296,10 @@ export class TreeScene extends Phaser.Scene {
         fontSize: '13px',
         color: nameColor,
         align: 'center',
-        wordWrap: { width: NODE_WIDTH - 16 },
       })
       .setOrigin(0.5)
       .setAlpha(alpha);
+    this.clampTitleWidth(nameText, NODE_WIDTH - 16);
 
     const costStr = spot.next
       ? costLabel(spot.next.cost.currency, spot.next.cost.amount)
@@ -290,6 +319,40 @@ export class TreeScene extends Phaser.Scene {
         .setOrigin(0.5)
         .setAlpha(alpha);
       this.nodesContainer.add(lockedText);
+    }
+  }
+
+  /** Shows the node-anchored tooltip above the node; flips below if that would clip the canvas top. */
+  private showTooltip(spot: SpotView, pos: SpotPosition): void {
+    this.tooltipText.setText(spotDescription(spot));
+    const panelWidth = this.tooltipText.width + TOOLTIP_PADDING * 2;
+    const panelHeight = this.tooltipText.height + TOOLTIP_PADDING * 2;
+    this.tooltipBg.setSize(panelWidth, panelHeight);
+
+    const canvasWidth = this.scale.width;
+    const canvasHeight = this.scale.height;
+    const x = Phaser.Math.Clamp(pos.x - panelWidth / 2, 0, Math.max(0, canvasWidth - panelWidth));
+
+    const above = pos.y - NODE_HEIGHT / 2 - TOOLTIP_GAP - panelHeight;
+    const y =
+      above >= 0 ? above : Phaser.Math.Clamp(pos.y + NODE_HEIGHT / 2 + TOOLTIP_GAP, 0, canvasHeight - panelHeight);
+
+    this.tooltipContainer.setPosition(x, y);
+    this.tooltipContainer.setVisible(true);
+  }
+
+  private hideTooltip(): void {
+    this.tooltipContainer.setVisible(false);
+  }
+
+  /** Truncates an already-rendered text object with an ellipsis until it fits maxWidth. */
+  private clampTitleWidth(text: Phaser.GameObjects.Text, maxWidth: number): void {
+    if (text.width <= maxWidth) return;
+    const full = text.text;
+    let end = full.length - 1;
+    while (end > 1 && text.width > maxWidth) {
+      text.setText(`${full.slice(0, end)}…`);
+      end -= 1;
     }
   }
 
