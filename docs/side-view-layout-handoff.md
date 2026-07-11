@@ -1,6 +1,6 @@
 # Side-view combat layout — handoff
 
-Status: planning · Authority: this layout change's scope · Last verified: 2026-07-11
+Status: historical · Authority: none (shipped 2026-07-11; see poc-qa.md "Side-view layout QA") · Last verified: 2026-07-11
 
 **Audience:** whoever implements the facing-line layout. Read after
 `CLAUDE.md` / `AGENTS.md`. **This doc wins on layout scope below**;

@@ -274,3 +274,59 @@ overheal wipes, both maxed kits clear Ash Gate, The Maw stays unwinnable.
 No interactive element moved, so the `UI` click-coordinate table needed no
 changes. One new clickable exists if a future stage wants it: the combat-log
 toggle at (946, 14). Full journey re-run green after integration.
+
+# Side-view layout QA — facing-line combat (2026-07-11)
+
+Combat now reads as a Darkest Dungeon–style side view: party on the left
+facing right, enemies on the right facing left, everyone bottom-aligned to
+one shared ground line. Presentation only — no engine, save, data, or
+balance changes (all balance gates byte-identical). Handoff:
+`side-view-layout-handoff.md` (historical).
+
+## How to run (unchanged commands, from `game/`)
+
+Same gates: `npm run check`, `npm run smoke`, `node scripts/journey.mjs`.
+To eyeball the layout: `npm run dev`, enter Ash Gate.
+
+## Done-means checklist (all verified)
+
+1. **Shared ground Y** — `GROUND_Y = 340`; units bottom-align via
+   `groundAnchorY(height)` so party (64), trash (48), and boss (112) all
+   stand on the same line despite different container centers.
+2. **Party left→right `healer · dps2 · dps1 · tank`** — visual slots
+   80→380 assigned by unit id (`PARTY_VISUAL_ORDER`); the engine's party
+   array order (tank → dps1 → dps2 → healer) is untouched. Tank fronts the
+   line nearest the enemies.
+3. **Enemies left→right 580→880** — engine order, evenly spread; a lone
+   boss centers at x 730.
+4. **Facing** — new `facing: 'left' | 'right'` on `UnitSpriteConfig`;
+   party unflipped, enemies `flipX`. Kenney tiles are front-facing
+   portraits, so this is the handoff's declared stopgap, not real
+   side-profile art.
+5. **Target marker** — the left-of-body chevron (ambiguous in a horizontal
+   line: it points at the left neighbor) became a small downward chevron
+   centered above the unit's topmost bar/number line (clears the healer's
+   mana stack). Still party-only (heal-target indicator).
+6. **Ground line** — one 2px `0x3a2a22` rect at GROUND_Y behind the units
+   (the handoff's optional flourish; no other art).
+7. **Phase 3 feedback intact** — lunge (horizontal toward target home X,
+   unchanged logic), `-N`/`+N` floats, flash, combat log, Escape cancel +
+   toast, armed spell border: all re-verified by journey stage B2 shots and
+   smoke.
+
+## Constants shipped
+
+Handoff §C starting values held with no tuning needed (no HUD collision:
+boss top edge y 228 vs boss cast bar y≈54). Name labels stay centered on
+the body. Alongside this phase, the post-Phase 3 float readability tune
+landed: floats rise 20px over 550ms (was 14px/400ms), damage font 22px
+(was 18px), heal font 20px (was 16px).
+
+## Journey impact
+
+One coordinate: `UI.combatTank` moved from the old column slot (170, 95)
+to the tank's new home (380, 308) — 64px body spans y 276–340 centered on
+x 380. Hit area is still the sprite body bounds. Everything else in the
+`UI` table (Return overlay, spell-bar slots, hub/tree) was layout-independent,
+as the handoff predicted. Party hotkeys stay out of PoC (Decision D not
+reopened). Full journey green after integration.
