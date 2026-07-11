@@ -1,5 +1,7 @@
 # Combat engine (Chunk 1)
 
+Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-07-10
+
 Pure, deterministic TypeScript. No Phaser, no wall-clock, no randomness — driven
 entirely by `advance(dtMs)`. Chunk 2 builds the Phaser view against exactly
 this surface (`engine.ts` + `types.ts`).

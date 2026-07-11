@@ -1,8 +1,10 @@
 # Unit art — Kenney Tiny Dungeon
 
+Status: current · Authority: combat unit tile mapping · Last verified: 2026-07-10
+
 Combat units render 16×16 tiles from Kenney's **Tiny Dungeon** pack (CC0, no
 attribution required). Everything else in the game stays temp art per
-CLAUDE.md.
+CLAUDE.md. Live mapping: `game/src/ui/sprites.ts`.
 
 ## Where things are
 

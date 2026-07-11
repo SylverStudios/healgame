@@ -1,7 +1,10 @@
 # PoC QA — journey checklist & verification
 
+Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-10
+
 **Date:** 2026-07-08 · **Verdict: PoC complete.** Every poc-spec §1 criterion is
 implemented, and all of them are enforced by automated gates that run headless.
+(Phase 2 amended subclass UX — see checklist row 7 and Phase 2 section below.)
 
 ## How to run
 
@@ -15,9 +18,9 @@ Verification gates (all must pass, all deterministic):
 
 | Command | What it proves |
 |---|---|
-| `npm run check` | typecheck (strict TS) + ESLint + 75 Vitest tests + production build |
+| `npm run check` | typecheck (strict TS) + ESLint + all Vitest tests + production build |
 | `npm run smoke` | game boots in headless Chromium with zero console errors |
-| `node scripts/journey.mjs` | full §1 player journey driven with real clicks/hotkeys in headless Chromium, asserting on the save between stages (~5 min) |
+| `node scripts/journey.mjs` | full player journey with real clicks/hotkeys, asserting on the save between stages (~5 min) |
 
 ## poc-spec §1 checklist
 
@@ -29,7 +32,7 @@ Verification gates (all must pass, all deterministic):
 | 4 | Level ding auto-grants Zealous Mending, no spend UI | ✅ | journey stage A2 + progression tests |
 | 5 | Gold spend unlocks one tree node (Deep Reserves) | ✅ | journey stage B + progression tests |
 | 6 | Ash Gate clearable → 1 ruby on first clear only | ✅ | `balance.test.ts` (full-kit bot wins) + progression tests (ruby once) |
-| 7 | Ruby → blind Vigil/Zealot split; other branch hidden; no respec | ✅ | journey stage B + progression tests |
+| 7 | Ruby → Vigil/Zealot oath **in the tree** (descriptions visible); rival LOCKED (not hidden); no respec | ✅ | journey stage B + tree/progression tests |
 | 8 | Dungeon 2 (The Maw): overpowered boss, endless sandbox | ✅ | journey stage C + `balance.test.ts` (full-kit bot wipes) |
 
 Also verified: save persists everything across reloads; restart wipes the save
@@ -72,12 +75,12 @@ Scripted bots run the real engine deterministically:
 
 ## Architecture notes for the next slice
 
-- `game/src/combat/` is pure, deterministic TS (no Phaser) — see its README
-  for the engine API; the UI slice can be replaced without touching rules.
-- All numbers live in `game/src/data/` as data, guarded by balance tests —
-  retune freely; the tests fail if the difficulty shape breaks.
-- `scripts/journey.mjs` clicks by scene-layout coordinates; if a scene's
-  layout constants change, update the `UI` table at the top of that script.
+- `game/src/combat/` — pure deterministic TS; see `game/src/combat/README.md`.
+- `game/src/tree/` + `data/spellTree.ts` — config-driven tree; see
+  `game/src/tree/AGENTS.md`. Combat loadouts via `loadoutFromSave`.
+- All numbers in `game/src/data/`, guarded by balance tests.
+- `scripts/journey.mjs` clicks by layout coordinates; update its `UI` table
+  when scene layouts change.
 
 ---
 
@@ -126,7 +129,7 @@ Back moved to 120,504) and the spell-bar slot helper.
    missing-health) unit-tested in `engine.effects.test.ts` (11 tests);
    balance gates run both maxed subclass builds through `buildLoadout`.
 5. **v1 migration** — save unit tests + journey stage M in a real browser.
-6. **Gates** — `check` (99 tests), `smoke`, and `journey.mjs` all pass.
+6. **Gates** — `check`, `smoke`, and `journey.mjs` all pass.
 7. **Research doc** — `docs/research/pixel-art-pipeline.md` delivered.
 
 ## Decisions made during Phase 2 (beyond the handoff's locked list)

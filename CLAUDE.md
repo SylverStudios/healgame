@@ -1,14 +1,21 @@
 # CLAUDE.md — operating healgame
 
+Status: current · Authority: gates, hard rules, working style · Last verified: 2026-07-10
+
 healgame is a healer-focused auto-battler PoC: Phaser 3 + TypeScript (strict) +
-Vite. The game lives in `game/`; design docs in `docs/`.
+Vite. The game lives in `game/`; design docs in `docs/`. Doc conventions and
+authority hierarchy: [`AGENTS.md`](AGENTS.md).
 
 ## Doc authority (highest wins)
 
-1. `docs/poc-spec.md` — the build bible for PoC-scope questions
-2. `docs/poc-qa.md` — decided micro-choices + tuning log (don't re-decide these)
-3. `docs/phase-1-poc-outcome.md` — what exists, key lessons, deferred scope
-4. `docs/tech-options.md` — stack rationale; `docs/GDD.md` — long-term context only
+Full list in [`AGENTS.md`](AGENTS.md). Short form:
+
+1. Active phase handoff (`Status: planning`) — wins that phase's scope
+2. `docs/poc-spec.md` — PoC baseline (phase amendments in poc-qa / handoffs win)
+3. `docs/poc-qa.md` — decided micro-choices + tuning log
+4. Module docs — `game/src/tree/AGENTS.md`, `game/src/combat/README.md`
+5. This file — gates and hard rules
+6. Historical handoffs / `docs/tech-options.md` / `docs/GDD.md` / research — lower
 
 ## Commands (run from `game/`)
 
@@ -28,13 +35,18 @@ touches scenes, save shape, progression, or encounter/spell data, run
 
 ```
 game/src/
-  combat/   pure TS combat engine — NO Phaser imports, no wall clock, no Math.random.
-            Public API + rule decisions: game/src/combat/README.md
-  data/     ALL gameplay numbers as data (constants, spells, encounters, tree)
-  meta/     pure progression logic (rewards, loadout, purchases, subclass)
+  combat/   pure TS combat engine — NO Phaser, no wall clock, no Math.random.
+            Public API + rule decisions: combat/README.md
+  tree/     config-driven skill-tree service (opaque state, update/view).
+            Agent contract: tree/AGENTS.md
+  data/     ALL gameplay numbers as data: constants, spells, encounters,
+            spellTree.ts (live SPELL_TREE + loadoutFromSave).
+            tree.ts = legacy TREE_NODES (deprecated; tests only)
+  meta/     pure progression (rewards, buildLoadout alias, dungeon unlock).
+            purchaseNode is deprecated — TreeScene uses tree.update
   save/     SaveData + localStorage wrapper (injectable store for tests)
-  scenes/   Phaser scenes; keys in scenes/keys.ts; CombatScene exports the
-            CombatSceneData / CombatResult contracts other scenes call it with
+  scenes/   Phaser scenes; keys in scenes/keys.ts; CombatScene exports
+            CombatSceneData / CombatResult
   ui/       placeholder widgets (Bar, UnitSprite, SpellBar)
   scripts/  smoke.mjs, journey.mjs (Playwright, pinned 1.49.1)
 ```
@@ -49,9 +61,9 @@ game/src/
 - **Balance is pinned**: `src/combat/balance.test.ts` encodes the difficulty
   shape (no-heal wipes, naive overheal wipes, full kit clears, The Maw
   unwinnable). Retune data freely — but these gates decide if the tune ships.
-- **Pure logic first**: meta/combat behavior lives in tested pure functions;
-  scenes are thin wiring that call them and `saveGame()` immediately after
-  any mutation. New logic gets colocated `*.test.ts` (Vitest).
+- **Pure logic first**: meta/combat/tree behavior lives in tested pure
+  functions; scenes are thin wiring that call them and `saveGame()`
+  immediately after any mutation. New logic gets colocated `*.test.ts`.
 - **Temp art only, one exception**: combat units render Kenney Tiny Dungeon
   16×16 tiles (CC0; sheet in `game/public/assets/`, unit→tile mapping in
   `game/src/ui/sprites.ts`, `pixelArt: true`). Everything else stays rects,

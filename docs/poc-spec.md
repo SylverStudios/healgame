@@ -1,6 +1,9 @@
 # Healgame — PoC Spec (locked)
 
-**Status:** Locked for vertical-slice planning  
+Status: current · Authority: PoC baseline (phase amendments in poc-qa / handoffs win) · Last verified: 2026-07-10
+
+**PoC implementation details.** Wins on PoC conflicts unless a later phase
+handoff or `poc-qa.md` amendment says otherwise. Long-term design: [`GDD.md`](./GDD.md).
 **Date:** 2026-07-08  
 **Title:** healgame  
 **Archetype under test:** Oathbound only  
@@ -18,7 +21,7 @@ The PoC is successful when a player can:
 4. Gain a **second skill from XP** (level ding → skill, no extra click required).
 5. Unlock **one skill from the spell tree** (gold spend).
 6. Clear Ash Gate, earn **1 ruby** (first completion of that dungeon).
-7. Spend that ruby on a **subclass split** (see §6) that opens one branch and hides/locks the other.
+7. Spend that ruby on a **subclass split** (see §6) that opens one branch and locks the other.
 8. Enter **Dungeon 2** with an **insanely overpowered boss**, die forever in an endless sandbox (no clear expected; no further dungeons).
 
 **Not required for PoC:** procs/floating combo indicators, major cooldowns, hub permanent buffs, Aegis/Wildbloom, respec, polished UI/art, party hotkeys.
@@ -39,7 +42,7 @@ The PoC is successful when a player can:
 | 6 | Targeting | **Click-to-target only** |
 | 7 | Rewards | **Fixed gold per enemy**; **1 ruby per dungeon first completion**; replay = gold + XP |
 | 8 | Hub buffs | **None in PoC** (deferred) |
-| 9 | Ruby sink | **One subclass split** — pick opens a tree branch, closes the other; unselected branch hidden until picked |
+| 9 | Ruby sink | **One subclass split** — pick opens a tree branch, locks the other (rival visible but LOCKED; see §6 amendment) |
 | 10 | Mercs | **Auto-attacks only** |
 | 11 | Wipe expectation | **First run wipes**; many wipes OK; no downside beyond time |
 | 12 | PoC bar | See §1 — no procs, no major CD; XP skill + tree skill + ruby subclass; Ash Gate clear; D2 sandbox |
@@ -69,7 +72,7 @@ New game
   → Play more: level ding → second skill auto-unlocks (XP skill)
   → Spend gold on spell tree → unlock one tree skill
   → Eventually clear Ash Gate → 1 ruby
-  → Spend ruby → subclass A or B (other branch hidden/locked)
+  → Spend ruby → subclass A or B in the spell tree (rival path LOCKED, not hidden)
   → Ash Gate replayable for gold + XP
   → Unlock Dungeon 2 → overpowered boss sandbox (cannot clear / no need to)
 ```
@@ -151,16 +154,23 @@ Dungeon 2 boss: absurd HP / damage so the party cannot win with PoC power. Sandb
 
 After Ash Gate first clear, player has 1 ruby and may buy a **subclass**.
 
-**Rules:**
+**Rules (original PoC draft):**
 
 - Two options (working names):
   - **Path of the Vigil** — leans efficient / slow-heal mastery (opens Vigil branch nodes).
   - **Path of the Zealot** — leans fast / emergency healing (opens Zealot branch nodes).
 - Choosing one **spends the ruby**, **opens that branch**, and **closes the other**.
-- The unselected branch is **not visible** (or fully locked/hidden) until chosen — player commits blind between the two labels/descriptions, then sees that path’s tree.
+- ~~The unselected branch is not visible until chosen (blind commit).~~
 - No respec; restart to try the other path.
 
-PoC only needs the **split UI + one visible follow-up node** on the chosen path (even a stub perk). Full trees can wait.
+### Amendment (Phase 2 — current)
+
+Blind pick / hidden rival branch is **retired**. Subclass oaths live **in the
+spell tree** with full descriptions visible before purchase. Buying one spends
+the ruby (two-click confirm in UI), sets subclass, and permanently locks the
+rival (shown greyed **LOCKED**, still visible). Follow-up nodes sit behind the
+chosen oath. Live config: `game/src/data/spellTree.ts`; tree service:
+`game/src/tree/AGENTS.md`.
 
 ---
 
@@ -222,3 +232,4 @@ These do **not** block cutting tasks or picking tech:
 | Version | Date | Notes |
 |---------|------|-------|
 | v1 | 2026-07-08 | Locked from pre-slice Q&A |
+| v2 | 2026-07-10 | §6 amended (Phase 2 in-tree oaths); frontmatter |

@@ -1,11 +1,9 @@
 /**
- * Spell-tree node data (phase-2-handoff §"Tree data model"). A real
- * prerequisite tree: Deep Reserves at the root, branching to the two
- * mutually-exclusive subclass oath nodes (exclusiveGroup), each branching to
- * a synergy node and a spell-mod node. TreeScene renders generically from
- * this array; purchase rules live in meta/progression.ts.
+ * Legacy TREE_NODES — **deprecated for live UI/combat**.
  *
- * Draft numbers from the handoff doc — tunable against the balance gates.
+ * Live config: `data/spellTree.ts` (`SPELL_TREE`). Service: `src/tree/`
+ * (see `tree/AGENTS.md`). Kept for progression unit tests that still exercise
+ * `purchaseNode` / `nodeStatus`. Do not extend for new features.
  */
 
 import type { SubclassId } from '../save/save';

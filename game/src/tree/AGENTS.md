@@ -1,5 +1,7 @@
 # Skill tree — agent notes
 
+Status: current · Authority: skill-tree service + live SPELL_TREE wiring · Last verified: 2026-07-10
+
 Config-driven tree service (`game/src/tree/`) plus the live spell-tree data and
 combat resolve (`game/src/data/spellTree.ts`). Phaser stays out of this folder.
 

@@ -1,43 +1,44 @@
 # Phase 1 outcome — PoC built and verified (2026-07-08)
 
-**Read this if you're an agent joining the project.** It records what Phase 1
-produced, how it was built, and the decisions you should not re-litigate.
+Status: historical · Authority: none — Phase 1 retrospective only · Last verified: 2026-07-10
+
+**Do not use as a live map.** Scenes, tree data, and progression APIs have
+moved on (no SubclassScene; live tree is `SPELL_TREE` + `game/src/tree/`).
+Start from [`CLAUDE.md`](../CLAUDE.md), [`AGENTS.md`](../AGENTS.md), and
+[`game/src/tree/AGENTS.md`](../game/src/tree/AGENTS.md).
+
+**Read this for Phase 1 lessons** — what shipped then, and decisions not to
+re-litigate for that era.
 
 ## Outcome
 
-The full PoC from [`poc-spec.md`](./poc-spec.md) §1 is playable in-browser:
-tutorial → Ash Gate wipe → hub economy → XP auto-grant (Zealous Mending) →
-gold tree node (Deep Reserves) → Ash Gate clear → 1 ruby → blind Vigil/Zealot
-subclass split → The Maw (unwinnable Dungeon 2 sandbox). Single localStorage
-save; restart wipes. Every §1 criterion is enforced by an automated gate —
-see [`poc-qa.md`](./poc-qa.md) for the checklist, balance gates, and the §10
-micro-choices that are now **decided** (level 2 at 10 XP, Deep Reserves node,
-D2 unlocks on clear, healer untargetable, cast-time-is-busy-time + parallel
-1s GCD, mana spent on cast completion).
+The full PoC from [`poc-spec.md`](./poc-spec.md) §1 was playable in-browser at
+phase close: tutorial → Ash Gate wipe → hub → XP auto-grant → gold tree node →
+Ash Gate clear → ruby subclass → The Maw. Single localStorage save; restart
+wipes. Gates and micro-choices: [`poc-qa.md`](./poc-qa.md).
 
-Stack as locked in [`tech-options.md`](./tech-options.md): Phaser 3 +
-TypeScript (strict) + Vite under `game/`. Temp art only (rects + text).
+Stack: Phaser 3 + TypeScript (strict) + Vite under `game/`
+([`tech-options.md`](./tech-options.md)).
 
-## What exists (map)
+## What existed at phase close (superseded — see live code)
 
-| Where | What |
+| Where | Then |
 |---|---|
-| `game/src/combat/` | Pure deterministic TS combat engine — **no Phaser imports**. API documented in `game/src/combat/README.md`. Driven by `advance(dtMs)`; zero randomness; event log is reproducible. |
-| `game/src/data/` | Every gameplay number as data: `constants.ts`, `spells.ts`, `encounters.ts` (Ash Gate, The Maw), `tree.ts` (base + branch nodes). |
-| `game/src/meta/progression.ts` | Pure meta logic: `applyCombatResult`, `buildLoadout`, `purchaseNode`, `chooseSubclass`, `visibleTreeNodes`, `isDungeon2Unlocked`. |
-| `game/src/save/save.ts` | `SaveData` + localStorage load/save/reset, injectable store for tests. |
-| `game/src/scenes/` | Boot, Tutorial, Combat, Hub, Tree, Subclass. `CombatScene` exports the `CombatSceneData`/`CombatResult` contracts. |
-| `game/src/ui/` | Bar, UnitSprite, SpellBar placeholder widgets. |
-| `game/scripts/` | `smoke.mjs` (headless boot, fails on console errors), `journey.mjs` (full §1 journey with real clicks + save assertions). |
+| `game/src/combat/` | Pure engine — still true; see `combat/README.md` |
+| `game/src/data/` | constants, spells, encounters, early `tree.ts` |
+| `game/src/meta/progression.ts` | rewards + early purchase/loadout helpers |
+| `game/src/save/save.ts` | SaveData + localStorage |
+| `game/src/scenes/` | Boot, Tutorial, Combat, Hub, Tree, **Subclass** (Subclass later deleted in Phase 2) |
+| `game/scripts/` | smoke + journey |
+
+**Live map today:** [`CLAUDE.md`](../CLAUDE.md) “Where things live”.
 
 ## Verification gates (all deterministic; all green at phase end)
 
-1. `npm run check` — typecheck + ESLint + 75 Vitest tests + build.
+1. `npm run check` — typecheck + ESLint + Vitest + build.
 2. `npm run smoke` — headless Chromium boot, zero console errors.
-3. `node scripts/journey.mjs` — 13 save-state assertions across the §1 journey (~5 min).
-4. `game/src/combat/balance.test.ts` — scripted-bot difficulty gates: no-heal
-   wipes, naive overhealing wipes, perfect starting-kit play never cruises,
-   full kit clears with ≥3 alive + Bonehowl landing, The Maw unwinnable.
+3. `node scripts/journey.mjs` — save-state assertions across the journey.
+4. `game/src/combat/balance.test.ts` — difficulty shape bots.
 
 ## Key decisions & lessons (don't rediscover these)
 
@@ -81,3 +82,4 @@ boss phases, respec, real UI/art (separate slice), audio, networking.
 | Version | Date | Notes |
 |---------|------|-------|
 | v1 | 2026-07-09 | Phase 1 retrospective written at phase close |
+| v2 | 2026-07-10 | Marked historical; live map → CLAUDE.md / tree AGENTS |
