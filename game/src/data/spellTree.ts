@@ -298,12 +298,33 @@ export function resolveCombatMods(
   };
 }
 
-/** Fight-start helper: opaque tree state → combat mods. */
+/**
+ * Fight-start helper: opaque tree state → combat mods.
+ * Callers that only have a save should use `loadoutFromSave`.
+ */
 export function combatModsFromTree(
   state: TreeState,
   unlockedSpellIds: readonly string[],
 ): CombatMods {
   return resolveCombatMods(ownedContents<SpellTreeContent>(SPELL_TREE, state), unlockedSpellIds);
+}
+
+/**
+ * Canonical combat entry point: save → tree state → flat CombatMods.
+ * Hub / tutorial / balance bots call this at fight start; the engine never
+ * sees the skill-tree graph.
+ */
+export function loadoutFromSave(save: {
+  treeRanks: Record<string, number>;
+  unlockedSpells: readonly string[];
+  gold?: number;
+  rubies?: number;
+}): CombatMods {
+  const state = treeStateFromLegacy(save.treeRanks, {
+    gold: save.gold ?? 0,
+    ruby: save.rubies ?? 0,
+  });
+  return combatModsFromTree(state, save.unlockedSpells);
 }
 
 /**
@@ -350,8 +371,7 @@ const SINGLE_NODES = [
 
 /**
  * Inverse of `ownedIdsFromLegacyRanks` — write tree service owned ids back into
- * the save's `treeRanks` shape so combat can keep using `buildLoadout` until
- * that path is migrated.
+ * the save's `treeRanks` shape for persistence (combat reads via loadoutFromSave).
  */
 export function legacyRanksFromOwned(owned: readonly string[]): Record<string, number> {
   const ranks: Record<string, number> = {};

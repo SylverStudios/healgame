@@ -10,6 +10,7 @@ import {
   SPELL_TREE,
   combatModsFromTree,
   legacyRanksFromOwned,
+  loadoutFromSave,
   ownedIdsFromLegacyRanks,
   resolveCombatMods,
   treeStateFromLegacy,
@@ -216,5 +217,18 @@ describe('parity with buildLoadout', () => {
       'grantSpell',
       'missingHealthBonus',
     ]);
+  });
+
+  it('loadoutFromSave matches combatModsFromTree for a maxed Vigil save', () => {
+    const ranks = {
+      'deep-reserves': 5,
+      'vigil-oath': 1,
+      'vigil-patient-vow': 3,
+      'vigil-measured-devotion': 1,
+    };
+    const unlocked = ['solemn-mend', 'zealous-mending'];
+    const viaSave = loadoutFromSave({ treeRanks: ranks, unlockedSpells: unlocked });
+    const viaState = combatModsFromTree(treeStateFromLegacy(ranks, { gold: 0, ruby: 0 }), unlocked);
+    expect(viaSave).toEqual(viaState);
   });
 });

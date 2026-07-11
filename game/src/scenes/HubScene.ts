@@ -9,7 +9,8 @@
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { loadSave, resetSave, saveGame, type SaveData } from '../save/save';
-import { applyCombatResult, buildLoadout, isDungeon2Unlocked, type HubNotice } from '../meta/progression';
+import { applyCombatResult, isDungeon2Unlocked, type HubNotice } from '../meta/progression';
+import { loadoutFromSave } from '../data/spellTree';
 import { levelForXp } from '../data/constants';
 import { ASH_GATE, THE_MAW } from '../data/encounters';
 import type { CombatResult, CombatSceneData } from './CombatScene';
@@ -87,7 +88,7 @@ export class HubScene extends Phaser.Scene {
     this.makeButton(centerX, height / 2 - 15, 300, 52, 'Enter Ash Gate', () => {
       const combatData: CombatSceneData = {
         encounterId: ASH_GATE.id,
-        loadout: buildLoadout(save),
+        loadout: loadoutFromSave(save),
         returnTo: SceneKeys.Hub,
       };
       this.scene.start(SceneKeys.Combat, combatData);
@@ -108,7 +109,7 @@ export class HubScene extends Phaser.Scene {
       this.makeButton(centerX, height / 2 + 180, 300, 52, 'Enter The Maw (Dungeon 2)', () => {
         const combatData: CombatSceneData = {
           encounterId: THE_MAW.id,
-          loadout: buildLoadout(save),
+          loadout: loadoutFromSave(save),
           returnTo: SceneKeys.Hub,
         };
         this.scene.start(SceneKeys.Combat, combatData);

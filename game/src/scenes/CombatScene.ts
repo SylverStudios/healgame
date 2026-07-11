@@ -23,12 +23,12 @@ import { Bar } from '../ui/bar';
 import { UnitSprite } from '../ui/unitSprite';
 import { frameForUnit } from '../ui/sprites';
 import { SpellBar } from '../ui/spellBar';
-import type { Loadout } from '../meta/progression';
+import type { CombatMods } from '../data/spellTree';
 
-/** Pinned contract (phase-2-handoff): callers pass a fully resolved Loadout. */
+/** Pinned contract: callers pass fully resolved CombatMods (from loadoutFromSave). */
 export interface CombatSceneData {
   encounterId: string;
-  loadout: Loadout;
+  loadout: CombatMods;
   returnTo: string;
 }
 
@@ -139,6 +139,8 @@ export class CombatScene extends Phaser.Scene {
 
     this.engine = new CombatEngine(encounter, spells, {
       bonusMaxMana: this.sceneData.loadout.bonusMaxMana,
+      synergies: this.sceneData.loadout.synergies,
+      missingHealthBonuses: this.sceneData.loadout.missingHealthBonuses,
     });
 
     this.buildPartySprites();

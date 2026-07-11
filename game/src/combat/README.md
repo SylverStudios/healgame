@@ -10,11 +10,10 @@ new CombatEngine(encounter: EncounterDef, spells: SpellDef[], options?: {
   synergies?: { triggerSpellId: string; buffedSpellId: string; bonusHeal: number }[];
   missingHealthBonuses?: { spellId: string; healPer10PctMissing: number }[];
 })
-// spells = player's unlocked list; options.bonusMaxMana (spell-tree nodes, e.g. Deep Reserves)
-// adds to the healer's max AND starting mana. options.synergies / options.missingHealthBonuses
-// (phase-2-handoff Chunk 1) are the resolved rule lists from Loadout — see "Synergy and
-// missing-health bonuses" below. Omit options (or any field) for the pre-Chunk-1 default (no
-// bonus of any kind) — fully backward compatible.
+// spells = player's unlocked list; options come from loadoutFromSave / CombatMods
+// (bonusMaxMana, synergies, missingHealthBonuses). castMod is already baked into
+// spell defs by resolveCombatMods — the engine never sees it. Omit options for
+// the pre-tree default (no bonus of any kind) — fully backward compatible.
 engine.advance(dtMs): CombatEvent[]   // steps the sim; safe for any dt (sub-steps internally)
 engine.setTarget(unitId): void        // click-to-target an ally; ignored if unknown/dead/enemy
 engine.castSpell(spellId): void       // starts, queues, or is silently dropped — see below
@@ -70,7 +69,7 @@ in `encounters.ts`, expected to be retuned.
     overheal split is computed from). Integer math only. Multiple matching
     entries sum. A dead target produces no heal event, so no bonus either.
   - Both kinds stack additively on the same cast. `castMod` never reaches the
-    engine — `buildLoadout` (meta/progression.ts) already resolves it into
+    engine — `resolveCombatMods` / `loadoutFromSave` already bake it into
     `SpellDef.castMs`/`mana` before spells are handed to the constructor.
 - **Waves/victory/wipe**: a wave clears (and the next spawns) the instant its
   last enemy dies; victory on boss hp 0; wipe the instant all 4 party members

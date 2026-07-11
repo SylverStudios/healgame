@@ -1,7 +1,7 @@
 /**
  * Spell tree scene — renders any TreeConfig via view() + layoutSpots().
- * Purchases go through tree.update; state is bridged back into SaveData so
- * combat (still on buildLoadout) keeps working. Ugly temp art on purpose.
+ * Purchases go through tree.update; state is bridged back into SaveData
+ * (treeRanks) for persistence. Combat resolves via loadoutFromSave.
  */
 
 import Phaser from 'phaser';

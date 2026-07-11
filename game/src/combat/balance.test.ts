@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CombatEngine } from './engine';
 import { ASH_GATE, THE_MAW } from '../data/encounters';
 import { SPELLS } from '../data/constants';
-import { buildLoadout } from '../meta/progression';
+import { loadoutFromSave, type CombatMods } from '../data/spellTree';
 import type { SaveData } from '../save/save';
 import type { CombatEngineOptions, EncounterDef, SpellDef, Unit } from './types';
 
@@ -34,7 +34,7 @@ const MAX_MS = 10 * 60 * 1000;
 
 const BASE_KIT: SpellDef[] = [SPELLS.solemnMend];
 
-/** Minimal synthetic SaveData for buildLoadout — only the fields the two maxed builds below need. */
+/** Minimal synthetic SaveData for loadoutFromSave — only the fields the two maxed builds below need. */
 function makeSave(overrides: Partial<SaveData>): SaveData {
   return {
     version: 2,
@@ -66,8 +66,8 @@ const ZEALOT_SAVE: SaveData = makeSave({
   subclass: 'zealot',
 });
 
-const VIGIL_LOADOUT = buildLoadout(VIGIL_SAVE);
-const ZEALOT_LOADOUT = buildLoadout(ZEALOT_SAVE);
+const VIGIL_LOADOUT: CombatMods = loadoutFromSave(VIGIL_SAVE);
+const ZEALOT_LOADOUT: CombatMods = loadoutFromSave(ZEALOT_SAVE);
 
 interface BotRun {
   status: 'victory' | 'wipe';
@@ -180,7 +180,7 @@ function runBot(
   };
 }
 
-function runBuildBot(encounter: EncounterDef, loadout: ReturnType<typeof buildLoadout>, style: BotStyle): BotRun {
+function runBuildBot(encounter: EncounterDef, loadout: CombatMods, style: BotStyle): BotRun {
   return runBot(
     encounter,
     loadout.spells,

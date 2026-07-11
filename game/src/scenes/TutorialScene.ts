@@ -7,7 +7,7 @@
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { loadSave, saveGame } from '../save/save';
-import { buildLoadout } from '../meta/progression';
+import { loadoutFromSave } from '../data/spellTree';
 import { ASH_GATE } from '../data/encounters';
 import { SPELLS } from '../data/constants';
 import type { CombatSceneData } from './CombatScene';
@@ -80,7 +80,7 @@ export class TutorialScene extends Phaser.Scene {
 
     const combatData: CombatSceneData = {
       encounterId: ASH_GATE.id,
-      loadout: buildLoadout(save),
+      loadout: loadoutFromSave(save),
       returnTo: SceneKeys.Hub,
     };
     this.scene.start(SceneKeys.Combat, combatData);

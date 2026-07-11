@@ -6,7 +6,7 @@
 
 import Phaser from 'phaser';
 import type { SpellDef } from '../combat/types';
-import type { Loadout } from '../meta/progression';
+import type { CombatMods } from '../data/spellTree';
 import { SpellTooltip, buildTooltipLines } from './spellTooltip';
 
 const BUTTON_WIDTH = 160;
@@ -101,7 +101,7 @@ export class SpellBar {
     centerX: number,
     y: number,
     spells: SpellDef[],
-    loadout: Loadout,
+    loadout: CombatMods,
     onCast: (spellId: string) => void,
     screenWidth = 960,
   ) {

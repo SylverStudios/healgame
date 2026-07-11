@@ -7,7 +7,7 @@
 
 import Phaser from 'phaser';
 import type { SpellDef } from '../combat/types';
-import type { Loadout } from '../meta/progression';
+import type { CombatMods } from '../data/spellTree';
 import { spellById } from '../data/spells';
 
 const PADDING = 6;
@@ -28,12 +28,12 @@ interface TooltipLine {
 }
 
 /** Looks up a spell's display name: resolved loadout copy first, then the static catalog. */
-function spellName(id: string, loadout: Loadout): string {
+function spellName(id: string, loadout: CombatMods): string {
   return loadout.spells.find((s) => s.id === id)?.name ?? spellById(id)?.name ?? id;
 }
 
 /** Builds the pinned content lines (order matters — see phase-2-handoff) for one spell button. */
-export function buildTooltipLines(spell: SpellDef, loadout: Loadout): TooltipLine[] {
+export function buildTooltipLines(spell: SpellDef, loadout: CombatMods): TooltipLine[] {
   const lines: TooltipLine[] = [
     { text: spell.name, color: NAME_LINE_COLOR },
     { text: `Heals ${spell.heal}`, color: DEFAULT_LINE_COLOR },

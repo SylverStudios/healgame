@@ -2,12 +2,14 @@
  * Pure meta-progression logic (poc-spec §5/§8, phase-2-handoff "Loadout") —
  * no Phaser. Scenes call these functions and immediately persist the mutated
  * SaveData via saveGame(); this module never touches storage itself.
+ *
+ * Combat loadouts are resolved by the spell-tree service (`loadoutFromSave`);
+ * `buildLoadout` is a thin alias kept for existing call sites/tests.
  */
 
 import { levelForXp, REWARDS, SPELLS } from '../data/constants';
-import { spellById } from '../data/spells';
 import { TREE_NODES, treeNodeById } from '../data/tree';
-import type { SpellDef } from '../combat/types';
+import { loadoutFromSave, type CombatMods } from '../data/spellTree';
 import type { SaveData } from '../save/save';
 import type { CombatResult } from '../scenes/CombatScene';
 
@@ -54,73 +56,18 @@ export function applyCombatResult(save: SaveData, result: CombatResult): HubNoti
 }
 
 /**
- * The cross-boundary loadout type (phase-2-handoff, pinned). `spells` are
- * RESOLVED defs — castMod tree nodes are already applied to castMs/mana, so
- * neither the engine nor the combat view ever sees castMod.
+ * Resolved fight kit. Alias of `CombatMods` — spells already have castMod
+ * baked in; the engine never sees tree layout or castMod nodes.
  */
-export interface Loadout {
-  spells: SpellDef[];
-  bonusMaxMana: number;
-  synergies: { triggerSpellId: string; buffedSpellId: string; bonusHeal: number }[];
-  missingHealthBonuses: { spellId: string; healPer10PctMissing: number }[];
+export type Loadout = CombatMods;
+
+/** Builds the resolved Loadout for the current save via the spell-tree service. */
+export function buildLoadout(save: SaveData): Loadout {
+  return loadoutFromSave(save);
 }
 
 function ranksOf(save: SaveData, nodeId: string): number {
   return save.treeRanks[nodeId] ?? 0;
-}
-
-/** Builds the resolved Loadout for the current save (unlocked + tree-granted spells, effects applied). */
-export function buildLoadout(save: SaveData): Loadout {
-  const loadout: Loadout = { spells: [], bonusMaxMana: 0, synergies: [], missingHealthBonuses: [] };
-
-  // Base list: XP-unlocked spells in unlock order, then tree-granted spells in
-  // tree order. Cloned so castMod resolution never mutates the data catalog.
-  const spellIds = [...save.unlockedSpells];
-  for (const node of TREE_NODES) {
-    if (node.effect.kind === 'grantSpell' && ranksOf(save, node.id) > 0 && !spellIds.includes(node.effect.spellId)) {
-      spellIds.push(node.effect.spellId);
-    }
-  }
-  loadout.spells = spellIds
-    .map((id) => spellById(id))
-    .filter((spell): spell is SpellDef => spell !== undefined)
-    .map((spell) => ({ ...spell }));
-
-  for (const node of TREE_NODES) {
-    const ranks = ranksOf(save, node.id);
-    if (ranks <= 0) continue;
-    const effect = node.effect;
-    switch (effect.kind) {
-      case 'bonusMaxMana':
-        loadout.bonusMaxMana += effect.amountPerRank * ranks;
-        break;
-      case 'synergy':
-        loadout.synergies.push({
-          triggerSpellId: effect.triggerSpellId,
-          buffedSpellId: effect.buffedSpellId,
-          bonusHeal: effect.bonusHealPerRank * ranks,
-        });
-        break;
-      case 'missingHealthBonus':
-        loadout.missingHealthBonuses.push({
-          spellId: effect.spellId,
-          healPer10PctMissing: effect.healPer10PctMissingPerRank * ranks,
-        });
-        break;
-      case 'castMod': {
-        const spell = loadout.spells.find((sp) => sp.id === effect.spellId);
-        if (spell) {
-          spell.castMs = Math.max(0, spell.castMs + effect.castMsDelta * ranks);
-          spell.mana = Math.max(0, spell.mana + effect.manaDelta * ranks);
-        }
-        break;
-      }
-      case 'grantSpell':
-        break; // already handled above
-    }
-  }
-
-  return loadout;
 }
 
 /** Everything a scene needs to render one node's state. All derived, no mutation. */
@@ -137,6 +84,10 @@ export interface TreeNodeStatus {
   purchasable: boolean;
 }
 
+/**
+ * @deprecated TreeScene uses the config-driven tree service. Kept for
+ * progression unit tests covering the legacy TREE_NODES purchase path.
+ */
 export function nodeStatus(save: SaveData, nodeId: string): TreeNodeStatus | undefined {
   const node = treeNodeById(nodeId);
   if (!node) return undefined;
@@ -163,11 +114,7 @@ export function nodeStatus(save: SaveData, nodeId: string): TreeNodeStatus | und
 }
 
 /**
- * Buys one rank of a spell-tree node. Fails (returns false, no mutation) if
- * the node is unknown, maxed, prereq-gated, exclusive-locked, or
- * unaffordable in its currency. On success, mutates `save` (currency spent,
- * rank recorded; a subclass oath node also sets save.subclass) and returns
- * true; caller saveGame()s.
+ * @deprecated TreeScene uses tree.update. Kept for progression unit tests.
  */
 export function purchaseNode(save: SaveData, nodeId: string): boolean {
   const node = treeNodeById(nodeId);
