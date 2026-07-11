@@ -26,7 +26,10 @@ const NAME_COLOR = '#e8d8c8';
 const COST_FONT = '11px monospace';
 const COST_COLOR = '#a8c8f0';
 const HOTKEY_FONT = '10px monospace';
-const HOTKEY_COLOR = '#8a7868';
+const HOTKEY_COLOR = '#e8d8c8';
+const KEYCAP_SIZE = 18;
+const KEYCAP_BG = 0x241a15;
+const KEYCAP_BORDER = 0x8a7868;
 
 class SpellButton {
   readonly spellId: string;
@@ -35,6 +38,7 @@ class SpellButton {
   readonly topY: number;
 
   private readonly bg: Phaser.GameObjects.Rectangle;
+  private readonly keycap: Phaser.GameObjects.Rectangle;
   private readonly nameText: Phaser.GameObjects.Text;
   private readonly costText: Phaser.GameObjects.Text;
   private readonly hotkeyText: Phaser.GameObjects.Text;
@@ -66,6 +70,12 @@ class SpellButton {
     this.bg.on('pointerover', () => onHoverStart(this.spellId, this.centerX, this.topY));
     this.bg.on('pointerout', () => onHoverEnd());
 
+    const keycapX = x - BUTTON_WIDTH / 2 + 6 + KEYCAP_SIZE / 2;
+    const keycapY = y - BUTTON_HEIGHT / 2 + 6 + KEYCAP_SIZE / 2;
+    this.keycap = scene.add
+      .rectangle(keycapX, keycapY, KEYCAP_SIZE, KEYCAP_SIZE, KEYCAP_BG)
+      .setStrokeStyle(1, KEYCAP_BORDER);
+
     this.nameText = scene.add
       .text(x, y - 8, spell.name, { fontFamily: NAME_FONT, color: NAME_COLOR })
       .setOrigin(0.5);
@@ -73,17 +83,18 @@ class SpellButton {
       .text(x, y + 11, `${spell.mana} mana`, { fontFamily: COST_FONT, color: COST_COLOR })
       .setOrigin(0.5);
     this.hotkeyText = scene.add
-      .text(x - BUTTON_WIDTH / 2 + 8, y - BUTTON_HEIGHT / 2 + 6, hotkeyLabel, {
+      .text(keycapX, keycapY, hotkeyLabel, {
         fontFamily: HOTKEY_FONT,
         color: HOTKEY_COLOR,
       })
-      .setOrigin(0, 0);
+      .setOrigin(0.5);
   }
 
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
     const alpha = enabled ? 1 : BUTTON_DISABLED_ALPHA;
     this.bg.setAlpha(alpha);
+    this.keycap.setAlpha(alpha);
     this.nameText.setAlpha(alpha);
     this.costText.setAlpha(alpha);
     this.hotkeyText.setAlpha(alpha);
@@ -98,6 +109,7 @@ class SpellButton {
 
   destroy(): void {
     this.bg.destroy();
+    this.keycap.destroy();
     this.nameText.destroy();
     this.costText.destroy();
     this.hotkeyText.destroy();

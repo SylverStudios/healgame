@@ -62,10 +62,26 @@ const FLOAT_DURATION_MS = 550;
 const FLOAT_FONT = 'monospace';
 const FLOAT_DEPTH = 50;
 
+/** Map heal/damage amount → float font size (handoff §L). */
+function floatFontPx(amount: number): string {
+  const a = Math.abs(amount);
+  let px = 18;
+  if (a <= 1) px = 18;
+  else if (a <= 2) px = 20;
+  else if (a <= 4) px = 24;
+  else if (a <= 6) px = 28;
+  else px = 32;
+  return `${px}px`;
+}
+
+const HALO_FILL_COLOR = 0xf2c14e;
+const HALO_FILL_ALPHA = 0.28;
+const HALO_STROKE_COLOR = 0x8a7868;
+const HALO_WIDTH = 52;
+const HALO_HEIGHT = 14;
+const HALO_DEPTH = -2;
 const DAMAGE_FLOAT_COLOR = '#e05a4e';
-const DAMAGE_FLOAT_FONT_SIZE = '22px';
 const HEAL_FLOAT_COLOR = '#7ad67a';
-const HEAL_FLOAT_FONT_SIZE = '20px';
 const FLOAT_STROKE_COLOR = '#0a0605';
 const FLOAT_STROKE_WIDTH = 3;
 
@@ -104,6 +120,8 @@ export class UnitSprite {
   private readonly manaBar: Bar | null;
   private readonly manaText: Phaser.GameObjects.Text | null;
   private readonly targetMarker: Phaser.GameObjects.Triangle;
+  /** Ember/iron ellipse under the unit's feet when targeted (handoff §M). */
+  private readonly targetHalo: Phaser.GameObjects.Ellipse;
 
   /** Standalone floating texts (hit markers / heal floats) not parented to the container. */
   private readonly activeFloats = new Set<Phaser.GameObjects.Text>();
@@ -196,6 +214,13 @@ export class UnitSprite {
       .setVisible(false);
     this.container.add(this.targetMarker);
 
+    const feetY = y + height / 2;
+    this.targetHalo = scene.add
+      .ellipse(x, feetY + 4, HALO_WIDTH, HALO_HEIGHT, HALO_FILL_COLOR, HALO_FILL_ALPHA)
+      .setStrokeStyle(1, HALO_STROKE_COLOR)
+      .setDepth(HALO_DEPTH)
+      .setVisible(false);
+
     this.update(unit);
   }
 
@@ -224,16 +249,22 @@ export class UnitSprite {
       this.hpBar.setVisible(false);
       this.manaBar?.setVisible(false);
       this.targetMarker.setVisible(false);
+      this.targetHalo.setVisible(false);
     }
   }
 
   setTargeted(isTargeted: boolean): void {
     this.targetMarker.setVisible(isTargeted && this.alive);
+    this.targetHalo.setVisible(isTargeted && this.alive);
   }
 
   /** Fixed home-position X, used by the scene to compute lunge direction between two sprites. */
   getHomeX(): number {
     return this.homeX;
+  }
+
+  getHomeY(): number {
+    return this.homeY;
   }
 
   /**
@@ -268,13 +299,13 @@ export class UnitSprite {
   /** Spawns a `-N` float at this unit's home position for a `damage` event on it. Always
    *  shown — including 0 and overkill raw amounts (handoff §A: no clamping to remaining HP). */
   spawnDamageFloat(amount: number): void {
-    this.spawnFloatText(`-${amount}`, DAMAGE_FLOAT_COLOR, DAMAGE_FLOAT_FONT_SIZE);
+    this.spawnFloatText(`-${amount}`, DAMAGE_FLOAT_COLOR, floatFontPx(amount));
   }
 
   /** Spawns a `+N` float at this unit's home position for an effective (`amount > 0`) heal. */
   spawnHealFloat(amount: number): void {
     if (amount <= 0) return;
-    this.spawnFloatText(`+${amount}`, HEAL_FLOAT_COLOR, HEAL_FLOAT_FONT_SIZE);
+    this.spawnFloatText(`+${amount}`, HEAL_FLOAT_COLOR, floatFontPx(amount));
   }
 
   private spawnFloatText(text: string, color: string, fontSize: string): void {
@@ -294,6 +325,11 @@ export class UnitSprite {
         obj.destroy();
       },
     });
+  }
+
+  /** Brief ember flash when the healer begins a cast (handoff §N). */
+  flashCast(): void {
+    this.flash(0xf2c14e);
   }
 
   /** Brief red flash for a damage event on this unit. */
@@ -327,6 +363,7 @@ export class UnitSprite {
       float.destroy();
     }
     this.activeFloats.clear();
+    this.targetHalo.destroy();
     this.container.destroy();
   }
 }

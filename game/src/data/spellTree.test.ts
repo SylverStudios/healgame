@@ -16,7 +16,7 @@ import {
   treeStateFromLegacy,
   type SpellTreeContent,
 } from './spellTree';
-import { create, ownedContents, update, validateConfig, view } from '../tree';
+import { create, ownedContents, ownedOf, update, validateConfig, view } from '../tree';
 
 function save(overrides: Partial<SaveData> = {}): SaveData {
   return { ...newSaveData(), ...overrides };
@@ -47,7 +47,6 @@ describe('SPELL_TREE config', () => {
 
   it('locks the rival oath via exclusiveGroup', () => {
     let state = create(SPELL_TREE, { gold: 100, ruby: 2 });
-    // Buy first deep-reserves rank
     const root = update(SPELL_TREE, state, { type: 'purchase', spotId: 'deep-reserves' });
     expect(root.ok).toBe(true);
     if (!root.ok) return;
@@ -58,13 +57,59 @@ describe('SPELL_TREE config', () => {
     if (!vigil.ok) return;
     state = vigil.state;
 
-    const zealot = update(SPELL_TREE, state, { type: 'purchase', spotId: 'zealot-oath' });
-    expect(zealot.ok).toBe(false);
-    if (zealot.ok) return;
-    expect(zealot.reason).toBe('exclusive-locked');
+    const zealotSpotPurchase = update(SPELL_TREE, state, { type: 'purchase', spotId: 'zealot-oath' });
+    expect(zealotSpotPurchase.ok).toBe(true);
+    if (!zealotSpotPurchase.ok) return;
+    expect(ownedOf(zealotSpotPurchase.state)).not.toContain('zealot-oath');
+    expect(ownedOf(zealotSpotPurchase.state)).toContain('warped-tempo-via-zealot');
 
-    const zealotView = view(SPELL_TREE, state).spots.find((s) => s.id === 'zealot-oath');
+    const zealotView = view(SPELL_TREE, zealotSpotPurchase.state).spots.find((s) => s.id === 'zealot-oath');
+    expect(zealotView?.next?.id).toBe('zealot-oath');
     expect(zealotView?.status).toBe('exclusive-locked');
+  });
+
+  it('offers forsaken-path tempo on the rival spot after swearing an oath', () => {
+    let state = create(SPELL_TREE, { gold: 10, ruby: 2 });
+    const root = update(SPELL_TREE, state, { type: 'purchase', spotId: 'deep-reserves' });
+    expect(root.ok).toBe(true);
+    if (!root.ok) return;
+    state = root.state;
+
+    const vigil = update(SPELL_TREE, state, { type: 'purchase', spotId: 'vigil-oath' });
+    expect(vigil.ok).toBe(true);
+    if (!vigil.ok) return;
+    state = vigil.state;
+
+    const zealotSpot = view(SPELL_TREE, state).spots.find((s) => s.id === 'zealot-oath');
+    expect(zealotSpot?.next?.id).toBe('warped-tempo-via-zealot');
+
+    const tempo = update(SPELL_TREE, state, { type: 'purchase', spotId: 'zealot-oath' });
+    expect(tempo.ok).toBe(true);
+    if (!tempo.ok) return;
+    state = tempo.state;
+
+    const vigilSpot = view(SPELL_TREE, state).spots.find((s) => s.id === 'vigil-oath');
+    expect(vigilSpot?.next?.id).toBe('warped-tempo-via-vigil');
+    expect(vigilSpot?.status).toBe('locked');
+
+    const rivalTempo = update(SPELL_TREE, state, { type: 'purchase', spotId: 'vigil-oath' });
+    expect(rivalTempo.ok).toBe(false);
+    if (rivalTempo.ok) return;
+    expect(rivalTempo.reason).toBe('requirements-unmet');
+  });
+
+  it('adds 1.5× pace to CombatMods when warped tempo is owned', () => {
+    const mods = resolveCombatMods(
+      [
+        {
+          name: 'Warped Tempo',
+          description: '',
+          effect: { kind: 'combatPace', multiplierTenths: 15 },
+        },
+      ],
+      ['solemn-mend'],
+    );
+    expect(mods.paceMultipliersTenths).toEqual([10, 15]);
   });
 });
 
@@ -149,6 +194,7 @@ describe('parity with buildLoadout', () => {
     expect(next.spells).toEqual(legacy.spells);
     expect(next.synergies).toEqual(legacy.synergies);
     expect(next.missingHealthBonuses).toEqual(legacy.missingHealthBonuses);
+    expect(next.paceMultipliersTenths).toEqual(legacy.paceMultipliersTenths);
   }
 
   it('matches on a fresh kit', () => {

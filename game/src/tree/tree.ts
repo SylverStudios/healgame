@@ -197,9 +197,34 @@ function exclusiveLocked(
   return false;
 }
 
-function nextInChain(spot: SpotDef, owned: ReadonlySet<string>): string | null {
-  for (const nodeId of spot.chain) {
-    if (!owned.has(nodeId)) return nodeId;
+/**
+ * First unowned chain entry, with exclusive-locked skip to a later
+ * `availableIfExclusiveLocked` consolation when the natural next is blocked.
+ */
+function nextInChain(
+  spot: SpotDef,
+  owned: ReadonlySet<string>,
+  nodesById: ReadonlyMap<string, NodeDef>,
+): string | null {
+  for (let i = 0; i < spot.chain.length; i++) {
+    const nodeId = spot.chain[i]!;
+    if (owned.has(nodeId)) continue;
+
+    const node = nodesById.get(nodeId)!;
+    if (exclusiveLocked(node, owned, nodesById)) {
+      for (let j = i + 1; j < spot.chain.length; j++) {
+        const consolationId = spot.chain[j]!;
+        if (owned.has(consolationId)) continue;
+        const consolation = nodesById.get(consolationId)!;
+        if (!consolation.availableIfExclusiveLocked) continue;
+        if (!requirementsMet(consolation, owned)) continue;
+        if (exclusiveLocked(consolation, owned, nodesById)) continue;
+        return consolationId;
+      }
+      return nodeId;
+    }
+
+    return nodeId;
   }
   return null;
 }
@@ -296,7 +321,7 @@ export function update(config: TreeConfig, state: TreeState, action: TreeAction)
   }
 
   const internal = asInternal(state);
-  const nextId = nextInChain(spot, internal.owned);
+  const nextId = nextInChain(spot, internal.owned, compiled.nodesById);
   if (nextId === null) {
     return reject(state, 'spot-complete', `Spot "${action.spotId}" is already fully purchased`);
   }
@@ -375,7 +400,7 @@ export function view(config: TreeConfig, state: TreeState): TreeView {
       if (!internal.owned.has(nodeId)) break;
       ownedViews.push(toNodeView(compiled.nodesById.get(nodeId)!));
     }
-    const nextId = nextInChain(spot, internal.owned);
+    const nextId = nextInChain(spot, internal.owned, compiled.nodesById);
     const nextNode = nextId === null ? null : compiled.nodesById.get(nextId)!;
     return {
       id: spot.id,

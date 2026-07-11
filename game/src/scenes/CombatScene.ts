@@ -24,6 +24,9 @@ import { UnitSprite } from '../ui/unitSprite';
 import { frameForUnit } from '../ui/sprites';
 import { SpellBar } from '../ui/spellBar';
 import { CombatLog } from '../ui/combatLog';
+import { shakeBossImpact, showCastBeam, showHealRipple } from '../ui/combatFx';
+import { PaceToggle } from '../ui/paceToggle';
+import { loadSave, saveGame } from '../save/save';
 import type { CombatMods } from '../data/spellTree';
 
 /** Pinned contract: callers pass fully resolved CombatMods (from loadoutFromSave). */
@@ -92,6 +95,9 @@ const BOSS_CAST_FILL_COLOR = 0xe05a4e;
 
 const SPELL_BAR_Y = 502;
 
+const PACE_TOGGLE_X = 20;
+const PACE_TOGGLE_Y = VIEW_HEIGHT - 8;
+
 /** Cast-cancel toast (handoff §D UI row): short-lived line near the player cast bar. */
 const TOAST_Y = 420;
 const TOAST_FONT = 'monospace';
@@ -154,6 +160,10 @@ export class CombatScene extends Phaser.Scene {
    *  has no clock field, so the combat log's [12.3s] timestamps are derived here. */
   private elapsedMs = 0;
 
+  private paceToggle!: PaceToggle;
+  private combatPaceTenths = 10;
+  private healerRune: Phaser.GameObjects.Triangle | null = null;
+
   private resultShown = false;
 
   constructor() {
@@ -200,6 +210,18 @@ export class CombatScene extends Phaser.Scene {
     this.registerHotkeys(spells);
     this.registerEscapeKey();
 
+    const save = loadSave();
+    const available = this.sceneData.loadout.paceMultipliersTenths;
+    this.combatPaceTenths = available.includes(save.combatPaceTenths) ? save.combatPaceTenths : 10;
+    this.paceToggle = new PaceToggle(this, PACE_TOGGLE_X, PACE_TOGGLE_Y, (tenths) => {
+      this.combatPaceTenths = tenths;
+      const current = loadSave();
+      current.combatPaceTenths = tenths;
+      saveGame(current);
+    });
+    this.paceToggle.setAvailable(available);
+    this.paceToggle.setCurrent(this.combatPaceTenths);
+
     this.combatLog = new CombatLog(this, VIEW_WIDTH);
     this.buildToast();
 
@@ -207,8 +229,9 @@ export class CombatScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    this.elapsedMs += delta;
-    const events = this.engine.advance(delta);
+    const simDelta = Math.max(0, Math.floor((delta * this.combatPaceTenths) / 10));
+    this.elapsedMs += simDelta;
+    const events = this.engine.advance(simDelta);
     this.handleEvents(events);
     this.syncView();
   }
@@ -406,12 +429,31 @@ export class CombatScene extends Phaser.Scene {
           const target = this.findSprite(event.targetId);
           target?.flashHeal();
           target?.spawnHealFloat(event.amount);
+          if (target) showHealRipple(this, target.getHomeX(), GROUND_Y);
           const overheal = event.overheal > 0 ? ` (${event.overheal} over)` : '';
           this.combatLog.push(
             `${this.formatTimestamp()} ${this.resolveSpellName(event.spellId)} heals ${this.resolveUnitName(event.targetId)} +${event.amount}${overheal}`,
           );
           break;
         }
+        case 'castStarted': {
+          const healer = this.partySprites.get('healer');
+          const castTarget = this.findSprite(event.cast.targetId);
+          healer?.flashCast();
+          if (healer && castTarget) {
+            showCastBeam(
+              this,
+              healer.getHomeX(),
+              healer.getHomeY(),
+              castTarget.getHomeX(),
+              castTarget.getHomeY(),
+            );
+          }
+          break;
+        }
+        case 'bossCastFinished':
+          shakeBossImpact(this);
+          break;
         case 'castCancelled': {
           const spellName = this.resolveSpellName(event.spellId);
           if (event.reason === 'escape') {
@@ -469,6 +511,7 @@ export class CombatScene extends Phaser.Scene {
     const healer = state.party.find((u) => u.role === 'healer');
     this.spellBar.setState(healer?.mana ?? 0, state.targetId !== null, state.status === 'running');
     this.spellBar.setArmedSpellIds(state.armedBuffedSpellIds);
+    this.syncHealerRune(state);
 
     this.waveText.setText(
       state.waveIndex < this.encounter.waves.length
@@ -478,6 +521,26 @@ export class CombatScene extends Phaser.Scene {
 
     const { gold, xp } = this.engine.rewards;
     this.rewardsText.setText(`Gold ${gold}   XP ${xp}`);
+  }
+
+  private syncHealerRune(state: CombatState): void {
+    const armed = state.armedBuffedSpellIds.length > 0;
+    const healerSprite = this.partySprites.get('healer');
+    if (!armed || !healerSprite) {
+      this.healerRune?.destroy();
+      this.healerRune = null;
+      return;
+    }
+    const x = healerSprite.getHomeX() - 36;
+    const y = healerSprite.getHomeY() - 24;
+    if (!this.healerRune) {
+      this.healerRune = this.add
+        .triangle(x, y, 0, -7, 6, 3, -6, 3, 0xf2c14e)
+        .setStrokeStyle(1, 0x8a7868)
+        .setDepth(40);
+    } else {
+      this.healerRune.setPosition(x, y);
+    }
   }
 
   private syncPlayerCastBar(state: CombatState): void {

@@ -55,6 +55,8 @@ const UI = {
   treeZealotOath: { x: 700, y: 260 },
   treePatientVow: { x: 150, y: 400 },
   treeBack: { x: 120, y: 504 },
+  // CombatScene pace toggle (bottom-left; PaceToggle origin bottom-left at 20,532).
+  combatPaceToggle: { x: 48, y: 516 },
 };
 
 function startPreview() {
@@ -118,7 +120,7 @@ async function seedSave(page, save) {
 
 function baseSave(overrides) {
   return {
-    version: 2,
+    version: 3,
     tutorialDone: true,
     gold: 0,
     xp: 0,
@@ -127,6 +129,7 @@ function baseSave(overrides) {
     treeRanks: {},
     subclass: null,
     clearedDungeons: [],
+    combatPaceTenths: 10,
     ...overrides,
   };
 }
@@ -172,7 +175,7 @@ try {
   await page.mouse.click(UI.tutorialLearn.x, UI.tutorialLearn.y);
   await page.waitForTimeout(800);
   let save = await readSave(page);
-  check(save?.version === 2, 'new saves are written as v2');
+  check(save?.version === 3, 'new saves are written as v3');
   check(save?.tutorialDone === true, 'tutorial click sets tutorialDone');
   check(save?.unlockedSpells.includes('solemn-mend') === true, 'Solemn Mend unlocked via tutorial');
   await page.waitForTimeout(3500); // let autos land so lunge/'*' feedback is in frame
@@ -196,7 +199,7 @@ try {
   await shot(page, 'hub-level-up-ribbon');
 
   // ---- Stage M: v1 save migrates to v2 with no progress lost -----------------
-  console.log('Stage M: raw v1 payload → boot → migrated v2 save');
+  console.log('Stage M: raw v1 payload → boot → migrated v3 save');
   await seedSave(page, {
     version: 1,
     tutorialDone: true,
@@ -209,7 +212,8 @@ try {
     clearedDungeons: ['ash-gate'],
   });
   save = await readSave(page);
-  check(save?.version === 2, 'v1 payload migrated to version 2 on boot');
+  check(save?.version === 3, 'v1 payload migrated to version 3 on boot');
+  check(save?.combatPaceTenths === 10, 'migration: default combat pace is 1×');
   check(save?.treeRanks?.['deep-reserves'] === 1, "migration: 'max-mana-1' → deep-reserves rank 1");
   check(save?.gold === 8, `migration: retired vigil-deep-focus refunded 5g (gold=${save?.gold}, expected 8)`);
   check(save?.treeRanks?.['vigil-oath'] === 1, 'migration: existing subclass owns vigil-oath at rank 1');
@@ -222,7 +226,7 @@ try {
   await seedSave(
     page,
     baseSave({
-      gold: 13,
+      gold: 17,
       xp: 12,
       rubies: 1,
       unlockedSpells: ['solemn-mend', 'zealous-mending'],
@@ -244,7 +248,7 @@ try {
   await page.waitForTimeout(400);
   save = await readSave(page);
   check(save.treeRanks['deep-reserves'] === 2, 'bought Deep Reserves rank 2 (multi-rank node)');
-  check(save.gold === 3, `gold spent per rank (gold=${save.gold}, expected 3)`);
+  check(save.gold === 7, `gold spent per rank (gold=${save.gold}, expected 7)`);
 
   // Oath is two-click: first click only ARMS (no purchase yet).
   await page.mouse.click(UI.treeVigilOath.x, UI.treeVigilOath.y);
@@ -259,14 +263,16 @@ try {
   check(save.subclass === 'vigil', 'oath purchase set subclass = vigil');
   check(save.rubies === 0, 'ruby spent on the oath');
   check(save.unlockedSpells.includes('solemn-vigil') === false, 'granted spell comes from the tree, not unlockedSpells');
-  await shot(page, 'tree-zealot-locked');
+  await shot(page, 'tree-zealot-forsaken');
 
-  // Zealot oath must now be permanently locked: clicks do nothing.
-  await page.mouse.click(UI.treeZealotOath.x, UI.treeZealotOath.y);
+  // Rival spot offers forsaken-path Warped Tempo (not the Zealot oath).
   await page.mouse.click(UI.treeZealotOath.x, UI.treeZealotOath.y);
   await page.waitForTimeout(400);
   save = await readSave(page);
-  check(!save.treeRanks['zealot-oath'] && save.subclass === 'vigil', 'rival oath is locked — clicks are inert');
+  check(!save.treeRanks['zealot-oath'], 'rival oath node was not purchased');
+  check(save.treeRanks['warped-tempo-via-zealot'] === 1, 'bought Warped Tempo on the forsaken rival spot');
+  check(save.gold === 3, `gold after tempo (gold=${save.gold}, expected 3)`);
+  await shot(page, 'tree-warped-tempo-owned');
 
   // Follow-up branch node (3g) unlocked by the oath.
   await page.mouse.click(UI.treePatientVow.x, UI.treePatientVow.y);
@@ -281,9 +287,14 @@ try {
   await shot(page, 'hub-with-oath');
 
   // ---- Stage B2: Vigil kit in combat — tooltip reflects tree modifiers -------
-  console.log('Stage B2: combat with the Vigil kit → Solemn Vigil tooltip + feedback');
+  console.log('Stage B2: combat with the Vigil kit → pace toggle + tooltip + feedback');
   await page.mouse.click(UI.hubAshGate.x, UI.hubAshGate.y);
   await page.waitForTimeout(1200);
+  await page.mouse.click(UI.combatPaceToggle.x, UI.combatPaceToggle.y);
+  await page.waitForTimeout(300);
+  save = await readSave(page);
+  check(save.combatPaceTenths === 15, 'pace toggle persisted 1.5× selection');
+  await shot(page, 'combat-pace-15x');
   const vigilSlot = UI.combatSpellSlot(2, 3); // solemn-mend, zealous-mending, solemn-vigil
   await page.mouse.move(vigilSlot.x, vigilSlot.y);
   await page.waitForTimeout(400);

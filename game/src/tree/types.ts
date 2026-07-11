@@ -39,6 +39,11 @@ export interface NodeDef {
    * rest (e.g. subclass oaths). Omitted = no exclusivity.
    */
   exclusiveGroup?: string;
+  /**
+   * When the spot's natural next node is exclusive-locked, the resolver may
+   * skip to this node if requires are met. Used for forsaken-path rewards.
+   */
+  availableIfExclusiveLocked?: boolean;
 }
 
 /**

@@ -37,15 +37,16 @@ describe('save', () => {
   it('returns a fresh save when nothing is stored', () => {
     const save = loadSave(memoryStore());
     expect(save).toEqual(newSaveData());
-    expect(save.version).toBe(2);
+    expect(save.version).toBe(3);
     expect(save.tutorialDone).toBe(false);
     expect(save.subclass).toBeNull();
+    expect(save.combatPaceTenths).toBe(10);
   });
 
-  it('round-trips a full v2 save', () => {
+  it('round-trips a full v3 save', () => {
     const store = memoryStore();
     const data: SaveData = {
-      version: 2,
+      version: 3,
       tutorialDone: true,
       gold: 7,
       xp: 12,
@@ -54,9 +55,30 @@ describe('save', () => {
       treeRanks: { 'deep-reserves': 3, 'vigil-oath': 1 },
       subclass: 'vigil',
       clearedDungeons: ['ash-gate'],
+      combatPaceTenths: 15,
     };
     saveGame(data, store);
     expect(loadSave(store)).toEqual(data);
+  });
+
+  it('round-trips a full v2 save via migration', () => {
+    const store = memoryStore();
+    const data = {
+      version: 2,
+      tutorialDone: true,
+      gold: 7,
+      xp: 12,
+      rubies: 0,
+      unlockedSpells: ['solemn-mend', 'zealous-mending'],
+      treeRanks: { 'deep-reserves': 3, 'vigil-oath': 1 },
+      subclass: 'vigil' as const,
+      clearedDungeons: ['ash-gate'],
+    };
+    store.setItem('healgame-save-v1', JSON.stringify(data));
+    const loaded = loadSave(store);
+    expect(loaded.version).toBe(3);
+    expect(loaded.combatPaceTenths).toBe(10);
+    expect(loaded.treeRanks).toEqual(data.treeRanks);
   });
 
   it('resetSave wipes everything (restart, no respec)', () => {
@@ -86,12 +108,13 @@ describe('save', () => {
   });
 });
 
-describe('v1 → v2 migration', () => {
+describe('v1 → v3 migration', () => {
   it('carries plain progress over losslessly', () => {
     const store = memoryStore();
     store.setItem('healgame-save-v1', v1Payload());
     const save = loadSave(store);
-    expect(save.version).toBe(2);
+    expect(save.version).toBe(3);
+    expect(save.combatPaceTenths).toBe(10);
     expect(save.tutorialDone).toBe(true);
     expect(save.gold).toBe(7);
     expect(save.xp).toBe(12);
