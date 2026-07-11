@@ -14,7 +14,12 @@ const BUTTON_HEIGHT = 52;
 const BUTTON_GAP = 14;
 const BUTTON_BG_COLOR = 0x3a2a22;
 const BUTTON_BORDER_COLOR = 0x0a0605;
+const BUTTON_BORDER_WIDTH = 1;
 const BUTTON_DISABLED_ALPHA = 0.35;
+
+/** Armed-synergy accent border (handoff §E): thicker gold stroke, no other feedback. */
+const ARMED_BORDER_COLOR = 0xf2c14e;
+const ARMED_BORDER_WIDTH = 3;
 
 const NAME_FONT = '13px monospace';
 const NAME_COLOR = '#e8d8c8';
@@ -34,6 +39,7 @@ class SpellButton {
   private readonly costText: Phaser.GameObjects.Text;
   private readonly hotkeyText: Phaser.GameObjects.Text;
   private enabled = true;
+  private armed = false;
 
   constructor(
     scene: Phaser.Scene,
@@ -52,7 +58,7 @@ class SpellButton {
 
     this.bg = scene.add
       .rectangle(x, y, BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_BG_COLOR)
-      .setStrokeStyle(1, BUTTON_BORDER_COLOR)
+      .setStrokeStyle(BUTTON_BORDER_WIDTH, BUTTON_BORDER_COLOR)
       .setInteractive({ useHandCursor: true });
     this.bg.on('pointerdown', () => {
       if (this.enabled) onClick(this.spellId);
@@ -81,6 +87,13 @@ class SpellButton {
     this.nameText.setAlpha(alpha);
     this.costText.setAlpha(alpha);
     this.hotkeyText.setAlpha(alpha);
+  }
+
+  /** Thicker accent stroke while a synergy buffing this spell is armed; default border otherwise. */
+  setArmed(armed: boolean): void {
+    if (armed === this.armed) return;
+    this.armed = armed;
+    this.bg.setStrokeStyle(armed ? ARMED_BORDER_WIDTH : BUTTON_BORDER_WIDTH, armed ? ARMED_BORDER_COLOR : BUTTON_BORDER_COLOR);
   }
 
   destroy(): void {
@@ -127,6 +140,12 @@ export class SpellBar {
     for (const button of this.buttons) {
       button.setEnabled(isRunning && hasTarget && healerMana >= button.mana);
     }
+  }
+
+  /** Accent border on buttons whose spell id has an armed synergy buffing it (handoff §E). */
+  setArmedSpellIds(ids: Iterable<string>): void {
+    const armedSet = ids instanceof Set ? ids : new Set(ids);
+    for (const button of this.buttons) button.setArmed(armedSet.has(button.spellId));
   }
 
   destroy(): void {

@@ -75,6 +75,7 @@ export type CombatEvent =
   | { type: 'heal'; targetId: string; amount: number; overheal: number; spellId: string }
   | { type: 'castStarted'; cast: CastState }
   | { type: 'castFinished'; spellId: string }
+  | { type: 'castCancelled'; spellId: string; reason: 'escape' | 'target-dead' }
   | { type: 'bossCastStarted'; cast: BossCastState }
   | { type: 'bossCastFinished'; name: string }
   | { type: 'unitDied'; unitId: string }
@@ -91,6 +92,8 @@ export interface CombatState {
   gcdRemainingMs: number;
   waveIndex: number;
   status: CombatStatus;
+  /** Spell ids that currently have at least one armed synergy buffing them. */
+  armedBuffedSpellIds: string[];
 }
 
 /** One group of identical trash enemies within a wave (poc-spec §7). */

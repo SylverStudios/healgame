@@ -20,33 +20,41 @@ export const TRASH = {
 } as const;
 
 export const GATE_WARDEN = {
-  // QA-tuned from the §4.2 draft (auto 2): with 2 the party out-heals the
-  // fight for free and a no-heal party still wins — see balance.test.ts gates.
-  autoDamage: 3,
-  swingIntervalMs: 3000,
+  // Phase 3 (handoff §B) retune: bumped from 3 (see balance.test.ts gates —
+  // the starting kit must never cruise to a full-party clear).
+  autoDamage: 4,
+  // Phase 3 (handoff §B): desynced from TRASH's 3000ms so boss/trash swings
+  // don't line up every tick.
+  swingIntervalMs: 3500,
   bonehowlCastMs: 10_000,
   bonehowlPartyDamage: 4,
 } as const;
 
 /**
  * Dungeon 2 boss (poc-spec §1 item 8, §7): "insanely overpowered" on purpose
- * — the party cannot win with PoC power. Auto damage 3 per 3s; Extinction is
+ * — the party cannot win with PoC power. Auto damage 3 per 3.5s; Extinction is
  * a 10s named cast dealing 10 damage to every living party member, first at
  * 15s into the boss fight then every 25s thereafter.
  */
 export const HOLLOW_KING = {
   hp: 999,
   autoDamage: 3,
-  swingIntervalMs: 3000,
+  swingIntervalMs: 3500,
   extinctionCastMs: 10_000,
   extinctionPartyDamage: 10,
 } as const;
 
-/** Mercs (tank + 2 DPS) auto-attack only (poc-spec §2 row 10). Draft damage, tunable. */
+/**
+ * Mercs (tank + 2 DPS) auto-attack only (poc-spec §2 row 10). Draft damage,
+ * tunable. Phase 3 (handoff §B): per-role swing intervals (no phase offsets)
+ * so simultaneous merc swings are rare — tank is slow or hard-hitting, DPS
+ * swing faster for less.
+ */
 export const MERCS = {
   tankAutoDamage: 1,
   dpsAutoDamage: 2,
-  swingIntervalMs: 3000,
+  tankSwingIntervalMs: 2500,
+  dpsSwingIntervalMs: 1000,
 } as const;
 
 export const SPELLS = {

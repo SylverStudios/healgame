@@ -18,15 +18,15 @@ function ended(events: CombatEvent[]): Extract<CombatEvent, { type: 'combatEnded
 }
 
 describe('auto-attack cadence', () => {
-  it('mercs swing on a fixed 3s cadence, focusing the first living enemy', () => {
+  it('mercs swing on role-differentiated cadences (tank 2500ms, dps 1000ms), focusing the first living enemy', () => {
     // A tanky single dummy that survives many swings so we can count them.
     const encounter = makeTestEncounter({ waves: [{ enemies: [{ name: 'Tanky', hp: 1000, count: 1 }] }] });
     const engine = new CombatEngine(encounter, TEST_SPELLS);
-    const events = engine.advance(9000); // 3 swings expected per merc
+    const events = engine.advance(9000); // tank swings at 2500/5000/7500 (3); dps at every 1000ms (9)
     const dmg = damages(events).filter((d) => ['tank', 'dps1', 'dps2'].includes(d.sourceId));
     expect(dmg.filter((d) => d.sourceId === 'tank')).toHaveLength(3);
-    expect(dmg.filter((d) => d.sourceId === 'dps1')).toHaveLength(3);
-    expect(dmg.filter((d) => d.sourceId === 'dps2')).toHaveLength(3);
+    expect(dmg.filter((d) => d.sourceId === 'dps1')).toHaveLength(9);
+    expect(dmg.filter((d) => d.sourceId === 'dps2')).toHaveLength(9);
     expect(dmg.filter((d) => d.sourceId === 'tank')[0]!.amount).toBe(1);
     expect(dmg.filter((d) => d.sourceId === 'dps1')[0]!.amount).toBe(2);
   });
@@ -60,13 +60,14 @@ describe('auto-attack cadence', () => {
 describe('wave progression', () => {
   it('advances to the next wave once all enemies in the current wave are dead', () => {
     const encounter = makeTestEncounter({
-      // Wave 2's dummy needs enough hp to survive the other mercs' swings landing in the same
-      // tick that wave 1 clears (mercs don't pause when a new wave spawns mid-tick).
-      waves: [{ enemies: [{ name: 'Weak', hp: 1, count: 1 }] }, { enemies: [{ name: 'Weak2', hp: 10, count: 1 }] }],
+      // Wave 2's dummy needs enough hp to survive the flurry of merc swings landing on it before
+      // t=3000 (dps fire every 1000ms; wave 1 clears fast under the Phase 3 per-role cadence, so
+      // several dps/tank swings pile onto wave 2 within this same window).
+      waves: [{ enemies: [{ name: 'Weak', hp: 1, count: 1 }] }, { enemies: [{ name: 'Weak2', hp: 999, count: 1 }] }],
     });
     const engine = new CombatEngine(encounter, TEST_SPELLS);
     expect(engine.state.waveIndex).toBe(0);
-    const events = engine.advance(3000); // tank's first swing (1 dmg) kills the 1-hp wave-1 dummy
+    const events = engine.advance(3000); // dps1's first swing (1000ms, 2 dmg) kills the 1-hp wave-1 dummy
     expect(deaths(events).some((d) => d.unitId.startsWith('w0-'))).toBe(true);
     expect(waveStarts(events).some((w) => w.waveIndex === 1)).toBe(true);
     expect(engine.state.waveIndex).toBe(1);
@@ -102,14 +103,14 @@ describe('Bonehowl (boss cast)', () => {
       },
     });
     const engine = new CombatEngine(encounter, TEST_SPELLS);
-    // Clear the single trash wave (1 dmg swing at t=3000 kills the 1hp dummy) -> boss spawns at t=3000.
-    // Boss cast starts at t=3000+5000=8000, completes at t=18000.
-    let events = engine.advance(8000);
+    // Clear the single trash wave (dps1's first swing at t=1000, 2 dmg, kills the 1hp dummy) ->
+    // boss spawns at t=1000. Boss cast starts at t=1000+5000=6000, completes at t=16000.
+    let events = engine.advance(6000);
     expect(events.some((e) => e.type === 'bossCastStarted')).toBe(true);
     expect(engine.state.bossCast).not.toBeNull();
     expect(engine.state.bossCast!.totalMs).toBe(10_000);
 
-    events = engine.advance(9999); // not yet landed
+    events = engine.advance(9999); // not yet landed (completes at t=16000)
     expect(events.some((e) => e.type === 'bossCastFinished')).toBe(false);
     const aliveJustBeforeLanding = engine.state.party.filter((u) => u.alive).map((u) => u.id);
 
@@ -125,11 +126,24 @@ describe('Bonehowl (boss cast)', () => {
   });
 
   it('boss keeps auto-attacking the tank while it is casting', () => {
-    const encounter = makeTestEncounter({ waves: [{ enemies: [{ name: 'Weak', hp: 1, count: 1 }] }] });
+    const encounter = makeTestEncounter({
+      waves: [{ enemies: [{ name: 'Weak', hp: 1, count: 1 }] }],
+      // High hp so mercs can't melt the boss before the cast we're testing lands
+      // (the default 20hp test boss dies to merc dps well before t=6000).
+      boss: {
+        id: 'test-boss',
+        name: 'Test Boss',
+        hp: 1000,
+        autoDamage: 2,
+        swingIntervalMs: 3000,
+        cast: { name: 'Bonehowl', castMs: 10_000, firstCastAtMs: 5000, intervalMs: 15_000, partyDamage: 4 },
+      },
+    });
     const engine = new CombatEngine(encounter, TEST_SPELLS);
-    engine.advance(8000); // boss cast starts
+    // Boss spawns at t=1000 (dps1 kills the 1hp dummy); cast starts at t=1000+5000=6000.
+    engine.advance(6000); // boss cast starts
     expect(engine.state.bossCast).not.toBeNull();
-    const events = engine.advance(3000); // a boss auto-attack swing should land mid-cast
+    const events = engine.advance(3000); // a boss auto-attack swing (t=7000, every 3000ms from spawn) should land mid-cast
     const bossAutos = damages(events).filter((d) => d.sourceId === 'test-boss' && d.targetId === 'tank');
     expect(bossAutos.length).toBeGreaterThanOrEqual(1);
     expect(engine.state.bossCast).not.toBeNull(); // still casting, not interrupted

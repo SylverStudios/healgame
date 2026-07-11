@@ -80,13 +80,13 @@ describe('GCD / cast busy timing', () => {
 });
 
 describe('mana', () => {
-  it('spends mana only when the cast completes, not when it starts', () => {
+  it('reserves mana the instant a cast starts (Phase 3); completion does not spend again', () => {
     const engine = new CombatEngine(makeTestEncounter(), TEST_SPELLS);
     engine.setTarget('tank');
     engine.castSpell(TEST_SOLEMN_MEND.id);
-    expect(engine.state.party.find((u) => u.id === 'healer')!.mana).toBe(20); // unspent mid-cast
+    expect(engine.state.party.find((u) => u.id === 'healer')!.mana).toBe(15); // reserved immediately: 20 - 5
     engine.advance(2000);
-    expect(engine.state.party.find((u) => u.id === 'healer')!.mana).toBe(15); // 20 - 5
+    expect(engine.state.party.find((u) => u.id === 'healer')!.mana).toBe(15); // unchanged on completion — no double-spend
   });
 
   it('rejects (silently ignores) a cast when mana is insufficient', () => {
@@ -145,7 +145,11 @@ describe('overheal', () => {
   });
 
   it('applies a partial heal + partial overheal when close to max hp', () => {
-    const engine = new CombatEngine(makeTestEncounter(), TEST_SPELLS);
+    // High-hp dummy so it survives to deliver its own 3000ms auto-attack on the tank rather than
+    // dying to merc dps first (a low-hp wave-1 dummy now dies well before its own first swing
+    // under the Phase 3 per-role merc cadence — see the auto-attack cadence tests above).
+    const encounter = makeTestEncounter({ waves: [{ enemies: [{ name: 'Dummy', hp: 999, count: 1 }] }] });
+    const engine = new CombatEngine(encounter, TEST_SPELLS);
     const tank = engine.state.party.find((u) => u.id === 'tank')!;
     // Can't mutate state directly (read-only snapshot) — instead verify via a target with headroom
     // exactly less than the heal amount: dps has 10 max hp, so it's always at/above heal-5 headroom;
@@ -153,7 +157,7 @@ describe('overheal', () => {
     // then heal for more than the deficit.
     void tank;
     engine.setTarget('tank');
-    // Let the wave-1 dummy hit the tank once (dummy auto: default TRASH damage from constants via engine).
+    // Let the trash dummy hit the tank once (dummy auto: default TRASH damage from constants via engine).
     engine.advance(3000); // one trash swing lands on tank
     const hpAfterHit = engine.state.party.find((u) => u.id === 'tank')!.hp;
     expect(hpAfterHit).toBeLessThan(20);

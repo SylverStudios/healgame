@@ -1,11 +1,11 @@
 # Phase 3 handoff — Combat UX legibility
 
-Status: planning · Authority: Phase 3 scope (not yet shipped) · Last verified: 2026-07-10
+Status: historical · Authority: none — shipped 2026-07-11; decisions recorded in poc-qa.md Phase 3 section · Last verified: 2026-07-11
 
 **Audience:** the central agent running Phase 3. Read after `CLAUDE.md` /
 `AGENTS.md`. **This doc wins on Phase 3 scope**; `poc-spec.md` still wins on
 untouched PoC rules; `poc-qa.md` / historical handoffs apply unless this doc
-explicitly amends them. Nothing below is in the codebase until the phase runs.
+explicitly amends them.
 
 ## Mission
 

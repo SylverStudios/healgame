@@ -13,15 +13,18 @@ export const ASH_GATE: EncounterDef = {
   id: 'ash-gate',
   name: 'Ash Gate',
   waves: [
-    { enemies: [{ name: 'Ash Husk', hp: 4, count: 2 }] },
-    { enemies: [{ name: 'Ash Husk', hp: 4, count: 3 }] },
+    { enemies: [{ name: 'Ash Husk', hp: 11, count: 2 }] },
+    { enemies: [{ name: 'Ash Husk', hp: 11, count: 3 }] },
   ],
   boss: {
     id: 'gate-warden',
     name: 'Gate Warden',
-    // QA-tuned (was 15): the boss must outlive at least one full Bonehowl
-    // telegraph and outlast a no-heal party — see balance.test.ts gates.
-    hp: 55,
+    // Phase 3 (handoff §B) retune: mercs got faster per-role swing intervals
+    // (net ~2.6x combined DPS vs the old uniform 3000ms cadence), so enemy hp
+    // scaled up proportionally to hold the original fight-length/difficulty
+    // shape — see balance.test.ts gates and the throwaway diagnostic used to
+    // derive these numbers.
+    hp: 145,
     autoDamage: GATE_WARDEN.autoDamage,
     swingIntervalMs: GATE_WARDEN.swingIntervalMs,
     cast: {
