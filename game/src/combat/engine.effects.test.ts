@@ -17,9 +17,10 @@ import type { CombatEvent, EncounterDef } from './types';
  *    never stacks); the next completed buffed cast consumes it, adding
  *    +bonusHeal to the heal's raw value. Armed state persists across
  *    intervening non-matching casts until consumed.
- *  - a trigger cast on a target that dies mid-cast still arms (mana spent,
- *    no heal event). A buffed cast on a dead target has no heal event, so
- *    the armed buff is NOT consumed (kept for the next live cast).
+ *  - Phase 3 (handoff §D): a cast whose target dies mid-cast is auto-cancelled
+ *    the instant that death is applied — it never completes, so it never
+ *    arms (a trigger cast) and never consumes (a buffed cast); the armed
+ *    state of any other rule is left untouched. Mana is refunded, not spent.
  *  - multiple synergy entries are independent; a matching buffed cast
  *    consumes and sums ALL currently-armed entries.
  *  - missing-health: +healPer10PctMissing per full 10% of the target's
@@ -109,8 +110,7 @@ describe('CombatEngine effects: synergy bonus', () => {
   });
 
   it(
-    'a trigger cast on a target that dies mid-cast still arms; a buffed cast on a dead target ' +
-      'does not consume (kept); a later live buffed cast then applies the still-armed bonus',
+    'Phase 3: a cast whose target dies mid-cast is auto-cancelled — never arms, never consumes, mana refunded',
     () => {
       // Trash always attacks the tank while it's alive, then the first living DPS. Fixed
       // TRASH.autoDamage=1 every fixed 3000ms swing makes every HP value below exact and
@@ -119,42 +119,37 @@ describe('CombatEngine effects: synergy bonus', () => {
         bonusMaxMana: 20, // headroom so mana never gates the sequence below
         synergies: [{ triggerSpellId: 'solemn-mend', buffedSpellId: 'zealous-mending', bonusHeal: 4 }],
       });
+      const startingMana = engine.state.party.find((u) => u.id === 'healer')!.mana;
 
-      // --- Phase 1: bring the tank (maxHp 20) to 1 hp via 19 trash swings (19*3000=57000ms),
-      // then a further partial 1500ms (trash timer freshly reset to 3000 at 57000, now at 1500).
+      // Bring the tank (maxHp 20) to 1 hp via 19 trash swings (19*3000=57000ms), then a further
+      // partial 1500ms (trash timer freshly reset to 3000 at 57000, now at 1500).
       engine.advance(57000);
       engine.advance(1500);
-      // Start a 2000ms Solemn Mend on the tank; the trash's next swing (1500ms away) lands
-      // mid-cast and kills the tank (hp 1 -> 0). The cast still completes: mana spent, no heal
-      // event — but it still arms (armed state does not depend on target aliveness).
+      // Start a 2000ms Solemn Mend (the trigger spell) on the tank; the trash's next swing
+      // (1500ms away) lands mid-cast and kills the tank (hp 1 -> 0). Phase 3 rule (handoff §D):
+      // this auto-cancels the cast the instant that death is applied — it never completes, so it
+      // never arms the synergy, and its reserved mana is refunded rather than spent.
       engine.setTarget('tank');
       engine.castSpell(TEST_SOLEMN_MEND.id);
-      let events = engine.advance(2000);
+      const manaAfterReserve = engine.state.party.find((u) => u.id === 'healer')!.mana;
+      expect(manaAfterReserve).toBe(startingMana - TEST_SOLEMN_MEND.mana); // reserved at cast start
+
+      const events = engine.advance(2000);
       expect(events.some((e) => e.type === 'unitDied' && e.unitId === 'tank')).toBe(true);
-      expect(events.some((e) => e.type === 'castFinished' && e.spellId === 'solemn-mend')).toBe(true);
+      expect(
+        events.some((e) => e.type === 'castCancelled' && e.spellId === 'solemn-mend' && e.reason === 'target-dead'),
+      ).toBe(true);
+      expect(events.some((e) => e.type === 'castFinished')).toBe(false);
       expect(heals(events)).toHaveLength(0);
+      expect(engine.state.party.find((u) => u.id === 'healer')!.mana).toBe(startingMana); // refunded, not spent
+      expect(engine.state.armedBuffedSpellIds).not.toContain('zealous-mending'); // never armed
 
-      // --- Phase 2: tank is dead, so trash now targets dps1 (maxHp 10). Bring it to 1 hp via
-      // 9 swings, then a further partial 2500ms (trash timer reset to 3000 after the 9th swing).
-      engine.advance(26500); // 9 swings land at cumulative 2500 + (k-1)*3000; the 9th at 26500
-      engine.advance(2500); // trash timer now at 500, well short of the 1000ms cast below
-      // Start a 1000ms Zealous Flare (the buffed spell) on dps1; the trash's next swing (500ms
-      // away) kills dps1 mid-cast. The cast completes (mana spent) but there's no heal event to
-      // add the bonus to, so the armed synergy is NOT consumed — it stays armed.
-      engine.setTarget('dps1');
-      engine.castSpell(TEST_ZEALOUS_MENDING.id);
-      events = engine.advance(1000);
-      expect(events.some((e) => e.type === 'unitDied' && e.unitId === 'dps1')).toBe(true);
-      expect(events.some((e) => e.type === 'castFinished' && e.spellId === 'zealous-mending')).toBe(true);
-      expect(heals(events)).toHaveLength(0);
-
-      // --- Phase 3: dps2 was never targeted by trash (tank, then dps1, always came first) and
-      // is still at full HP. Casting the buffed spell on it now proves the bonus survived the
-      // failed (dead-target) consume attempt in Phase 2.
+      // dps2 was never targeted by trash (tank always came first) and is still at full HP.
+      // Casting the buffed spell on it now proves no bonus was armed by the cancelled cast above.
       engine.setTarget('dps2');
       engine.castSpell(TEST_ZEALOUS_MENDING.id);
       const h = onlyHeal(engine.advance(1000));
-      expect(h.amount + h.overheal).toBe(TEST_ZEALOUS_MENDING.heal + 4);
+      expect(h.amount + h.overheal).toBe(TEST_ZEALOUS_MENDING.heal); // no +4 bonus
     },
   );
 });

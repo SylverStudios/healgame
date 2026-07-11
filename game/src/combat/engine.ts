@@ -2,8 +2,9 @@
  * Pure, deterministic combat simulation (poc-spec §4). No Phaser, no wall-clock
  * time, no randomness — driven entirely by explicit advance(dtMs) steps.
  *
- * See ./README.md for the rule decisions (mana-on-complete, queue semantics,
- * boss cast cadence, targeting priority) this implementation encodes.
+ * See ./README.md for the rule decisions (mana reserve/refund, cast cancel,
+ * queue semantics, boss cast cadence, targeting priority) this implementation
+ * encodes.
  */
 
 import { GCD_MS, MERCS, PARTY, REWARDS, TRASH } from '../data/constants';
@@ -83,7 +84,8 @@ export class CombatEngine {
       },
     ];
     for (const u of this.party) {
-      if (u.role === 'tank' || u.role === 'dps') this.swingTimers.set(u.id, MERCS.swingIntervalMs);
+      if (u.role === 'tank') this.swingTimers.set(u.id, MERCS.tankSwingIntervalMs);
+      else if (u.role === 'dps') this.swingTimers.set(u.id, MERCS.dpsSwingIntervalMs);
     }
 
     this.spawnWave(0);
@@ -138,6 +140,26 @@ export class CombatEngine {
     this.pending.push(this.beginCast(spellId, targetId));
   }
 
+  /**
+   * Cancel the active cast (refunding its reserved mana) and clear any queued
+   * cast. Buffered like `castSpell` — mutates immediately, the `castCancelled`
+   * event is delivered on the next `advance()`. If only a queue entry exists
+   * (no active cast), it's cleared with no refund and no event (it never
+   * started). No-op if nothing is active or queued, or combat has ended.
+   */
+  cancelCast(): void {
+    if (this.status !== 'running') return;
+    if (this.playerCast) {
+      const spellId = this.playerCast.spellId;
+      this.refundCastMana(spellId);
+      this.playerCast = null;
+      this.queuedCast = null;
+      this.pending.push({ type: 'castCancelled', spellId, reason: 'escape' });
+    } else if (this.queuedCast) {
+      this.queuedCast = null;
+    }
+  }
+
   get state(): Readonly<CombatState> {
     return {
       party: this.party.map((u) => ({ ...u })),
@@ -148,6 +170,7 @@ export class CombatEngine {
       gcdRemainingMs: Math.max(0, this.gcdRemainingMs),
       waveIndex: this.waveIndex,
       status: this.status,
+      armedBuffedSpellIds: [...new Set(this.synergies.filter((s) => s.armed).map((s) => s.buffedSpellId))],
     };
   }
 
@@ -194,7 +217,11 @@ export class CombatEngine {
         const remaining = this.swingTimers.get(id);
         if (remaining === undefined || remaining > 0) continue;
         this.resolveMercSwing(id, events);
-        if (this.swingTimers.has(id)) this.swingTimers.set(id, MERCS.swingIntervalMs);
+        if (this.swingTimers.has(id)) {
+          const merc = this.party.find((u) => u.id === id);
+          const interval = merc?.role === 'tank' ? MERCS.tankSwingIntervalMs : MERCS.dpsSwingIntervalMs;
+          this.swingTimers.set(id, interval);
+        }
       }
     }
     // 5. enemy/boss auto-attacks
@@ -225,29 +252,51 @@ export class CombatEngine {
 
   private beginCast(spellId: string, targetId: string): CombatEvent {
     const spell = this.spellById(spellId)!;
+    // Mana is reserved (debited) the instant a cast starts, not on completion
+    // (Phase 3 handoff §D — supersedes the old "spent on completion" rule).
+    // This blocks double-spending mana on a cast that's still in flight.
+    const healer = this.getUnit('healer')!;
+    healer.mana = Math.max(0, healer.mana - spell.mana);
     this.playerCast = { spellId, targetId, remainingMs: spell.castMs, totalMs: spell.castMs };
     this.gcdRemainingMs = GCD_MS;
     return { type: 'castStarted', cast: { ...this.playerCast } };
+  }
+
+  /** Refunds a cast's reserved mana (escape/target-dead cancel). Symmetric with beginCast's debit. */
+  private refundCastMana(spellId: string): void {
+    const spell = this.spellById(spellId);
+    const healer = this.getUnit('healer');
+    if (spell && healer) healer.mana = Math.min(healer.maxMana, healer.mana + spell.mana);
+  }
+
+  /** If the active player cast targets `unitId`, auto-cancel it (mid-cast target death). */
+  private cancelCastIfTargeting(unitId: string, events: CombatEvent[]): void {
+    if (!this.playerCast || this.playerCast.targetId !== unitId) return;
+    const spellId = this.playerCast.spellId;
+    this.refundCastMana(spellId);
+    this.playerCast = null;
+    events.push({ type: 'castCancelled', spellId, reason: 'target-dead' });
   }
 
   private completePlayerCast(events: CombatEvent[]): void {
     const cast = this.playerCast!;
     this.playerCast = null;
     const spell = this.spellById(cast.spellId)!;
-    const healer = this.getUnit('healer')!;
-    // Mana is spent when the cast completes (poc-spec doesn't specify; simplest rule — see README).
-    healer.mana = Math.max(0, healer.mana - spell.mana);
+    // Mana was already reserved/debited at cast start — do not subtract again.
     events.push({ type: 'castFinished', spellId: cast.spellId });
 
     const target = this.getUnit(cast.targetId);
 
+    // Phase 3 (handoff §D): a cast whose target dies mid-cast is auto-cancelled
+    // (cancelCastIfTargeting) the instant that death is applied, so a cast only
+    // ever reaches completion here with a still-alive target. The `target.alive`
+    // checks below are a defensive invariant guard, not live behavior.
+    //
     // Consume-then-arm (locked order, phase-2-handoff): a spell that is both a
     // trigger and a buffed target consumes any already-armed bonus for itself
     // first, then arms fresh from this same completed cast.
     let synergyBonus = 0;
     if (target && target.alive) {
-      // Buffed cast on a dead target has no heal event, so nothing to add the
-      // bonus to — armed entries are kept, not consumed, in that case.
       for (const syn of this.synergies) {
         if (syn.buffedSpellId === spell.id && syn.armed) {
           synergyBonus += syn.bonusHeal;
@@ -255,9 +304,7 @@ export class CombatEngine {
         }
       }
     }
-    // Arming happens regardless of target aliveness (mana was spent; a trigger
-    // cast on a target that died mid-cast still arms). Re-arming replaces
-    // (boolean flag), never stacks.
+    // Re-arming replaces (boolean flag), never stacks.
     for (const syn of this.synergies) {
       if (syn.triggerSpellId === spell.id) syn.armed = true;
     }
@@ -330,6 +377,8 @@ export class CombatEngine {
         target.alive = false;
         this.swingTimers.delete(target.id);
         events.push({ type: 'unitDied', unitId: target.id });
+        // Same tick the death is applied: auto-cancel an active cast targeting this unit.
+        this.cancelCastIfTargeting(target.id, events);
         this.checkWipe(events);
       }
     }
@@ -360,6 +409,8 @@ export class CombatEngine {
         unit.alive = false;
         this.swingTimers.delete(unit.id);
         events.push({ type: 'unitDied', unitId: unit.id });
+        // Same tick the death is applied: auto-cancel an active cast targeting this unit.
+        this.cancelCastIfTargeting(unit.id, events);
       }
     }
     this.checkWipe(events);
