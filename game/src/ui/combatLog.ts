@@ -28,6 +28,9 @@ const PANEL_BG_COLOR = 0x1a1210;
 const PANEL_BG_ALPHA = 0.9;
 const PANEL_BORDER_COLOR = 0x0a0605;
 
+/** Above unit sprites/floats (wave rebuilds create sprites after this widget), below the result overlay (1000). */
+const LOG_DEPTH = 500;
+
 const COLLAPSED_LABEL = 'Log ▸';
 const EXPANDED_LABEL = 'Log ▾';
 
@@ -55,6 +58,7 @@ export class CombatLog {
         color: HEADER_COLOR,
       })
       .setOrigin(1, 0)
+      .setDepth(LOG_DEPTH)
       .setInteractive({ useHandCursor: true });
     this.headerText.on('pointerdown', () => this.toggle());
 
@@ -68,6 +72,7 @@ export class CombatLog {
         PANEL_BG_ALPHA,
       )
       .setOrigin(0, 0)
+      .setDepth(LOG_DEPTH)
       .setStrokeStyle(1, PANEL_BORDER_COLOR)
       .setVisible(false);
 
@@ -79,6 +84,7 @@ export class CombatLog {
         lineSpacing: LINE_HEIGHT - 11,
       })
       .setOrigin(0, 0)
+      .setDepth(LOG_DEPTH)
       .setVisible(false);
   }
 

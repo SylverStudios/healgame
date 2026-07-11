@@ -126,6 +126,9 @@ export class CombatScene extends Phaser.Scene {
   private rewardsText!: Phaser.GameObjects.Text;
 
   private combatLog!: CombatLog;
+  /** id → display name for every unit ever seen this combat — log lines can reference units
+   *  already gone from the engine's snapshot (e.g. the kill that ends a wave). */
+  private unitNames = new Map<string, string>();
   private toastText!: Phaser.GameObjects.Text;
   /** Scene-side elapsed-ms accumulator (sum of update deltas since combat start) — the engine
    *  has no clock field, so the combat log's [12.3s] timestamps are derived here. */
@@ -142,6 +145,7 @@ export class CombatScene extends Phaser.Scene {
     this.resultShown = false;
     this.partySprites = new Map();
     this.enemySprites = new Map();
+    this.unitNames = new Map();
     this.elapsedMs = 0;
   }
 
@@ -193,6 +197,7 @@ export class CombatScene extends Phaser.Scene {
   private buildPartySprites(): void {
     const party = this.engine.state.party;
     party.forEach((unit, i) => {
+      this.unitNames.set(unit.id, unit.name);
       const y = slotY(i, party.length, ROSTER_TOP_Y, ROSTER_BOTTOM_Y);
       const sprite = new UnitSprite(unit, {
         scene: this,
@@ -219,6 +224,7 @@ export class CombatScene extends Phaser.Scene {
     const height = isBoss ? BOSS_UNIT_HEIGHT : TRASH_UNIT_HEIGHT;
 
     enemies.forEach((unit, i) => {
+      this.unitNames.set(unit.id, unit.name);
       const y = slotY(i, enemies.length, ROSTER_TOP_Y, ROSTER_BOTTOM_Y);
       const sprite = new UnitSprite(unit, {
         scene: this,
@@ -386,12 +392,9 @@ export class CombatScene extends Phaser.Scene {
     return this.partySprites.get(unitId) ?? this.enemySprites.get(unitId);
   }
 
-  /** Resolves a unit id to its display name from the live engine snapshot; falls back to the raw id. */
+  /** Resolves a unit id to its display name from the seen-units cache; falls back to the raw id. */
   private resolveUnitName(unitId: string): string {
-    const state = this.engine.state;
-    return (
-      state.party.find((u) => u.id === unitId)?.name ?? state.enemies.find((u) => u.id === unitId)?.name ?? unitId
-    );
+    return this.unitNames.get(unitId) ?? unitId;
   }
 
   /** Resolves a spell id to its display name from the player's loadout; falls back to the raw id. */
