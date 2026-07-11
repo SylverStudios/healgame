@@ -46,10 +46,23 @@ export interface CombatResult {
 const VIEW_WIDTH = 960;
 const VIEW_HEIGHT = 540;
 
-const PARTY_X = 170;
-const ENEMY_X = 730;
-const ROSTER_TOP_Y = 95;
-const ROSTER_BOTTOM_Y = 415;
+// Side-view facing line (side-view-layout-handoff §A/§C): party on the left
+// facing right, enemies on the right facing left, everyone bottom-aligned to
+// one shared ground Y (units have different heights, so their container
+// centers differ — see groundAnchorY()).
+const GROUND_Y = 340;
+const PARTY_SLOT_LEFT = 80;
+const PARTY_SLOT_RIGHT = 380;
+const ENEMY_SLOT_LEFT = 580;
+const ENEMY_SLOT_RIGHT = 880;
+const GROUND_LINE_COLOR = 0x3a2a22;
+const GROUND_LINE_WIDTH = 2;
+const GROUND_LINE_MARGIN = 40;
+
+/** Engine party order is tank → dps1 → dps2 → healer (unchanged); visual left→right
+ *  order is healer · dps2 · dps1 · tank so the tank stands nearest the enemy line
+ *  (handoff §B). Presentation-only — index into this array, never reorder the engine's. */
+const PARTY_VISUAL_ORDER = ['healer', 'dps2', 'dps1', 'tank'];
 
 // Unit sizes are multiples of the 16px tile so pixels scale evenly
 // (party 4×, trash 3×, boss 7× — see docs/research/pixel-art-pipeline.md).
@@ -95,10 +108,17 @@ const HUD_FONT = 'monospace';
 
 // ---- helpers ----------------------------------------------------------------
 
-/** Evenly spread `count` units between `top` and `bottom`, single unit centered. */
-function slotY(index: number, count: number, top: number, bottom: number): number {
-  if (count <= 1) return (top + bottom) / 2;
-  return top + ((bottom - top) * index) / (count - 1);
+/** Evenly spread `count` units between `left` and `right`, single unit centered. */
+function slotX(index: number, count: number, left: number, right: number): number {
+  if (count <= 1) return (left + right) / 2;
+  return left + ((right - left) * index) / (count - 1);
+}
+
+/** Home Y for a unit of `height` so its bottom edge (feet) sits on GROUND_Y — units have
+ *  different heights (party 64 / trash 48 / boss 112), so their container centers (which is
+ *  what x/y position) differ even though they all read as standing on one ground line. */
+function groundAnchorY(height: number): number {
+  return GROUND_Y - height / 2;
 }
 
 /** combatEnded fires only on a real end, but its status field is the full CombatStatus union. */
@@ -162,6 +182,7 @@ export class CombatScene extends Phaser.Scene {
       missingHealthBonuses: this.sceneData.loadout.missingHealthBonuses,
     });
 
+    this.buildGroundLine();
     this.buildPartySprites();
     this.rebuildEnemies(this.engine.state.enemies);
     this.buildHud();
@@ -194,14 +215,37 @@ export class CombatScene extends Phaser.Scene {
 
   // ---- setup --------------------------------------------------------------
 
+  /** One flat line under the battle line so the facing line reads as standing on shared
+   *  ground (handoff §A, optional) — drawn once behind everything else, no animation. */
+  private buildGroundLine(): void {
+    this.add
+      .rectangle(
+        VIEW_WIDTH / 2,
+        GROUND_Y,
+        ENEMY_SLOT_RIGHT - PARTY_SLOT_LEFT + GROUND_LINE_MARGIN * 2,
+        GROUND_LINE_WIDTH,
+        GROUND_LINE_COLOR,
+      )
+      .setDepth(-1);
+  }
+
   private buildPartySprites(): void {
     const party = this.engine.state.party;
-    party.forEach((unit, i) => {
+    const y = groundAnchorY(PARTY_UNIT_HEIGHT);
+    party.forEach((unit) => {
       this.unitNames.set(unit.id, unit.name);
-      const y = slotY(i, party.length, ROSTER_TOP_Y, ROSTER_BOTTOM_Y);
+      // Presentation-only slot: visual order (healer·dps2·dps1·tank) is looked up by unit
+      // id, not array index — the engine's party array order is unchanged (handoff §B).
+      const visualIndex = PARTY_VISUAL_ORDER.indexOf(unit.id);
+      const x = slotX(
+        visualIndex >= 0 ? visualIndex : 0,
+        PARTY_VISUAL_ORDER.length,
+        PARTY_SLOT_LEFT,
+        PARTY_SLOT_RIGHT,
+      );
       const sprite = new UnitSprite(unit, {
         scene: this,
-        x: PARTY_X,
+        x,
         y,
         width: PARTY_UNIT_WIDTH,
         height: PARTY_UNIT_HEIGHT,
@@ -209,6 +253,7 @@ export class CombatScene extends Phaser.Scene {
         showMana: unit.role === 'healer',
         clickable: true,
         onClick: (id) => this.onAllyClick(id),
+        facing: 'right',
       });
       this.partySprites.set(unit.id, sprite);
     });
@@ -222,19 +267,21 @@ export class CombatScene extends Phaser.Scene {
     const isBoss = enemies.length === 1 && enemies[0]?.role === 'boss';
     const width = isBoss ? BOSS_UNIT_WIDTH : TRASH_UNIT_WIDTH;
     const height = isBoss ? BOSS_UNIT_HEIGHT : TRASH_UNIT_HEIGHT;
+    const y = groundAnchorY(height);
 
     enemies.forEach((unit, i) => {
       this.unitNames.set(unit.id, unit.name);
-      const y = slotY(i, enemies.length, ROSTER_TOP_Y, ROSTER_BOTTOM_Y);
+      const x = slotX(i, enemies.length, ENEMY_SLOT_LEFT, ENEMY_SLOT_RIGHT);
       const sprite = new UnitSprite(unit, {
         scene: this,
-        x: ENEMY_X,
+        x,
         y,
         width,
         height,
         frame: frameForUnit(unit),
         showMana: false,
         clickable: false,
+        facing: 'left',
       });
       this.enemySprites.set(unit.id, sprite);
     });
