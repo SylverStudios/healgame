@@ -115,10 +115,10 @@ describe('mana', () => {
     }
     expect(engine.state.party.find((u) => u.id === 'healer')!.mana).toBe(5);
 
-    // Queue a Solemn Mend (5 mana, legal right now) behind a Zealous Mending (8 mana) that will
+    // Queue a Solemn Mend (5 mana, legal right now) behind a Zealous Mending (6 mana) that will
     // consume the remaining mana down to -3 clamped to 0 on completion, leaving 0 for the queued spell.
-    engine.castSpell(TEST_ZEALOUS_MENDING.id); // starts immediately: costs 8 but only 5 available
-    // Zealous Mending itself should have been rejected (OOM) since 5 < 8:
+    engine.castSpell(TEST_ZEALOUS_MENDING.id); // starts immediately: costs 6 but only 5 available
+    // Zealous Mending itself should have been rejected (OOM) since 5 < 6:
     expect(engine.state.playerCast).toBeNull();
 
     // Now legally start Solemn Mend (5 mana exactly) then queue another Solemn Mend behind it.

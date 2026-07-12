@@ -231,7 +231,7 @@ export class TreeScene extends Phaser.Scene {
     const treeView = view(SPELL_TREE, this.treeState);
     const gold = treeView.wallet['gold'] ?? 0;
     const ruby = treeView.wallet['ruby'] ?? 0;
-    this.headerText.setText(`Gold: ${gold}    Rubies: ${ruby}`);
+    this.headerText.setText(`Gold ${gold} (tree)    Rubies ${ruby} (oaths)`);
     this.statusText.setText(this.armMessage());
     this.feedbackText.setText(this.feedback);
 

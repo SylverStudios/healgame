@@ -1,7 +1,8 @@
 /**
  * Bottom row of spell buttons (poc-spec §4: click ally -> click spell/hotkey).
- * One button per unlocked spell; disabled look when mana is short or nothing
- * is targeted. Temp art only — flat rectangles + text, no icons.
+ * One button per unlocked spell; dimmed + crimson cost when mana is short;
+ * dimmed when nothing is targeted or combat ended. Temp art only — flat
+ * rectangles + text, no icons.
  */
 
 import Phaser from 'phaser';
@@ -13,9 +14,10 @@ const BUTTON_WIDTH = 160;
 const BUTTON_HEIGHT = 52;
 const BUTTON_GAP = 14;
 const BUTTON_BG_COLOR = 0x3a2a22;
+const BUTTON_BG_OOM_COLOR = 0x2a1a18;
 const BUTTON_BORDER_COLOR = 0x0a0605;
 const BUTTON_BORDER_WIDTH = 1;
-const BUTTON_DISABLED_ALPHA = 0.35;
+const BUTTON_DISABLED_ALPHA = 0.28;
 
 /** Armed-synergy accent border (handoff §E): thicker gold stroke, no other feedback. */
 const ARMED_BORDER_COLOR = 0xf2c14e;
@@ -25,6 +27,7 @@ const NAME_FONT = '13px monospace';
 const NAME_COLOR = '#e8d8c8';
 const COST_FONT = '11px monospace';
 const COST_COLOR = '#a8c8f0';
+const COST_OOM_COLOR = '#e05a4e';
 const HOTKEY_FONT = '10px monospace';
 const HOTKEY_COLOR = '#e8d8c8';
 const KEYCAP_SIZE = 18;
@@ -90,13 +93,16 @@ class SpellButton {
       .setOrigin(0.5);
   }
 
-  setEnabled(enabled: boolean): void {
+  /** Enabled = clickable (running + target + affordable). OOM always paints crimson cost. */
+  setCastability(enabled: boolean, canAfford: boolean): void {
     this.enabled = enabled;
     const alpha = enabled ? 1 : BUTTON_DISABLED_ALPHA;
+    this.bg.setFillStyle(canAfford ? BUTTON_BG_COLOR : BUTTON_BG_OOM_COLOR);
     this.bg.setAlpha(alpha);
     this.keycap.setAlpha(alpha);
     this.nameText.setAlpha(alpha);
-    this.costText.setAlpha(alpha);
+    this.costText.setAlpha(canAfford ? alpha : Math.max(alpha, 0.55));
+    this.costText.setColor(canAfford ? COST_COLOR : COST_OOM_COLOR);
     this.hotkeyText.setAlpha(alpha);
   }
 
@@ -147,10 +153,12 @@ export class SpellBar {
     });
   }
 
-  /** Toggle each button's enabled look based on current healer mana / target / running state. */
+  /** Toggle each button's look from healer mana / target / running state. */
   setState(healerMana: number, hasTarget: boolean, isRunning: boolean): void {
     for (const button of this.buttons) {
-      button.setEnabled(isRunning && hasTarget && healerMana >= button.mana);
+      const canAfford = healerMana >= button.mana;
+      const enabled = isRunning && hasTarget && canAfford;
+      button.setCastability(enabled, canAfford);
     }
   }
 

@@ -1,12 +1,10 @@
 # Combat juice + forsaken-path tempo — handoff
 
-Status: historical · Authority: this phase's scope · Last verified: 2026-07-11
+Status: historical · Authority: none — shipped 2026-07-11; decisions in poc-qa.md juice section · Last verified: 2026-07-12
 
-**Audience:** the central agent running this phase in a **fresh session**. Read
-after `CLAUDE.md` / `AGENTS.md`. **This doc wins on juice / tempo / tree
-consolation scope below**; `poc-spec.md` still wins on combat rules unless this
-doc explicitly amends them. Side-view layout must already be **shipped**
-(`docs/side-view-layout-handoff.md` → `historical`) before chunk 0 proceeds.
+**Shipped.** Do not re-run this mission. Live contracts: `CLAUDE.md`,
+`game/src/combat/README.md`, `game/src/tree/AGENTS.md`. QA log:
+[`poc-qa.md`](./poc-qa.md) (Combat juice section).
 
 **Baseline expectation:** main after side-view merge. Phase 3 combat UX
 (numeric floats, armed border, cast cancel, combat log) is shipped — see
@@ -317,13 +315,14 @@ Add a stage after oath swear:
 
 ## Definition of done (central)
 
-- [ ] All done-means 1–9 verified in play or journey/screenshots
-- [ ] `npm run check` + `npm run smoke` + full `journey.mjs`
-- [ ] `poc-qa.md` appended; this file `Status: historical`
-- [ ] One commit per chunk (central)
+- [x] All done-means 1–9 verified in play or journey/screenshots
+- [x] `npm run check` + `npm run smoke` + full `journey.mjs`
+- [x] `poc-qa.md` appended; this file `Status: historical`
+- [x] One commit per chunk (central)
 
 ## Document history
 
 | Version | Date | Notes |
 |---------|------|-------|
 | v1 | 2026-07-11 | Preparer brief from juice planning; waits on side-view |
+| v2 | 2026-07-12 | Authority retired to none; DoD checked after ship |

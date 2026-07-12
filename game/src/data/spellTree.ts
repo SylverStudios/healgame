@@ -92,8 +92,8 @@ const deepReserves = rankSpot({
   costs: Array.from({ length: 5 }, () => ({ currency: 'gold', amount: 5 })),
   contentForRank: () => ({
     name: 'Deep Reserves',
-    description: '+2 max mana per rank',
-    effect: { kind: 'bonusMaxMana', amount: 2 },
+    description: '+5 max mana per rank',
+    effect: { kind: 'bonusMaxMana', amount: 5 },
   }),
 });
 

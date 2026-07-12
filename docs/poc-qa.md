@@ -1,6 +1,6 @@
 # PoC QA — journey checklist & verification
 
-Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-11
+Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-12
 
 **Date:** 2026-07-08 · **Verdict: PoC complete.** Every poc-spec §1 criterion is
 implemented, and all of them are enforced by automated gates that run headless.
@@ -61,16 +61,20 @@ Scripted bots run the real engine deterministically:
 
 ## Micro-choices made (poc-spec §10)
 
-1. Level 2 at **10 XP**.
-2. Gold tree node: **Deep Reserves** — +5 max mana, 5 gold.
+1. Level 2 at **10 XP** → auto-grants **Zealous Mending** (XP's only PoC
+   job; no spend UI). Further XP accrues with no extra levels yet.
+2. Gold tree node: **Deep Reserves** — **+5 max mana per rank**, 5 gold,
+   5 ranks (one rank = one extra Solemn Mend cast from the base pool).
 3. Dungeon 2 unlocks **after Ash Gate first clear** (spec's preference).
 4. Healer is **never targeted** by enemies in PoC.
 5. Cast time is the busy time; GCD 1s runs in parallel (`max(cast, GCD)`),
    one-slot spell queue re-validated when busy ends. Mana spent on cast
    **completion**. *(Phase 3 amends: mana is now reserved at cast start and
    refunded on cancel — see the Phase 3 section.)*
-6. Subclass branch nodes (Deep Focus / Battle Fervor) reuse the +5 max mana
-   effect with branch flavor — one visible follow-up node each, per §6.
+6. Subclass follow-ups are **synergies / cast mods / missing-health** (Patient
+   Vow, Measured Devotion, Fervent Chain, Desperate Zeal) — not flat mana.
+   Retired v1 nodes `vigil-deep-focus` / `zealot-battle-fervor` refund on
+   migration only.
 7. The Maw has one light trash wave before the Hollow King so grind attempts
    still pay a little gold/XP (grind-sandbox intent of §7).
 
@@ -120,8 +124,8 @@ Back moved to 120,504) and the spell-bar slot helper.
    casts correctly show no float.
 2. **Tooltips reflect tree modifiers** — journey shot: Solemn Vigil tooltip
    reads `Heals 9 / Costs 7 mana / Cast: 3.0s / +1 heal when armed by Solemn
-   Mend` with Patient Vow rank 1 owned; healer mana in the same shot is 24/24
-   (20 base + 2 Deep Reserves ranks × 2).
+   Mend` with Patient Vow rank 1 owned; healer mana scales with Deep Reserves
+   (20 base + ranks × amount — see micro-choice 2 / playtest retune).
 3. **Node-graph tree** — edges colored by state (green owned / accent
    available / dim locked), `n/N` rank pips, oath details visible on hover
    before buying, two-click oath purchase, rival oath greyed LOCKED and
@@ -377,3 +381,29 @@ engine rule changes; balance gates byte-identical at 1× sim.
 Stage B seed gold raised to 17g (tempo 4g + Patient Vow 3g after oath).
 New stages: forsaken tempo purchase on zealot spot, pace toggle click in B2.
 New `UI.combatPaceToggle`. Full journey green after integration.
+
+# Playtest retune — mana feel, spell affordance, currencies (2026-07-12)
+
+Post-juice playtest. No new phase handoff; living numbers + hub copy.
+
+## Changes
+
+| Topic | Before | After | Why |
+|---|---|---|---|
+| Deep Reserves | +2 max mana / rank | **+5 max mana / rank** | A couple ranks must buy a real cast (Solemn Mend costs 5) |
+| Zealous Mending | heal 5 / mana 8 / 1s | **heal 6 / mana 6 / 1s** | Second spell is a tempo tool, not a mana trap vs Mend |
+| Spell bar OOM | 35% alpha only | Stronger dim + **crimson cost** when unaffordable | Uncastable-from-mana must read at a glance |
+| Hub currencies | `Gold N  XP N (Lv)  Rubies N` | Labeled roles + XP progress to Zealous | XP purpose was opaque; gold/ruby sinks were clearer |
+
+## Currency roles (pinned for hub copy)
+
+| Currency | PoC job |
+|---|---|
+| **XP** | Auto-unlock kit breadth at level thresholds (only Lv 2 → Zealous today) |
+| **Gold** | Buy spell-tree nodes (Deep Reserves, forsaken tempo, …) |
+| **Rubies** | Swear a subclass oath (scarce; first-clear only) |
+
+## Gates
+
+`balance.test.ts` shape unchanged (no-heal wipe, naive wipe, full-kit clear,
+The Maw unwinnable). Retune values live in `constants.ts` / `spellTree.ts`.

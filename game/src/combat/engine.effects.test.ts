@@ -201,7 +201,7 @@ describe('CombatEngine effects: both bonuses stack additively', () => {
     // Zealous Flare's 1000ms cast has 3000ms of headroom now — no collision.
     const h = onlyHeal(castAndComplete(engine, 'tank', TEST_ZEALOUS_MENDING.id, TEST_ZEALOUS_MENDING.castMs));
     const raw = TEST_ZEALOUS_MENDING.heal + 4 + 2; // heal + synergy + missing-health(floor(2*10/20)=1 * 2)
-    expect(raw).toBe(11);
+    expect(raw).toBe(12);
     const applied = Math.min(raw, 2);
     expect(h.amount).toBe(applied);
     expect(h.overheal).toBe(raw - applied);

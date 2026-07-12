@@ -1,9 +1,9 @@
 /**
- * Hub (poc-spec §3, §5): shows currencies/level, applies the result of the
- * combat run that just ended (if any), and is the launch point for Ash Gate,
- * the spell tree, the ruby subclass split (§6, once affordable), and
- * Dungeon 2 / The Maw (§7, once Ash Gate is cleared). Temp art only —
- * panels + text buttons, dark palette, monospace.
+ * Hub (poc-spec §3, §5): shows currencies with roles, applies the result of
+ * the combat run that just ended (if any), and is the launch point for Ash
+ * Gate, the spell tree (gold + ruby oaths), and Dungeon 2 / The Maw (§7,
+ * once Ash Gate is cleared). Temp art only — panels + text buttons, dark
+ * palette, monospace.
  */
 
 import Phaser from 'phaser';
@@ -11,7 +11,7 @@ import { SceneKeys } from './keys';
 import { loadSave, resetSave, saveGame, type SaveData } from '../save/save';
 import { applyCombatResult, isDungeon2Unlocked, type HubNotice } from '../meta/progression';
 import { loadoutFromSave } from '../data/spellTree';
-import { levelForXp } from '../data/constants';
+import { levelForXp, SPELLS, XP_LEVEL_2_THRESHOLD } from '../data/constants';
 import { ASH_GATE, THE_MAW } from '../data/encounters';
 import type { CombatResult, CombatSceneData } from './CombatScene';
 
@@ -61,15 +61,31 @@ export class HubScene extends Phaser.Scene {
   }
 
   private buildStats(save: SaveData): void {
+    const { width } = this.scale;
     const level = levelForXp(save.xp);
-    const line = `Gold ${save.gold}    XP ${save.xp} (Lv ${level})    Rubies ${save.rubies}`;
-    this.add
-      .text(this.scale.width / 2, 88, line, { fontFamily: FONT, fontSize: '16px', color: ACCENT_COLOR })
-      .setOrigin(0.5);
+    const hasZealous = save.unlockedSpells.includes(SPELLS.zealousMending.id);
+    const xpLine = hasZealous
+      ? `XP ${save.xp} (Lv ${level}) — ${SPELLS.zealousMending.name} unlocked`
+      : `XP ${save.xp}/${XP_LEVEL_2_THRESHOLD} → unlock ${SPELLS.zealousMending.name}`;
+
+    const lines = [
+      `Gold ${save.gold} — spend in Spell Tree`,
+      xpLine,
+      `Rubies ${save.rubies} — swear an oath (first clear)`,
+    ];
+    lines.forEach((line, i) => {
+      this.add
+        .text(width / 2, 78 + i * 22, line, {
+          fontFamily: FONT,
+          fontSize: '15px',
+          color: i === 1 ? ACCENT_COLOR : DIM_COLOR,
+        })
+        .setOrigin(0.5);
+    });
   }
 
   private buildNotices(notices: HubNotice[]): void {
-    const startY = 128;
+    const startY = 152;
     notices.forEach((notice, i) => {
       const y = startY + i * 36;
       this.add
