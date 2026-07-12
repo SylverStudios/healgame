@@ -454,6 +454,22 @@ export class CombatScene extends Phaser.Scene {
         case 'bossCastFinished':
           shakeBossImpact(this);
           break;
+        case 'bossFocusStarted': {
+          // Tunnel Vision channel begins on one party member (alpha-0.1 §D3).
+          // The telegraph's bossCastFinished already fired the small shake.
+          this.findSprite(event.targetId)?.setBossFocused(true);
+          this.combatLog.push(
+            `${this.formatTimestamp()} ${this.encounter.boss.name} fixates on ${this.resolveUnitName(event.targetId)} — ${event.name}!`,
+          );
+          break;
+        }
+        // No bossFocusTick case: tick HP loss arrives as a normal 'damage'
+        // event (float + log line), and 10 extra lines/shakes in 10s is noise.
+        case 'bossFocusEnded': {
+          this.findSprite(event.targetId)?.setBossFocused(false);
+          this.combatLog.push(`${this.formatTimestamp()} ${event.name} ends.`);
+          break;
+        }
         case 'castCancelled': {
           const spellName = this.resolveSpellName(event.spellId);
           if (event.reason === 'escape') {
@@ -469,6 +485,10 @@ export class CombatScene extends Phaser.Scene {
           this.rebuildEnemies(this.engine.state.enemies);
           break;
         case 'combatEnded':
+          // A channel can be live when the fight ends (e.g. boss dies mid-
+          // Tunnel-Vision) — the engine stops before emitting bossFocusEnded,
+          // so clear any lingering brand before the overlay.
+          this.partySprites.forEach((sprite) => sprite.setBossFocused(false));
           if (isFinalStatus(event.status)) this.showResultOverlay(event.status);
           break;
         default:
