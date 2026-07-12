@@ -78,6 +78,9 @@ export type CombatEvent =
   | { type: 'castCancelled'; spellId: string; reason: 'escape' | 'target-dead' }
   | { type: 'bossCastStarted'; cast: BossCastState }
   | { type: 'bossCastFinished'; name: string }
+  | { type: 'bossFocusStarted'; targetId: string; name: string; totalMs: number }
+  | { type: 'bossFocusTick'; targetId: string; amount: number }
+  | { type: 'bossFocusEnded'; targetId: string; name: string }
   | { type: 'unitDied'; unitId: string }
   | { type: 'waveStarted'; waveIndex: number }
   | { type: 'combatEnded'; status: CombatStatus };
@@ -107,8 +110,14 @@ export interface WaveDef {
   enemies: EnemyGroupDef[];
 }
 
-/** Bonehowl-style named boss cast: telegraphed, hits every living party member on completion. */
-export interface BossCastDef {
+/**
+ * Bonehowl-style named boss cast: telegraphed, hits every living party member
+ * on completion. `kind` is optional here (defaults to this arm) so existing
+ * encounter data/tests written before the Tunnel Vision union stay valid
+ * unchanged.
+ */
+export interface PartyAoECastDef {
+  kind?: 'partyAoE';
   name: string;
   castMs: number;
   /** Delay from boss-phase start to the first cast start. */
@@ -117,6 +126,27 @@ export interface BossCastDef {
   intervalMs: number;
   partyDamage: number;
 }
+
+/**
+ * Tunnel Vision-style boss cast (Alpha 0.1 §D3): a named telegraph, then a
+ * channel that ticks damage into one focused non-tank party member. Boss
+ * auto-attacks continue on the tank throughout both phases (not a full
+ * interrupt) — see combat/README.md.
+ */
+export interface TunnelVisionCastDef {
+  kind: 'tunnelVision';
+  name: string;
+  /** Named cast-bar warning before the channel begins. */
+  telegraphMs: number;
+  /** Delay from boss-phase start to first telegraph start; intervalMs is telegraph-start-to-telegraph-start. */
+  firstCastAtMs: number;
+  intervalMs: number;
+  channelMs: number;
+  tickMs: number;
+  damagePerTick: number;
+}
+
+export type BossCastDef = PartyAoECastDef | TunnelVisionCastDef;
 
 export interface BossDef {
   id: string;

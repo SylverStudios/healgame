@@ -89,9 +89,49 @@ in `encounters.ts`, expected to be retuned.
   simultaneous full-party swing ticks are rare. `swingTimers` is seeded from
   the unit's role/encounter interval at spawn and reset to that same interval
   after every swing.
-- **Bonehowl**: `firstCastAtMs`/`intervalMs` are start-to-start; the gap before
-  each subsequent cast is `intervalMs - castMs`. The boss keeps auto-attacking
-  while casting (not a channel).
+- **Boss cast union** (Alpha 0.1 §D3): `BossDef.cast` is a discriminated union,
+  `BossCastDef = PartyAoECastDef | TunnelVisionCastDef`. `kind` is optional on
+  `PartyAoECastDef` (defaults to that arm) so every pre-existing encounter
+  (Ash Gate's Bonehowl, The Maw's Extinction) keeps compiling and behaving
+  identically without setting `kind` at all — only `TunnelVisionCastDef`
+  requires `kind: 'tunnelVision'`.
+- **Bonehowl / Extinction (`partyAoE`)**: `firstCastAtMs`/`intervalMs` are
+  start-to-start; the gap before each subsequent cast is `intervalMs - castMs`.
+  The boss keeps auto-attacking while casting (not a channel).
+- **Tunnel Vision (`tunnelVision`)** — telegraph, then a single-target channel:
+  - **Telegraph**: on activation, `state.bossCast` is set with
+    `totalMs = telegraphMs` (same `BossCastState` the cast bar already
+    renders), and `bossCastStarted` fires exactly as for a `partyAoE` cast.
+    The boss keeps auto-attacking the tank throughout — same "not a full
+    interrupt" rule as Bonehowl — during **both** the telegraph and the
+    channel that follows.
+  - **Telegraph → channel**: when the telegraph completes, `bossCastFinished`
+    fires, `bossCast` clears (the channel is represented by focus events, not
+    the cast bar), a focus target is picked (see rotation below), and
+    `bossFocusStarted { targetId, name, totalMs: channelMs }` fires.
+  - **Channel ticks**: every `tickMs` (for `channelMs / tickMs` ticks total),
+    `damagePerTick` is applied to the focus target through the *same* damage
+    pipeline as any other hit — the normal `damage` event, `unitDied` +
+    wipe-check on death — then `bossFocusTick { targetId, amount }` fires
+    *after* that `damage` event.
+  - **Channel end**: `bossFocusEnded { targetId, name }` fires either after
+    the final tick, or immediately if the focus target dies mid-channel (early
+    end, **no retarget** — the channel just stops).
+  - **Cadence (start-to-start, same semantics as `partyAoE`)**:
+    `firstCastAtMs`/`intervalMs` measure telegraph-start-to-telegraph-start.
+    The interval timer is reset the instant a telegraph starts (not when the
+    channel ends), so it keeps running underneath the whole telegraph+channel
+    occupancy. Defensive rule: a new telegraph can never start while a channel
+    is active — if the interval elapses first, it just waits and fires the
+    instant the channel ends (the next boundary after it ends).
+  - **Deterministic target rotation (no `Math.random`, ever)**: eligible =
+    living party members with `role !== 'tank'`, sorted by stable unit `id`;
+    pick `eligible[focusIndex % eligible.length]`, then increment
+    `focusIndex` once per activation. `focusIndex` starts at 0 and lives in
+    engine state for the fight's lifetime — a unit that dies is simply
+    excluded from `eligible` on the next activation without resetting or
+    skipping the cursor (e.g. with `[dps1, dps2, healer]` and `dps1` dead,
+    `focusIndex` continuing at 1 lands on `healer`, not `dps2`).
 - **Synergy and missing-health bonuses** (Chunk 1, phase-2-handoff): both are
   resolved into the existing `heal` event — no new event types. A cast's raw
   heal value is `spell.heal + synergyBonuses + missingHealthBonuses`; the
@@ -134,8 +174,11 @@ in `encounters.ts`, expected to be retuned.
 ## Determinism
 
 Simultaneous events resolve in a fixed priority each tick: player cast completes
-→ queued cast fires → boss cast completes → merc autos (tank, dps1, dps2) →
-enemy/boss autos (spawn order) → boss cast timer starts a new cast. `advance()`
+→ queued cast fires → boss cast completes (`partyAoE` party damage, or a
+`tunnelVision` telegraph finishing into a channel) → boss focus tick
+(`tunnelVision` channel damage, if one landed this tick) → merc autos (tank,
+dps1, dps2) → enemy/boss autos (spawn order) → boss cast timer starts a new
+telegraph/cast (blocked while a `tunnelVision` channel is active). `advance()`
 sub-steps to the next timer boundary, so the event log for a given command
 sequence is independent of how the caller chunks `dtMs`. Commands issued between
 `advance()` calls (`castSpell` may emit `castStarted`; `cancelCast` may emit

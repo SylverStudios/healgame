@@ -19,8 +19,25 @@ import type {
   MissingHealthBonusRule,
   SpellDef,
   SynergyRule,
+  TunnelVisionCastDef,
   Unit,
 } from './types';
+
+/**
+ * Internal engine-only state for an active Tunnel Vision channel (telegraph
+ * already finished). Not part of the public CombatState surface — VFX/log
+ * consumers drive off the bossFocusStarted/Tick/Ended events instead.
+ */
+interface BossFocusState {
+  targetId: string;
+  name: string;
+  /** Total ms remaining in the channel (ends the channel at/below 0). */
+  remainingMs: number;
+  /** Countdown to the next tick. */
+  tickRemainingMs: number;
+  tickMs: number;
+  damagePerTick: number;
+}
 
 export class CombatEngine {
   private readonly encounter: EncounterDef;
@@ -43,8 +60,13 @@ export class CombatEngine {
   private targetId: string | null = null;
 
   private bossCastState: BossCastState | null = null;
-  /** Countdown to the next boss cast start; null while a cast is active or the boss has no cast. */
+  /** Countdown to the next boss cast start; null while a party-AoE cast is active or the boss has no cast. */
   private bossCastTimerRemainingMs: number | null = null;
+
+  /** Active Tunnel Vision channel (telegraph already finished); null otherwise. */
+  private bossFocusState: BossFocusState | null = null;
+  /** Deterministic round-robin cursor into the eligible (non-tank, living) focus targets; never Math.random. */
+  private focusIndex = 0;
 
   private waveIndex = 0;
   private status: CombatStatus = 'running';
@@ -187,6 +209,9 @@ export class CombatEngine {
     for (const remaining of this.swingTimers.values()) min = Math.min(min, remaining);
     if (this.bossCastState) min = Math.min(min, this.bossCastState.remainingMs);
     if (this.bossCastTimerRemainingMs !== null) min = Math.min(min, this.bossCastTimerRemainingMs);
+    if (this.bossFocusState) {
+      min = Math.min(min, this.bossFocusState.remainingMs, this.bossFocusState.tickRemainingMs);
+    }
     return min;
   }
 
@@ -197,6 +222,10 @@ export class CombatEngine {
     for (const [id, remaining] of this.swingTimers) this.swingTimers.set(id, remaining - step);
     if (this.bossCastState) this.bossCastState.remainingMs -= step;
     if (this.bossCastTimerRemainingMs !== null) this.bossCastTimerRemainingMs -= step;
+    if (this.bossFocusState) {
+      this.bossFocusState.remainingMs -= step;
+      this.bossFocusState.tickRemainingMs -= step;
+    }
 
     // 1. player cast completes
     if (this.playerCast && this.playerCast.remainingMs <= 0) {
@@ -206,11 +235,15 @@ export class CombatEngine {
     if (this.gcdRemainingMs <= 0 && this.playerCast === null) {
       this.fireQueuedCast(events);
     }
-    // 3. boss cast completes -> party-wide damage
+    // 3. boss cast completes -> party-wide damage (partyAoE) or telegraph ends -> focus channel begins (tunnelVision)
     if (this.status === 'running' && this.bossCastState && this.bossCastState.remainingMs <= 0) {
       this.completeBossCast(events);
     }
-    // 4. merc auto-attacks
+    // 4. boss focus tick (Tunnel Vision channel damage)
+    if (this.status === 'running' && this.bossFocusState && this.bossFocusState.tickRemainingMs <= 0) {
+      this.resolveBossFocusTick(events);
+    }
+    // 5. merc auto-attacks
     if (this.status === 'running') {
       for (const id of ['tank', 'dps1', 'dps2']) {
         if (this.status !== 'running') break;
@@ -224,7 +257,7 @@ export class CombatEngine {
         }
       }
     }
-    // 5. enemy/boss auto-attacks
+    // 6. enemy/boss auto-attacks
     if (this.status === 'running') {
       for (const enemy of [...this.activeEnemies]) {
         if (this.status !== 'running') break;
@@ -237,12 +270,13 @@ export class CombatEngine {
         }
       }
     }
-    // 6. boss cast timer elapses -> start a new telegraphed cast
+    // 7. boss cast timer elapses -> start a new telegraphed cast (blocked while a focus channel is active)
     if (
       this.status === 'running' &&
       this.bossCastTimerRemainingMs !== null &&
       this.bossCastTimerRemainingMs <= 0 &&
-      this.bossCastState === null
+      this.bossCastState === null &&
+      this.bossFocusState === null
     ) {
       this.startBossCast(events);
     }
@@ -389,17 +423,36 @@ export class CombatEngine {
   private startBossCast(events: CombatEvent[]): void {
     const castDef = this.encounter.boss.cast;
     if (!castDef || !this.boss || !this.boss.alive) return;
-    this.bossCastState = { name: castDef.name, remainingMs: castDef.castMs, totalMs: castDef.castMs };
-    this.bossCastTimerRemainingMs = null;
+    if (castDef.kind === 'tunnelVision') {
+      this.bossCastState = { name: castDef.name, remainingMs: castDef.telegraphMs, totalMs: castDef.telegraphMs };
+      // Start-to-start cadence (D3/D8): reset the interval timer now, right at
+      // telegraph start, so it keeps counting through both the telegraph and
+      // the channel. Step 7's `bossFocusState === null` guard stops a new
+      // telegraph from starting while the channel is still active — if the
+      // interval elapses first (this goes <= 0) it just waits and fires the
+      // instant the channel ends (the "next boundary after it ends").
+      this.bossCastTimerRemainingMs = castDef.intervalMs;
+    } else {
+      this.bossCastState = { name: castDef.name, remainingMs: castDef.castMs, totalMs: castDef.castMs };
+      this.bossCastTimerRemainingMs = null;
+    }
     events.push({ type: 'bossCastStarted', cast: { ...this.bossCastState } });
   }
 
   private completeBossCast(events: CombatEvent[]): void {
     const cast = this.bossCastState!;
+    const castDef = this.encounter.boss.cast!;
     this.bossCastState = null;
     events.push({ type: 'bossCastFinished', name: cast.name });
 
-    const castDef = this.encounter.boss.cast!;
+    if (castDef.kind === 'tunnelVision') {
+      // Telegraph finished -> channel begins. The start-to-start cadence
+      // timer is already running (set in startBossCast), so nothing to
+      // reschedule here.
+      this.startBossFocus(castDef, events);
+      return;
+    }
+
     const bossId = this.boss!.id;
     for (const unit of this.party) {
       if (!unit.alive) continue;
@@ -418,6 +471,66 @@ export class CombatEngine {
       // Start-to-start cadence: the gap before the next cast is intervalMs - castMs.
       this.bossCastTimerRemainingMs = castDef.intervalMs - castDef.castMs;
     }
+  }
+
+  /**
+   * Begin a Tunnel Vision channel right after its telegraph completes.
+   * Deterministic target selection (D3/D8, no Math.random): eligible = living
+   * party members with role !== 'tank', sorted by stable unit id;
+   * eligible[focusIndex % eligible.length], then focusIndex increments once
+   * per activation.
+   */
+  private startBossFocus(castDef: TunnelVisionCastDef, events: CombatEvent[]): void {
+    const eligible = this.party
+      .filter((u) => u.alive && u.role !== 'tank')
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    if (eligible.length === 0) {
+      // No valid focus target (every non-tank party member is dead) -- skip
+      // this activation; the next telegraph is still governed by the
+      // already-running cadence timer.
+      return;
+    }
+    const target = eligible[this.focusIndex % eligible.length]!;
+    this.focusIndex += 1;
+    this.bossFocusState = {
+      targetId: target.id,
+      name: castDef.name,
+      remainingMs: castDef.channelMs,
+      tickRemainingMs: castDef.tickMs,
+      tickMs: castDef.tickMs,
+      damagePerTick: castDef.damagePerTick,
+    };
+    events.push({ type: 'bossFocusStarted', targetId: target.id, name: castDef.name, totalMs: castDef.channelMs });
+  }
+
+  /**
+   * Resolve one Tunnel Vision damage tick: damage goes through the same
+   * pipeline as any other damage (applyDamageToUnit -> normal `damage` event,
+   * `unitDied` + wipe-check on death), then `bossFocusTick` is emitted after.
+   * The channel ends (bossFocusEnded) either when the target dies mid-channel
+   * (early end, no retarget) or after its final tick.
+   */
+  private resolveBossFocusTick(events: CombatEvent[]): void {
+    const focus = this.bossFocusState!;
+    const target = this.getUnit(focus.targetId);
+    if (target && target.alive) {
+      this.applyDamageToUnit(target, focus.damagePerTick, this.boss!.id, events);
+      events.push({ type: 'bossFocusTick', targetId: focus.targetId, amount: focus.damagePerTick });
+    }
+
+    const after = this.getUnit(focus.targetId);
+    if (!after || !after.alive) {
+      // Focus target died mid-channel: end early, no retarget.
+      this.bossFocusState = null;
+      events.push({ type: 'bossFocusEnded', targetId: focus.targetId, name: focus.name });
+      return;
+    }
+    if (focus.remainingMs <= 0) {
+      this.bossFocusState = null;
+      events.push({ type: 'bossFocusEnded', targetId: focus.targetId, name: focus.name });
+      return;
+    }
+    focus.tickRemainingMs = focus.tickMs;
   }
 
   // ---- internal: wave/encounter progression -------------------------------------------

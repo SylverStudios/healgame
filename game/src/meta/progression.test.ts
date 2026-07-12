@@ -267,9 +267,11 @@ describe('THE_MAW data sanity', () => {
   });
 
   it('has a named party-wide cast (Extinction) defined', () => {
-    expect(THE_MAW.boss.cast?.name).toBe('Extinction');
-    expect(THE_MAW.boss.cast?.partyDamage).toBeGreaterThan(0);
-    expect(THE_MAW.boss.cast?.castMs).toBe(10_000);
+    const cast = THE_MAW.boss.cast;
+    expect(cast?.name).toBe('Extinction');
+    if (!cast || cast.kind === 'tunnelVision') throw new Error('Extinction must be a party-AoE cast');
+    expect(cast.partyDamage).toBeGreaterThan(0);
+    expect(cast.castMs).toBe(10_000);
   });
 
   it('includes a light trash wave so grinding still pays gold/xp', () => {
