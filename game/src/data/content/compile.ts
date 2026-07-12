@@ -53,7 +53,7 @@ function compileValidatedDungeon(
     typeof dungeonOrId === 'string'
       ? catalogs.dungeons.find(({ id }) => id === dungeonOrId)
       : dungeonOrId;
-  if (dungeon === undefined || !catalogs.dungeons.some(({ id }) => id === dungeon.id)) {
+  if (dungeon === undefined || !catalogs.dungeons.includes(dungeon)) {
     throw new Error(`Cannot compile unknown dungeon "${String(dungeonOrId)}"`);
   }
 

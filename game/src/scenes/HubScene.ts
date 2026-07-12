@@ -129,15 +129,26 @@ export class HubScene extends Phaser.Scene {
   private buildButtons(save: SaveData): void {
     const { width, height } = this.scale;
     const centerX = width / 2;
+    const unlockedDungeons = ORDERED_DUNGEONS.filter((dungeon) =>
+      isDungeonUnlocked(save, dungeon.id),
+    );
+    const compactDungeonGrid = unlockedDungeons.length > 2;
+    const compactColumns = 3;
+    const compactRows = Math.ceil(unlockedDungeons.length / compactColumns);
 
-    ORDERED_DUNGEONS.forEach((dungeon, index) => {
-      if (!isDungeonUnlocked(save, dungeon.id)) return;
-
-      // Preserve the current two-dungeon targets. Further ordered entries
-      // continue downward deterministically without additional scene wiring.
-      const y = index === 0 ? height / 2 - 15 : height / 2 + 180 + (index - 1) * 65;
-      const suffix = index === 0 ? '' : ` (Dungeon ${index + 1})`;
-      this.makeButton(centerX, y, 300, 52, `Enter ${dungeon.name}${suffix}`, () => {
+    unlockedDungeons.forEach((dungeon, visibleIndex) => {
+      // Keep today's one/two-dungeon journey targets exact. Three or more
+      // unlocked entries reflow into a bounded three-column grid.
+      const column = visibleIndex % compactColumns;
+      const row = Math.floor(visibleIndex / compactColumns);
+      const x = compactDungeonGrid ? centerX + (column - 1) * 300 : centerX;
+      const y = compactDungeonGrid
+        ? 240 + (row - (compactRows - 1) / 2) * 52
+        : dungeon.order === 1
+          ? height / 2 - 15
+          : height / 2 + 180;
+      const suffix = dungeon.order === 1 ? '' : ` (Dungeon ${dungeon.order})`;
+      this.makeButton(x, y, compactDungeonGrid ? 260 : 300, compactDungeonGrid ? 44 : 52, `Enter ${dungeon.name}${suffix}`, () => {
         const combatData: CombatSceneData = {
           encounterId: dungeon.id,
           loadout: loadoutFromSave(save),
@@ -147,14 +158,15 @@ export class HubScene extends Phaser.Scene {
       });
     });
 
-    this.makeButton(centerX, height / 2 + 50, 300, 52, 'Spell Tree', () => {
+    const treeY = compactDungeonGrid ? 390 : height / 2 + 50;
+    this.makeButton(centerX, treeY, 300, 52, 'Spell Tree', () => {
       this.scene.start(SceneKeys.Tree);
     });
 
     if (save.subclass !== null) {
       const label = save.subclass === 'vigil' ? 'Path of the Vigil' : 'Path of the Zealot';
       this.add
-        .text(centerX, height / 2 + 115, `Oath: ${label}`, { fontFamily: FONT, fontSize: '16px', color: ACCENT_COLOR })
+        .text(centerX, compactDungeonGrid ? 445 : height / 2 + 115, `Oath: ${label}`, { fontFamily: FONT, fontSize: '16px', color: ACCENT_COLOR })
         .setOrigin(0.5);
     }
 

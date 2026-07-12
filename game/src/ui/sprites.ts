@@ -8,6 +8,7 @@
  */
 
 import type { Unit } from '../combat/types';
+import type { MobVisualKey } from '../data/content/types';
 import { MOB_REGISTRY } from '../data/mobs';
 
 export const UNIT_TEXTURE_KEY = 'tiny-dungeon';
@@ -31,17 +32,19 @@ const PARTY_FRAMES: Record<string, number> = {
   healer: FRAME.wizard,
 };
 
-const MOB_VISUAL_FRAMES: Readonly<Record<string, number>> = {
+const MOB_VISUAL_FRAMES = {
   'ash-husk': FRAME.ghost,
   'iron-husk': FRAME.ghost,
   'gate-warden': FRAME.brute,
   'spire-lancer': FRAME.demon,
   'hollow-king': FRAME.demon,
-};
+} as const satisfies Readonly<Record<MobVisualKey, number>>;
 
 /** Supported tile frame for an authored mob visual key. */
 export function frameForMobVisualKey(visualKey: string): number | undefined {
-  return MOB_VISUAL_FRAMES[visualKey];
+  return Object.prototype.hasOwnProperty.call(MOB_VISUAL_FRAMES, visualKey)
+    ? MOB_VISUAL_FRAMES[visualKey as MobVisualKey]
+    : undefined;
 }
 
 /**

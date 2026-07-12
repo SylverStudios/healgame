@@ -11,8 +11,6 @@ export { HOLLOW_KING_MOB } from './hollowKing';
 export { IRON_HUSK } from './ironHusk';
 export { SPIRE_LANCER_MOB } from './spireLancer';
 
-export const MOB_ORDER = ['ash-husk', 'iron-husk', 'gate-warden', 'spire-lancer', 'hollow-king'] as const;
-
 export const MOBS = [
   ASH_HUSK,
   IRON_HUSK,

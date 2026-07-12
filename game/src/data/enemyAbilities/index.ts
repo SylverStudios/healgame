@@ -7,8 +7,6 @@ export { BONEHOWL } from './bonehowl';
 export { EXTINCTION } from './extinction';
 export { TUNNEL_VISION } from './tunnelVision';
 
-export const ENEMY_ABILITY_ORDER = ['bonehowl', 'tunnel-vision', 'extinction'] as const;
-
 export const ENEMY_ABILITIES = [BONEHOWL, TUNNEL_VISION, EXTINCTION] as const satisfies readonly EnemyAbilityDef[];
 
 export const ENEMY_ABILITY_REGISTRY: Readonly<Record<string, EnemyAbilityDef>> = Object.freeze(

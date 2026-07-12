@@ -2,6 +2,16 @@ import type { EncounterDef } from '../../combat/types';
 
 export const CONTENT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+/** Presentation keys that every live MobDef may use; ui/sprites.ts exhaustively maps them. */
+export const MOB_VISUAL_KEYS = [
+  'ash-husk',
+  'iron-husk',
+  'gate-warden',
+  'spire-lancer',
+  'hollow-king',
+] as const;
+export type MobVisualKey = (typeof MOB_VISUAL_KEYS)[number];
+
 export type EnemyAbilityDef = PartyAoeAbilityDef | TunnelVisionAbilityDef;
 
 /**
@@ -42,7 +52,7 @@ export interface MobDef {
   autoDamage: number;
   swingIntervalMs: number;
   abilityIds: readonly string[];
-  visualKey: string;
+  visualKey: MobVisualKey;
 }
 
 export interface MobStatOverrides {

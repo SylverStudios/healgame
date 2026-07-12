@@ -121,6 +121,16 @@ describe('live dungeon content', () => {
     expect(compileAllDungeons(reordered)).toEqual(compileAllDungeons(reordered));
   });
 
+  it('rejects a lookalike dungeon object that was not validated as part of the catalog', () => {
+    const lookalike = { ...CONTENT_CATALOGS.dungeons[0] };
+    expect(() => compileDungeon(lookalike, CONTENT_CATALOGS)).toThrow(
+      'Cannot compile unknown dungeon',
+    );
+    expect(() => formatDungeonPreview(lookalike, CONTENT_CATALOGS)).toThrow(
+      'Cannot compile unknown dungeon',
+    );
+  });
+
   it('formats a stable preview with effective overrides and ability cadence', () => {
     expect(formatDungeonPreview('the-maw', CONTENT_CATALOGS)).toBe(
       [
