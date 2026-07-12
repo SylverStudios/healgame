@@ -48,11 +48,40 @@ export interface MissingHealthBonusRule {
   healPer10PctMissing: number;
 }
 
+/**
+ * On a completed cast of `spellId`, adds
+ * `ceil(spell.heal * pctPer10PctMissing * bands / 100)` where
+ * `bands = floor((maxHp - hp) * 10 / maxHp)`, computed on the target BEFORE
+ * the heal lands — same banding as `MissingHealthBonusRule`, but
+ * percent-of-base-heal (not flat), rounded up. `spell.heal` is always the
+ * completing spell's *base* printed heal, never a synergy-buffed total
+ * (Alpha 0.1 §D4 Graven Scale: pctPer10PctMissing = 5).
+ */
+export interface MissingHealthPctBonusRule {
+  spellId: string;
+  pctPer10PctMissing: number;
+}
+
+/**
+ * On a completed cast of `spellId`, adds `bonusHeal` when the target's HP
+ * BEFORE the heal is at least `hpPctAtLeast` percent of maxHp (Alpha 0.1 §D4
+ * Steady Hands: 80, +1). Threshold check is
+ * `target.hp * 100 >= rule.hpPctAtLeast * target.maxHp` — integer-safe, no
+ * floats — and inclusive (a target exactly at the threshold qualifies).
+ */
+export interface FullHealthBonusRule {
+  spellId: string;
+  hpPctAtLeast: number;
+  bonusHeal: number;
+}
+
 export interface CombatEngineOptions {
   /** Adds to the healer's max AND starting mana (e.g. Deep Reserves). */
   bonusMaxMana?: number;
   synergies?: SynergyRule[];
   missingHealthBonuses?: MissingHealthBonusRule[];
+  missingHealthPctBonuses?: MissingHealthPctBonusRule[];
+  fullHealthBonuses?: FullHealthBonusRule[];
 }
 
 export interface CastState {

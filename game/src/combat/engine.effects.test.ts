@@ -8,7 +8,7 @@ import {
   TEST_SPELLS,
   TEST_ZEALOUS_MENDING,
 } from './testFixtures';
-import type { CombatEvent, EncounterDef } from './types';
+import type { CombatEvent, EncounterDef, SpellDef } from './types';
 
 /**
  * Chunk 1 (phase-2-handoff "Engine"): constructor options for synergy and
@@ -205,6 +205,184 @@ describe('CombatEngine effects: both bonuses stack additively', () => {
     const applied = Math.min(raw, 2);
     expect(h.amount).toBe(applied);
     expect(h.overheal).toBe(raw - applied);
+    expect(h.amount + h.overheal).toBe(raw);
+  });
+});
+
+/**
+ * Chunk 4 (alpha-0.1 §D4): two new heal-formula rules, resolved in the same
+ * place as the flat missing-health bonus and additive with it. Locked
+ * semantics under test:
+ *  - missingHealthPctBonuses (Graven Scale shape): on a completed cast of
+ *    spellId, adds ceil(spell.heal * pctPer10PctMissing * bands / 100) where
+ *    bands = floor((maxHp - hp) * 10 / maxHp) on the target's hp BEFORE the
+ *    heal lands. Percent of the spell's BASE printed heal only — never of a
+ *    synergy-buffed total. Rounded UP (ceil); the flat rule's floor banding
+ *    is unchanged.
+ *  - fullHealthBonuses (Steady Hands shape): on a completed cast of spellId,
+ *    adds bonusHeal when target.hp * 100 >= hpPctAtLeast * target.maxHp
+ *    (pre-heal hp, integer-safe, inclusive threshold).
+ *  - both are additive with base + synergy + flat missing-health on one heal;
+ *    multiple entries matching one spellId sum (mirrors the flat rule);
+ *    entries keyed to a different spellId never fire.
+ *
+ * Same deterministic damage source as above: fixed TRASH.autoDamage (1) on
+ * the tank (maxHp 20) every fixed 3000ms swing — each swing is exactly 5% of
+ * the tank's maxHp, so band counts and thresholds are hand-computable.
+ */
+
+/** Test-only heal-9 spell so the §D4 worked example (9-hp heal, 5%/band, 4 bands) is exact. */
+const TEST_BIG_SPELL: SpellDef = { id: 'test-big', name: 'Big Heal', heal: 9, mana: 3, castMs: 1000 };
+
+describe('CombatEngine effects: missing-health pct bonus (Graven Scale shape)', () => {
+  /** Advances exactly `missing` trash swings (3000ms each, 1 damage) against the full-hp tank,
+   * landing on the boundary so the trash's timer is freshly reset — 3000ms of cast headroom. */
+  function bringTankToMissing(engine: CombatEngine, missing: number): void {
+    engine.advance(missing * 3000);
+  }
+
+  it('adds 0 at 0 bands: a full-HP target gets no pct bonus', () => {
+    const engine = new CombatEngine(NEVER_DYING_TRASH_ENCOUNTER, TEST_SPELLS, {
+      missingHealthPctBonuses: [{ spellId: 'solemn-mend', pctPer10PctMissing: 5 }],
+    });
+    const h = onlyHeal(castAndComplete(engine, 'tank', TEST_SOLEMN_MEND.id, TEST_SOLEMN_MEND.castMs));
+    expect(h.amount + h.overheal).toBe(TEST_SOLEMN_MEND.heal); // no bonus
+    expect(h.overheal).toBe(TEST_SOLEMN_MEND.heal); // full hp — all overheal
+  });
+
+  it('exact band math (§D4 worked example): 9-hp heal, 5%/band, 4 bands -> ceil(9*5*4/100) = ceil(1.8) = 2', () => {
+    const engine = new CombatEngine(NEVER_DYING_TRASH_ENCOUNTER, [...TEST_SPELLS, TEST_BIG_SPELL], {
+      missingHealthPctBonuses: [{ spellId: 'test-big', pctPer10PctMissing: 5 }],
+    });
+    bringTankToMissing(engine, 8); // 8/20 missing = 40% -> bands = 4
+    const h = onlyHeal(castAndComplete(engine, 'tank', TEST_BIG_SPELL.id, TEST_BIG_SPELL.castMs));
+    const raw = TEST_BIG_SPELL.heal + 2;
+    const applied = Math.min(raw, 8);
+    expect(h.amount).toBe(applied);
+    expect(h.overheal).toBe(raw - applied);
+    expect(h.amount + h.overheal).toBe(raw);
+  });
+
+  it('rounds up (ceil, not floor): 5-hp heal, 5%/band, 1 band -> ceil(0.25) = 1, not 0', () => {
+    const engine = new CombatEngine(NEVER_DYING_TRASH_ENCOUNTER, TEST_SPELLS, {
+      missingHealthPctBonuses: [{ spellId: 'solemn-mend', pctPer10PctMissing: 5 }],
+    });
+    bringTankToMissing(engine, 2); // 2/20 missing = 10% -> bands = 1
+    const h = onlyHeal(castAndComplete(engine, 'tank', TEST_SOLEMN_MEND.id, TEST_SOLEMN_MEND.castMs));
+    expect(h.amount + h.overheal).toBe(TEST_SOLEMN_MEND.heal + 1); // floor would give +0
+  });
+
+  it('multiple entries matching one spellId sum (each ceil-ed independently, mirroring the flat rule)', () => {
+    const engine = new CombatEngine(NEVER_DYING_TRASH_ENCOUNTER, TEST_SPELLS, {
+      missingHealthPctBonuses: [
+        { spellId: 'solemn-mend', pctPer10PctMissing: 5 },
+        { spellId: 'solemn-mend', pctPer10PctMissing: 5 },
+      ],
+    });
+    bringTankToMissing(engine, 4); // 4/20 missing = 20% -> bands = 2
+    const h = onlyHeal(castAndComplete(engine, 'tank', TEST_SOLEMN_MEND.id, TEST_SOLEMN_MEND.castMs));
+    // Each entry: ceil(5*5*2/100) = ceil(0.5) = 1; two entries sum to +2.
+    expect(h.amount + h.overheal).toBe(TEST_SOLEMN_MEND.heal + 2);
+  });
+
+  it('an entry keyed to a different spellId never fires', () => {
+    const engine = new CombatEngine(NEVER_DYING_TRASH_ENCOUNTER, TEST_SPELLS, {
+      missingHealthPctBonuses: [{ spellId: 'zealous-mending', pctPer10PctMissing: 5 }],
+    });
+    bringTankToMissing(engine, 8); // plenty of bands — but the rule is keyed to the other spell
+    const h = onlyHeal(castAndComplete(engine, 'tank', TEST_SOLEMN_MEND.id, TEST_SOLEMN_MEND.castMs));
+    expect(h.amount + h.overheal).toBe(TEST_SOLEMN_MEND.heal);
+  });
+});
+
+describe('CombatEngine effects: full-health bonus (Steady Hands shape)', () => {
+  function bringTankToMissing(engine: CombatEngine, missing: number): void {
+    engine.advance(missing * 3000);
+  }
+
+  it('applies at exactly the threshold (inclusive >=): tank at 16/20 with hpPctAtLeast 80', () => {
+    const engine = new CombatEngine(NEVER_DYING_TRASH_ENCOUNTER, TEST_SPELLS, {
+      fullHealthBonuses: [{ spellId: 'solemn-mend', hpPctAtLeast: 80, bonusHeal: 1 }],
+    });
+    bringTankToMissing(engine, 4); // hp 16 = exactly 80% of 20
+    const h = onlyHeal(castAndComplete(engine, 'tank', TEST_SOLEMN_MEND.id, TEST_SOLEMN_MEND.castMs));
+    const raw = TEST_SOLEMN_MEND.heal + 1;
+    const applied = Math.min(raw, 4);
+    expect(h.amount).toBe(applied);
+    expect(h.overheal).toBe(raw - applied);
+    expect(h.amount + h.overheal).toBe(raw);
+  });
+
+  it('does not apply below the threshold: tank at 15/20 (75%) with hpPctAtLeast 80', () => {
+    const engine = new CombatEngine(NEVER_DYING_TRASH_ENCOUNTER, TEST_SPELLS, {
+      fullHealthBonuses: [{ spellId: 'solemn-mend', hpPctAtLeast: 80, bonusHeal: 1 }],
+    });
+    bringTankToMissing(engine, 5); // hp 15 = 75% of 20 — just below
+    const h = onlyHeal(castAndComplete(engine, 'tank', TEST_SOLEMN_MEND.id, TEST_SOLEMN_MEND.castMs));
+    expect(h.amount + h.overheal).toBe(TEST_SOLEMN_MEND.heal);
+  });
+
+  it('applies on a full-HP target (heal is pure overheal) while the pct bonus is 0', () => {
+    const engine = new CombatEngine(NEVER_DYING_TRASH_ENCOUNTER, TEST_SPELLS, {
+      missingHealthPctBonuses: [{ spellId: 'solemn-mend', pctPer10PctMissing: 5 }],
+      fullHealthBonuses: [{ spellId: 'solemn-mend', hpPctAtLeast: 80, bonusHeal: 1 }],
+    });
+    const h = onlyHeal(castAndComplete(engine, 'tank', TEST_SOLEMN_MEND.id, TEST_SOLEMN_MEND.castMs));
+    const raw = TEST_SOLEMN_MEND.heal + 1; // full-health +1; pct bonus 0 (bands = 0)
+    expect(h.amount).toBe(0);
+    expect(h.overheal).toBe(raw);
+  });
+
+  it('an 85% target gets both: bands = 1 pct bonus AND the full-health bonus on the same heal', () => {
+    const engine = new CombatEngine(NEVER_DYING_TRASH_ENCOUNTER, TEST_SPELLS, {
+      missingHealthPctBonuses: [{ spellId: 'solemn-mend', pctPer10PctMissing: 5 }],
+      fullHealthBonuses: [{ spellId: 'solemn-mend', hpPctAtLeast: 80, bonusHeal: 1 }],
+    });
+    bringTankToMissing(engine, 3); // hp 17 = 85% of 20: bands = floor(3*10/20) = 1; 1700 >= 1600
+    const h = onlyHeal(castAndComplete(engine, 'tank', TEST_SOLEMN_MEND.id, TEST_SOLEMN_MEND.castMs));
+    const raw = TEST_SOLEMN_MEND.heal + 1 + 1; // pct ceil(5*5*1/100)=1, full-health +1
+    expect(h.amount).toBe(3); // missing 3 — rest overheals
+    expect(h.overheal).toBe(raw - 3);
+  });
+
+  it('an entry keyed to a different spellId never fires', () => {
+    const engine = new CombatEngine(NEVER_DYING_TRASH_ENCOUNTER, TEST_SPELLS, {
+      fullHealthBonuses: [{ spellId: 'zealous-mending', hpPctAtLeast: 80, bonusHeal: 1 }],
+    });
+    const h = onlyHeal(castAndComplete(engine, 'tank', TEST_SOLEMN_MEND.id, TEST_SOLEMN_MEND.castMs));
+    expect(h.amount + h.overheal).toBe(TEST_SOLEMN_MEND.heal); // full hp would qualify — wrong spell
+  });
+
+  it('multiple entries matching one spellId sum', () => {
+    const engine = new CombatEngine(NEVER_DYING_TRASH_ENCOUNTER, TEST_SPELLS, {
+      fullHealthBonuses: [
+        { spellId: 'solemn-mend', hpPctAtLeast: 80, bonusHeal: 1 },
+        { spellId: 'solemn-mend', hpPctAtLeast: 90, bonusHeal: 2 },
+      ],
+    });
+    const h = onlyHeal(castAndComplete(engine, 'tank', TEST_SOLEMN_MEND.id, TEST_SOLEMN_MEND.castMs));
+    expect(h.amount + h.overheal).toBe(TEST_SOLEMN_MEND.heal + 1 + 2); // full hp satisfies both thresholds
+  });
+});
+
+describe('CombatEngine effects: base + synergy + flat missing + pct missing stack additively', () => {
+  it('all bonuses land on one cast; the pct bonus is computed from the base heal, not the buffed total', () => {
+    const engine = new CombatEngine(NEVER_DYING_TRASH_ENCOUNTER, TEST_SPELLS, {
+      synergies: [{ triggerSpellId: 'solemn-mend', buffedSpellId: 'zealous-mending', bonusHeal: 4 }],
+      missingHealthBonuses: [{ spellId: 'zealous-mending', healPer10PctMissing: 2 }],
+      missingHealthPctBonuses: [{ spellId: 'zealous-mending', pctPer10PctMissing: 5 }],
+    });
+    // Arm the synergy on dps1 (2000ms Solemn Mend; trash's timer then at 1000ms remaining).
+    castAndComplete(engine, 'dps1', TEST_SOLEMN_MEND.id, TEST_SOLEMN_MEND.castMs);
+    // Four more swings (1000ms, then 3x 3000ms) bring the tank to missing 4 (20% -> bands = 2)
+    // at cumulative 10000ms, landing exactly on a fresh-reset boundary — 3000ms of headroom.
+    engine.advance(10000);
+    const h = onlyHeal(castAndComplete(engine, 'tank', TEST_ZEALOUS_MENDING.id, TEST_ZEALOUS_MENDING.castMs));
+    // pct = ceil(6*5*2/100) = ceil(0.6) = 1, from base heal 6 — NOT the synergy-buffed 10.
+    const raw = TEST_ZEALOUS_MENDING.heal + 4 + 2 * 2 + 1; // base 6 + synergy 4 + flat 4 + pct 1
+    expect(raw).toBe(15);
+    expect(h.amount).toBe(4); // missing 4 — rest overheals
+    expect(h.overheal).toBe(raw - 4);
     expect(h.amount + h.overheal).toBe(raw);
   });
 });

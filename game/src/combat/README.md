@@ -11,11 +11,14 @@ new CombatEngine(encounter: EncounterDef, spells: SpellDef[], options?: {
   bonusMaxMana?: number;
   synergies?: { triggerSpellId: string; buffedSpellId: string; bonusHeal: number }[];
   missingHealthBonuses?: { spellId: string; healPer10PctMissing: number }[];
+  missingHealthPctBonuses?: { spellId: string; pctPer10PctMissing: number }[];
+  fullHealthBonuses?: { spellId: string; hpPctAtLeast: number; bonusHeal: number }[];
 })
 // spells = player's unlocked list; options come from loadoutFromSave / CombatMods
-// (bonusMaxMana, synergies, missingHealthBonuses). castMod is already baked into
-// spell defs by resolveCombatMods — the engine never sees it. Omit options for
-// the pre-tree default (no bonus of any kind) — fully backward compatible.
+// (bonusMaxMana, synergies, missing-health/full-health heal rules). castMod is
+// already baked into spell defs by resolveCombatMods — the engine never sees it.
+// Omit options for the pre-tree default (no bonus of any kind) — fully backward
+// compatible.
 engine.advance(dtMs): CombatEvent[]   // steps the sim; safe for any dt (sub-steps internally)
 engine.setTarget(unitId): void        // click-to-target an ally; ignored if unknown/dead/enemy
 engine.castSpell(spellId): void       // starts, queues, or is silently dropped — see below
@@ -132,10 +135,12 @@ in `encounters.ts`, expected to be retuned.
     excluded from `eligible` on the next activation without resetting or
     skipping the cursor (e.g. with `[dps1, dps2, healer]` and `dps1` dead,
     `focusIndex` continuing at 1 lands on `healer`, not `dps2`).
-- **Synergy and missing-health bonuses** (Chunk 1, phase-2-handoff): both are
-  resolved into the existing `heal` event — no new event types. A cast's raw
-  heal value is `spell.heal + synergyBonuses + missingHealthBonuses`; the
-  overheal split (`amount + overheal === raw`) works exactly as before.
+- **Synergy and heal-formula bonuses** (Chunk 1, phase-2-handoff; extended
+  Alpha 0.1 §D4): all are resolved into the existing `heal` event — no new
+  event types. A cast's raw heal value is `spell.heal + synergyBonuses +
+  missingHealthBonuses + missingHealthPctBonuses + fullHealthBonuses` (all
+  additive on the same completed cast); the overheal split
+  (`amount + overheal === raw`) works exactly as before.
   - **Synergy**: a *completed* cast of `triggerSpellId` arms that rule
     (re-arming replaces — it's a boolean flag, never a stacking counter). The
     next *completed* cast of `buffedSpellId` consumes it, adding `bonusHeal`.
@@ -157,13 +162,34 @@ in `encounters.ts`, expected to be retuned.
     read from the synergies' live `armed` flags. Drives the spell-bar's armed
     border in the UI — no new event type; missing-health bonuses are not
     represented here (they're not an "armed" toggle state).
-  - **Missing-health**: on a completed cast of a matching `spellId`, adds
+  - **Missing-health (flat)**: on a completed cast of a matching `spellId`, adds
     `healPer10PctMissing * floor((target.maxHp - target.hp) * 10 / target.maxHp)`
     — the target's HP is read **before** this heal lands (same moment the
     overheal split is computed from). Integer math only. Multiple matching
     entries sum. A dead target produces no heal event, so no bonus either.
-  - Both kinds stack additively on the same cast. `castMod` never reaches the
-    engine — `resolveCombatMods` / `loadoutFromSave` already bake it into
+  - **Missing-health (pct of base heal)** (Alpha 0.1 §D4, Graven Scale shape —
+    `missingHealthPctBonuses`): same pre-heal banding as the flat rule
+    (`bands = floor((maxHp - hp) * 10 / maxHp)`), but the bonus is a percent
+    of the completing spell's **base printed heal**, rounded **up**:
+    `ceil(spell.heal * pctPer10PctMissing * bands / 100)`. Always computed
+    from `spell.heal` — never from a synergy-buffed total, so arming order
+    can't change the pct bonus. At full HP, bands = 0 → bonus 0. Multiple
+    matching entries each ceil independently, then sum (mirrors the flat
+    rule's duplicate handling). Pure integer inputs; `Math.ceil` on the one
+    division keeps outputs integer.
+  - **Full-health bonus** (Alpha 0.1 §D4, Steady Hands shape —
+    `fullHealthBonuses`): on a completed cast of a matching `spellId`, adds
+    `bonusHeal` when the target's **pre-heal** HP is at least `hpPctAtLeast`
+    percent of maxHp — checked as `target.hp * 100 >= hpPctAtLeast * target.maxHp`
+    (integer-safe, no floats), **inclusive** at the threshold. A full-HP
+    target qualifies: the bonus applies even when the whole heal overheals
+    (the existing `overheal` field carries it). Multiple matching entries sum.
+    Note ≥80% implies ≤2 missing-health bands, so in practice this rule and
+    big pct-bonus payoffs are near-mutually exclusive — but both are computed
+    independently and can land on the same heal (e.g. an 85% target: bands = 1
+    pct bonus + the full-health bonus).
+  - All bonus kinds stack additively on the same cast. `castMod` never reaches
+    the engine — `resolveCombatMods` / `loadoutFromSave` already bake it into
     `SpellDef.castMs`/`mana` before spells are handed to the constructor.
 - **Waves/victory/wipe**: a wave clears (and the next spawns) the instant its
   last enemy dies; victory on boss hp 0; wipe the instant all 4 party members

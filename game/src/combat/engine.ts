@@ -16,7 +16,9 @@ import type {
   CombatState,
   CombatStatus,
   EncounterDef,
+  FullHealthBonusRule,
   MissingHealthBonusRule,
+  MissingHealthPctBonusRule,
   SpellDef,
   SynergyRule,
   TunnelVisionCastDef,
@@ -46,6 +48,8 @@ export class CombatEngine {
   /** Synergy rules with mutable per-entry armed state (constructor-cloned; never shared with the caller). */
   private readonly synergies: (SynergyRule & { armed: boolean })[];
   private readonly missingHealthBonuses: MissingHealthBonusRule[];
+  private readonly missingHealthPctBonuses: MissingHealthPctBonusRule[];
+  private readonly fullHealthBonuses: FullHealthBonusRule[];
 
   private party: Unit[] = [];
   private activeEnemies: Unit[] = [];
@@ -92,6 +96,10 @@ export class CombatEngine {
     // engine's mutable `armed` state never touches the caller's arrays.
     this.synergies = (options?.synergies ?? []).map((s) => ({ ...s, armed: false }));
     this.missingHealthBonuses = (options?.missingHealthBonuses ?? []).map((m) => ({ ...m }));
+    // Chunk 4 (alpha-0.1 §D4): pct-of-base-heal missing-health rule (Graven Scale)
+    // and full-health threshold rule (Steady Hands), cloned like the arrays above.
+    this.missingHealthPctBonuses = (options?.missingHealthPctBonuses ?? []).map((m) => ({ ...m }));
+    this.fullHealthBonuses = (options?.fullHealthBonuses ?? []).map((f) => ({ ...f }));
 
     this.party = [
       { id: 'tank', name: 'Tank', role: 'tank', hp: PARTY.tankMaxHp, maxHp: PARTY.tankMaxHp, mana: 0, maxMana: 0, alive: true },
@@ -351,13 +359,32 @@ export class CombatEngine {
 
     if (target && target.alive) {
       const missing = Math.max(0, target.maxHp - target.hp);
+      // Full 10% bands of missing HP, on the target's hp BEFORE this heal lands —
+      // shared by the flat and pct missing-health rules below.
+      const bands = Math.floor((missing * 10) / target.maxHp);
       let missingHealthBonus = 0;
       for (const mh of this.missingHealthBonuses) {
         if (mh.spellId === spell.id) {
-          missingHealthBonus += mh.healPer10PctMissing * Math.floor((missing * 10) / target.maxHp);
+          missingHealthBonus += mh.healPer10PctMissing * bands;
         }
       }
-      const raw = spell.heal + synergyBonus + missingHealthBonus;
+      // Chunk 4 (alpha-0.1 §D4 Graven Scale): percent-of-base-heal per band, rounded
+      // up. Always computed from spell.heal — never from synergy-buffed totals.
+      let missingHealthPctBonus = 0;
+      for (const mp of this.missingHealthPctBonuses) {
+        if (mp.spellId === spell.id) {
+          missingHealthPctBonus += Math.ceil((spell.heal * mp.pctPer10PctMissing * bands) / 100);
+        }
+      }
+      // Chunk 4 (alpha-0.1 §D4 Steady Hands): +bonusHeal when the target's pre-heal
+      // HP is at least hpPctAtLeast% of maxHp. Integer-safe inclusive threshold.
+      let fullHealthBonus = 0;
+      for (const fh of this.fullHealthBonuses) {
+        if (fh.spellId === spell.id && target.hp * 100 >= fh.hpPctAtLeast * target.maxHp) {
+          fullHealthBonus += fh.bonusHeal;
+        }
+      }
+      const raw = spell.heal + synergyBonus + missingHealthBonus + missingHealthPctBonus + fullHealthBonus;
       const applied = Math.min(raw, missing);
       const overheal = raw - applied;
       target.hp += applied;
