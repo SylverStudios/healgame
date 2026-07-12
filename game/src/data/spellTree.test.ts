@@ -16,7 +16,7 @@ import {
   treeStateFromLegacy,
   type SpellTreeContent,
 } from './spellTree';
-import { create, ownedContents, ownedOf, update, validateConfig, view } from '../tree';
+import { create, ownedContents, ownedOf, update, validateConfig, view, walletOf } from '../tree';
 
 function save(overrides: Partial<SaveData> = {}): SaveData {
   return { ...newSaveData(), ...overrides };
@@ -34,9 +34,15 @@ describe('SPELL_TREE config', () => {
       'zealot-oath',
       'vigil-patient-vow',
       'vigil-measured-devotion',
+      'vigil-graven-scale',
       'zealot-fervent-chain',
-      'zealot-desperate-zeal',
+      'zealot-steady-hands',
     ]);
+  });
+
+  it('retires zealot-desperate-zeal — absent from the live tree (Alpha 0.1 §D4)', () => {
+    expect(SPELL_TREE.spots.map((s) => s.id)).not.toContain('zealot-desperate-zeal');
+    expect(SPELL_TREE.nodes.map((n) => n.id)).not.toContain('zealot-desperate-zeal');
   });
 
   it('models multi-rank nodes as chains', () => {
@@ -194,6 +200,8 @@ describe('parity with buildLoadout', () => {
     expect(next.spells).toEqual(legacy.spells);
     expect(next.synergies).toEqual(legacy.synergies);
     expect(next.missingHealthBonuses).toEqual(legacy.missingHealthBonuses);
+    expect(next.missingHealthPctBonuses).toEqual(legacy.missingHealthPctBonuses);
+    expect(next.fullHealthBonuses).toEqual(legacy.fullHealthBonuses);
     expect(next.paceMultipliersTenths).toEqual(legacy.paceMultipliersTenths);
   }
 
@@ -219,7 +227,20 @@ describe('parity with buildLoadout', () => {
         'deep-reserves': 5,
         'zealot-oath': 1,
         'zealot-fervent-chain': 3,
-        'zealot-desperate-zeal': 1,
+        'zealot-steady-hands': 1,
+      },
+      ['solemn-mend', 'zealous-mending'],
+    );
+  });
+
+  it('matches maxed Vigil build with Graven Scale', () => {
+    expectParity(
+      {
+        'deep-reserves': 5,
+        'vigil-oath': 1,
+        'vigil-patient-vow': 3,
+        'vigil-measured-devotion': 1,
+        'vigil-graven-scale': 1,
       },
       ['solemn-mend', 'zealous-mending'],
     );
@@ -253,7 +274,7 @@ describe('parity with buildLoadout', () => {
 
   it('ownedContents is a flat bag combat can reduce (no layout)', () => {
     const state = treeStateFromLegacy(
-      { 'deep-reserves': 2, 'zealot-oath': 1, 'zealot-desperate-zeal': 1 },
+      { 'deep-reserves': 2, 'zealot-oath': 1, 'zealot-steady-hands': 1 },
       { gold: 0, ruby: 0 },
     );
     const contents = ownedContents<SpellTreeContent>(SPELL_TREE, state);
@@ -261,8 +282,60 @@ describe('parity with buildLoadout', () => {
       'bonusMaxMana',
       'bonusMaxMana',
       'grantSpell',
-      'missingHealthBonus',
+      'fullHealthBonus',
     ]);
+  });
+
+  it('round-trips the new Alpha 0.1 node ids through the legacy bridge', () => {
+    const ranks = {
+      'deep-reserves': 1,
+      'vigil-oath': 1,
+      'vigil-patient-vow': 1,
+      'vigil-graven-scale': 1,
+    };
+    expect(legacyRanksFromOwned(ownedIdsFromLegacyRanks(ranks))).toEqual(ranks);
+
+    const zealotRanks = {
+      'deep-reserves': 1,
+      'zealot-oath': 1,
+      'zealot-fervent-chain': 1,
+      'zealot-steady-hands': 1,
+    };
+    expect(legacyRanksFromOwned(ownedIdsFromLegacyRanks(zealotRanks))).toEqual(zealotRanks);
+  });
+
+  it('resolveCombatMods emits missingHealthPctBonus for a purchased Graven Scale', () => {
+    const state = treeStateFromLegacy(
+      { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-patient-vow': 1, 'vigil-graven-scale': 1 },
+      { gold: 0, ruby: 0 },
+    );
+    const mods = combatModsFromTree(state, ['solemn-mend']);
+    expect(mods.missingHealthPctBonuses).toEqual([{ spellId: 'solemn-vigil', pctPer10PctMissing: 5 }]);
+  });
+
+  it('resolveCombatMods emits fullHealthBonus for a purchased Steady Hands', () => {
+    const state = treeStateFromLegacy(
+      { 'deep-reserves': 1, 'zealot-oath': 1, 'zealot-steady-hands': 1 },
+      { gold: 0, ruby: 0 },
+    );
+    const mods = combatModsFromTree(state, ['zealous-mending']);
+    expect(mods.fullHealthBonuses).toEqual([
+      { spellId: 'zealous-mending', hpPctAtLeast: 80, bonusHeal: 1 },
+    ]);
+  });
+
+  it('refunds gold for legacy saves that still own the retired desperate-zeal node', () => {
+    const state = treeStateFromLegacy(
+      { 'zealot-oath': 1, 'zealot-desperate-zeal': 1 },
+      { gold: 2, ruby: 0 },
+    );
+    expect(ownedOf(state)).not.toContain('zealot-desperate-zeal');
+    expect(walletOf(state)['gold']).toBe(6); // 2 on hand + 4 refunded (the retired node's old cost)
+  });
+
+  it('does not refund when the retired node was never owned', () => {
+    const state = treeStateFromLegacy({ 'zealot-oath': 1 }, { gold: 2, ruby: 0 });
+    expect(walletOf(state)['gold']).toBe(2);
   });
 
   it('loadoutFromSave matches combatModsFromTree for a maxed Vigil save', () => {

@@ -62,8 +62,9 @@ const SPELL_TREE_POSITIONS: Readonly<Record<string, SpotPosition>> = {
   'zealot-oath': { x: 700, y: 260 },
   'vigil-patient-vow': { x: 150, y: 400 },
   'vigil-measured-devotion': { x: 380, y: 400 },
+  'vigil-graven-scale': { x: 150, y: 550 },
   'zealot-fervent-chain': { x: 590, y: 400 },
-  'zealot-desperate-zeal': { x: 820, y: 400 },
+  'zealot-steady-hands': { x: 820, y: 400 },
 };
 
 function asContent(raw: unknown): SpellTreeContent | null {

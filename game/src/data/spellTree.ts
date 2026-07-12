@@ -11,7 +11,13 @@
 
 import { SPELLS } from './constants';
 import { spellById } from './spells';
-import type { SpellDef, SynergyRule, MissingHealthBonusRule } from '../combat/types';
+import type {
+  SpellDef,
+  SynergyRule,
+  MissingHealthBonusRule,
+  MissingHealthPctBonusRule,
+  FullHealthBonusRule,
+} from '../combat/types';
 import type { SubclassId } from '../save/save';
 import {
   create,
@@ -32,6 +38,8 @@ export type SpellTreeEffect =
   | { kind: 'grantSpell'; spellId: string }
   | { kind: 'synergy'; triggerSpellId: string; buffedSpellId: string; bonusHeal: number }
   | { kind: 'missingHealthBonus'; spellId: string; healPer10PctMissing: number }
+  | { kind: 'missingHealthPctBonus'; spellId: string; pctPer10PctMissing: number }
+  | { kind: 'fullHealthBonus'; spellId: string; hpPctAtLeast: number; bonusHeal: number }
   | { kind: 'castMod'; spellId: string; castMsDelta: number; manaDelta: number }
   | { kind: 'combatPace'; multiplierTenths: number };
 
@@ -49,6 +57,10 @@ export interface CombatMods {
   bonusMaxMana: number;
   synergies: SynergyRule[];
   missingHealthBonuses: MissingHealthBonusRule[];
+  /** Alpha 0.1 §D4 Graven Scale: percent-of-base-heal missing-health bonus. */
+  missingHealthPctBonuses: MissingHealthPctBonusRule[];
+  /** Alpha 0.1 §D4 Steady Hands: bonus heal when target is at/above a health threshold. */
+  fullHealthBonuses: FullHealthBonusRule[];
   /** Sorted unique pace multipliers (tenths); always includes 10; adds 15 when tempo owned. */
   paceMultipliersTenths: number[];
 }
@@ -210,18 +222,45 @@ const ferventChain = rankSpot({
   }),
 });
 
-const desperateZeal: NodeDef = {
-  id: 'zealot-desperate-zeal',
-  requires: { mode: 'all', nodes: ['zealot-oath'] },
-  cost: { currency: 'gold', amount: 4 },
+/**
+ * Alpha 0.1 §D4: `zealot-desperate-zeal` (Zealous Flare flat missing-health
+ * bonus) is retired — the missing-health identity moves to Vigil's
+ * `vigil-graven-scale` (percent-of-base-heal). `zealot-steady-hands` takes
+ * this node's slot in the branch structure (same prereq: zealot-oath).
+ * Legacy saves that still own the retired node are refunded its gold cost on
+ * load — see `RETIRED_NODE_REFUNDS` / `ownedIdsFromLegacyRanks` below.
+ */
+const RETIRED_ZEALOT_DESPERATE_ZEAL_ID = 'zealot-desperate-zeal';
+
+const gravenScale: NodeDef = {
+  id: 'vigil-graven-scale',
+  requires: { mode: 'all', nodes: ['vigil-patient-vow-1'] },
+  cost: { currency: 'gold', amount: 5 },
   content: content({
-    name: 'Desperate Zeal',
-    description: `${SPELLS.zealousFlare.name} heals +1 per full 10% of the target's missing health.`,
+    name: 'Graven Scale',
+    description: `${SPELLS.solemnVigil.name}: +5% of base heal per 10% target health missing (rounds up)`,
+    subclass: 'vigil',
+    effect: {
+      kind: 'missingHealthPctBonus',
+      spellId: SPELLS.solemnVigil.id,
+      pctPer10PctMissing: 5,
+    },
+  }),
+};
+
+const steadyHands: NodeDef = {
+  id: 'zealot-steady-hands',
+  requires: { mode: 'all', nodes: ['zealot-oath'] },
+  cost: { currency: 'gold', amount: 5 },
+  content: content({
+    name: 'Steady Hands',
+    description: `${SPELLS.zealousMending.name}: +1 heal when the target is at 80%+ health`,
     subclass: 'zealot',
     effect: {
-      kind: 'missingHealthBonus',
-      spellId: SPELLS.zealousFlare.id,
-      healPer10PctMissing: 1,
+      kind: 'fullHealthBonus',
+      spellId: SPELLS.zealousMending.id,
+      hpPctAtLeast: 80,
+      bonusHeal: 1,
     },
   }),
 };
@@ -236,8 +275,9 @@ export const SPELL_TREE: TreeConfig = {
     warpedTempoViaZealot,
     ...patientVow.nodes,
     measuredDevotion,
+    gravenScale,
     ...ferventChain.nodes,
-    desperateZeal,
+    steadyHands,
   ],
   spots: [
     deepReserves.spot,
@@ -245,8 +285,9 @@ export const SPELL_TREE: TreeConfig = {
     { id: 'zealot-oath', chain: ['zealot-oath', 'warped-tempo-via-zealot'] },
     patientVow.spot,
     { id: 'vigil-measured-devotion', chain: ['vigil-measured-devotion'] },
+    { id: 'vigil-graven-scale', chain: ['vigil-graven-scale'] },
     ferventChain.spot,
-    { id: 'zealot-desperate-zeal', chain: ['zealot-desperate-zeal'] },
+    { id: 'zealot-steady-hands', chain: ['zealot-steady-hands'] },
   ],
 };
 
@@ -268,6 +309,8 @@ export function resolveCombatMods(
   let bonusMaxMana = 0;
   const synergyMap = new Map<string, SynergyRule>();
   const missingMap = new Map<string, MissingHealthBonusRule>();
+  const missingPctMap = new Map<string, MissingHealthPctBonusRule>();
+  const fullHealthMap = new Map<string, FullHealthBonusRule>();
   const castMods: Extract<SpellTreeEffect, { kind: 'castMod' }>[] = [];
   const paceTenths = new Set<number>([10]);
 
@@ -303,6 +346,30 @@ export function resolveCombatMods(
         }
         break;
       }
+      case 'missingHealthPctBonus': {
+        const prev = missingPctMap.get(effect.spellId);
+        if (prev) prev.pctPer10PctMissing += effect.pctPer10PctMissing;
+        else {
+          missingPctMap.set(effect.spellId, {
+            spellId: effect.spellId,
+            pctPer10PctMissing: effect.pctPer10PctMissing,
+          });
+        }
+        break;
+      }
+      case 'fullHealthBonus': {
+        const key = `${effect.spellId}:${effect.hpPctAtLeast}`;
+        const prev = fullHealthMap.get(key);
+        if (prev) prev.bonusHeal += effect.bonusHeal;
+        else {
+          fullHealthMap.set(key, {
+            spellId: effect.spellId,
+            hpPctAtLeast: effect.hpPctAtLeast,
+            bonusHeal: effect.bonusHeal,
+          });
+        }
+        break;
+      }
       case 'castMod':
         castMods.push(effect);
         break;
@@ -330,6 +397,8 @@ export function resolveCombatMods(
     bonusMaxMana,
     synergies: [...synergyMap.values()],
     missingHealthBonuses: [...missingMap.values()],
+    missingHealthPctBonuses: [...missingPctMap.values()],
+    fullHealthBonuses: [...fullHealthMap.values()],
     paceMultipliersTenths: [...paceTenths].sort((a, b) => a - b),
   };
 }
@@ -364,8 +433,31 @@ export function loadoutFromSave(save: {
 }
 
 /**
+ * Gold refunded per retired-from-the-live-tree node still present in a save's
+ * `treeRanks` (Alpha 0.1 §D4: `zealot-desperate-zeal` removed — mirrors the
+ * v1→v2 `RETIRED_V1_NODES` refund pattern in `save/save.ts`, but recomputed
+ * from `treeRanks` on every load rather than a one-time migration, since the
+ * save version itself hasn't changed). Amount matches the node's old cost.
+ */
+const RETIRED_NODE_REFUNDS: Readonly<Record<string, number>> = {
+  [RETIRED_ZEALOT_DESPERATE_ZEAL_ID]: 4,
+};
+
+/** Total gold owed back for retired node ids still present in legacy `treeRanks`. */
+function retiredNodeGoldRefund(treeRanks: Record<string, number>): number {
+  let refund = 0;
+  for (const [id, amount] of Object.entries(RETIRED_NODE_REFUNDS)) {
+    if ((treeRanks[id] ?? 0) > 0) refund += amount;
+  }
+  return refund;
+}
+
+/**
  * Map legacy `treeRanks` (nodeId → ranks) onto owned chain node ids for the
- * new config. Used by parity tests and (later) save migration.
+ * new config. Used by parity tests and (later) save migration. Retired node
+ * ids (e.g. `zealot-desperate-zeal`) are never emitted — they no longer exist
+ * in `SPELL_TREE` and `create()` throws on unknown owned ids; their gold is
+ * refunded separately via `retiredNodeGoldRefund` in `treeStateFromLegacy`.
  */
 export function ownedIdsFromLegacyRanks(treeRanks: Record<string, number>): string[] {
   const owned: string[] = [];
@@ -379,19 +471,26 @@ export function ownedIdsFromLegacyRanks(treeRanks: Record<string, number>): stri
   if ((treeRanks['zealot-oath'] ?? 0) > 0) owned.push('zealot-oath');
   pushRanks('vigil-patient-vow', treeRanks['vigil-patient-vow'] ?? 0, 3);
   if ((treeRanks['vigil-measured-devotion'] ?? 0) > 0) owned.push('vigil-measured-devotion');
+  if ((treeRanks['vigil-graven-scale'] ?? 0) > 0) owned.push('vigil-graven-scale');
   pushRanks('zealot-fervent-chain', treeRanks['zealot-fervent-chain'] ?? 0, 3);
-  if ((treeRanks['zealot-desperate-zeal'] ?? 0) > 0) owned.push('zealot-desperate-zeal');
+  if ((treeRanks['zealot-steady-hands'] ?? 0) > 0) owned.push('zealot-steady-hands');
   if ((treeRanks['warped-tempo-via-vigil'] ?? 0) > 0) owned.push('warped-tempo-via-vigil');
   if ((treeRanks['warped-tempo-via-zealot'] ?? 0) > 0) owned.push('warped-tempo-via-zealot');
   return owned;
 }
 
-/** Build opaque tree state from a legacy save-shaped ranks map + wallet. */
+/**
+ * Build opaque tree state from a legacy save-shaped ranks map + wallet.
+ * Adds any retired-node gold refund to the wallet on the way in (Alpha 0.1
+ * §D4) — once a save persists a purchase, `legacyRanksFromOwned` no longer
+ * emits the retired id, so the refund is not re-applied on the next load.
+ */
 export function treeStateFromLegacy(
   treeRanks: Record<string, number>,
   wallet: { gold: number; ruby: number },
 ): TreeState {
-  return create(SPELL_TREE, wallet, ownedIdsFromLegacyRanks(treeRanks));
+  const refundedWallet = { ...wallet, gold: wallet.gold + retiredNodeGoldRefund(treeRanks) };
+  return create(SPELL_TREE, refundedWallet, ownedIdsFromLegacyRanks(treeRanks));
 }
 
 const MULTI_RANK_PREFIXES: { prefix: string; max: number }[] = [
@@ -404,7 +503,8 @@ const SINGLE_NODES = [
   'vigil-oath',
   'zealot-oath',
   'vigil-measured-devotion',
-  'zealot-desperate-zeal',
+  'vigil-graven-scale',
+  'zealot-steady-hands',
   'warped-tempo-via-vigil',
   'warped-tempo-via-zealot',
 ] as const;

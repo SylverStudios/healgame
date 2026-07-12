@@ -60,10 +60,11 @@ const VIGIL_SAVE: SaveData = makeSave({
 });
 
 /** Maxed Zealot build: Deep Reserves x5, Zealot oath + Fervent Chain x3 (Mending->Flare synergy)
- * + Desperate Zeal (Zealous Flare's missing-health bonus). */
+ * + Steady Hands (Alpha 0.1 §D4: Zealous Mending's full-health bonus, replacing retired
+ * Desperate Zeal). */
 const ZEALOT_SAVE: SaveData = makeSave({
   unlockedSpells: ['solemn-mend', 'zealous-mending'],
-  treeRanks: { 'deep-reserves': 5, 'zealot-oath': 1, 'zealot-fervent-chain': 3, 'zealot-desperate-zeal': 1 },
+  treeRanks: { 'deep-reserves': 5, 'zealot-oath': 1, 'zealot-fervent-chain': 3, 'zealot-steady-hands': 1 },
   subclass: 'zealot',
 });
 

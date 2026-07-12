@@ -190,6 +190,8 @@ export class CombatScene extends Phaser.Scene {
       bonusMaxMana: this.sceneData.loadout.bonusMaxMana,
       synergies: this.sceneData.loadout.synergies,
       missingHealthBonuses: this.sceneData.loadout.missingHealthBonuses,
+      missingHealthPctBonuses: this.sceneData.loadout.missingHealthPctBonuses,
+      fullHealthBonuses: this.sceneData.loadout.fullHealthBonuses,
     });
 
     this.buildGroundLine();

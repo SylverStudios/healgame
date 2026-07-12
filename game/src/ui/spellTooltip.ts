@@ -65,6 +65,22 @@ export function buildTooltipLines(spell: SpellDef, loadout: CombatMods): Tooltip
       });
     }
   }
+  for (const bonus of loadout.missingHealthPctBonuses) {
+    if (bonus.spellId === spell.id) {
+      lines.push({
+        text: `+${bonus.pctPer10PctMissing}% base per 10% target health missing`,
+        color: SYNERGY_LINE_COLOR,
+      });
+    }
+  }
+  for (const bonus of loadout.fullHealthBonuses) {
+    if (bonus.spellId === spell.id) {
+      lines.push({
+        text: `+${bonus.bonusHeal} heal when target at ${bonus.hpPctAtLeast}%+ hp`,
+        color: SYNERGY_LINE_COLOR,
+      });
+    }
+  }
 
   return lines;
 }
