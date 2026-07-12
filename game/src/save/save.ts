@@ -6,12 +6,14 @@
  * v2: `treeNodes: string[]` became `treeRanks: Record<nodeId, ranks>`; the
  * subclass is now set by purchasing a subclass tree node. The storage key
  * intentionally stays 'healgame-save-v1' — loadSave migrates v1 payloads.
+ *
+ * v3: `combatPaceTenths` — selected combat pace multiplier (10 = 1×, 15 = 1.5×).
  */
 
 export type SubclassId = 'vigil' | 'zealot';
 
 export interface SaveData {
-  version: 2;
+  version: 3;
   tutorialDone: boolean;
   gold: number;
   xp: number;
@@ -24,6 +26,8 @@ export interface SaveData {
   subclass: SubclassId | null;
   /** Dungeon ids cleared at least once (first clear pays the ruby). */
   clearedDungeons: string[];
+  /** Selected combat pace multiplier in tenths (10 = 1×, 15 = 1.5×). */
+  combatPaceTenths: number;
 }
 
 /** The v1 shape, kept only so loadSave can migrate old payloads. */
@@ -39,9 +43,22 @@ interface SaveDataV1 {
   clearedDungeons: string[];
 }
 
+/** v2 shape — migrated to v3 on load. */
+interface SaveDataV2 {
+  version: 2;
+  tutorialDone: boolean;
+  gold: number;
+  xp: number;
+  rubies: number;
+  unlockedSpells: string[];
+  treeRanks: Record<string, number>;
+  subclass: SubclassId | null;
+  clearedDungeons: string[];
+}
+
 export function newSaveData(): SaveData {
   return {
-    version: 2,
+    version: 3,
     tutorialDone: false,
     gold: 0,
     xp: 0,
@@ -50,6 +67,7 @@ export function newSaveData(): SaveData {
     treeRanks: {},
     subclass: null,
     clearedDungeons: [],
+    combatPaceTenths: 10,
   };
 }
 
@@ -74,7 +92,7 @@ function migrateV1(v1: SaveDataV1): SaveData {
   }
   if (v1.subclass !== null) treeRanks[`${v1.subclass}-oath`] = 1;
 
-  return {
+  return migrateV2({
     version: 2,
     tutorialDone: v1.tutorialDone,
     gold,
@@ -84,6 +102,22 @@ function migrateV1(v1: SaveDataV1): SaveData {
     treeRanks,
     subclass: v1.subclass,
     clearedDungeons: [...v1.clearedDungeons],
+  });
+}
+
+/** v2 → v3: add default combat pace (1×). */
+function migrateV2(v2: SaveDataV2): SaveData {
+  return {
+    version: 3,
+    tutorialDone: v2.tutorialDone,
+    gold: v2.gold,
+    xp: v2.xp,
+    rubies: v2.rubies,
+    unlockedSpells: [...v2.unlockedSpells],
+    treeRanks: { ...v2.treeRanks },
+    subclass: v2.subclass,
+    clearedDungeons: [...v2.clearedDungeons],
+    combatPaceTenths: 10,
   };
 }
 
@@ -106,6 +140,11 @@ export function loadSave(store: KeyValueStore | null = defaultStore()): SaveData
   try {
     const parsed: unknown = JSON.parse(raw);
     if (isSaveData(parsed)) return parsed;
+    if (isSaveDataV2(parsed)) {
+      const migrated = migrateV2(parsed);
+      saveGame(migrated, store);
+      return migrated;
+    }
     if (isSaveDataV1(parsed)) {
       const migrated = migrateV1(parsed);
       saveGame(migrated, store);
@@ -139,6 +178,16 @@ function hasBaseShape(v: Record<string, unknown>): boolean {
 }
 
 function isSaveData(value: unknown): value is SaveData {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (v.version !== 3 || !hasBaseShape(v)) return false;
+  const ranks = v.treeRanks;
+  if (typeof ranks !== 'object' || ranks === null || Array.isArray(ranks)) return false;
+  if (!Object.values(ranks).every((r) => typeof r === 'number')) return false;
+  return typeof v.combatPaceTenths === 'number';
+}
+
+function isSaveDataV2(value: unknown): value is SaveDataV2 {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
   if (v.version !== 2 || !hasBaseShape(v)) return false;

@@ -1,6 +1,6 @@
 # Skill tree — agent notes
 
-Status: current · Authority: skill-tree service + live SPELL_TREE wiring · Last verified: 2026-07-10
+Status: current · Authority: skill-tree service + live SPELL_TREE wiring · Last verified: 2026-07-11
 
 Config-driven tree service (`game/src/tree/`) plus the live spell-tree data and
 combat resolve (`game/src/data/spellTree.ts`). Phaser stays out of this folder.
@@ -44,10 +44,15 @@ paths — do not extend them.
 3. Prerequisites: `requires: { mode: 'all' \| 'any', nodes }`. Spot chain order
    also gates later entries. Exactly one root (no requires, first in its spot).
 4. Subclass lockout = `exclusiveGroup` on the oath nodes; UI two-click arm is
-   scene-only, not tree-service state.
-5. Combat never sees the graph — only `CombatMods` (`spells` with castMod
-   baked in, `bonusMaxMana`, `synergies`, `missingHealthBonuses`).
-6. Changing TreeScene click positions → update the `UI` table in
+   scene-only (subclass group only), not tree-service state.
+5. **Forsaken-path consolation:** nodes with `availableIfExclusiveLocked: true`
+   in a spot chain are offered when the natural next entry is `exclusive-locked`
+   (e.g. `warped-tempo-via-zealot` on the zealot spot after swearing Vigil).
+   The tree service skips forward; `spellTree.ts` owns effect kinds.
+6. Combat never sees the graph — only `CombatMods` (`spells` with castMod
+   baked in, `bonusMaxMana`, `synergies`, `missingHealthBonuses`,
+   `paceMultipliersTenths`).
+7. Changing TreeScene click positions → update the `UI` table in
    `scripts/journey.mjs`.
 
 ## Gates

@@ -189,7 +189,24 @@ export class TreeScene extends Phaser.Scene {
       .setVisible(false);
 
     this.buildBackButton(120, 504);
+    this.buildOathLockIcon();
     this.render();
+  }
+
+  /** Simple lock glyph between the Vigil and Zealot oath nodes (handoff §Q). */
+  private buildOathLockIcon(): void {
+    const x = 480;
+    const y = 260;
+    const shackle = this.add
+      .rectangle(x, y - 7, 12, 9, BG_COLOR)
+      .setStrokeStyle(2, 0x8a7868)
+      .setDepth(1);
+    const body = this.add
+      .rectangle(x, y + 3, 14, 12, 0x8a7868)
+      .setStrokeStyle(1, BORDER_COLOR)
+      .setDepth(1);
+    shackle.disableInteractive();
+    body.disableInteractive();
   }
 
   private disarmAndRerenderIfNeeded(): void {
@@ -357,7 +374,7 @@ export class TreeScene extends Phaser.Scene {
   }
 
   private onSpotClicked(spot: SpotView): void {
-    const needsArm = spot.next?.exclusiveGroup !== undefined && spot.status === 'affordable';
+    const needsArm = spot.next?.exclusiveGroup === 'subclass' && spot.status === 'affordable';
 
     if (needsArm) {
       if (this.armedSpotId === spot.id) {

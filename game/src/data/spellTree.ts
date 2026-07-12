@@ -32,7 +32,8 @@ export type SpellTreeEffect =
   | { kind: 'grantSpell'; spellId: string }
   | { kind: 'synergy'; triggerSpellId: string; buffedSpellId: string; bonusHeal: number }
   | { kind: 'missingHealthBonus'; spellId: string; healPer10PctMissing: number }
-  | { kind: 'castMod'; spellId: string; castMsDelta: number; manaDelta: number };
+  | { kind: 'castMod'; spellId: string; castMsDelta: number; manaDelta: number }
+  | { kind: 'combatPace'; multiplierTenths: number };
 
 /** Opaque-to-tree payload: display + effect (+ optional subclass tag for oaths). */
 export interface SpellTreeContent {
@@ -48,6 +49,8 @@ export interface CombatMods {
   bonusMaxMana: number;
   synergies: SynergyRule[];
   missingHealthBonuses: MissingHealthBonusRule[];
+  /** Sorted unique pace multipliers (tenths); always includes 10; adds 15 when tempo owned. */
+  paceMultipliersTenths: number[];
 }
 
 function content(c: SpellTreeContent): SpellTreeContent {
@@ -123,6 +126,32 @@ const zealotOath: NodeDef = {
       `${s(SPELLS.zealousFlare.castMs)} cast — fast, pricey per point.`,
     subclass: 'zealot',
     effect: { kind: 'grantSpell', spellId: SPELLS.zealousFlare.id },
+  }),
+};
+
+const warpedTempoViaVigil: NodeDef = {
+  id: 'warped-tempo-via-vigil',
+  exclusiveGroup: 'combat-tempo',
+  availableIfExclusiveLocked: true,
+  requires: { mode: 'all', nodes: ['zealot-oath'] },
+  cost: { currency: 'gold', amount: 4 },
+  content: content({
+    name: 'Warped Tempo',
+    description: 'Forsaken gift: unlock 1.5× combat pace (locks the rival consolation).',
+    effect: { kind: 'combatPace', multiplierTenths: 15 },
+  }),
+};
+
+const warpedTempoViaZealot: NodeDef = {
+  id: 'warped-tempo-via-zealot',
+  exclusiveGroup: 'combat-tempo',
+  availableIfExclusiveLocked: true,
+  requires: { mode: 'all', nodes: ['vigil-oath'] },
+  cost: { currency: 'gold', amount: 4 },
+  content: content({
+    name: 'Warped Tempo',
+    description: 'Forsaken gift: unlock 1.5× combat pace (locks the rival consolation).',
+    effect: { kind: 'combatPace', multiplierTenths: 15 },
   }),
 };
 
@@ -203,6 +232,8 @@ export const SPELL_TREE: TreeConfig = {
     ...deepReserves.nodes,
     vigilOath,
     zealotOath,
+    warpedTempoViaVigil,
+    warpedTempoViaZealot,
     ...patientVow.nodes,
     measuredDevotion,
     ...ferventChain.nodes,
@@ -210,8 +241,8 @@ export const SPELL_TREE: TreeConfig = {
   ],
   spots: [
     deepReserves.spot,
-    { id: 'vigil-oath', chain: ['vigil-oath'] },
-    { id: 'zealot-oath', chain: ['zealot-oath'] },
+    { id: 'vigil-oath', chain: ['vigil-oath', 'warped-tempo-via-vigil'] },
+    { id: 'zealot-oath', chain: ['zealot-oath', 'warped-tempo-via-zealot'] },
     patientVow.spot,
     { id: 'vigil-measured-devotion', chain: ['vigil-measured-devotion'] },
     ferventChain.spot,
@@ -238,6 +269,7 @@ export function resolveCombatMods(
   const synergyMap = new Map<string, SynergyRule>();
   const missingMap = new Map<string, MissingHealthBonusRule>();
   const castMods: Extract<SpellTreeEffect, { kind: 'castMod' }>[] = [];
+  const paceTenths = new Set<number>([10]);
 
   for (const { effect } of contents) {
     switch (effect.kind) {
@@ -274,6 +306,9 @@ export function resolveCombatMods(
       case 'castMod':
         castMods.push(effect);
         break;
+      case 'combatPace':
+        paceTenths.add(effect.multiplierTenths);
+        break;
     }
   }
 
@@ -295,6 +330,7 @@ export function resolveCombatMods(
     bonusMaxMana,
     synergies: [...synergyMap.values()],
     missingHealthBonuses: [...missingMap.values()],
+    paceMultipliersTenths: [...paceTenths].sort((a, b) => a - b),
   };
 }
 
@@ -345,6 +381,8 @@ export function ownedIdsFromLegacyRanks(treeRanks: Record<string, number>): stri
   if ((treeRanks['vigil-measured-devotion'] ?? 0) > 0) owned.push('vigil-measured-devotion');
   pushRanks('zealot-fervent-chain', treeRanks['zealot-fervent-chain'] ?? 0, 3);
   if ((treeRanks['zealot-desperate-zeal'] ?? 0) > 0) owned.push('zealot-desperate-zeal');
+  if ((treeRanks['warped-tempo-via-vigil'] ?? 0) > 0) owned.push('warped-tempo-via-vigil');
+  if ((treeRanks['warped-tempo-via-zealot'] ?? 0) > 0) owned.push('warped-tempo-via-zealot');
   return owned;
 }
 
@@ -367,6 +405,8 @@ const SINGLE_NODES = [
   'zealot-oath',
   'vigil-measured-devotion',
   'zealot-desperate-zeal',
+  'warped-tempo-via-vigil',
+  'warped-tempo-via-zealot',
 ] as const;
 
 /**

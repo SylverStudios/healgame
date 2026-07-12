@@ -330,3 +330,50 @@ x 380. Hit area is still the sprite body bounds. Everything else in the
 `UI` table (Return overlay, spell-bar slots, hub/tree) was layout-independent,
 as the handoff predicted. Party hotkeys stay out of PoC (Decision D not
 reopened). Full journey green after integration.
+
+# Combat juice + forsaken-path tempo QA (2026-07-11)
+
+Presentation juice, tree forsaken-path **Warped Tempo** (1.5× combat pace),
+and spell-bar chrome. Handoff: `combat-juice-handoff.md` (historical). No
+engine rule changes; balance gates byte-identical at 1× sim.
+
+## How to run (from `game/`)
+
+`npm run check`, `npm run smoke`, `node scripts/journey.mjs`.
+
+## Done-means checklist (all verified)
+
+1. **Boss screenshake** — `bossCastFinished` triggers a modest camera shake
+   only; merc/trash autos and heals do not shake.
+2. **Scaled floats** — `-N`/`+N` font size scales monotonically with amount
+   (`floatFontPx` table in `unitSprite.ts`); rise+fade motion unchanged.
+3. **Target halo** — ember/iron ellipse under targeted ally feet (primary
+   indicator; chevron above bars kept as secondary).
+4. **Cast effects** — `castStarted`: healer ember flash + thin beam to target;
+   heal land: existing flash + optional ground ripple.
+5. **Armed healer rune** — small ember sigil near healer while
+   `armedBuffedSpellIds` non-empty; gold armed spell border kept; no label.
+6. **Keycap badges** — spell hotkeys render as bordered square badges
+   (top-left of each button).
+7. **Oath lock icon** — simple padlock geometry between Vigil/Zealot nodes;
+   non-interactive.
+8. **Forsaken-path tempo** — after swearing one oath, rival spot offers
+   purchasable `warped-tempo-via-*` (4g); `combat-tempo` exclusive group
+   locks the other consolation.
+9. **Pace toggle** — bottom-left control cycles `1x`/`1.5x` when 1.5× owned;
+   hidden at 1×-only; `combatPaceTenths` persists in save v3.
+
+## Pinned micro-choices
+
+| Topic | Decision |
+|---|---|
+| Sim vs juice clock | `engine.advance` uses paced `dt`; float/shake/heal-ripple tweens stay wall-clock |
+| Save | v3 adds `combatPaceTenths` (default 10); v2 migrates on load |
+| Oath two-click arm | Subclass group only — Warped Tempo is single-click |
+| Pace toggle position | Bottom-left `(20, 532)` origin; journey click `(48, 516)` |
+
+## Journey impact
+
+Stage B seed gold raised to 17g (tempo 4g + Patient Vow 3g after oath).
+New stages: forsaken tempo purchase on zealot spot, pace toggle click in B2.
+New `UI.combatPaceToggle`. Full journey green after integration.
