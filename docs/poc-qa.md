@@ -526,3 +526,47 @@ trade a real, deterministic gate (`balance.test.ts`'s scripted bots) for
 wall-clock-timing guesswork, which cuts against this project's
 determinism-over-vibes rule. Full journey run: 0 failures, 0 console errors,
 ~4 minutes, 29 screenshots.
+# Data-driven dungeon content QA (2026-07-12)
+
+Enemy abilities, mobs, and ordered dungeons now live in typed catalogs under
+`game/src/data/`; authoring and runtime contracts are documented in
+`game/src/data/README.md`. A pure validator and compiler resolve those
+references into the existing `EncounterDef` combat input.
+
+## Pinned decisions
+
+- TypeScript remains the authoring format. No JSON/YAML source, generated
+  output, or arbitrary ability scripting layer.
+- Dungeon order is the explicit `DUNGEON_ORDER`, never filename order.
+- A boss is a reusable mob in the dungeon's final wave; the compiler lowers
+  that authoring form into the engine's current separate boss field.
+- Current runtime limits remain explicit: one scheduled boss ability
+  (`partyAoE` or `tunnelVision`) and no active trash abilities. New ability
+  kinds require engine behavior first.
+- Mob stat overrides are allowed for deliberate encounter tuning and are
+  always exposed by textual preview.
+- The content CLI is read-only; source-writing scaffolds remain deferred.
+
+## Behavior and verification
+
+Ash Gate, Iron Pass, and The Maw compile to their Alpha 0.1 effective HP,
+damage, timing, wave, reward, and ability values. Balance shape is unchanged.
+Encounter lookup, unlocks, first-clear rewards, hub buttons, and enemy sprite
+selection now consume catalog IDs/metadata; cleared dungeon IDs remain
+save-compatible and required no additional save migration.
+
+From `game/`, content authors can run:
+
+```bash
+npm run content -- validate
+npm run content -- list
+npm run content -- preview <dungeon-id>
+npm run content -- preview --all
+```
+
+Validation covers references, IDs, integer ranges, cast cadence, explicit
+order, unlock cycles, final-boss shape, visual keys, runtime ability limits,
+and unused-content warnings. Vitest additionally pins legacy-equivalent
+compiled values, deterministic assembly/simulation, reward overrides, mob
+identity, and preview text. Full `npm run verify` passed after integration;
+no current scene click target moved.

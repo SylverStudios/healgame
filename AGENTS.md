@@ -5,7 +5,8 @@ Status: current · Authority: doc conventions for all agents · Last verified: 2
 How we keep docs trustworthy. Operating rules for the game itself live in
 [`CLAUDE.md`](CLAUDE.md). Module contracts live next to code (e.g.
 [`game/src/tree/AGENTS.md`](game/src/tree/AGENTS.md),
-[`game/src/combat/README.md`](game/src/combat/README.md)).
+[`game/src/combat/README.md`](game/src/combat/README.md), and
+[`game/src/data/README.md`](game/src/data/README.md)).
 
 ## Frontmatter (required on every doc)
 
@@ -36,6 +37,7 @@ to [`docs/poc-qa.md`](docs/poc-qa.md).
 4. Colocated module docs — win for that module:
    - [`game/src/tree/AGENTS.md`](game/src/tree/AGENTS.md)
    - [`game/src/combat/README.md`](game/src/combat/README.md)
+   - [`game/src/data/README.md`](game/src/data/README.md)
 5. [`CLAUDE.md`](CLAUDE.md) — gates, hard rules, working style
 6. Historical handoffs / outcomes — lessons only
 7. [`docs/tech-options.md`](docs/tech-options.md) — stack rationale
@@ -82,6 +84,7 @@ agents should prefer `verify`.
   |--------|-------------|
   | Tree service / wiring | `game/src/tree/AGENTS.md` |
   | Combat rules | `game/src/combat/README.md`; balance shape → `poc-qa.md` |
+  | Dungeon/mob/ability content pipeline | `game/src/data/README.md` |
   | Save shape | `save.ts` header + `poc-qa.md` note; bump version per CLAUDE.md |
   | Scene layout | `scripts/journey.mjs` `UI` table |
   | Phase complete | Append `poc-qa.md`; mark handoff `historical` |

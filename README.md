@@ -26,6 +26,14 @@ journey (~5 min); `npm run verify:fast` skips journey. CI runs the full suite on
 every push/PR ([`.github/workflows/verify.yml`](.github/workflows/verify.yml)).
 Results + tuning: [docs/poc-qa.md](docs/poc-qa.md).
 
+Dungeon content is inspectable without launching the game:
+
+```bash
+npm run content -- validate
+npm run content -- list
+npm run content -- preview --all
+```
+
 ## Docs
 
 Doc conventions + authority: [`AGENTS.md`](AGENTS.md). Operating rules:
@@ -37,6 +45,7 @@ Doc conventions + authority: [`AGENTS.md`](AGENTS.md). Operating rules:
 | [PoC QA](docs/poc-qa.md) | Journey checklist, balance gates, tuning log |
 | [Tree AGENTS](game/src/tree/AGENTS.md) | Config-driven skill-tree service |
 | [Combat README](game/src/combat/README.md) | Engine API + rule decisions |
+| [Dungeon content README](game/src/data/README.md) | Ability, mob, dungeon, validation, assembly, and preview contracts |
 | [Unit art](docs/unit-art.md) | Kenney tile mapping |
 | [GDD](docs/GDD.md) | Long-term design only |
 | [Tech options](docs/tech-options.md) | Stack comparison (historical decision aid) |
