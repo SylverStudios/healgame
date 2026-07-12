@@ -8,6 +8,7 @@
  */
 
 import type { Unit } from '../combat/types';
+import { MOB_REGISTRY } from '../data/mobs';
 
 export const UNIT_TEXTURE_KEY = 'tiny-dungeon';
 export const UNIT_TEXTURE_URL = 'assets/tiny-dungeon.png';
@@ -30,14 +31,32 @@ const PARTY_FRAMES: Record<string, number> = {
   healer: FRAME.wizard,
 };
 
-const BOSS_FRAMES: Record<string, number> = {
+const MOB_VISUAL_FRAMES: Readonly<Record<string, number>> = {
+  'ash-husk': FRAME.ghost,
+  'iron-husk': FRAME.ghost,
   'gate-warden': FRAME.brute,
+  'spire-lancer': FRAME.demon,
   'hollow-king': FRAME.demon,
 };
 
-/** Tile frame for a combat unit — party by id, bosses by encounter boss id, trash by role. */
-export function frameForUnit(unit: Pick<Unit, 'id' | 'role'>): number {
-  if (unit.role === 'boss') return BOSS_FRAMES[unit.id] ?? FRAME.demon;
-  if (unit.role === 'enemy') return FRAME.ghost;
+/** Supported tile frame for an authored mob visual key. */
+export function frameForMobVisualKey(visualKey: string): number | undefined {
+  return MOB_VISUAL_FRAMES[visualKey];
+}
+
+/**
+ * Tile frame for a combat unit. Catalog mobs resolve through stable mobId and
+ * MobDef.visualKey; generated runtime ids never select enemy presentation.
+ */
+export function frameForUnit(unit: Pick<Unit, 'id' | 'role' | 'mobId'>): number {
+  if (unit.role === 'boss' || unit.role === 'enemy') {
+    const mob =
+      unit.mobId !== undefined && Object.prototype.hasOwnProperty.call(MOB_REGISTRY, unit.mobId)
+        ? MOB_REGISTRY[unit.mobId]
+        : undefined;
+    const catalogFrame = mob === undefined ? undefined : frameForMobVisualKey(mob.visualKey);
+    if (catalogFrame !== undefined) return catalogFrame;
+    return unit.role === 'boss' ? FRAME.demon : FRAME.ghost;
+  }
   return PARTY_FRAMES[unit.id] ?? FRAME.fighter;
 }

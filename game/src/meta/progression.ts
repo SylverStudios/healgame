@@ -7,7 +7,8 @@
  * `buildLoadout` is a thin alias kept for existing call sites/tests.
  */
 
-import { levelForXp, REWARDS, SPELLS } from '../data/constants';
+import { levelForXp, SPELLS } from '../data/constants';
+import { getDungeonById, isDungeonIdUnlocked } from '../data/dungeons';
 import { TREE_NODES, treeNodeById } from '../data/tree';
 import { loadoutFromSave, type CombatMods } from '../data/spellTree';
 import type { SaveData } from '../save/save';
@@ -43,19 +44,22 @@ export function applyCombatResult(save: SaveData, result: CombatResult): HubNoti
     });
   }
 
-  if (result.status === 'victory' && !save.clearedDungeons.includes(result.encounterId)) {
-    save.clearedDungeons.push(result.encounterId);
-    // Alpha 0.1 §D1: rubies remain Ash-Gate-only; other first clears still
-    // record (Iron Pass clear is what unlocks The Maw) but pay no ruby.
-    const grantsRuby = (REWARDS.rubyFirstClearDungeonIds as readonly string[]).includes(result.encounterId);
-    if (grantsRuby) save.rubies += REWARDS.rubyPerFirstClear;
-    // Alpha 0.1 §D7: the FIRST-ever Ash Gate clear also queues the relic pick
-    // (HubScene routes to RelicScene before building the hub UI). Iron
-    // Pass/other first clears never set this flag.
-    if (result.encounterId === 'ash-gate') save.relicPickPending = true;
+  const dungeon = getDungeonById(result.encounterId);
+  if (
+    result.status === 'victory' &&
+    dungeon !== undefined &&
+    !save.clearedDungeons.includes(dungeon.id)
+  ) {
+    save.rubies += dungeon.rewards.rubyPerFirstClear;
+    save.clearedDungeons.push(dungeon.id);
+    // Alpha 0.1 §D7: the first Ash Gate clear queues the one-time relic pick.
+    if (dungeon.id === 'ash-gate') save.relicPickPending = true;
     notices.push({
       kind: 'firstClear',
-      text: grantsRuby ? `FIRST CLEAR — +${REWARDS.rubyPerFirstClear} Ruby` : 'FIRST CLEAR!',
+      text:
+        dungeon.rewards.rubyPerFirstClear > 0
+          ? `FIRST CLEAR — +${dungeon.rewards.rubyPerFirstClear} Ruby`
+          : 'FIRST CLEAR!',
     });
   }
 
@@ -137,18 +141,22 @@ export function purchaseNode(save: SaveData, nodeId: string): boolean {
   return true;
 }
 
-/**
- * Dungeon 2 ("Iron Pass") unlocks after Ash Gate's first clear
- * (alpha-0.1-handoff §D1).
- */
-export function isIronPassUnlocked(save: SaveData): boolean {
-  return save.clearedDungeons.includes('ash-gate');
+/** Generic config-driven dungeon unlock check. Unknown ids are never unlocked. */
+export function isDungeonUnlocked(save: SaveData, id: string): boolean {
+  return isDungeonIdUnlocked(id, save.clearedDungeons);
 }
 
-/**
- * Dungeon 3 ("The Maw") unlocks after Iron Pass's first clear
- * (alpha-0.1-handoff §D1 amends poc-spec §7's old "after Ash Gate" rule).
- */
+/** @deprecated Use isDungeonUnlocked(save, 'the-maw'). */
+export function isDungeon2Unlocked(save: SaveData): boolean {
+  return isDungeonUnlocked(save, 'the-maw');
+}
+
+/** Compatibility wrapper for Alpha 0.1 call sites. */
+export function isIronPassUnlocked(save: SaveData): boolean {
+  return isDungeonUnlocked(save, 'iron-pass');
+}
+
+/** Compatibility wrapper for Alpha 0.1 call sites. */
 export function isMawUnlocked(save: SaveData): boolean {
-  return save.clearedDungeons.includes('iron-pass');
+  return isDungeonUnlocked(save, 'the-maw');
 }

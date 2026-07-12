@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyCombatResult,
   buildLoadout,
+  isDungeonUnlocked,
   isIronPassUnlocked,
   isMawUnlocked,
   nodeStatus,
@@ -10,6 +11,7 @@ import {
 import { newSaveData, type SaveData } from '../save/save';
 import { SPELLS, XP_LEVEL_2_THRESHOLD } from '../data/constants';
 import { IRON_PASS, THE_MAW } from '../data/encounters';
+import { getDungeonById } from '../data/dungeons';
 import type { CombatResult } from '../scenes/CombatScene';
 
 function save(overrides: Partial<SaveData> = {}): SaveData {
@@ -54,9 +56,10 @@ describe('applyCombatResult', () => {
   it('grants a ruby and records the clear on the first victory in a dungeon', () => {
     const s = save();
     const notices = applyCombatResult(s, result({ status: 'victory', encounterId: 'ash-gate' }));
-    expect(s.rubies).toBe(1);
+    const reward = getDungeonById('ash-gate')?.rewards.rubyPerFirstClear;
+    expect(s.rubies).toBe(reward);
     expect(s.clearedDungeons).toEqual(['ash-gate']);
-    expect(notices).toEqual([{ kind: 'firstClear', text: 'FIRST CLEAR — +1 Ruby' }]);
+    expect(notices).toEqual([{ kind: 'firstClear', text: `FIRST CLEAR — +${reward} Ruby` }]);
   });
 
   it('does not grant a second ruby on a replay victory', () => {
@@ -104,6 +107,14 @@ describe('applyCombatResult', () => {
     const s = save();
     applyCombatResult(s, result({ status: 'wipe', encounterId: 'ash-gate' }));
     expect(s.relicPickPending).toBe(false);
+  });
+
+  it('does not reward or record an unknown dungeon id', () => {
+    const s = save();
+    const notices = applyCombatResult(s, result({ status: 'victory', encounterId: 'unknown-dungeon' }));
+    expect(s.rubies).toBe(0);
+    expect(s.clearedDungeons).toEqual([]);
+    expect(notices).toEqual([]);
   });
 });
 
@@ -334,6 +345,28 @@ describe('IRON_PASS data sanity', () => {
     expect(cast.channelMs).toBe(10_000);
     expect(cast.tickMs).toBe(1000);
     expect(cast.damagePerTick).toBe(2);
+  });
+});
+
+describe('isDungeonUnlocked', () => {
+  it('uses each dungeon unlock config', () => {
+    const fresh = save();
+    expect(isDungeonUnlocked(fresh, 'ash-gate')).toBe(true);
+    expect(isDungeonUnlocked(fresh, 'iron-pass')).toBe(false);
+    expect(isDungeonUnlocked(fresh, 'the-maw')).toBe(false);
+    expect(isDungeonUnlocked(save({ clearedDungeons: ['ash-gate'] }), 'iron-pass')).toBe(true);
+    expect(isDungeonUnlocked(save({ clearedDungeons: ['ash-gate'] }), 'the-maw')).toBe(false);
+    expect(
+      isDungeonUnlocked(
+        save({ clearedDungeons: ['ash-gate', 'iron-pass'] }),
+        'the-maw',
+      ),
+    ).toBe(true);
+  });
+
+  it('is false for an unknown dungeon id even if that id appears cleared', () => {
+    expect(isDungeonUnlocked(save({ clearedDungeons: ['unknown-dungeon'] }), 'unknown-dungeon')).toBe(false);
+    expect(isDungeonUnlocked(save({ clearedDungeons: ['toString'] }), 'toString')).toBe(false);
   });
 });
 

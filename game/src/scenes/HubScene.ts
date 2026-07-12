@@ -10,11 +10,11 @@
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { loadSave, resetSave, saveGame, type SaveData } from '../save/save';
-import { applyCombatResult, isIronPassUnlocked, isMawUnlocked, type HubNotice } from '../meta/progression';
+import { applyCombatResult, isDungeonUnlocked, type HubNotice } from '../meta/progression';
 import { loadoutFromSave } from '../data/spellTree';
 import { relicById } from '../data/relics';
 import { levelForXp, SPELLS, XP_LEVEL_2_THRESHOLD } from '../data/constants';
-import { ASH_GATE, IRON_PASS, THE_MAW } from '../data/encounters';
+import { ORDERED_DUNGEONS } from '../data/dungeons';
 import type { CombatResult, CombatSceneData } from './CombatScene';
 
 interface HubSceneData {
@@ -130,13 +130,21 @@ export class HubScene extends Phaser.Scene {
     const { width, height } = this.scale;
     const centerX = width / 2;
 
-    this.makeButton(centerX, height / 2 - 15, 300, 52, 'Enter Ash Gate', () => {
-      const combatData: CombatSceneData = {
-        encounterId: ASH_GATE.id,
-        loadout: loadoutFromSave(save),
-        returnTo: SceneKeys.Hub,
-      };
-      this.scene.start(SceneKeys.Combat, combatData);
+    ORDERED_DUNGEONS.forEach((dungeon, index) => {
+      if (!isDungeonUnlocked(save, dungeon.id)) return;
+
+      // Preserve the current two-dungeon targets. Further ordered entries
+      // continue downward deterministically without additional scene wiring.
+      const y = index === 0 ? height / 2 - 15 : height / 2 + 180 + (index - 1) * 65;
+      const suffix = index === 0 ? '' : ` (Dungeon ${index + 1})`;
+      this.makeButton(centerX, y, 300, 52, `Enter ${dungeon.name}${suffix}`, () => {
+        const combatData: CombatSceneData = {
+          encounterId: dungeon.id,
+          loadout: loadoutFromSave(save),
+          returnTo: SceneKeys.Hub,
+        };
+        this.scene.start(SceneKeys.Combat, combatData);
+      });
     });
 
     this.makeButton(centerX, height / 2 + 50, 300, 52, 'Spell Tree', () => {
@@ -148,28 +156,6 @@ export class HubScene extends Phaser.Scene {
       this.add
         .text(centerX, height / 2 + 115, `Oath: ${label}`, { fontFamily: FONT, fontSize: '16px', color: ACCENT_COLOR })
         .setOrigin(0.5);
-    }
-
-    if (isIronPassUnlocked(save)) {
-      this.makeButton(centerX, height / 2 + 180, 300, 52, 'Enter Iron Pass (Dungeon 2)', () => {
-        const combatData: CombatSceneData = {
-          encounterId: IRON_PASS.id,
-          loadout: loadoutFromSave(save),
-          returnTo: SceneKeys.Hub,
-        };
-        this.scene.start(SceneKeys.Combat, combatData);
-      });
-    }
-
-    if (isMawUnlocked(save)) {
-      this.makeButton(centerX, height / 2 + 245, 300, 52, 'Enter The Maw (Dungeon 3)', () => {
-        const combatData: CombatSceneData = {
-          encounterId: THE_MAW.id,
-          loadout: loadoutFromSave(save),
-          returnTo: SceneKeys.Hub,
-        };
-        this.scene.start(SceneKeys.Combat, combatData);
-      });
     }
 
     this.buildRestartControl(centerX, height - 36);

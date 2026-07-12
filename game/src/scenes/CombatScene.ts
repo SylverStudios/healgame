@@ -17,7 +17,7 @@ import type {
   SpellDef,
   Unit,
 } from '../combat/types';
-import { ENCOUNTERS } from '../data/encounters';
+import { getEncounterById } from '../data/encounters';
 import { GCD_MS } from '../data/constants';
 import { Bar } from '../ui/bar';
 import { UnitSprite } from '../ui/unitSprite';
@@ -181,8 +181,10 @@ export class CombatScene extends Phaser.Scene {
   }
 
   create(): void {
-    const encounter = ENCOUNTERS.find((e) => e.id === this.sceneData.encounterId) ?? ENCOUNTERS[0];
-    if (!encounter) throw new Error('CombatScene: no encounters configured');
+    const encounter = getEncounterById(this.sceneData.encounterId);
+    if (encounter === undefined) {
+      throw new Error(`CombatScene: unknown encounter id "${this.sceneData.encounterId}"`);
+    }
     this.encounter = encounter;
 
     const spells = this.sceneData.loadout.spells;
