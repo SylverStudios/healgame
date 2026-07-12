@@ -249,7 +249,7 @@ describe('content diagnostics', () => {
         autoDamage: 1,
         swingIntervalMs: 1,
         abilityIds: ['missing', 'Bad Ability'],
-        visualKey: 'trash',
+        visualKey: 'ash-husk',
       },
       {
         id: 'boss',
@@ -259,7 +259,7 @@ describe('content diagnostics', () => {
         autoDamage: 1,
         swingIntervalMs: 1,
         abilityIds: [],
-        visualKey: 'boss',
+        visualKey: 'gate-warden',
       },
       {
         id: 'orphan',
@@ -269,7 +269,7 @@ describe('content diagnostics', () => {
         autoDamage: 1,
         swingIntervalMs: 1,
         abilityIds: [],
-        visualKey: 'orphan',
+        visualKey: 'hollow-king',
       },
     ];
     const dungeons: readonly DungeonDef[] = [
