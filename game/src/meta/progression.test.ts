@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   applyCombatResult,
   buildLoadout,
-  isDungeon2Unlocked,
+  isIronPassUnlocked,
+  isMawUnlocked,
   nodeStatus,
   purchaseNode,
 } from './progression';
 import { newSaveData, type SaveData } from '../save/save';
 import { SPELLS, XP_LEVEL_2_THRESHOLD } from '../data/constants';
-import { THE_MAW } from '../data/encounters';
+import { IRON_PASS, THE_MAW } from '../data/encounters';
 import type { CombatResult } from '../scenes/CombatScene';
 
 function save(overrides: Partial<SaveData> = {}): SaveData {
@@ -63,6 +64,14 @@ describe('applyCombatResult', () => {
     const notices = applyCombatResult(s, result({ status: 'victory', encounterId: 'ash-gate' }));
     expect(s.rubies).toBe(1);
     expect(notices).toEqual([]);
+  });
+
+  it('records an iron-pass first clear (unlocking The Maw) but grants no ruby — §D1', () => {
+    const s = save({ clearedDungeons: ['ash-gate'], rubies: 1 });
+    const notices = applyCombatResult(s, result({ status: 'victory', encounterId: 'iron-pass' }));
+    expect(s.rubies).toBe(1);
+    expect(s.clearedDungeons).toEqual(['ash-gate', 'iron-pass']);
+    expect(notices).toEqual([{ kind: 'firstClear', text: 'FIRST CLEAR!' }]);
   });
 
   it('does not grant a ruby on a wipe', () => {
@@ -251,13 +260,55 @@ describe('nodeStatus', () => {
   });
 });
 
-describe('isDungeon2Unlocked', () => {
+describe('isIronPassUnlocked', () => {
   it('is false on a fresh save', () => {
-    expect(isDungeon2Unlocked(save())).toBe(false);
+    expect(isIronPassUnlocked(save())).toBe(false);
   });
 
   it('is true once ash-gate has been cleared', () => {
-    expect(isDungeon2Unlocked(save({ clearedDungeons: ['ash-gate'] }))).toBe(true);
+    expect(isIronPassUnlocked(save({ clearedDungeons: ['ash-gate'] }))).toBe(true);
+  });
+});
+
+describe('isMawUnlocked', () => {
+  it('is false on a fresh save', () => {
+    expect(isMawUnlocked(save())).toBe(false);
+  });
+
+  it('is still false after only ash-gate has been cleared', () => {
+    expect(isMawUnlocked(save({ clearedDungeons: ['ash-gate'] }))).toBe(false);
+  });
+
+  it('is true once iron-pass has been cleared', () => {
+    expect(isMawUnlocked(save({ clearedDungeons: ['ash-gate', 'iron-pass'] }))).toBe(true);
+  });
+});
+
+describe('IRON_PASS data sanity', () => {
+  it('has four trash waves with the drafted counts/hp', () => {
+    expect(IRON_PASS.waves).toHaveLength(4);
+    const shapes = IRON_PASS.waves.map((w) => ({
+      count: w.enemies[0]?.count,
+      hp: w.enemies[0]?.hp,
+    }));
+    expect(shapes).toEqual([
+      { count: 2, hp: 14 },
+      { count: 3, hp: 14 },
+      { count: 3, hp: 16 },
+      { count: 4, hp: 16 },
+    ]);
+  });
+
+  it('has a boss cast of kind tunnelVision with the drafted cadence', () => {
+    const cast = IRON_PASS.boss.cast;
+    expect(cast?.name).toBe('Tunnel Vision');
+    if (!cast || cast.kind !== 'tunnelVision') throw new Error('Tunnel Vision must be a tunnelVision cast');
+    expect(cast.telegraphMs).toBe(3000);
+    expect(cast.firstCastAtMs).toBe(8000);
+    expect(cast.intervalMs).toBe(30_000);
+    expect(cast.channelMs).toBe(10_000);
+    expect(cast.tickMs).toBe(1000);
+    expect(cast.damagePerTick).toBe(2);
   });
 });
 

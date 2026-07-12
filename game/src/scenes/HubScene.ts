@@ -1,18 +1,19 @@
 /**
  * Hub (poc-spec §3, §5): shows currencies with roles, applies the result of
- * the combat run that just ended (if any), and is the launch point for Ash
- * Gate, the spell tree (gold + ruby oaths), and Dungeon 2 / The Maw (§7,
- * once Ash Gate is cleared). Temp art only — panels + text buttons, dark
+ * the combat run that just ended (if any), and is the launch point for
+ * Ash Gate, the spell tree (gold + ruby oaths), Iron Pass (Dungeon 2, once
+ * Ash Gate is cleared — alpha-0.1-handoff §D1), and The Maw (Dungeon 3, once
+ * Iron Pass is cleared). Temp art only — panels + text buttons, dark
  * palette, monospace.
  */
 
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { loadSave, resetSave, saveGame, type SaveData } from '../save/save';
-import { applyCombatResult, isDungeon2Unlocked, type HubNotice } from '../meta/progression';
+import { applyCombatResult, isIronPassUnlocked, isMawUnlocked, type HubNotice } from '../meta/progression';
 import { loadoutFromSave } from '../data/spellTree';
 import { levelForXp, SPELLS, XP_LEVEL_2_THRESHOLD } from '../data/constants';
-import { ASH_GATE, THE_MAW } from '../data/encounters';
+import { ASH_GATE, IRON_PASS, THE_MAW } from '../data/encounters';
 import type { CombatResult, CombatSceneData } from './CombatScene';
 
 interface HubSceneData {
@@ -121,8 +122,19 @@ export class HubScene extends Phaser.Scene {
         .setOrigin(0.5);
     }
 
-    if (isDungeon2Unlocked(save)) {
-      this.makeButton(centerX, height / 2 + 180, 300, 52, 'Enter The Maw (Dungeon 2)', () => {
+    if (isIronPassUnlocked(save)) {
+      this.makeButton(centerX, height / 2 + 180, 300, 52, 'Enter Iron Pass (Dungeon 2)', () => {
+        const combatData: CombatSceneData = {
+          encounterId: IRON_PASS.id,
+          loadout: loadoutFromSave(save),
+          returnTo: SceneKeys.Hub,
+        };
+        this.scene.start(SceneKeys.Combat, combatData);
+      });
+    }
+
+    if (isMawUnlocked(save)) {
+      this.makeButton(centerX, height / 2 + 245, 300, 52, 'Enter The Maw (Dungeon 3)', () => {
         const combatData: CombatSceneData = {
           encounterId: THE_MAW.id,
           loadout: loadoutFromSave(save),

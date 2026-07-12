@@ -6,7 +6,7 @@
  * Chunk 1 task brief) meant to be tuned later; kept as data, not code.
  */
 
-import { GATE_WARDEN, HOLLOW_KING } from './constants';
+import { GATE_WARDEN, HOLLOW_KING, IRON_TRASH, SPIRE_LANCER } from './constants';
 import type { EncounterDef } from '../combat/types';
 
 export const ASH_GATE: EncounterDef = {
@@ -41,11 +41,49 @@ export const ASH_GATE: EncounterDef = {
 };
 
 /**
- * The Maw (Dungeon 2, poc-spec §1 item 8, §7): unlocks after Ash Gate's
- * first clear. One light trash wave (same stats as Ash Gate wave 1) so
- * grind attempts still pay a little gold/XP, then Hollow King — a boss
- * intentionally sized far beyond PoC power. Cannot be cleared; it's an
- * endless sandbox, not a "no further dungeons" content wall.
+ * Iron Pass (Dungeon 2, alpha-0.1-handoff §D2/§D3): unlocks after Ash Gate's
+ * first clear. Four trash waves (same "Ash Husk" template, reskinned "Iron
+ * Husk" in data only) building toward Spire Lancer — a single-target
+ * pressure boss using the Tunnel Vision cast (see combat/types.ts
+ * `TunnelVisionCastDef` and combat/README.md for cadence semantics).
+ */
+export const IRON_PASS: EncounterDef = {
+  id: 'iron-pass',
+  name: 'Iron Pass',
+  // Iron Husks swing off IRON_TRASH (2 dmg / 3.0s), harder than the global
+  // TRASH constants Ash Gate uses — per-group override, see EnemyGroupDef.
+  waves: [
+    { enemies: [{ name: 'Iron Husk', hp: 14, count: 2, ...IRON_TRASH }] },
+    { enemies: [{ name: 'Iron Husk', hp: 14, count: 3, ...IRON_TRASH }] },
+    { enemies: [{ name: 'Iron Husk', hp: 16, count: 3, ...IRON_TRASH }] },
+    { enemies: [{ name: 'Iron Husk', hp: 16, count: 4, ...IRON_TRASH }] },
+  ],
+  boss: {
+    id: 'spire-lancer',
+    name: 'Spire Lancer',
+    hp: SPIRE_LANCER.hp,
+    autoDamage: SPIRE_LANCER.autoDamage,
+    swingIntervalMs: SPIRE_LANCER.swingIntervalMs,
+    cast: {
+      kind: 'tunnelVision',
+      name: 'Tunnel Vision',
+      telegraphMs: SPIRE_LANCER.telegraphMs,
+      firstCastAtMs: SPIRE_LANCER.firstCastAtMs,
+      intervalMs: SPIRE_LANCER.intervalMs,
+      channelMs: SPIRE_LANCER.channelMs,
+      tickMs: SPIRE_LANCER.tickMs,
+      damagePerTick: SPIRE_LANCER.damagePerTick,
+    },
+  },
+};
+
+/**
+ * The Maw (Dungeon 3, poc-spec §1 item 8, §7): unlocks after Iron Pass's
+ * first clear (alpha-0.1-handoff §D1 amends the old "after Ash Gate" rule).
+ * One light trash wave (same stats as Ash Gate wave 1) so grind attempts
+ * still pay a little gold/XP, then Hollow King — a boss intentionally sized
+ * far beyond PoC power. Cannot be cleared; it's an endless sandbox, not a
+ * "no further dungeons" content wall.
  */
 export const THE_MAW: EncounterDef = {
   id: 'the-maw',
@@ -69,4 +107,4 @@ export const THE_MAW: EncounterDef = {
   },
 };
 
-export const ENCOUNTERS: EncounterDef[] = [ASH_GATE, THE_MAW];
+export const ENCOUNTERS: EncounterDef[] = [ASH_GATE, IRON_PASS, THE_MAW];

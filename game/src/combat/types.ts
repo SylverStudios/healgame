@@ -99,11 +99,18 @@ export interface CombatState {
   armedBuffedSpellIds: string[];
 }
 
-/** One group of identical trash enemies within a wave (poc-spec §7). */
+/**
+ * One group of identical trash enemies within a wave (poc-spec §7).
+ * `autoDamage`/`swingIntervalMs` override the global TRASH constants per
+ * group (Alpha 0.1 §D2: Iron Pass trash hits harder without touching Ash
+ * Gate); omitted = TRASH fallback.
+ */
 export interface EnemyGroupDef {
   name: string;
   hp: number;
   count: number;
+  autoDamage?: number;
+  swingIntervalMs?: number;
 }
 
 export interface WaveDef {

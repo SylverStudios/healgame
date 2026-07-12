@@ -68,6 +68,9 @@ export class CombatEngine {
   /** Deterministic round-robin cursor into the eligible (non-tank, living) focus targets; never Math.random. */
   private focusIndex = 0;
 
+  /** Per-trash-unit swing stats (EnemyGroupDef overrides resolved at spawn; TRASH fallback). */
+  private trashStats = new Map<string, { autoDamage: number; swingIntervalMs: number }>();
+
   private waveIndex = 0;
   private status: CombatStatus = 'running';
 
@@ -265,7 +268,10 @@ export class CombatEngine {
         if (remaining === undefined || remaining > 0) continue;
         this.resolveEnemySwing(enemy.id, events);
         if (this.swingTimers.has(enemy.id)) {
-          const interval = enemy.role === 'boss' ? this.encounter.boss.swingIntervalMs : TRASH.swingIntervalMs;
+          const interval =
+            enemy.role === 'boss'
+              ? this.encounter.boss.swingIntervalMs
+              : (this.trashStats.get(enemy.id)?.swingIntervalMs ?? TRASH.swingIntervalMs);
           this.swingTimers.set(enemy.id, interval);
         }
       }
@@ -386,7 +392,10 @@ export class CombatEngine {
     if (!enemy || !enemy.alive) return;
     const target = this.pickAllyTarget();
     if (!target) return;
-    const dmg = enemy.role === 'boss' ? this.encounter.boss.autoDamage : TRASH.autoDamage;
+    const dmg =
+      enemy.role === 'boss'
+        ? this.encounter.boss.autoDamage
+        : (this.trashStats.get(enemy.id)?.autoDamage ?? TRASH.autoDamage);
     this.applyDamageToUnit(target, dmg, enemy.id, events);
   }
 
@@ -540,11 +549,14 @@ export class CombatEngine {
     if (!wave) return;
     const enemies: Unit[] = [];
     wave.enemies.forEach((group, gi) => {
+      const autoDamage = group.autoDamage ?? TRASH.autoDamage;
+      const swingIntervalMs = group.swingIntervalMs ?? TRASH.swingIntervalMs;
       for (let i = 0; i < group.count; i++) {
         const id = `w${index}-${gi}-${i}`;
         const unit: Unit = { id, name: group.name, role: 'enemy', hp: group.hp, maxHp: group.hp, mana: 0, maxMana: 0, alive: true };
         enemies.push(unit);
-        this.swingTimers.set(id, TRASH.swingIntervalMs);
+        this.trashStats.set(id, { autoDamage, swingIntervalMs });
+        this.swingTimers.set(id, swingIntervalMs);
       }
     });
     this.activeEnemies = enemies;

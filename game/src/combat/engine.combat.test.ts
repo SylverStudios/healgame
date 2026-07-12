@@ -40,6 +40,17 @@ describe('auto-attack cadence', () => {
     expect(hits[0]!.amount).toBe(TRASH.autoDamage);
   });
 
+  it('per-group autoDamage/swingIntervalMs override the global TRASH constants (Alpha 0.1 §D2)', () => {
+    const encounter = makeTestEncounter({
+      waves: [{ enemies: [{ name: 'Iron Husk', hp: 1000, count: 1, autoDamage: 2, swingIntervalMs: 2000 }] }],
+    });
+    const engine = new CombatEngine(encounter, TEST_SPELLS);
+    const events = engine.advance(9000); // swings at 2000/4000/6000/8000
+    const hits = damages(events).filter((d) => d.targetId === 'tank');
+    expect(hits).toHaveLength(4);
+    expect(hits[0]!.amount).toBe(2);
+  });
+
   it('once the tank dies, enemy autos fall through to a living DPS, then the healer', () => {
     // Tank has 20 hp and takes 1 dmg/3s from a single dummy -> dies after 20 swings (60s),
     // but the dummy is being killed by mercs too, so give it effectively unkillable hp and
