@@ -42,6 +42,13 @@ export function compileDungeon(
   catalogs: ContentCatalogs,
 ): EncounterDef {
   assertValid(catalogs);
+  return compileValidatedDungeon(dungeonOrId, catalogs);
+}
+
+function compileValidatedDungeon(
+  dungeonOrId: DungeonDef | string,
+  catalogs: ContentCatalogs,
+): EncounterDef {
   const dungeon =
     typeof dungeonOrId === 'string'
       ? catalogs.dungeons.find(({ id }) => id === dungeonOrId)
@@ -65,13 +72,20 @@ export function compileDungeon(
   return {
     id: dungeon.id,
     name: dungeon.name,
+    goldPerEnemy: dungeon.rewards.goldPerEnemy,
+    xpPerEnemy: dungeon.rewards.xpPerEnemy,
+    rubyPerFirstClear: dungeon.rewards.rubyPerFirstClear,
     waves: dungeon.waves.slice(0, -1).map((wave) => ({
       enemies: wave.enemies.map((group) => {
         const mob = required(mobById, group.mobId, 'mob');
+        const stats = effectiveMobStats(mob, group.statOverrides);
         return {
+          mobId: mob.id,
           name: mob.name,
-          hp: effectiveMobStats(mob, group.statOverrides).hp,
+          hp: stats.hp,
           count: group.count,
+          autoDamage: stats.autoDamage,
+          swingIntervalMs: stats.swingIntervalMs,
         };
       }),
     })),
@@ -89,7 +103,9 @@ export function compileDungeon(
 export function compileAllDungeons(catalogs: ContentCatalogs): EncounterDef[] {
   assertValid(catalogs);
   const dungeonById = new Map(catalogs.dungeons.map((dungeon) => [dungeon.id, dungeon]));
-  return catalogs.dungeonOrder.map((id) => compileDungeon(required(dungeonById, id, 'dungeon'), catalogs));
+  return catalogs.dungeonOrder.map((id) =>
+    compileValidatedDungeon(required(dungeonById, id, 'dungeon'), catalogs),
+  );
 }
 
 function assertValid(catalogs: ContentCatalogs): void {
@@ -108,6 +124,17 @@ function compileAbility(ability: EnemyAbilityDef): BossCastDef {
         firstCastAtMs: ability.firstCastAtMs,
         intervalMs: ability.intervalMs,
         partyDamage: ability.partyDamage,
+      };
+    case 'tunnelVision':
+      return {
+        kind: 'tunnelVision',
+        name: ability.name,
+        telegraphMs: ability.telegraphMs,
+        firstCastAtMs: ability.firstCastAtMs,
+        intervalMs: ability.intervalMs,
+        channelMs: ability.channelMs,
+        tickMs: ability.tickMs,
+        damagePerTick: ability.damagePerTick,
       };
   }
 }

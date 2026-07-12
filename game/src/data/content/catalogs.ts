@@ -5,11 +5,15 @@ import type { ContentCatalogs } from './types';
 
 export const VISUAL_KEYS = [
   'bonehowl',
+  'tunnel-vision',
   'extinction',
   'ash-husk',
+  'iron-husk',
   'gate-warden',
+  'spire-lancer',
   'hollow-king',
   'ash-gate',
+  'iron-pass',
   'the-maw',
 ] as const;
 

@@ -2,7 +2,7 @@ import type { EncounterDef } from '../../combat/types';
 
 export const CONTENT_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-export type EnemyAbilityDef = PartyAoeAbilityDef;
+export type EnemyAbilityDef = PartyAoeAbilityDef | TunnelVisionAbilityDef;
 
 /**
  * The runtime currently supports one telegraphed party-wide boss cast.
@@ -16,6 +16,19 @@ export interface PartyAoeAbilityDef {
   firstCastAtMs: number;
   intervalMs: number;
   partyDamage: number;
+  visualKey: string;
+}
+
+export interface TunnelVisionAbilityDef {
+  id: string;
+  name: string;
+  kind: 'tunnelVision';
+  telegraphMs: number;
+  firstCastAtMs: number;
+  intervalMs: number;
+  channelMs: number;
+  tickMs: number;
+  damagePerTick: number;
   visualKey: string;
 }
 

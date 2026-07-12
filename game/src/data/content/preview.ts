@@ -62,5 +62,7 @@ function formatAbility(ability: EnemyAbilityDef): string {
   switch (ability.kind) {
     case 'partyAoE':
       return `${ability.name} [${ability.id}] partyAoE — cast ${ability.castMs}ms, first ${ability.firstCastAtMs}ms, interval ${ability.intervalMs}ms, party damage ${ability.partyDamage}`;
+    case 'tunnelVision':
+      return `${ability.name} [${ability.id}] tunnelVision — telegraph ${ability.telegraphMs}ms, first ${ability.firstCastAtMs}ms, interval ${ability.intervalMs}ms, channel ${ability.channelMs}ms, tick ${ability.tickMs}ms, tick damage ${ability.damagePerTick}`;
   }
 }

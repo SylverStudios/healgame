@@ -10,6 +10,10 @@ function isPositiveInteger(value: number): boolean {
   return Number.isInteger(value) && value > 0;
 }
 
+function isNonNegativeInteger(value: number): boolean {
+  return Number.isInteger(value) && value >= 0;
+}
+
 function diagnostic(
   severity: ContentDiagnostic['severity'],
   code: string,
@@ -71,31 +75,49 @@ export function validateContent(catalogs: ContentCatalogs): ContentValidationRes
 
   catalogs.abilities.forEach((ability, index) => {
     const path = `abilities[${index}]`;
-    if (ability.kind !== 'partyAoE') {
-      error('unsupported-ability-kind', `${path}.kind`, `ability kind "${String(ability.kind)}" is unsupported`);
-      return;
+    if (ability.name.trim().length === 0) {
+      error('empty-name', `${path}.name`, 'ability name must not be empty');
     }
-    (
-      [
-        ['castMs', ability.castMs],
-        ['firstCastAtMs', ability.firstCastAtMs],
-        ['intervalMs', ability.intervalMs],
-        ['partyDamage', ability.partyDamage],
-      ] as const
-    ).forEach(([field, value]) => {
+    const timingFields =
+      ability.kind === 'partyAoE'
+        ? ([
+            ['castMs', ability.castMs],
+            ['firstCastAtMs', ability.firstCastAtMs],
+            ['intervalMs', ability.intervalMs],
+            ['partyDamage', ability.partyDamage],
+          ] as const)
+        : ([
+            ['telegraphMs', ability.telegraphMs],
+            ['firstCastAtMs', ability.firstCastAtMs],
+            ['intervalMs', ability.intervalMs],
+            ['channelMs', ability.channelMs],
+            ['tickMs', ability.tickMs],
+            ['damagePerTick', ability.damagePerTick],
+          ] as const);
+    timingFields.forEach(([field, value]) => {
       if (!isPositiveInteger(value)) {
         error('invalid-positive-integer', `${path}.${field}`, `${field} must be a positive integer`);
       }
     });
-    if (
-      isPositiveInteger(ability.intervalMs) &&
-      isPositiveInteger(ability.castMs) &&
-      ability.intervalMs < ability.castMs
-    ) {
+    const activeDuration =
+      ability.kind === 'partyAoE' ? ability.castMs : ability.telegraphMs + ability.channelMs;
+    if (isPositiveInteger(ability.intervalMs) && ability.intervalMs < activeDuration) {
       error(
         'invalid-cast-cadence',
         `${path}.intervalMs`,
-        `intervalMs ${ability.intervalMs} must be at least castMs ${ability.castMs}`,
+        `intervalMs ${ability.intervalMs} must be at least active duration ${activeDuration}`,
+      );
+    }
+    if (
+      ability.kind === 'tunnelVision' &&
+      isPositiveInteger(ability.channelMs) &&
+      isPositiveInteger(ability.tickMs) &&
+      ability.channelMs % ability.tickMs !== 0
+    ) {
+      error(
+        'invalid-channel-cadence',
+        `${path}.tickMs`,
+        `tickMs ${ability.tickMs} must divide channelMs ${ability.channelMs}`,
       );
     }
     checkVisualKey(ability.visualKey, `${path}.visualKey`);
@@ -103,10 +125,12 @@ export function validateContent(catalogs: ContentCatalogs): ContentValidationRes
 
   catalogs.mobs.forEach((mob, index) => {
     const path = `mobs[${index}]`;
+    if (mob.name.trim().length === 0) {
+      error('empty-name', `${path}.name`, 'mob name must not be empty');
+    }
     (
       [
         ['hp', mob.hp],
-        ['autoDamage', mob.autoDamage],
         ['swingIntervalMs', mob.swingIntervalMs],
       ] as const
     ).forEach(([field, value]) => {
@@ -114,8 +138,18 @@ export function validateContent(catalogs: ContentCatalogs): ContentValidationRes
         error('invalid-positive-integer', `${path}.${field}`, `${field} must be a positive integer`);
       }
     });
-    if (mob.tags.length === 0) {
-      error('missing-mob-tag', `${path}.tags`, 'mob must have at least one tag');
+    if (!isNonNegativeInteger(mob.autoDamage)) {
+      error(
+        'invalid-non-negative-integer',
+        `${path}.autoDamage`,
+        'autoDamage must be a non-negative integer',
+      );
+    }
+    if (
+      mob.tags.length !== 1 ||
+      (mob.tags[0] !== 'trash' && mob.tags[0] !== 'boss')
+    ) {
+      error('invalid-mob-tags', `${path}.tags`, 'mob must have exactly one of the trash or boss tags');
     }
     if (new Set(mob.tags).size !== mob.tags.length) {
       error('duplicate-mob-tag', `${path}.tags`, 'mob tags must be unique');
@@ -125,6 +159,13 @@ export function validateContent(catalogs: ContentCatalogs): ContentValidationRes
         'runtime-ability-limit',
         `${path}.abilityIds`,
         `current runtime supports at most one ability; found ${mob.abilityIds.length}`,
+      );
+    }
+    if (mob.tags.includes('trash') && mob.abilityIds.length > 0) {
+      error(
+        'trash-abilities-unsupported',
+        `${path}.abilityIds`,
+        'trash abilities are unsupported by the current runtime',
       );
     }
     mob.abilityIds.forEach((abilityId, abilityIndex) => {
@@ -161,6 +202,9 @@ export function validateContent(catalogs: ContentCatalogs): ContentValidationRes
 
   catalogs.dungeons.forEach((dungeon, dungeonIndex) => {
     const path = `dungeons[${dungeonIndex}]`;
+    if (dungeon.name.trim().length === 0) {
+      error('empty-name', `${path}.name`, 'dungeon name must not be empty');
+    }
     validateDungeon(dungeon, path, mobById, usedMobs, error);
     if (!orderedIds.has(dungeon.id)) {
       error('missing-dungeon-order-id', `${path}.id`, `dungeon "${dungeon.id}" is absent from dungeonOrder`);
@@ -175,11 +219,11 @@ export function validateContent(catalogs: ContentCatalogs): ContentValidationRes
         ['rubyPerFirstClear', dungeon.rewards.rubyPerFirstClear],
       ] as const
     ).forEach(([field, value]) => {
-      if (!isPositiveInteger(value)) {
+      if (!isNonNegativeInteger(value)) {
         error(
-          'invalid-positive-integer',
+          'invalid-non-negative-integer',
           `${path}.rewards.${field}`,
-          `${field} must be a positive integer`,
+          `${field} must be a non-negative integer`,
         );
       }
     });
@@ -249,11 +293,24 @@ function validateDungeon(
       }
       if (group.statOverrides !== undefined) {
         Object.entries(group.statOverrides).forEach(([field, value]) => {
-          if (!isPositiveInteger(value)) {
+          if (field !== 'hp' && field !== 'autoDamage' && field !== 'swingIntervalMs') {
             error(
-              'invalid-positive-integer',
+              'unsupported-stat-override',
               `${groupPath}.statOverrides.${field}`,
-              `${field} override must be a positive integer`,
+              `${field} is not a supported runtime override`,
+            );
+          } else if (
+            field === 'autoDamage'
+              ? !isNonNegativeInteger(value)
+              : !isPositiveInteger(value)
+          ) {
+            const requirement = field === 'autoDamage' ? 'a non-negative' : 'a positive';
+            error(
+              field === 'autoDamage'
+                ? 'invalid-non-negative-integer'
+                : 'invalid-positive-integer',
+              `${groupPath}.statOverrides.${field}`,
+              `${field} override must be ${requirement} integer`,
             );
           }
         });

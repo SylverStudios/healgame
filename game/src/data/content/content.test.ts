@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ASH_GATE, THE_MAW } from '../encounters';
+import type { EncounterDef } from '../../combat/types';
 import { CONTENT_CATALOGS } from './catalogs';
 import {
   compileAllDungeons,
@@ -10,6 +10,91 @@ import { formatDungeonPreview } from './preview';
 import type { ContentCatalogs, DungeonDef, EnemyAbilityDef, MobDef } from './types';
 import { validateContent } from './validate';
 
+const LEGACY_EQUIVALENT_ENCOUNTERS = [
+  {
+    id: 'ash-gate',
+    name: 'Ash Gate',
+    goldPerEnemy: 1,
+    xpPerEnemy: 1,
+    rubyPerFirstClear: 1,
+    waves: [
+      {
+        enemies: [
+          {
+            mobId: 'ash-husk',
+            name: 'Ash Husk',
+            hp: 11,
+            count: 2,
+            autoDamage: 1,
+            swingIntervalMs: 3000,
+          },
+        ],
+      },
+      {
+        enemies: [
+          {
+            mobId: 'ash-husk',
+            name: 'Ash Husk',
+            hp: 11,
+            count: 3,
+            autoDamage: 1,
+            swingIntervalMs: 3000,
+          },
+        ],
+      },
+    ],
+    boss: {
+      id: 'gate-warden',
+      name: 'Gate Warden',
+      hp: 145,
+      autoDamage: 4,
+      swingIntervalMs: 3500,
+      cast: {
+        name: 'Bonehowl',
+        castMs: 10_000,
+        firstCastAtMs: 3000,
+        intervalMs: 12_000,
+        partyDamage: 4,
+      },
+    },
+  },
+  {
+    id: 'the-maw',
+    name: 'The Maw',
+    goldPerEnemy: 1,
+    xpPerEnemy: 1,
+    rubyPerFirstClear: 1,
+    waves: [
+      {
+        enemies: [
+          {
+            mobId: 'ash-husk',
+            name: 'Ash Husk',
+            hp: 4,
+            count: 2,
+            autoDamage: 1,
+            swingIntervalMs: 3000,
+          },
+        ],
+      },
+    ],
+    boss: {
+      id: 'hollow-king',
+      name: 'Hollow King',
+      hp: 999,
+      autoDamage: 3,
+      swingIntervalMs: 3500,
+      cast: {
+        name: 'Extinction',
+        castMs: 10_000,
+        firstCastAtMs: 15_000,
+        intervalMs: 25_000,
+        partyDamage: 10,
+      },
+    },
+  },
+] as const satisfies readonly EncounterDef[];
+
 describe('live dungeon content', () => {
   it('is valid without warnings', () => {
     expect(validateContent(CONTENT_CATALOGS)).toEqual({
@@ -19,10 +104,10 @@ describe('live dungeon content', () => {
     });
   });
 
-  it('compiles to the exact current runtime encounters', () => {
-    expect(compileDungeon('ash-gate', CONTENT_CATALOGS)).toEqual(ASH_GATE);
-    expect(compileDungeon('the-maw', CONTENT_CATALOGS)).toEqual(THE_MAW);
-    expect(compileAllDungeons(CONTENT_CATALOGS)).toEqual([ASH_GATE, THE_MAW]);
+  it('compiles to explicit legacy-equivalent runtime values', () => {
+    expect(compileDungeon('ash-gate', CONTENT_CATALOGS)).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[0]);
+    expect(compileDungeon('the-maw', CONTENT_CATALOGS)).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[1]);
+    expect(compileAllDungeons(CONTENT_CATALOGS)).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS);
   });
 
   it('assembles deterministically from explicit order, independent of catalog array order', () => {
@@ -32,7 +117,7 @@ describe('live dungeon content', () => {
       mobs: [...CONTENT_CATALOGS.mobs].reverse(),
       dungeons: [...CONTENT_CATALOGS.dungeons].reverse(),
     };
-    expect(compileAllDungeons(reordered)).toEqual([ASH_GATE, THE_MAW]);
+    expect(compileAllDungeons(reordered)).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS);
     expect(compileAllDungeons(reordered)).toEqual(compileAllDungeons(reordered));
   });
 
@@ -55,6 +140,73 @@ describe('live dungeon content', () => {
 });
 
 describe('content diagnostics', () => {
+  it('accepts zero rewards and auto damage, including an auto-damage override', () => {
+    const zeroValues: ContentCatalogs = {
+      ...CONTENT_CATALOGS,
+      mobs: [
+        { ...CONTENT_CATALOGS.mobs[0], autoDamage: 0 },
+        CONTENT_CATALOGS.mobs[1],
+        CONTENT_CATALOGS.mobs[2],
+      ],
+      dungeons: [
+        {
+          ...CONTENT_CATALOGS.dungeons[0],
+          rewards: { goldPerEnemy: 0, xpPerEnemy: 0, rubyPerFirstClear: 0 },
+          waves: [
+            {
+              enemies: [
+                {
+                  ...CONTENT_CATALOGS.dungeons[0].waves[0].enemies[0],
+                  statOverrides: { autoDamage: 0 },
+                },
+              ],
+            },
+            CONTENT_CATALOGS.dungeons[0].waves[1],
+            CONTENT_CATALOGS.dungeons[0].waves[2],
+          ],
+        },
+        CONTENT_CATALOGS.dungeons[1],
+      ],
+    };
+
+    expect(validateContent(zeroValues).errors).toEqual([]);
+    const compiled = compileDungeon('ash-gate', zeroValues);
+    expect(compiled.goldPerEnemy).toBe(0);
+    expect(compiled.xpPerEnemy).toBe(0);
+    expect(compiled.rubyPerFirstClear).toBe(0);
+    expect(compiled.waves[0]?.enemies[0]?.autoDamage).toBe(0);
+  });
+
+  it('rejects empty names, ambiguous mob tags, and trash abilities', () => {
+    const malformed: ContentCatalogs = {
+      ...CONTENT_CATALOGS,
+      abilities: [
+        { ...CONTENT_CATALOGS.abilities[0], name: '  ' },
+        CONTENT_CATALOGS.abilities[1],
+      ],
+      mobs: [
+        {
+          ...CONTENT_CATALOGS.mobs[0],
+          name: '',
+          tags: ['trash', 'boss'],
+          abilityIds: ['bonehowl'],
+        },
+        CONTENT_CATALOGS.mobs[1],
+        CONTENT_CATALOGS.mobs[2],
+      ],
+      dungeons: [
+        { ...CONTENT_CATALOGS.dungeons[0], name: '\t' },
+        CONTENT_CATALOGS.dungeons[1],
+      ],
+    };
+
+    const codes = validateContent(malformed).errors.map(({ code }) => code);
+    expect(codes.filter((code) => code === 'empty-name')).toHaveLength(3);
+    expect(codes).toEqual(
+      expect.arrayContaining(['invalid-mob-tags', 'trash-abilities-unsupported']),
+    );
+  });
+
   it('returns all errors and unused-content warnings for an invalid fixture', () => {
     const abilities: readonly EnemyAbilityDef[] = [
       {

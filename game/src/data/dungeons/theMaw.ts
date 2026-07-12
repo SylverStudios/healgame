@@ -3,12 +3,12 @@ import type { DungeonDef } from '../content/types';
 export const THE_MAW_DUNGEON = {
   id: 'the-maw',
   name: 'The Maw',
-  order: 2,
-  unlock: { kind: 'dungeonClear', dungeonId: 'ash-gate' },
+  order: 3,
+  unlock: { kind: 'dungeonClear', dungeonId: 'iron-pass' },
   rewards: {
     goldPerEnemy: 1,
     xpPerEnemy: 1,
-    rubyPerFirstClear: 1,
+    rubyPerFirstClear: 0,
   },
   visualKey: 'the-maw',
   waves: [
