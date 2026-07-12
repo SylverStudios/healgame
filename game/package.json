@@ -12,7 +12,9 @@
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "smoke": "node scripts/smoke.mjs",
-    "check": "npm run typecheck && npm run lint && npm run test && vite build"
+    "check": "npm run typecheck && npm run lint && npm run test && vite build",
+    "verify": "node scripts/verify.mjs",
+    "verify:fast": "node scripts/verify.mjs --fast"
   },
   "dependencies": {
     "phaser": "^3.87.0"

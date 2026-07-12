@@ -1,6 +1,6 @@
 # CLAUDE.md — operating healgame
 
-Status: current · Authority: gates, hard rules, working style · Last verified: 2026-07-10
+Status: current · Authority: gates, hard rules, working style · Last verified: 2026-07-12
 
 healgame is a healer-focused auto-battler PoC: Phaser 3 + TypeScript (strict) +
 Vite. The game lives in `game/`; design docs in `docs/`. Doc conventions and
@@ -22,14 +22,18 @@ Full list in [`AGENTS.md`](AGENTS.md). Short form:
 | Command | Purpose |
 |---|---|
 | `npm run dev` | Play at http://localhost:5173 |
-| `npm run check` | **The gate**: typecheck + ESLint + all Vitest tests + build |
-| `npm run smoke` | Headless Chromium boot; fails on any console error |
-| `node scripts/journey.mjs` | Full player-journey e2e with save assertions (~5 min) |
+| `npm run verify` | **The gate**: typecheck + lint + test + build + smoke + journey |
+| `npm run verify:fast` | Same without journey (~5 min faster) |
 | `npm run test:watch` | Vitest watch mode while developing |
 
-**Definition of done for any change:** `check` + `smoke` pass. If the change
-touches scenes, save shape, progression, or encounter/spell data, run
-`journey.mjs` too. Never commit red.
+`verify` is implemented by `scripts/verify.mjs` — one entry point for local
+and CI. Passing stages print one line; failures dump captured output. Individual
+stages (`npm run check`, `npm run smoke`, `node scripts/journey.mjs`) still
+exist but prefer `verify`.
+
+**Definition of done for any change:** `npm run verify:fast` passes at minimum.
+If the change touches scenes, save shape, progression, or encounter/spell data,
+run full `npm run verify`. Never commit red.
 
 ## Where things live
 
@@ -48,7 +52,7 @@ game/src/
   scenes/   Phaser scenes; keys in scenes/keys.ts; CombatScene exports
             CombatSceneData / CombatResult
   ui/       placeholder widgets (Bar, UnitSprite, SpellBar)
-  scripts/  smoke.mjs, journey.mjs (Playwright, pinned 1.49.1)
+  scripts/  verify.mjs (quality gate), smoke.mjs, journey.mjs (Playwright 1.49.1)
 ```
 
 ## Hard rules
