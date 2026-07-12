@@ -67,7 +67,11 @@ try {
   }
 } finally {
   await browser?.close();
-  preview.kill();
+  if (preview) {
+    preview.stdout?.destroy();
+    preview.stderr?.destroy();
+    preview.kill('SIGKILL');
+  }
 }
 
 if (errors.length > 0) {

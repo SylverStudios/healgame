@@ -2,7 +2,7 @@
 
 ![healgame concept art — healer and warband on a battle line](assets/healer-game.png)
 
-Status: current · Authority: repo landing / vibe · Last verified: 2026-07-10
+Status: current · Authority: repo landing / vibe · Last verified: 2026-07-12
 
 A healer-focused indie game inspired by *Master Healer Kale with useless party*, rebuilt around exclusive builds, readable casting, and old-school MMO healing — in a heavy-metal dark fantasy skin.
 
@@ -20,9 +20,11 @@ You are the only healer that matters: a grim warband stands on a single horizont
 cd game && npm install && npm run dev   # → http://localhost:5173
 ```
 
-Verification (from `game/`): `npm run check` (types + lint + all Vitest tests +
-build), `npm run smoke` (headless boot), `node scripts/journey.mjs` (full
-player journey). Results + tuning: [docs/poc-qa.md](docs/poc-qa.md).
+**Quality gate** (from `game/`): `npm run verify` — one script for local and CI;
+passing stages print a single line, failures dump output. Full suite includes
+journey (~5 min); `npm run verify:fast` skips journey. CI runs the full suite on
+every push/PR ([`.github/workflows/verify.yml`](.github/workflows/verify.yml)).
+Results + tuning: [docs/poc-qa.md](docs/poc-qa.md).
 
 ## Docs
 

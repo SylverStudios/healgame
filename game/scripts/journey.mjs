@@ -324,7 +324,11 @@ try {
   await shot(page, 'hub-after-maw');
 } finally {
   await browser?.close();
-  preview.kill();
+  if (preview) {
+    preview.stdout?.destroy();
+    preview.stderr?.destroy();
+    preview.kill('SIGKILL');
+  }
 }
 
 for (const e of consoleErrors) failures.push(`console error: ${e}`);

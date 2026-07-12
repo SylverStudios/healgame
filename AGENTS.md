@@ -1,6 +1,6 @@
 # AGENTS.md — healgame documentation system
 
-Status: current · Authority: doc conventions for all agents · Last verified: 2026-07-10
+Status: current · Authority: doc conventions for all agents · Last verified: 2026-07-12
 
 How we keep docs trustworthy. Operating rules for the game itself live in
 [`CLAUDE.md`](CLAUDE.md). Module contracts live next to code (e.g.
@@ -40,6 +40,22 @@ to [`docs/poc-qa.md`](docs/poc-qa.md).
 7. [`docs/tech-options.md`](docs/tech-options.md) — stack rationale
 8. [`docs/GDD.md`](docs/GDD.md) — long-term only
 9. [`docs/research/`](docs/research/) — never authoritative for implementation
+
+## Quality gate
+
+Run from `game/` before committing:
+
+```bash
+npm run verify        # full suite (typecheck, lint, test, build, smoke, journey)
+npm run verify:fast   # skip journey (~5 min saved)
+```
+
+Implemented by [`game/scripts/verify.mjs`](game/scripts/verify.mjs). Passing
+stages emit one line each; only failures print full output. GitHub Actions runs
+the same script (see [`.github/workflows/verify.yml`](.github/workflows/verify.yml)).
+
+Individual stages still exist (`npm run check`, `npm run smoke`, etc.) but
+agents should prefer `verify`.
 
 ## Where things live
 
