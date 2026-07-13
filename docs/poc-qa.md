@@ -407,3 +407,122 @@ Post-juice playtest. No new phase handoff; living numbers + hub copy.
 
 `balance.test.ts` shape unchanged (no-heal wipe, naive wipe, full-kit clear,
 The Maw unwinnable). Retune values live in `constants.ts` / `spellTree.ts`.
+
+# Alpha 0.1 QA — mid dungeon, tree layer 2, cooldowns, relics (2026-07-13)
+
+Everything below was verified against `alpha-0.1-handoff.md`'s "Done means"
+list by the central agent — per chunk (`check` after every chunk) and again
+end-to-end after integration (chunk 9b: balance bots + `journey.mjs` +
+this section). Handoff status flips to historical.
+
+## How to run (unchanged commands, from `game/`)
+
+| Command | Purpose |
+|---|---|
+| `npm run check` | typecheck + ESLint + all Vitest tests (240) + build |
+| `npm run smoke` | headless boot, fails on any console error |
+| `node scripts/journey.mjs [--shots DIR]` | full player journey (~4 min) |
+
+## What shipped (the four pillars)
+
+1. **Mid dungeon — Iron Pass.** Ash Gate → Iron Pass → The Maw
+   (`isIronPassUnlocked`/`isMawUnlocked` in `meta/progression.ts`). Four
+   harder-hitting trash waves, then Spire Lancer's **Tunnel Vision**: a 3s
+   telegraph, then a 10s/1s-tick single-target channel on a focused non-tank
+   ally, with its own halo (distinct from the heal-target chevron/halo).
+2. **Tree layer 2 — mana focus.** 2 passive mana nodes + 1 CD-granting node
+   per branch (Deep Well/Thrift/Still Waters for Vigil; Quick Breath/
+   Spendthrift Grace/Frenzied Liturgy for Zealot), behind existing branch
+   follow-ups. Plus the **§D4 rebalance**: `zealot-desperate-zeal` retired;
+   Vigil's `Solemn Vigil` missing-health bonus is now percent-of-base-heal
+   (`Graven Scale`); Zealot gets a new full-health identity node
+   (`Steady Hands`, +1 heal at ≥80% target HP) at the old node's tree slot.
+3. **Two cooldowns — first major CDs.** Vigil's **Still Waters** (60s: next
+   completed heal is free) and Zealot's **Frenzied Liturgy** (30s: heals cost
+   1 less mana). Off-GCD activation; spell-bar buttons appear only when the
+   loadout grants a cooldown (zero layout shift otherwise).
+4. **Relics — one-time pick.** After the **first-ever** Ash Gate clear,
+   `relicPickPending` routes the next Hub load straight to `RelicScene`
+   (pick 1 of 3 — Ember Ledger / Triage Bell / Still Reservoir); the choice
+   persists as `save.relicId`, shows as a hub icon + hover tooltip, and is
+   never offered again. Save is v4 (`relicId`, `relicPickPending`).
+
+## Decided micro-choices (amend/extend PoC + prior phases)
+
+1. **Tunnel Vision may target the healer** — amends PoC micro-choice 4
+   ("healer never targeted") for this boss only: eligible focus targets are
+   living party members with `role !== 'tank'` (deterministic round-robin by
+   stable unit id), which includes the healer. Ash Gate/The Maw enemy
+   targeting is unchanged (tank only, then DPS, then healer once the tank
+   is dead).
+2. **Ruby stays Ash-Gate-only.** Iron Pass's first clear still records
+   `clearedDungeons` (unlocking The Maw) and shows a `FIRST CLEAR!` notice,
+   but grants no ruby — Alpha 0.1 adds no new ruby sink.
+3. **CDs are off-GCD and can fire mid-cast** — activating a cooldown never
+   consumes the GCD and is allowed at any point except while the run has
+   already ended (victory/wipe); it can land while a heal is mid-cast.
+4. **Still Waters' free-heal charge is consumed at cast START, even on
+   cancel** — locked. Arming the charge and then cancelling the cast it was
+   meant for still burns the charge (no refund-of-the-refund); this keeps
+   the charge's bookkeeping identical to normal mana reservation instead of
+   adding a second special case to `cancelCast`.
+5. **Relic pick is one-time, no skip; restart wipes it.** `RelicScene` has
+   no skip/back button — the player must choose. `resetSave` clears
+   `relicId`/`relicPickPending` like everything else.
+6. **TreeScene now scrolls.** Layer 2 sits below the existing branch rows
+   (world y 650/800, past the 900-tall world / 540-tall viewport); mouse
+   wheel pans a screen-fixed HUD over a taller world (`WORLD_HEIGHT = 900`,
+   max scroll 360). No change to any pre-existing (unscrolled) node position.
+
+## Chunk 9a tuning table (verbatim from the balance-bot diagnostic)
+
+| Value | Draft | Shipped | Why |
+|---|---|---|---|
+| Iron Pass wave HP | 14 / 14 / 16 / 16 (182 total) | **9 / 9 / 10 / 10** (115 total) | The draft burned ~65% of a maxed healer's max mana before the boss even spawned, leaving too little to survive Tunnel Vision |
+| `SPIRE_LANCER.hp` | 170 | **190** | Fits 2 Tunnel Visions landing in the fight (design's "ideally 2"); >195 starts costing the fight's 3rd survivor |
+| `SPIRE_LANCER.autoDamage` | 4 | **3** | Eases passive tank-swing pressure that compounds with healing the Tunnel Vision target |
+
+## Balance gates (all pass; shape widened, not weakened)
+
+1. Ash Gate, no healing → wipe.
+2. Ash Gate, naive spam-healing on the starting kit → wipe.
+3. Ash Gate, disciplined play on the starting kit → never cruises (wipe, or
+   an OOM pyrrhic scrape with ≤2 survivors).
+4. Ash Gate, disciplined play, **both** maxed subclass builds → victory,
+   ≥3 alive, Bonehowl lands ≥1×.
+5. Iron Pass, maxed **Vigil** build, disciplined play → victory, ≥3 alive,
+   Tunnel Vision fires ≥1, ≥1 cooldown activation.
+6. Iron Pass, maxed **Zealot** build, disciplined play → victory, ≥3 alive,
+   ≥1 cooldown activation.
+7. The Maw, either maxed build **with any of the 3 relics**, disciplined
+   play → wipe (sandbox holds even with the new relic layer).
+
+## Journey.mjs rewrite (chunk 9b)
+
+New stages layered onto the Phase-2/3/juice flow (letters keep the existing
+convention): **M2** (v3 payload → v4 migration, relic fields added — a
+distinct branch from M's v1→v4 chain), **Relic** (seeds
+`relicPickPending: true` — the exact state `applyCombatResult` leaves right
+after a real first clear — to exercise the live Hub→RelicScene routing, pick,
+persistence, and "never re-offered" behavior without needing a scripted
+live combat win), **D2** (Ash-Gate-only save → Iron Pass unlocked, The Maw
+slot inert; enters Iron Pass and bails without playing it out — Iron Pass's
+clearability is gates 5/6, not a journey job), **B3** (tree layer 2: scrolls
+to the new row, buys a Vigil mana passive + Still Waters; a second lean seed
+proves the §D4 rebalance by buying Zealot's Steady Hands at the retired
+Desperate Zeal position). Stage **C** (was the Maw stage) is now explicitly
+gated: Ash-Gate-only save asserts the Maw slot is inert before re-seeding
+with Iron Pass also cleared and re-running the existing unwinnable-sandbox
+wipe wait. All `UI` table coordinates for Iron Pass/Maw hub buttons, relic
+cards, the relic hub icon, and the scrolled tree-layer-2 nodes were added
+against the live scene code (not eyeballed) — see the table's comments in
+`scripts/journey.mjs` for the exact math (canvas 960×540, scroll clamp 360).
+
+**Note on scope:** stages B/B3/D2 seed save state directly rather than
+scripting a live Ash-Gate/Iron-Pass win — the fight requires reactive,
+per-tick target selection (who's low) that isn't observable from outside the
+canvas (no DOM text, no exposed engine state), so a blind live replay would
+trade a real, deterministic gate (`balance.test.ts`'s scripted bots) for
+wall-clock-timing guesswork, which cuts against this project's
+determinism-over-vibes rule. Full journey run: 0 failures, 0 console errors,
+~4 minutes, 29 screenshots.

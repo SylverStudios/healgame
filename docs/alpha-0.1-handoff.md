@@ -1,6 +1,6 @@
 # Alpha 0.1 — mid dungeon, tree layer 2, cooldowns, relics
 
-Status: planning · Authority: this phase's scope · Last verified: 2026-07-12
+Status: historical — shipped 2026-07-13 (see poc-qa.md Alpha 0.1 section) · Last verified: 2026-07-12
 
 **Audience:** a **central agent in a fresh session** who reads this doc end-to-end,
 then **delegates chunks to Sonnet-class subagents** sequentially (parallel only
@@ -381,3 +381,4 @@ coords, CD button if journey tests activation.
 | Date | Notes |
 |------|-------|
 | 2026-07-12 | Alpha 0.1 scope from user: mid dungeon, tree L2, 2 CDs, 3 relics; replaces menu/sound board draft |
+| 2026-07-13 | Shipped — chunk 9b closed out balance bots + `journey.mjs` + docs; all gates green. Detail moved to `poc-qa.md` Alpha 0.1 section; this doc is now historical. |
