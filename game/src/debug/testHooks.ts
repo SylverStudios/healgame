@@ -26,14 +26,23 @@ type NamedHit = {
   scene: Phaser.Scene;
 };
 
-function isContainer(obj: Phaser.GameObjects.GameObject): obj is Phaser.GameObjects.Container {
-  return Array.isArray((obj as Phaser.GameObjects.Container).list);
+/** Phaser mixins are not on the GameObject base type — probe at runtime. */
+type BoundsCapable = Phaser.GameObjects.GameObject & {
+  getBounds(): Phaser.Geom.Rectangle;
+  visible: boolean;
+  scrollFactorX?: number;
+  scrollFactorY?: number;
+};
+
+function asBoundsCapable(obj: Phaser.GameObjects.GameObject): BoundsCapable | null {
+  const candidate = obj as unknown as BoundsCapable;
+  if (typeof candidate.getBounds !== 'function') return null;
+  if (typeof candidate.visible !== 'boolean') return null;
+  return candidate;
 }
 
-function hasGetBounds(
-  obj: Phaser.GameObjects.GameObject,
-): obj is Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.GetBounds {
-  return typeof (obj as Phaser.GameObjects.Components.GetBounds).getBounds === 'function';
+function isContainer(obj: Phaser.GameObjects.GameObject): obj is Phaser.GameObjects.Container {
+  return Array.isArray((obj as Phaser.GameObjects.Container).list);
 }
 
 /** Walk a display-list node and its Container children; first match wins. */
@@ -42,7 +51,8 @@ function collectVisibleNamed(
   scene: Phaser.Scene,
   into: Map<string, NamedHit>,
 ): void {
-  if (obj.visible !== false && typeof obj.name === 'string' && obj.name.length > 0) {
+  const capable = asBoundsCapable(obj);
+  if (capable && capable.visible && typeof obj.name === 'string' && obj.name.length > 0) {
     if (!into.has(obj.name)) into.set(obj.name, { obj, scene });
   }
   if (isContainer(obj)) {
@@ -57,12 +67,12 @@ function collectVisibleNamed(
  * camera scroll and the object's scrollFactor (TreeScene HUD uses 0).
  */
 function screenCenter(hit: NamedHit): { x: number; y: number } | null {
-  if (!hasGetBounds(hit.obj)) return null;
-  const bounds = hit.obj.getBounds();
+  const capable = asBoundsCapable(hit.obj);
+  if (!capable) return null;
+  const bounds = capable.getBounds();
   const cam = hit.scene.cameras.main;
-  const tf = hit.obj as Phaser.GameObjects.Components.Transform;
-  const sfX = typeof tf.scrollFactorX === 'number' ? tf.scrollFactorX : 1;
-  const sfY = typeof tf.scrollFactorY === 'number' ? tf.scrollFactorY : 1;
+  const sfX = typeof capable.scrollFactorX === 'number' ? capable.scrollFactorX : 1;
+  const sfY = typeof capable.scrollFactorY === 'number' ? capable.scrollFactorY : 1;
   return {
     x: bounds.centerX - cam.scrollX * sfX,
     y: bounds.centerY - cam.scrollY * sfY,

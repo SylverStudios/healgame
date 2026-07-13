@@ -88,7 +88,6 @@ Scripted bots run the real engine deterministically:
   typed dungeon/mob/ability catalogs compiled into `EncounterDef`.
 - `scripts/journey.mjs` clicks by semantic name via `__healgame.locate` (see
   `docs/semantic-targets-handoff.md`); interactive objects must `setName`.
-  when scene layouts change.
 
 ---
 
