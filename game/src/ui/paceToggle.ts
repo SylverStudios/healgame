@@ -24,7 +24,8 @@ export class PaceToggle {
       .rectangle(x, y, TOGGLE_WIDTH, TOGGLE_HEIGHT, BG_COLOR)
       .setStrokeStyle(1, BORDER_COLOR)
       .setOrigin(0, 1)
-      .setVisible(false);
+      .setVisible(false)
+      .setName('combatPaceToggle');
     this.label = scene.add
       .text(x + TOGGLE_WIDTH / 2, y - TOGGLE_HEIGHT / 2, '1x', {
         fontFamily: FONT,

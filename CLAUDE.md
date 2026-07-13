@@ -58,6 +58,7 @@ game/src/
   scenes/   Phaser scenes; keys in scenes/keys.ts; CombatScene exports
             CombatSceneData / CombatResult
   ui/       placeholder widgets (Bar, UnitSprite, SpellBar)
+  debug/    journey test hooks (`window.__healgame.locate` / `list`)
   scripts/  verify.mjs (quality gate), smoke.mjs, journey.mjs (Playwright 1.49.1)
 ```
 
@@ -81,10 +82,12 @@ game/src/
 - **Scope discipline**: poc-spec §9 lists what stays out (procs, major CDs,
   hub buffs, respec, Aegis/Wildbloom, party hotkeys, networking…). Reject
   additions unless the user explicitly reopens scope.
-- **Layout constants ↔ journey.mjs**: scene click targets are duplicated in
-  the `UI` table at the top of `scripts/journey.mjs`. Changing a scene layout
-  means updating that table (journey failing on a save assertion right after
-  a layout change is almost always this).
+- **Interactive objects ↔ journey.mjs**: every clickable/hoverable GameObject
+  a journey stage may aim at carries a stable `setName(...)` (see the table in
+  [`docs/semantic-targets-handoff.md`](docs/semantic-targets-handoff.md)).
+  Journey resolves via `window.__healgame.locate(name)` — layout changes must
+  **not** require journey coordinate edits. Adding a new interactive control
+  means naming it and clicking it by name.
 - **Save changes**: `SaveData` is versioned (`healgame-save-v1`); if the shape
   changes, bump the version and keep `loadSave` falling back to a fresh save
   on unrecognized data.

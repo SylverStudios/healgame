@@ -61,7 +61,8 @@ export class RelicScene extends Phaser.Scene {
     const bg = this.add
       .rectangle(x, y, CARD_WIDTH, CARD_HEIGHT, CARD_BG)
       .setStrokeStyle(2, BORDER_COLOR)
-      .setInteractive({ useHandCursor: true });
+      .setInteractive({ useHandCursor: true })
+      .setName(`relicCard:${relic.id}`);
 
     this.add
       .text(x, y - CARD_HEIGHT / 2 + 36, relic.name, { fontFamily: FONT, fontSize: '18px', color: ACCENT_COLOR })

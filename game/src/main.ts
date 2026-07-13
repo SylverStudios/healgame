@@ -5,8 +5,9 @@ import { CombatScene } from './scenes/CombatScene';
 import { HubScene } from './scenes/HubScene';
 import { TreeScene } from './scenes/TreeScene';
 import { RelicScene } from './scenes/RelicScene';
+import { installTestHooks } from './debug/testHooks';
 
-new Phaser.Game({
+const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
   width: 960,
@@ -21,3 +22,4 @@ new Phaser.Game({
   },
   scene: [BootScene, TutorialScene, CombatScene, HubScene, TreeScene, RelicScene],
 });
+installTestHooks(game);

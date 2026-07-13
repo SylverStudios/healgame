@@ -65,7 +65,7 @@ agents should prefer `verify`.
 |------|----------|
 | Living rules | `CLAUDE.md`, `docs/poc-spec.md`, `docs/poc-qa.md` |
 | Active mission | None; check `docs/*-handoff.md` for a future `Status: planning` handoff |
-| Latest shipped phase | `docs/alpha-0.1-handoff.md` (`Status: historical`) |
+| Latest shipped phase | `docs/semantic-targets-handoff.md` (`Status: historical`; Alpha 0.1 remains `docs/alpha-0.1-handoff.md`) |
 | PoC retrospective | `docs/poc-changelog.md` (`Status: historical`, frozen) |
 | Module contracts | Colocated `AGENTS.md` / `README.md` |
 | Historical | Bannered handoffs / outcomes (or `docs/archive/`) |
@@ -86,5 +86,5 @@ agents should prefer `verify`.
   | Combat rules | `game/src/combat/README.md`; balance shape → `poc-qa.md` |
   | Dungeon/mob/ability content pipeline | `game/src/data/README.md` |
   | Save shape | `save.ts` header + `poc-qa.md` note; bump version per CLAUDE.md |
-  | Scene layout | `scripts/journey.mjs` `UI` table |
+  | Scene layout / interactive targets | `setName` on the object + journey by name (`docs/semantic-targets-handoff.md`); do not reintroduce a coordinate `UI` table |
   | Phase complete | Append `poc-qa.md`; mark handoff `historical` |

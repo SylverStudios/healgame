@@ -165,6 +165,7 @@ export class UnitSprite {
       // Hit area is the full frame bounds (including transparent pixels) —
       // same clickable box the old rect gave, so journey.mjs targets hold.
       this.body.setInteractive({ useHandCursor: true });
+      this.body.setName(`combatAlly:${this.id}`);
       this.body.on('pointerdown', () => {
         if (this.alive) onClick?.(this.id);
       });

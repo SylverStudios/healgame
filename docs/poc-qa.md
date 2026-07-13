@@ -86,8 +86,8 @@ Scripted bots run the real engine deterministically:
 - All numbers in `game/src/data/`, guarded by balance tests.
 - `game/src/data/README.md` + `npm run content -- validate|list|preview` —
   typed dungeon/mob/ability catalogs compiled into `EncounterDef`.
-- `scripts/journey.mjs` clicks by layout coordinates; update its `UI` table
-  when scene layouts change.
+- `scripts/journey.mjs` clicks by semantic name via `__healgame.locate` (see
+  `docs/semantic-targets-handoff.md`); interactive objects must `setName`.
 
 ---
 
@@ -574,3 +574,35 @@ identity, and preview text. Catalog additions must also update
 `content/cli.test.ts` output pins, `ui/sprites.test.ts` art coverage, and any
 dungeon-specific sanity/balance cases. Full `npm run verify` passed after
 integration; the journey `UI` table tracks the three-dungeon Hub reflow.
+
+---
+
+# Semantic click targets — journey by name (2026-07-13)
+
+Status: current · Authority: QA log for this phase · Last verified: 2026-07-13
+
+## What shipped
+
+Interactive GameObjects carry stable `setName` labels. Journey drives the game
+through `window.__healgame.locate(name)` / `list()` from
+`game/src/debug/testHooks.ts` (installed in `main.ts`). The hard-coded `UI`
+coordinate table in `scripts/journey.mjs` is gone. Return clicks in combat are
+conditional on `locate('combatReturn')`. Maw gating asserts
+`locate('hubMaw') === null` before Iron Pass clear.
+
+Name inventory and design record: [`docs/semantic-targets-handoff.md`](semantic-targets-handoff.md)
+(`Status: historical`). CLAUDE.md hard rule retitled to **Interactive objects ↔
+journey.mjs**. `AGENTS.md` / `game/src/tree/AGENTS.md` no longer point at a
+coordinate table.
+
+## Alpha 0.1 extensions named beyond the original handoff table
+
+`hubIronPass`, `hubRelicIcon`, `combatPaceToggle`, `relicCard:<relicId>` —
+everything journey still aims at after Iron Pass / relics / pace toggle.
+
+## Acceptance
+
+Full `npm run verify` passed (typecheck, lint, test, build, smoke, journey).
+Journey no longer embeds ally/spell/hub pixel tables — a `GROUND_Y` layout
+nudge cannot desync journey because `locate('combatAlly:tank')` reads live
+bounds.
