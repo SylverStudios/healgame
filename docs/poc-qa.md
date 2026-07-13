@@ -1,6 +1,6 @@
 # PoC QA — journey checklist & verification
 
-Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-12
+Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-13
 
 **Date:** 2026-07-08 · **Verdict: PoC complete.** Every poc-spec §1 criterion is
 implemented, and all of them are enforced by automated gates that run headless.
@@ -84,6 +84,8 @@ Scripted bots run the real engine deterministically:
 - `game/src/tree/` + `data/spellTree.ts` — config-driven tree; see
   `game/src/tree/AGENTS.md`. Combat loadouts via `loadoutFromSave`.
 - All numbers in `game/src/data/`, guarded by balance tests.
+- `game/src/data/README.md` + `npm run content -- validate|list|preview` —
+  typed dungeon/mob/ability catalogs compiled into `EncounterDef`.
 - `scripts/journey.mjs` clicks by layout coordinates; update its `UI` table
   when scene layouts change.
 
@@ -265,12 +267,12 @@ probe, deleted):
 | Value | Old | New |
 |---|---|---|
 | MERCS swing | 3000 ms (all) | tank 2500 ms / DPS 1000 ms |
-| GATE_WARDEN / HOLLOW_KING swing | 3000 ms | 3500 ms (desync from trash) |
-| GATE_WARDEN autoDamage | 3 | 4 |
+| Gate Warden / Hollow King mob swing | 3000 ms | 3500 ms (desync from trash) |
+| Gate Warden mob autoDamage | 3 | 4 |
 | Ash Husk hp | 4 | 11 |
 | Gate Warden hp | 55 | 145 |
 
-TRASH.swingIntervalMs stays 3000. Gate shape unchanged: no-heal wipes, naive
+Ash Husk swing stays 3000. Gate shape unchanged: no-heal wipes, naive
 overheal wipes, both maxed kits clear Ash Gate, The Maw stays unwinnable.
 
 ## Journey impact
@@ -479,8 +481,8 @@ this section). Handoff status flips to historical.
 | Value | Draft | Shipped | Why |
 |---|---|---|---|
 | Iron Pass wave HP | 14 / 14 / 16 / 16 (182 total) | **9 / 9 / 10 / 10** (115 total) | The draft burned ~65% of a maxed healer's max mana before the boss even spawned, leaving too little to survive Tunnel Vision |
-| `SPIRE_LANCER.hp` | 170 | **190** | Fits 2 Tunnel Visions landing in the fight (design's "ideally 2"); >195 starts costing the fight's 3rd survivor |
-| `SPIRE_LANCER.autoDamage` | 4 | **3** | Eases passive tank-swing pressure that compounds with healing the Tunnel Vision target |
+| `spire-lancer` mob hp (`data/mobs/spireLancer.ts`) | 170 | **190** | Fits 2 Tunnel Visions landing in the fight (design's "ideally 2"); >195 starts costing the fight's 3rd survivor |
+| `spire-lancer` mob autoDamage | 4 | **3** | Eases passive tank-swing pressure that compounds with healing the Tunnel Vision target |
 
 ## Balance gates (all pass; shape widened, not weakened)
 
@@ -526,7 +528,7 @@ trade a real, deterministic gate (`balance.test.ts`'s scripted bots) for
 wall-clock-timing guesswork, which cuts against this project's
 determinism-over-vibes rule. Full journey run: 0 failures, 0 console errors,
 ~4 minutes, 29 screenshots.
-# Data-driven dungeon content QA (2026-07-12)
+# Data-driven dungeon content QA (2026-07-13)
 
 Enemy abilities, mobs, and ordered dungeons now live in typed catalogs under
 `game/src/data/`; authoring and runtime contracts are documented in
@@ -568,5 +570,7 @@ Validation covers references, IDs, integer ranges, cast cadence, explicit
 order, unlock cycles, final-boss shape, visual keys, runtime ability limits,
 and unused-content warnings. Vitest additionally pins legacy-equivalent
 compiled values, deterministic assembly/simulation, reward overrides, mob
-identity, and preview text. Full `npm run verify` passed after integration;
-no current scene click target moved.
+identity, and preview text. Catalog additions must also update
+`content/cli.test.ts` output pins, `ui/sprites.test.ts` art coverage, and any
+dungeon-specific sanity/balance cases. Full `npm run verify` passed after
+integration; the journey `UI` table tracks the three-dungeon Hub reflow.

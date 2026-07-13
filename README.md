@@ -2,7 +2,7 @@
 
 ![healgame concept art — healer and warband on a battle line](assets/healer-game.png)
 
-Status: current · Authority: repo landing / vibe · Last verified: 2026-07-12
+Status: current · Authority: repo landing / vibe · Last verified: 2026-07-13
 
 A healer-focused indie game inspired by *Master Healer Kale with useless party*, rebuilt around exclusive builds, readable casting, and old-school MMO healing — in a heavy-metal dark fantasy skin.
 
@@ -52,12 +52,12 @@ Doc conventions + authority: [`AGENTS.md`](AGENTS.md). Operating rules:
 | [Kale research](docs/research/master-healer-kale.md) | Inspiration |
 
 Shipped phase handoffs (historical only): Phase 1 outcome, Phase 2, Phase 3
-combat UX, side-view layout, combat juice — see `docs/*-handoff.md` /
-`docs/phase-1-poc-outcome.md`.
+combat UX, side-view layout, combat juice, and Alpha 0.1 — see
+`docs/*-handoff.md` / `docs/phase-1-poc-outcome.md`.
 
 ## PoC in one breath
 
 Oathbound only · tutorial one heal · expected wipe · XP skill + gold tree ·
-ruby subclass oath **in the spell tree** (rival LOCKED, visible) · Ash Gate ·
-unwinnable Dungeon 2 sandbox · no procs/major CDs/hub buffs · single local
-save · restart only
+ruby subclass oath **in the spell tree** (rival LOCKED, visible) · Ash Gate →
+Iron Pass → unwinnable Maw sandbox · first major cooldowns + one relic pick ·
+no proc framework/hub buffs · single local save · restart only

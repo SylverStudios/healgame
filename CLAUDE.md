@@ -1,6 +1,6 @@
 # CLAUDE.md — operating healgame
 
-Status: current · Authority: gates, hard rules, working style · Last verified: 2026-07-12
+Status: current · Authority: gates, hard rules, working style · Last verified: 2026-07-13
 
 healgame is a healer-focused auto-battler PoC: Phaser 3 + TypeScript (strict) +
 Vite. The game lives in `game/`; design docs in `docs/`. Doc conventions and
@@ -27,6 +27,8 @@ Full list in [`AGENTS.md`](AGENTS.md). Short form:
 | `npm run verify:fast` | Same without journey (~5 min faster) |
 | `npm run test:watch` | Vitest watch mode while developing |
 | `npm run content -- validate` | Validate all dungeon, mob, and enemy-ability data |
+| `npm run content -- list` | List dungeon order and unlock prerequisites |
+| `npm run content -- preview <id>` | Print one resolved dungeon definition |
 | `npm run content -- preview --all` | Print the resolved ordered dungeon catalog |
 
 `verify` is implemented by `scripts/verify.mjs` — one entry point for local

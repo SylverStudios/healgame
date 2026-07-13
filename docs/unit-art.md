@@ -1,6 +1,6 @@
 # Unit art — Kenney Tiny Dungeon
 
-Status: current · Authority: combat unit tile mapping · Last verified: 2026-07-10
+Status: current · Authority: combat unit tile mapping · Last verified: 2026-07-13
 
 Combat units render 16×16 tiles from Kenney's **Tiny Dungeon** pack (CC0, no
 attribution required). Everything else in the game stays temp art per
@@ -35,13 +35,15 @@ CLAUDE.md. Live mapping: `game/src/ui/sprites.ts`.
 ## Current casting
 
 tank→96 knight · dps1→98 fighter · dps2→112 ranger · healer→84 wizard ·
-Ash Husk→121 ghost · Gate Warden→109 brute · Hollow King→110 demon.
-Party maps by unit id, bosses by encounter boss id, trash by role
-(fallbacks: fighter / demon).
+Ash Husk / Iron Husk→121 ghost · Gate Warden→109 brute · Spire Lancer /
+Hollow King→110 demon. Party maps by unit id. Catalog enemies map by stable
+`Unit.mobId` → `MobDef.visualKey` → `MOB_VISUAL_FRAMES`; unknown mobs fall
+back to ghost/demon by role.
 
 ## Adding a unit's art
 
-Add its id→frame entry in `sprites.ts` — nothing else. New enemy types need
-either a new id entry or they inherit the role fallback. Then run the gates
-(`npm run check`, `npm run smoke`; `journey.mjs` if scene layout moved) and
-eyeball one combat screenshot — tile picks can only be verified visually.
+Add the key to `MOB_VISUAL_KEYS` in `data/content/types.ts`, set the mob's
+`visualKey`, and map that key in `MOB_VISUAL_FRAMES` in `sprites.ts`. Reuse an
+existing key when the same temporary tile is intentional. Then run
+`npm run verify:fast` (`npm run verify` if scene layout moved) and eyeball one
+combat screenshot — tile picks can only be verified visually.

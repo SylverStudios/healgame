@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CombatEngine } from './engine';
-import { GATE_WARDEN, GCD_MS } from '../data/constants';
+import { GCD_MS } from '../data/constants';
+import { GATE_WARDEN_MOB } from '../data/mobs';
 import {
   makeTestEncounter,
   TEST_MINOR_SPELL,
@@ -208,10 +209,16 @@ describe('per-role swing cadence (Phase 3 handoff §B)', () => {
     expect(damages(onTime).some((d) => d.targetId === 'tank' && d.sourceId.startsWith('w0-'))).toBe(true);
   });
 
-  it('boss swing cadence (GATE_WARDEN 3500ms) differs from trash cadence (3000ms)', () => {
+  it('boss swing cadence (Gate Warden 3500ms) differs from trash cadence (3000ms)', () => {
     const encounter = makeTestEncounter({
       waves: [{ enemies: [{ name: 'Weak', hp: 1, count: 1 }] }],
-      boss: { id: 'test-boss', name: 'Test Boss', hp: 999, autoDamage: 2, swingIntervalMs: GATE_WARDEN.swingIntervalMs },
+      boss: {
+        id: 'test-boss',
+        name: 'Test Boss',
+        hp: 999,
+        autoDamage: 2,
+        swingIntervalMs: GATE_WARDEN_MOB.swingIntervalMs,
+      },
     });
     const engine = new CombatEngine(encounter, TEST_SPELLS);
     // dps1's first swing (t=1000, 2dmg) kills the 1hp dummy -> boss spawns at t=1000. Its first
