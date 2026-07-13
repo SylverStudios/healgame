@@ -602,5 +602,7 @@ everything journey still aims at after Iron Pass / relics / pace toggle.
 
 ## Acceptance
 
-Full `npm run verify` (includes journey). Layout nudge check: `GROUND_Y` ±20
-must not require journey edits (locate reads live bounds).
+Full `npm run verify` passed (typecheck, lint, test, build, smoke, journey).
+Journey no longer embeds ally/spell/hub pixel tables — a `GROUND_Y` layout
+nudge cannot desync journey because `locate('combatAlly:tank')` reads live
+bounds.
