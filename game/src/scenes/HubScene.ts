@@ -3,8 +3,8 @@
  * the combat run that just ended (if any), and is the launch point for
  * Ash Gate, the spell tree (gold + ruby oaths), Iron Pass (Dungeon 2, once
  * Ash Gate is cleared — alpha-0.1-handoff §D1), and The Maw (Dungeon 3, once
- * Iron Pass is cleared). Temp art only — panels + text buttons, dark
- * palette, monospace.
+ * Iron Pass is cleared). Run mods (oath + relic) live in the shared top-right
+ * RunModsBar. Temp art only — panels + text buttons, dark palette, monospace.
  */
 
 import Phaser from 'phaser';
@@ -12,9 +12,10 @@ import { SceneKeys } from './keys';
 import { loadSave, resetSave, saveGame, type SaveData } from '../save/save';
 import { applyCombatResult, isDungeonUnlocked, type HubNotice } from '../meta/progression';
 import { loadoutFromSave } from '../data/spellTree';
-import { relicById } from '../data/relics';
+import { runModsFromSave } from '../data/runMods';
 import { levelForXp, SPELLS, XP_LEVEL_2_THRESHOLD } from '../data/constants';
 import { ORDERED_DUNGEONS } from '../data/dungeons';
+import { RunModsBar } from '../ui/runModsBar';
 import type { CombatResult, CombatSceneData } from './CombatScene';
 
 interface HubSceneData {
@@ -30,23 +31,6 @@ const ACCENT_COLOR = '#f2c14e';
 const DIM_COLOR = '#a89888';
 const DANGER_COLOR = '#e05a4e';
 const FONT = 'monospace';
-
-/** Alpha 0.1 §D7/§D9: 24px relic icon top-right, simple colored circle keyed per relic id. */
-const RELIC_ICON_RADIUS = 12;
-const RELIC_ICON_MARGIN = 30;
-const RELIC_ICON_BORDER = 0x0a0605;
-const RELIC_COLORS: Record<string, number> = {
-  'ember-ledger': 0xe0703a, // ember-orange
-  'triage-bell': 0xf2c14e, // gold
-  'still-reservoir': 0x6a8aa0, // blue-grey
-};
-const RELIC_TOOLTIP_BG = 0x241a15;
-const RELIC_TOOLTIP_BORDER = 0x0a0605;
-const RELIC_TOOLTIP_PADDING = 8;
-const RELIC_TOOLTIP_NAME_COLOR = '#f2c14e';
-const RELIC_TOOLTIP_DESC_COLOR = '#e8d8c8';
-const RELIC_TOOLTIP_MAX_WIDTH = 220;
-const RELIC_TOOLTIP_DEPTH = 300;
 
 export class HubScene extends Phaser.Scene {
   private sceneData: HubSceneData = {};
@@ -86,7 +70,7 @@ export class HubScene extends Phaser.Scene {
     this.buildStats(save);
     this.buildNotices(notices);
     this.buildButtons(save);
-    this.buildRelicIcon(save);
+    new RunModsBar(this, runModsFromSave(save), { viewWidth: width });
   }
 
   private buildStats(save: SaveData): void {
@@ -171,13 +155,6 @@ export class HubScene extends Phaser.Scene {
       this.scene.start(SceneKeys.Tree);
     }, 'hubTree');
 
-    if (save.subclass !== null) {
-      const label = save.subclass === 'vigil' ? 'Path of the Vigil' : 'Path of the Zealot';
-      this.add
-        .text(centerX, compactDungeonGrid ? 445 : height / 2 + 115, `Oath: ${label}`, { fontFamily: FONT, fontSize: '16px', color: ACCENT_COLOR })
-        .setOrigin(0.5);
-    }
-
     this.buildRestartControl(centerX, height - 36);
   }
 
@@ -197,60 +174,6 @@ export class HubScene extends Phaser.Scene {
       resetSave();
       this.scene.start(SceneKeys.Tutorial);
     });
-  }
-
-  /** Top-right relic icon (§D7/§D9): nothing rendered when no relic is chosen yet.
-   *  Hover shows name + description in a simple text panel (Tree/SpellBar tooltip pattern). */
-  private buildRelicIcon(save: SaveData): void {
-    const relic = relicById(save.relicId);
-    if (!relic) return;
-
-    const { width } = this.scale;
-    const x = width - RELIC_ICON_MARGIN;
-    const y = RELIC_ICON_MARGIN;
-    const color = RELIC_COLORS[relic.id] ?? 0xa89888;
-
-    const icon = this.add
-      .circle(x, y, RELIC_ICON_RADIUS, color)
-      .setStrokeStyle(2, RELIC_ICON_BORDER)
-      .setInteractive({ useHandCursor: true })
-      .setName('hubRelicIcon');
-
-    const tooltipBg = this.add
-      .rectangle(0, 0, 10, 10, RELIC_TOOLTIP_BG)
-      .setOrigin(1, 0)
-      .setStrokeStyle(1, RELIC_TOOLTIP_BORDER);
-    const nameText = this.add.text(0, 0, relic.name, {
-      fontFamily: FONT,
-      fontSize: '14px',
-      color: RELIC_TOOLTIP_NAME_COLOR,
-    });
-    const descText = this.add.text(0, 0, relic.description, {
-      fontFamily: FONT,
-      fontSize: '12px',
-      color: RELIC_TOOLTIP_DESC_COLOR,
-      wordWrap: { width: RELIC_TOOLTIP_MAX_WIDTH },
-    });
-    const tooltip = this.add
-      .container(0, 0, [tooltipBg, nameText, descText])
-      .setDepth(RELIC_TOOLTIP_DEPTH)
-      .setVisible(false);
-
-    const showTooltip = (): void => {
-      nameText.setPosition(-RELIC_TOOLTIP_PADDING - nameText.width, RELIC_TOOLTIP_PADDING);
-      descText.setPosition(
-        -RELIC_TOOLTIP_PADDING - descText.width,
-        RELIC_TOOLTIP_PADDING + nameText.height + 4,
-      );
-      const panelWidth = Math.max(nameText.width, descText.width) + RELIC_TOOLTIP_PADDING * 2;
-      const panelHeight = nameText.height + descText.height + RELIC_TOOLTIP_PADDING * 2 + 4;
-      tooltipBg.setSize(panelWidth, panelHeight);
-      tooltip.setPosition(x - RELIC_ICON_RADIUS - 6, y + RELIC_ICON_RADIUS + 6);
-      tooltip.setVisible(true);
-    };
-
-    icon.on('pointerover', showTooltip);
-    icon.on('pointerout', () => tooltip.setVisible(false));
   }
 
   private makeButton(

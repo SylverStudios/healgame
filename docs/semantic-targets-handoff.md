@@ -3,6 +3,9 @@
 Status: historical — shipped 2026-07-13 (see poc-qa.md Semantic click targets
 section) · Authority: none — archive · Last verified: 2026-07-13
 
+Note: `hubRelicIcon` was superseded by `runMod:<id>` when the shared run-mods
+top bar shipped (oath + relic, Hub/Combat/Tree).
+
 **Audience:** historical — the setName / `__healgame.locate` / journey-by-name
 change is live. Kept here as the design record and name inventory.
 
@@ -27,7 +30,7 @@ and hovers by name — no hard-coded layout coordinates.
 | `hubAshGate` / `hubIronPass` / `hubMaw` | dungeon button rects | `HubScene.ts` `makeButton` via dungeon id |
 | `hubTree` | Spell Tree button | `HubScene.ts` |
 | `hubRestart` | restart text label | `HubScene.ts` |
-| `hubRelicIcon` | relic circle (when chosen) | `HubScene.ts` |
+| `runMod:<id>` | oath/relic icon hit target (top bar) | `ui/runModsBar.ts` (Hub / Combat / Tree) |
 | `treeNode:<spotId>` | node bg rect | `TreeScene.ts` (e.g. `treeNode:deep-reserves`) |
 | `treeBack` | back-button rect | `TreeScene.ts` |
 | `combatAlly:<unitId>` | sprite body when clickable | `unitSprite.ts` |
