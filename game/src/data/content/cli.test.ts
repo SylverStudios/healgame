@@ -14,24 +14,27 @@ describe('content CLI', () => {
   it('validates and lists the live ordered catalog', () => {
     const validation = runContent('validate');
     expect(validation.status).toBe(0);
-    expect(validation.stdout).toContain('Content valid: 2 dungeons, 3 mobs, 2 abilities');
+    expect(validation.stdout).toContain('Content valid: 3 dungeons, 5 mobs, 3 abilities');
 
     const list = runContent('list');
     expect(list.status).toBe(0);
     expect(list.stdout).toContain('1. Ash Gate [ash-gate] — always unlocked');
-    expect(list.stdout).toContain('2. The Maw [the-maw] — unlocks after ash-gate');
+    expect(list.stdout).toContain('2. Iron Pass [iron-pass] — unlocks after ash-gate');
+    expect(list.stdout).toContain('3. The Maw [the-maw] — unlocks after iron-pass');
   });
 
   it('previews one dungeon or the complete catalog', () => {
     const one = runContent('preview', 'the-maw');
     expect(one.status).toBe(0);
-    expect(one.stdout).toContain('Dungeon 2: The Maw [the-maw]');
+    expect(one.stdout).toContain('Dungeon 3: The Maw [the-maw]');
     expect(one.stdout).toContain('Ability: Extinction [extinction] partyAoE');
 
     const all = runContent('preview', '--all');
     expect(all.status).toBe(0);
     expect(all.stdout).toContain('Dungeon 1: Ash Gate [ash-gate]');
-    expect(all.stdout).toContain('Dungeon 2: The Maw [the-maw]');
+    expect(all.stdout).toContain('Dungeon 2: Iron Pass [iron-pass]');
+    expect(all.stdout).toContain('Ability: Tunnel Vision [tunnel-vision] tunnelVision');
+    expect(all.stdout).toContain('Dungeon 3: The Maw [the-maw]');
   });
 
   it('exits nonzero for bad arguments and unknown dungeon ids', () => {

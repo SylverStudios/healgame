@@ -69,10 +69,11 @@ const UI = {
   combatSpellSlot: (i, n) => ({ x: 480 - ((n - 1) * 174) / 2 + i * 174, y: 502 }),
   hubAshGate: { x: 480, y: 255 },
   hubTree: { x: 480, y: 320 },
-  // Alpha 0.1 §D1: Iron Pass (Dungeon 2) took the old Maw slot; The Maw
-  // (Dungeon 3) moved below it. Canvas 960x540 → centerX 480, height/2 270.
+  // With two unlocked dungeons, Iron Pass keeps the old Maw slot. Once all
+  // three unlock, HubScene reflows them into a centered three-column row:
+  // Ash x180, Iron x480, Maw x780, all y240.
   hubIronPass: { x: 480, y: 450 },
-  hubMaw: { x: 480, y: 515 },
+  hubMaw: { x: 780, y: 240 },
   // Alpha 0.1 §D7: top-right relic icon (24px diamond/circle), margin 30.
   hubRelicIcon: { x: 930, y: 30 },
   // TreeScene node graph (NODE_POSITIONS in TreeScene.ts)

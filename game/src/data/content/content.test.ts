@@ -59,11 +59,85 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
     },
   },
   {
+    id: 'iron-pass',
+    name: 'Iron Pass',
+    goldPerEnemy: 1,
+    xpPerEnemy: 1,
+    rubyPerFirstClear: 0,
+    waves: [
+      {
+        enemies: [
+          {
+            mobId: 'iron-husk',
+            name: 'Iron Husk',
+            hp: 9,
+            count: 2,
+            autoDamage: 2,
+            swingIntervalMs: 3000,
+          },
+        ],
+      },
+      {
+        enemies: [
+          {
+            mobId: 'iron-husk',
+            name: 'Iron Husk',
+            hp: 9,
+            count: 3,
+            autoDamage: 2,
+            swingIntervalMs: 3000,
+          },
+        ],
+      },
+      {
+        enemies: [
+          {
+            mobId: 'iron-husk',
+            name: 'Iron Husk',
+            hp: 10,
+            count: 3,
+            autoDamage: 2,
+            swingIntervalMs: 3000,
+          },
+        ],
+      },
+      {
+        enemies: [
+          {
+            mobId: 'iron-husk',
+            name: 'Iron Husk',
+            hp: 10,
+            count: 4,
+            autoDamage: 2,
+            swingIntervalMs: 3000,
+          },
+        ],
+      },
+    ],
+    boss: {
+      id: 'spire-lancer',
+      name: 'Spire Lancer',
+      hp: 190,
+      autoDamage: 3,
+      swingIntervalMs: 3500,
+      cast: {
+        kind: 'tunnelVision',
+        name: 'Tunnel Vision',
+        telegraphMs: 3000,
+        firstCastAtMs: 8000,
+        intervalMs: 30_000,
+        channelMs: 10_000,
+        tickMs: 1000,
+        damagePerTick: 2,
+      },
+    },
+  },
+  {
     id: 'the-maw',
     name: 'The Maw',
     goldPerEnemy: 1,
     xpPerEnemy: 1,
-    rubyPerFirstClear: 1,
+    rubyPerFirstClear: 0,
     waves: [
       {
         enemies: [
@@ -106,7 +180,8 @@ describe('live dungeon content', () => {
 
   it('compiles to explicit legacy-equivalent runtime values', () => {
     expect(compileDungeon('ash-gate', CONTENT_CATALOGS)).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[0]);
-    expect(compileDungeon('the-maw', CONTENT_CATALOGS)).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[1]);
+    expect(compileDungeon('iron-pass', CONTENT_CATALOGS)).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[1]);
+    expect(compileDungeon('the-maw', CONTENT_CATALOGS)).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[2]);
     expect(compileAllDungeons(CONTENT_CATALOGS)).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS);
   });
 
@@ -134,9 +209,9 @@ describe('live dungeon content', () => {
   it('formats a stable preview with effective overrides and ability cadence', () => {
     expect(formatDungeonPreview('the-maw', CONTENT_CATALOGS)).toBe(
       [
-        'Dungeon 2: The Maw [the-maw]',
-        'Unlock: clear ash-gate',
-        'Rewards: gold 1/enemy, XP 1/enemy, ruby 1/first clear',
+        'Dungeon 3: The Maw [the-maw]',
+        'Unlock: clear iron-pass',
+        'Rewards: gold 1/enemy, XP 1/enemy, ruby 0/first clear',
         'Visual: the-maw',
         'Wave 1:',
         '  2x Ash Husk [ash-husk] — HP 4, auto 1/3000ms, boss no, overrides hp=4',
@@ -155,8 +230,7 @@ describe('content diagnostics', () => {
       ...CONTENT_CATALOGS,
       mobs: [
         { ...CONTENT_CATALOGS.mobs[0], autoDamage: 0 },
-        CONTENT_CATALOGS.mobs[1],
-        CONTENT_CATALOGS.mobs[2],
+        ...CONTENT_CATALOGS.mobs.slice(1),
       ],
       dungeons: [
         {
@@ -175,7 +249,7 @@ describe('content diagnostics', () => {
             CONTENT_CATALOGS.dungeons[0].waves[2],
           ],
         },
-        CONTENT_CATALOGS.dungeons[1],
+        ...CONTENT_CATALOGS.dungeons.slice(1),
       ],
     };
 
@@ -192,7 +266,7 @@ describe('content diagnostics', () => {
       ...CONTENT_CATALOGS,
       abilities: [
         { ...CONTENT_CATALOGS.abilities[0], name: '  ' },
-        CONTENT_CATALOGS.abilities[1],
+        ...CONTENT_CATALOGS.abilities.slice(1),
       ],
       mobs: [
         {
@@ -201,12 +275,11 @@ describe('content diagnostics', () => {
           tags: ['trash', 'boss'],
           abilityIds: ['bonehowl'],
         },
-        CONTENT_CATALOGS.mobs[1],
-        CONTENT_CATALOGS.mobs[2],
+        ...CONTENT_CATALOGS.mobs.slice(1),
       ],
       dungeons: [
         { ...CONTENT_CATALOGS.dungeons[0], name: '\t' },
-        CONTENT_CATALOGS.dungeons[1],
+        ...CONTENT_CATALOGS.dungeons.slice(1),
       ],
     };
 
@@ -339,7 +412,7 @@ describe('content diagnostics', () => {
             },
           ],
         },
-        CONTENT_CATALOGS.dungeons[1],
+        ...CONTENT_CATALOGS.dungeons.slice(1),
       ],
     };
     const codes = validateContent(malformed).errors.map(({ code }) => code);
@@ -376,7 +449,7 @@ describe('content diagnostics', () => {
             },
           ],
         },
-        CONTENT_CATALOGS.dungeons[1],
+        ...CONTENT_CATALOGS.dungeons.slice(1),
       ],
     };
     const codes = validateContent(malformed).errors.map(({ code }) => code);
@@ -401,7 +474,7 @@ describe('content diagnostics', () => {
           intervalMs: 0,
           visualKey: 'not-registered',
         },
-        CONTENT_CATALOGS.abilities[1],
+        ...CONTENT_CATALOGS.abilities.slice(1),
       ],
     };
     const expected = validateContent(invalid);
