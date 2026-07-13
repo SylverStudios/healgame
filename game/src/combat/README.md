@@ -13,6 +13,7 @@ new CombatEngine(encounter: EncounterDef, spells: SpellDef[], options?: {
   missingHealthBonuses?: { spellId: string; healPer10PctMissing: number }[];
   missingHealthPctBonuses?: { spellId: string; pctPer10PctMissing: number }[];
   fullHealthBonuses?: { spellId: string; hpPctAtLeast: number; bonusHeal: number }[];
+  cooldowns?: CooldownDef[]; // Alpha 0.1 §D6 — see "Cooldowns" below
 })
 // spells = player's unlocked list; options come from loadoutFromSave / CombatMods
 // (bonusMaxMana, synergies, missing-health/full-health heal rules). castMod is
@@ -23,6 +24,7 @@ engine.advance(dtMs): CombatEvent[]   // steps the sim; safe for any dt (sub-ste
 engine.setTarget(unitId): void        // click-to-target an ally; ignored if unknown/dead/enemy
 engine.castSpell(spellId): void       // starts, queues, or is silently dropped — see below
 engine.cancelCast(): void             // cancel active cast (+ any queue) and refund reserved mana — see below
+engine.activateCooldown(cooldownId): void // off-GCD; see "Cooldowns" below
 engine.state: Readonly<CombatState>
 engine.rewards: { gold, xp }          // accrued per kill, immediately, even on a later wipe
 ```
@@ -75,6 +77,60 @@ in `encounters.ts`, expected to be retuned.
     and arms") — the old rule assumed mana was spent up front and undoing a
     completed cast was worse than letting it resolve into nothing; reserve
     semantics make a clean cancel possible instead.
+- **Cooldowns** (Alpha 0.1 §D6 — first major CDs): data in `data/cooldowns.ts`
+  (`CooldownDef`), live per-CD state on `state.cooldowns: CooldownState[]`
+  (same order as the `cooldowns` constructor option; empty array when none —
+  the pre-Alpha-0.1 default). `engine.activateCooldown(id)` is buffered like
+  `castSpell`/`cancelCast`: mutates immediately, `cooldownActivated` is
+  delivered on the next `advance()`. Silently ignored: unknown id, still on
+  cooldown (`remainingCooldownMs > 0`), or combat not running.
+  - **Off-GCD, no exceptions**: activation never checks `gcdRemainingMs` or
+    `playerCast` — it's legal mid-cast, mid-Tunnel-Vision-channel, while
+    another CD's buff is active, any time `status === 'running'`. Its own
+    `cooldownMs` timer ticks alongside every other timer via `advance(dtMs)`
+    (participates in `nextTimerBoundary`, so sub-stepping still lands on it
+    exactly) — no wall clock, same determinism guarantee as everything else.
+  - **Still Waters shape (`freeNextHeal`)**: activating arms one charge
+    (`state.cooldowns[i].activeRemainingMs` reports `1` while armed — an
+    **armed flag, not a duration**; `0` once consumed). The **first player
+    cast that STARTS** while armed (an immediate `castSpell`, or a queued cast
+    firing via `fireQueuedCast` both count as "starting") bypasses the
+    affordability check entirely (castable at 0 mana — the OOM panic button),
+    reserves **0** mana, and consumes the charge right there in `beginCast`
+    (emitting `cooldownBuffEnded` alongside that cast's `castStarted`). If
+    that cast later **completes**: the heal lands, no mana was ever spent —
+    `completePlayerCast` never re-touches mana regardless. If it's
+    **cancelled** (escape or target-dead): the charge is already consumed and
+    nothing is refunded, because nothing was ever reserved — locked design,
+    not a bug. A second charge only arms on the next `activateCooldown` once
+    the 60s cooldown is ready again.
+  - **Frenzied Liturgy shape (`manaCostReduction`)**: activating opens a
+    `durationMs` window (sim time, ticks down every `advance()` alongside
+    `remainingCooldownMs`). While open, `effectiveManaCost(spell)` —
+    `max(0, spell.mana - costReduction)`, summed across every currently-open
+    `manaCostReduction` window — is what a cast reserves **at cast start**;
+    the *reserved* (already-reduced) amount is stored on the engine (not
+    recomputed) and is exactly what a later cancel refunds or a later
+    completion silently consumes. So a window that **expires mid-cast does
+    not retro-charge** the difference — the reduction locked in the instant
+    the cast started. Window expiry is detected in `tick()` the moment
+    `buffRemainingMs` crosses to `<=0` and emits `cooldownBuffEnded` exactly
+    once (clamped at 0 so it never re-fires). Re-activating while a window is
+    already open would reset it to full duration rather than stack — not
+    reachable with the shipped data (`cooldownMs === durationMs`, so the CD
+    isn't ready again until after the window has already closed), but that's
+    the rule if a future CD ever has `cooldownMs < durationMs`.
+  - **Interaction**: if a Still Waters charge is armed AND a Frenzied Liturgy
+    window is open when a cast starts, **the free charge wins** — reserve 0,
+    consume the charge, leave the cost-reduction window untouched (it keeps
+    ticking, available for the *next* cast). Affordability while only the
+    window is open checks the reduced cost, not the base `spell.mana`.
+  - **UI**: `spellBar.ts` renders one small button per granted cooldown to the
+    right of the spell buttons (absent entirely — zero layout shift — when
+    the loadout grants none). Dimmed while `remainingCooldownMs > 0`, with
+    `${Math.ceil(remainingCooldownMs / 1000)}s` centered; gold accent border
+    (the same stroke used for armed synergies) while `activeRemainingMs > 0`.
+    Clicking a button on cooldown does nothing.
 - **Overheal**: `heal` event's `amount` (applied) + `overheal` (wasted) always
   equals the spell's raw `heal`.
 - **Targeting** (locked §10.4): enemies/boss attack the tank while alive, then a
@@ -199,13 +255,19 @@ in `encounters.ts`, expected to be retuned.
 
 ## Determinism
 
-Simultaneous events resolve in a fixed priority each tick: player cast completes
-→ queued cast fires → boss cast completes (`partyAoE` party damage, or a
-`tunnelVision` telegraph finishing into a channel) → boss focus tick
-(`tunnelVision` channel damage, if one landed this tick) → merc autos (tank,
-dps1, dps2) → enemy/boss autos (spawn order) → boss cast timer starts a new
-telegraph/cast (blocked while a `tunnelVision` channel is active). `advance()`
-sub-steps to the next timer boundary, so the event log for a given command
-sequence is independent of how the caller chunks `dtMs`. Commands issued between
-`advance()` calls (`castSpell` may emit `castStarted`; `cancelCast` may emit
-`castCancelled`) are buffered and flushed at the start of the next `advance()`.
+Simultaneous events resolve in a fixed priority each tick: **cooldown buff
+windows that expired this tick** (`manaCostReduction` → `cooldownBuffEnded`) →
+player cast completes → queued cast fires → boss cast completes (`partyAoE`
+party damage, or a `tunnelVision` telegraph finishing into a channel) → boss
+focus tick (`tunnelVision` channel damage, if one landed this tick) → merc
+autos (tank, dps1, dps2) → enemy/boss autos (spawn order) → boss cast timer
+starts a new telegraph/cast (blocked while a `tunnelVision` channel is
+active). `advance()` sub-steps to the next timer boundary — cooldown
+(`remainingCooldownMs`) and buff-window (`manaCostReduction`'s
+`buffRemainingMs`) timers participate in that boundary calculation too, so a
+cooldown becoming ready or a buff window expiring always lands on an exact
+sub-step — so the event log for a given command sequence is independent of
+how the caller chunks `dtMs`. Commands issued between `advance()` calls
+(`castSpell` may emit `castStarted`; `cancelCast` may emit `castCancelled`;
+`activateCooldown` may emit `cooldownActivated`) are buffered and flushed at
+the start of the next `advance()`.

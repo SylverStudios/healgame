@@ -75,6 +75,44 @@ export interface FullHealthBonusRule {
   bonusHeal: number;
 }
 
+/**
+ * A cooldown's gameplay effect (Alpha 0.1 §D6 — first major CDs, off-GCD).
+ * `freeNextHeal` (Still Waters): arms a charge; the first player cast that
+ * STARTS while armed bypasses the affordability check, reserves 0 mana, and
+ * consumes the charge at cast start. `manaCostReduction` (Frenzied Liturgy):
+ * opens a `durationMs` window (sim time) during which heal casts reserve
+ * `max(0, spell.mana - costReduction)` at cast start.
+ */
+export type CooldownEffect =
+  | { kind: 'freeNextHeal' }
+  | { kind: 'manaCostReduction'; durationMs: number; costReduction: number };
+
+/** Data-driven cooldown definition (instances live in data/cooldowns.ts). */
+export interface CooldownDef {
+  id: string;
+  name: string;
+  description: string;
+  cooldownMs: number;
+  effect: CooldownEffect;
+}
+
+/**
+ * Per-CD live state exposed on CombatState for the UI (spellBar.ts). Same
+ * order as the `cooldowns` option passed to the constructor.
+ */
+export interface CooldownState {
+  id: string;
+  name: string;
+  /** 0 = ready to activate. */
+  remainingCooldownMs: number;
+  /**
+   * manaCostReduction: ms left in the buff window. freeNextHeal: `1` while a
+   * charge is armed, `0` otherwise — an armed flag, not a duration (see
+   * combat/README.md). Either way, `> 0` means "show the active-buff accent".
+   */
+  activeRemainingMs: number;
+}
+
 export interface CombatEngineOptions {
   /** Adds to the healer's max AND starting mana (e.g. Deep Reserves). */
   bonusMaxMana?: number;
@@ -82,6 +120,8 @@ export interface CombatEngineOptions {
   missingHealthBonuses?: MissingHealthBonusRule[];
   missingHealthPctBonuses?: MissingHealthPctBonusRule[];
   fullHealthBonuses?: FullHealthBonusRule[];
+  /** Alpha 0.1 §D6: cooldowns granted by the tree (e.g. Still Waters, Frenzied Liturgy). */
+  cooldowns?: CooldownDef[];
 }
 
 export interface CastState {
@@ -110,6 +150,8 @@ export type CombatEvent =
   | { type: 'bossFocusStarted'; targetId: string; name: string; totalMs: number }
   | { type: 'bossFocusTick'; targetId: string; amount: number }
   | { type: 'bossFocusEnded'; targetId: string; name: string }
+  | { type: 'cooldownActivated'; id: string; name: string }
+  | { type: 'cooldownBuffEnded'; id: string }
   | { type: 'unitDied'; unitId: string }
   | { type: 'waveStarted'; waveIndex: number }
   | { type: 'combatEnded'; status: CombatStatus };
@@ -126,6 +168,8 @@ export interface CombatState {
   status: CombatStatus;
   /** Spell ids that currently have at least one armed synergy buffing them. */
   armedBuffedSpellIds: string[];
+  /** Alpha 0.1 §D6: live cooldown state, same order as the constructor's `cooldowns` option; empty when none. */
+  cooldowns: CooldownState[];
 }
 
 /**

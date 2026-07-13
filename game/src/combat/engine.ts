@@ -15,6 +15,8 @@ import type {
   CombatEvent,
   CombatState,
   CombatStatus,
+  CooldownDef,
+  CooldownState,
   EncounterDef,
   FullHealthBonusRule,
   MissingHealthBonusRule,
@@ -41,6 +43,22 @@ interface BossFocusState {
   damagePerTick: number;
 }
 
+/**
+ * Internal per-cooldown runtime state (Alpha 0.1 §D6). Not part of the public
+ * CombatState surface — `state` reduces this to CooldownState for the UI.
+ * `def` is cloned (effect object too) in the constructor so the engine's
+ * mutable runtime fields never touch a caller-owned CooldownDef.
+ */
+interface CooldownRuntime {
+  def: CooldownDef;
+  /** 0 = ready to activate. */
+  remainingCooldownMs: number;
+  /** freeNextHeal only: true while a charge is armed, awaiting the next cast start. */
+  armed: boolean;
+  /** manaCostReduction only: ms left in the buff window; 0 = inactive. */
+  buffRemainingMs: number;
+}
+
 export class CombatEngine {
   private readonly encounter: EncounterDef;
   private readonly spells: SpellDef[];
@@ -50,6 +68,8 @@ export class CombatEngine {
   private readonly missingHealthBonuses: MissingHealthBonusRule[];
   private readonly missingHealthPctBonuses: MissingHealthPctBonusRule[];
   private readonly fullHealthBonuses: FullHealthBonusRule[];
+  /** Cooldown runtime state, same order as options.cooldowns (Alpha 0.1 §D6). */
+  private readonly cooldowns: CooldownRuntime[];
 
   private party: Unit[] = [];
   private activeEnemies: Unit[] = [];
@@ -59,6 +79,9 @@ export class CombatEngine {
   private readonly swingTimers = new Map<string, number>();
 
   private playerCast: CastState | null = null;
+  /** Mana actually reserved for the active playerCast at cast start — may be less than
+   *  spellById(cast.spellId).mana (Still Waters: 0; Frenzied Liturgy: cost - reduction). */
+  private playerCastReservedMana = 0;
   private queuedCast: { spellId: string; targetId: string } | null = null;
   private gcdRemainingMs = 0;
   private targetId: string | null = null;
@@ -100,6 +123,15 @@ export class CombatEngine {
     // and full-health threshold rule (Steady Hands), cloned like the arrays above.
     this.missingHealthPctBonuses = (options?.missingHealthPctBonuses ?? []).map((m) => ({ ...m }));
     this.fullHealthBonuses = (options?.fullHealthBonuses ?? []).map((f) => ({ ...f }));
+    // Alpha 0.1 §D6: cooldown defs cloned (effect object too) so this instance's mutable
+    // runtime state (remainingCooldownMs, armed, buffRemainingMs) never touches the caller's
+    // array/objects. Every CD starts ready (remainingCooldownMs 0), no charge, no buff.
+    this.cooldowns = (options?.cooldowns ?? []).map((def) => ({
+      def: { ...def, effect: { ...def.effect } },
+      remainingCooldownMs: 0,
+      armed: false,
+      buffRemainingMs: 0,
+    }));
 
     this.party = [
       { id: 'tank', name: 'Tank', role: 'tank', hp: PARTY.tankMaxHp, maxHp: PARTY.tankMaxHp, mana: 0, maxMana: 0, alive: true },
@@ -168,9 +200,16 @@ export class CombatEngine {
       return;
     }
 
-    const healer = this.getUnit('healer')!;
-    if (healer.mana < spell.mana) return;
-    this.pending.push(this.beginCast(spellId, targetId));
+    // Still Waters (Alpha 0.1 §D6): an armed freeNextHeal charge bypasses the
+    // affordability check entirely (castable even at 0 mana) — beginCast
+    // reserves 0 mana and consumes the charge.
+    if (!this.findArmedFreeHealCooldown()) {
+      const healer = this.getUnit('healer')!;
+      if (healer.mana < this.effectiveManaCost(spell)) return;
+    }
+    const out: CombatEvent[] = [];
+    this.beginCast(spellId, targetId, out);
+    this.pending.push(...out);
   }
 
   /**
@@ -184,13 +223,37 @@ export class CombatEngine {
     if (this.status !== 'running') return;
     if (this.playerCast) {
       const spellId = this.playerCast.spellId;
-      this.refundCastMana(spellId);
+      this.refundCastMana();
       this.playerCast = null;
       this.queuedCast = null;
       this.pending.push({ type: 'castCancelled', spellId, reason: 'escape' });
     } else if (this.queuedCast) {
       this.queuedCast = null;
     }
+  }
+
+  /**
+   * Activate a cooldown (Alpha 0.1 §D6). Off-GCD: no busy/GCD check at all —
+   * allowed mid-cast, mid-channel, any time combat is running. Buffered like
+   * castSpell: mutates immediately, `cooldownActivated` is delivered on the
+   * next advance(). Silently ignored: unknown id, still on cooldown, or
+   * combat not running.
+   */
+  activateCooldown(cooldownId: string): void {
+    if (this.status !== 'running') return;
+    const cd = this.cooldowns.find((c) => c.def.id === cooldownId);
+    if (!cd || cd.remainingCooldownMs > 0) return;
+    cd.remainingCooldownMs = cd.def.cooldownMs;
+    if (cd.def.effect.kind === 'freeNextHeal') {
+      cd.armed = true;
+    } else {
+      // manaCostReduction: re-activating while the window is still open resets it to full
+      // duration rather than stacking (Alpha 0.1 §D6). Not reachable with current data
+      // (cooldownMs === durationMs means the CD isn't ready until after the window closes),
+      // but correct if a future CD has cooldownMs < durationMs.
+      cd.buffRemainingMs = cd.def.effect.durationMs;
+    }
+    this.pending.push({ type: 'cooldownActivated', id: cd.def.id, name: cd.def.name });
   }
 
   get state(): Readonly<CombatState> {
@@ -204,6 +267,15 @@ export class CombatEngine {
       waveIndex: this.waveIndex,
       status: this.status,
       armedBuffedSpellIds: [...new Set(this.synergies.filter((s) => s.armed).map((s) => s.buffedSpellId))],
+      cooldowns: this.cooldowns.map(
+        (cd): CooldownState => ({
+          id: cd.def.id,
+          name: cd.def.name,
+          remainingCooldownMs: Math.max(0, cd.remainingCooldownMs),
+          activeRemainingMs:
+            cd.def.effect.kind === 'freeNextHeal' ? (cd.armed ? 1 : 0) : Math.max(0, cd.buffRemainingMs),
+        }),
+      ),
     };
   }
 
@@ -223,6 +295,10 @@ export class CombatEngine {
     if (this.bossFocusState) {
       min = Math.min(min, this.bossFocusState.remainingMs, this.bossFocusState.tickRemainingMs);
     }
+    for (const cd of this.cooldowns) {
+      if (cd.remainingCooldownMs > 0) min = Math.min(min, cd.remainingCooldownMs);
+      if (cd.buffRemainingMs > 0) min = Math.min(min, cd.buffRemainingMs);
+    }
     return min;
   }
 
@@ -237,24 +313,41 @@ export class CombatEngine {
       this.bossFocusState.remainingMs -= step;
       this.bossFocusState.tickRemainingMs -= step;
     }
+    // Cooldown timers (Alpha 0.1 §D6): plain cooldown countdown (no event on reaching
+    // ready — the UI reads remainingCooldownMs === 0 off state) and manaCostReduction
+    // buff windows, which emit cooldownBuffEnded exactly once on expiry (below). The
+    // `> 0` guard means a window that's already hit 0 stays at 0 and never re-fires.
+    const expiredBuffCooldownIds: string[] = [];
+    for (const cd of this.cooldowns) {
+      if (cd.remainingCooldownMs > 0) cd.remainingCooldownMs = Math.max(0, cd.remainingCooldownMs - step);
+      if (cd.buffRemainingMs > 0) {
+        cd.buffRemainingMs -= step;
+        if (cd.buffRemainingMs <= 0) {
+          cd.buffRemainingMs = 0;
+          expiredBuffCooldownIds.push(cd.def.id);
+        }
+      }
+    }
 
-    // 1. player cast completes
+    // 1. cooldown buff windows that expired this tick (Frenzied Liturgy)
+    for (const id of expiredBuffCooldownIds) events.push({ type: 'cooldownBuffEnded', id });
+    // 2. player cast completes
     if (this.playerCast && this.playerCast.remainingMs <= 0) {
       this.completePlayerCast(events);
     }
-    // 2. GCD/cast busy window ends -> fire queued spell, if any
+    // 3. GCD/cast busy window ends -> fire queued spell, if any
     if (this.gcdRemainingMs <= 0 && this.playerCast === null) {
       this.fireQueuedCast(events);
     }
-    // 3. boss cast completes -> party-wide damage (partyAoE) or telegraph ends -> focus channel begins (tunnelVision)
+    // 4. boss cast completes -> party-wide damage (partyAoE) or telegraph ends -> focus channel begins (tunnelVision)
     if (this.status === 'running' && this.bossCastState && this.bossCastState.remainingMs <= 0) {
       this.completeBossCast(events);
     }
-    // 4. boss focus tick (Tunnel Vision channel damage)
+    // 5. boss focus tick (Tunnel Vision channel damage)
     if (this.status === 'running' && this.bossFocusState && this.bossFocusState.tickRemainingMs <= 0) {
       this.resolveBossFocusTick(events);
     }
-    // 5. merc auto-attacks
+    // 6. merc auto-attacks
     if (this.status === 'running') {
       for (const id of ['tank', 'dps1', 'dps2']) {
         if (this.status !== 'running') break;
@@ -268,7 +361,7 @@ export class CombatEngine {
         }
       }
     }
-    // 6. enemy/boss auto-attacks
+    // 7. enemy/boss auto-attacks
     if (this.status === 'running') {
       for (const enemy of [...this.activeEnemies]) {
         if (this.status !== 'running') break;
@@ -284,7 +377,7 @@ export class CombatEngine {
         }
       }
     }
-    // 7. boss cast timer elapses -> start a new telegraphed cast (blocked while a focus channel is active)
+    // 8. boss cast timer elapses -> start a new telegraphed cast (blocked while a focus channel is active)
     if (
       this.status === 'running' &&
       this.bossCastTimerRemainingMs !== null &&
@@ -298,30 +391,49 @@ export class CombatEngine {
 
   // ---- internal: player casting --------------------------------------------------
 
-  private beginCast(spellId: string, targetId: string): CombatEvent {
+  /**
+   * Starts a cast: computes the actual mana reservation (Alpha 0.1 §D6 —
+   * `0` if a Still Waters charge is armed, else `effectiveManaCost`, which
+   * folds in any active Frenzied Liturgy window), reserves it, and pushes
+   * `castStarted` (and, if a free-heal charge was just consumed,
+   * `cooldownBuffEnded`) onto `out`. Mana is reserved (debited) the instant a
+   * cast starts, not on completion (Phase 3 handoff §D — supersedes the old
+   * "spent on completion" rule); this blocks double-spending mana on a cast
+   * that's still in flight.
+   */
+  private beginCast(spellId: string, targetId: string, out: CombatEvent[]): void {
     const spell = this.spellById(spellId)!;
-    // Mana is reserved (debited) the instant a cast starts, not on completion
-    // (Phase 3 handoff §D — supersedes the old "spent on completion" rule).
-    // This blocks double-spending mana on a cast that's still in flight.
     const healer = this.getUnit('healer')!;
-    healer.mana = Math.max(0, healer.mana - spell.mana);
+    const freeHealCd = this.findArmedFreeHealCooldown();
+    let reservedMana: number;
+    if (freeHealCd) {
+      reservedMana = 0;
+      // Consumed at cast START whether the cast later completes or is cancelled
+      // (locked design — Alpha 0.1 §D6): a cancelled free cast never refunds
+      // anything, because nothing was ever reserved.
+      freeHealCd.armed = false;
+    } else {
+      reservedMana = this.effectiveManaCost(spell);
+    }
+    healer.mana = Math.max(0, healer.mana - reservedMana);
     this.playerCast = { spellId, targetId, remainingMs: spell.castMs, totalMs: spell.castMs };
+    this.playerCastReservedMana = reservedMana;
     this.gcdRemainingMs = GCD_MS;
-    return { type: 'castStarted', cast: { ...this.playerCast } };
+    out.push({ type: 'castStarted', cast: { ...this.playerCast } });
+    if (freeHealCd) out.push({ type: 'cooldownBuffEnded', id: freeHealCd.def.id });
   }
 
-  /** Refunds a cast's reserved mana (escape/target-dead cancel). Symmetric with beginCast's debit. */
-  private refundCastMana(spellId: string): void {
-    const spell = this.spellById(spellId);
+  /** Refunds the active cast's reserved mana (escape/target-dead cancel). Symmetric with beginCast's debit. */
+  private refundCastMana(): void {
     const healer = this.getUnit('healer');
-    if (spell && healer) healer.mana = Math.min(healer.maxMana, healer.mana + spell.mana);
+    if (healer) healer.mana = Math.min(healer.maxMana, healer.mana + this.playerCastReservedMana);
   }
 
   /** If the active player cast targets `unitId`, auto-cancel it (mid-cast target death). */
   private cancelCastIfTargeting(unitId: string, events: CombatEvent[]): void {
     if (!this.playerCast || this.playerCast.targetId !== unitId) return;
     const spellId = this.playerCast.spellId;
-    this.refundCastMana(spellId);
+    this.refundCastMana();
     this.playerCast = null;
     events.push({ type: 'castCancelled', spellId, reason: 'target-dead' });
   }
@@ -398,9 +510,14 @@ export class CombatEngine {
     this.queuedCast = null;
     const spell = this.spellById(spellId);
     const target = this.getUnit(targetId);
-    const healer = this.getUnit('healer')!;
-    if (!spell || !target || !target.alive || healer.mana < spell.mana) return;
-    events.push(this.beginCast(spellId, targetId));
+    if (!spell || !target || !target.alive) return;
+    // A queued cast that fires while a Still Waters charge is armed counts as
+    // "the first cast started" (Alpha 0.1 §D6) — same bypass as castSpell.
+    if (!this.findArmedFreeHealCooldown()) {
+      const healer = this.getUnit('healer')!;
+      if (healer.mana < this.effectiveManaCost(spell)) return;
+    }
+    this.beginCast(spellId, targetId, events);
   }
 
   // ---- internal: auto-attacks -----------------------------------------------------
@@ -646,5 +763,26 @@ export class CombatEngine {
 
   private spellById(id: string): SpellDef | undefined {
     return this.spells.find((s) => s.id === id);
+  }
+
+  /** First armed freeNextHeal cooldown, if any (Alpha 0.1 §D6 Still Waters) — consumed at cast start. */
+  private findArmedFreeHealCooldown(): CooldownRuntime | undefined {
+    return this.cooldowns.find((cd) => cd.def.effect.kind === 'freeNextHeal' && cd.armed);
+  }
+
+  /**
+   * Spell's mana cost after any active manaCostReduction buff windows (Alpha
+   * 0.1 §D6 Frenzied Liturgy), summed across cooldowns and floored at 0. Does
+   * not consider freeNextHeal — callers check `findArmedFreeHealCooldown`
+   * first, since a free charge always wins over a cost-reduction window.
+   */
+  private effectiveManaCost(spell: SpellDef): number {
+    let reduction = 0;
+    for (const cd of this.cooldowns) {
+      if (cd.def.effect.kind === 'manaCostReduction' && cd.buffRemainingMs > 0) {
+        reduction += cd.def.effect.costReduction;
+      }
+    }
+    return Math.max(0, spell.mana - reduction);
   }
 }

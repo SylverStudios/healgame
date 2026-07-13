@@ -192,6 +192,7 @@ export class CombatScene extends Phaser.Scene {
       missingHealthBonuses: this.sceneData.loadout.missingHealthBonuses,
       missingHealthPctBonuses: this.sceneData.loadout.missingHealthPctBonuses,
       fullHealthBonuses: this.sceneData.loadout.fullHealthBonuses,
+      cooldowns: this.sceneData.loadout.cooldowns,
     });
 
     this.buildGroundLine();
@@ -208,6 +209,8 @@ export class CombatScene extends Phaser.Scene {
       this.sceneData.loadout,
       (spellId) => this.onSpellCast(spellId),
       VIEW_WIDTH,
+      this.sceneData.loadout.cooldowns,
+      (cooldownId) => this.onCooldownActivate(cooldownId),
     );
     this.registerHotkeys(spells);
     this.registerEscapeKey();
@@ -408,6 +411,14 @@ export class CombatScene extends Phaser.Scene {
     this.syncView();
   }
 
+  /** Cooldowns are off-GCD (Alpha 0.1 §D6) — no busy/target checks here; the engine itself
+   *  silently ignores unknown ids and re-activation while still on cooldown. */
+  private onCooldownActivate(cooldownId: string): void {
+    if (this.engine.state.status !== 'running') return;
+    this.engine.activateCooldown(cooldownId);
+    this.syncView();
+  }
+
   // ---- event feedback --------------------------------------------------------
 
   private handleEvents(events: CombatEvent[]): void {
@@ -472,6 +483,9 @@ export class CombatScene extends Phaser.Scene {
           this.combatLog.push(`${this.formatTimestamp()} ${event.name} ends.`);
           break;
         }
+        case 'cooldownActivated':
+          this.combatLog.push(`${this.formatTimestamp()} ${event.name} activated!`);
+          break;
         case 'castCancelled': {
           const spellName = this.resolveSpellName(event.spellId);
           if (event.reason === 'escape') {
@@ -533,6 +547,7 @@ export class CombatScene extends Phaser.Scene {
     const healer = state.party.find((u) => u.role === 'healer');
     this.spellBar.setState(healer?.mana ?? 0, state.targetId !== null, state.status === 'running');
     this.spellBar.setArmedSpellIds(state.armedBuffedSpellIds);
+    this.spellBar.updateCooldowns(state.cooldowns);
     this.syncHealerRune(state);
 
     this.waveText.setText(

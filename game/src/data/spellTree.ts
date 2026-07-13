@@ -17,6 +17,7 @@ import type {
   MissingHealthBonusRule,
   MissingHealthPctBonusRule,
   FullHealthBonusRule,
+  CooldownDef,
 } from '../combat/types';
 import type { SubclassId } from '../save/save';
 import {
@@ -63,6 +64,8 @@ export interface CombatMods {
   fullHealthBonuses: FullHealthBonusRule[];
   /** Sorted unique pace multipliers (tenths); always includes 10; adds 15 when tempo owned. */
   paceMultipliersTenths: number[];
+  /** Alpha 0.1 §D6: cooldowns granted by the tree (e.g. Still Waters, Frenzied Liturgy). Chunk 7 adds the grantCooldown effect kind that populates this. */
+  cooldowns: CooldownDef[];
 }
 
 function content(c: SpellTreeContent): SpellTreeContent {
@@ -400,6 +403,9 @@ export function resolveCombatMods(
     missingHealthPctBonuses: [...missingPctMap.values()],
     fullHealthBonuses: [...fullHealthMap.values()],
     paceMultipliersTenths: [...paceTenths].sort((a, b) => a - b),
+    // Chunk 7 adds the grantCooldown SpellTreeEffect kind that populates this; chunk 6 only
+    // wires the plumbing (engine + data/cooldowns.ts + spellBar UI) with an always-empty list.
+    cooldowns: [],
   };
 }
 
