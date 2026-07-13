@@ -44,11 +44,18 @@ export function applyCombatResult(save: SaveData, result: CombatResult): HubNoti
   }
 
   if (result.status === 'victory' && !save.clearedDungeons.includes(result.encounterId)) {
-    save.rubies += REWARDS.rubyPerFirstClear;
     save.clearedDungeons.push(result.encounterId);
+    // Alpha 0.1 §D1: rubies remain Ash-Gate-only; other first clears still
+    // record (Iron Pass clear is what unlocks The Maw) but pay no ruby.
+    const grantsRuby = (REWARDS.rubyFirstClearDungeonIds as readonly string[]).includes(result.encounterId);
+    if (grantsRuby) save.rubies += REWARDS.rubyPerFirstClear;
+    // Alpha 0.1 §D7: the FIRST-ever Ash Gate clear also queues the relic pick
+    // (HubScene routes to RelicScene before building the hub UI). Iron
+    // Pass/other first clears never set this flag.
+    if (result.encounterId === 'ash-gate') save.relicPickPending = true;
     notices.push({
       kind: 'firstClear',
-      text: `FIRST CLEAR — +${REWARDS.rubyPerFirstClear} Ruby`,
+      text: grantsRuby ? `FIRST CLEAR — +${REWARDS.rubyPerFirstClear} Ruby` : 'FIRST CLEAR!',
     });
   }
 
@@ -130,7 +137,18 @@ export function purchaseNode(save: SaveData, nodeId: string): boolean {
   return true;
 }
 
-/** Dungeon 2 ("The Maw") unlocks after Ash Gate's first clear (poc-spec §7). */
-export function isDungeon2Unlocked(save: SaveData): boolean {
+/**
+ * Dungeon 2 ("Iron Pass") unlocks after Ash Gate's first clear
+ * (alpha-0.1-handoff §D1).
+ */
+export function isIronPassUnlocked(save: SaveData): boolean {
   return save.clearedDungeons.includes('ash-gate');
+}
+
+/**
+ * Dungeon 3 ("The Maw") unlocks after Iron Pass's first clear
+ * (alpha-0.1-handoff §D1 amends poc-spec §7's old "after Ash Gate" rule).
+ */
+export function isMawUnlocked(save: SaveData): boolean {
+  return save.clearedDungeons.includes('iron-pass');
 }

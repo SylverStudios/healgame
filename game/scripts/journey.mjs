@@ -1,25 +1,46 @@
 /**
- * End-to-end player journey test (poc-spec §1 + phase-2-handoff) in headless
- * Chromium.
+ * End-to-end player journey test (poc-spec §1 + phase-2-handoff +
+ * alpha-0.1-handoff) in headless Chromium.
  *
  * Drives the real game with mouse/keyboard, asserts on the localStorage save
  * between stages, screenshots every scene, and fails on any console error.
  *
  * Stages:
  *   A  fresh save → tutorial → learn Solemn Mend → Ash Gate → naive-heal to a
- *      wipe → hub applies gold/XP (save is v2 from birth)
+ *      wipe → hub applies gold/XP (save is v4 from birth)
  *   A2 seeded 8 XP → one more run crosses level 2 (Zealous auto-grant ribbon)
- *   M  seeded RAW v1 payload → boot migrates to v2 (deep-reserves rank,
- *      retired-node refund, subclass → oath node) with no progress lost
- *   B  seeded post-first-clear v2 save → tree graph: buy Deep Reserves ranks,
+ *   M  seeded RAW v1 payload → boot migrates to v4 (deep-reserves rank,
+ *      retired-node refund, subclass → oath node, relicId/relicPickPending
+ *      added) with no progress lost
+ *   M2 seeded v3 payload → boot migrates to v4 (relicId: null,
+ *      relicPickPending: false added, all v3 fields preserved)
+ *   Relic  seeded post-first-Ash-Gate-clear save with relicPickPending true
+ *      (alpha-0.1-handoff §D7) → Hub redirects straight to RelicScene → pick
+ *      card 2 → relicId persists, pending clears, hub shows the relic icon,
+ *      never re-offered on a later hub visit
+ *   D2 seeded Ash-Gate-cleared save → hub shows Iron Pass (Dungeon 2), NOT
+ *      The Maw (alpha-0.1-handoff §D1) → enter Iron Pass → return unwon
+ *   B  seeded post-first-clear v4 save → tree graph: buy Deep Reserves ranks,
  *      arm + swear the Vigil oath in-tree (ruby spent, Zealot locked), buy a
  *      follow-up node → hub shows the oath
+ *   B3 seeded sworn-oath + prereq-node saves → tree layer 2 (§D5): scroll to
+ *      the new row, buy a Vigil mana passive + the Still Waters CD node; a
+ *      second seed proves the §D4 rebalance (Steady Hands purchasable at the
+ *      old Desperate Zeal slot on a Zealot save)
  *   B2 combat with the Vigil kit → hover the Solemn Vigil button → tooltip
  *      screenshot (modifier lines from the tree) + mid-fight feedback shot
- *   C  enter The Maw → unwinnable sandbox → wipe → back to hub
+ *   C  Maw gating (§D1): Ash-Gate-only save → Maw absent; Ash Gate + Iron
+ *      Pass cleared → Maw present → enter → unwinnable sandbox → wipe → hub
  *
- * Ash Gate victory itself is proven deterministically at engine level
- * (src/combat/balance.test.ts); stage B seeds the post-clear save state.
+ * Ash Gate / Iron Pass victory itself is proven deterministically at engine
+ * level (src/combat/balance.test.ts); stages B/B3/D2 seed the relevant save
+ * states directly rather than replaying an already-proven live win — a live
+ * heal-rotation would need to react to per-tick HP, which isn't observable
+ * from outside the canvas, so scripting one blind would trade a real gate
+ * for wall-clock-timing guesswork (the thing this project's gates exist to
+ * avoid). The Relic stage seeds `relicPickPending: true` (the exact state
+ * `applyCombatResult` leaves right after a real first clear) so it can
+ * exercise the actual RelicScene routing/pick/persistence live instead.
  *
  * Usage: node scripts/journey.mjs [--shots DIR]
  */
@@ -48,15 +69,32 @@ const UI = {
   combatSpellSlot: (i, n) => ({ x: 480 - ((n - 1) * 174) / 2 + i * 174, y: 502 }),
   hubAshGate: { x: 480, y: 255 },
   hubTree: { x: 480, y: 320 },
-  hubMaw: { x: 480, y: 450 },
+  // Alpha 0.1 §D1: Iron Pass (Dungeon 2) took the old Maw slot; The Maw
+  // (Dungeon 3) moved below it. Canvas 960x540 → centerX 480, height/2 270.
+  hubIronPass: { x: 480, y: 450 },
+  hubMaw: { x: 480, y: 515 },
+  // Alpha 0.1 §D7: top-right relic icon (24px diamond/circle), margin 30.
+  hubRelicIcon: { x: 930, y: 30 },
   // TreeScene node graph (NODE_POSITIONS in TreeScene.ts)
   treeDeepReserves: { x: 480, y: 130 },
   treeVigilOath: { x: 260, y: 260 },
   treeZealotOath: { x: 700, y: 260 },
   treePatientVow: { x: 150, y: 400 },
+  // Alpha 0.1 §D4 rebalance: zealot-steady-hands takes the retired
+  // zealot-desperate-zeal slot — same position, no scroll needed.
+  treeZealotSteadyHands: { x: 820, y: 400 },
   treeBack: { x: 120, y: 504 },
+  // Alpha 0.1 §D5 tree layer 2: world y 650/800, below the 540-tall
+  // viewport. TreeScene scrolls (WHEEL_SCROLL_SCALE 0.5, max scroll
+  // 360 at WORLD_HEIGHT 900); `page.mouse.wheel(0, 720)` while hovering
+  // the canvas saturates scrollY at 360. Screen coords below = world y − 360.
+  treeCanvasCenter: { x: 480, y: 270 },
+  treeVigilDeepWell: { x: 150, y: 290 }, // world (150, 650)
+  treeVigilStillWaters: { x: 265, y: 440 }, // world (265, 800)
   // CombatScene pace toggle (bottom-left; PaceToggle origin bottom-left at 20,532).
   combatPaceToggle: { x: 48, y: 516 },
+  // RelicScene: 3 cards centered at (180,290) / (480,290) / (780,290).
+  relicCard: (i) => ({ x: 180 + i * 300, y: 290 }),
 };
 
 function startPreview() {
@@ -120,7 +158,7 @@ async function seedSave(page, save) {
 
 function baseSave(overrides) {
   return {
-    version: 3,
+    version: 4,
     tutorialDone: true,
     gold: 0,
     xp: 0,
@@ -130,6 +168,8 @@ function baseSave(overrides) {
     subclass: null,
     clearedDungeons: [],
     combatPaceTenths: 10,
+    relicId: null,
+    relicPickPending: false,
     ...overrides,
   };
 }
@@ -175,9 +215,10 @@ try {
   await page.mouse.click(UI.tutorialLearn.x, UI.tutorialLearn.y);
   await page.waitForTimeout(800);
   let save = await readSave(page);
-  check(save?.version === 3, 'new saves are written as v3');
+  check(save?.version === 4, 'new saves are written as v4');
   check(save?.tutorialDone === true, 'tutorial click sets tutorialDone');
   check(save?.unlockedSpells.includes('solemn-mend') === true, 'Solemn Mend unlocked via tutorial');
+  check(save?.relicId === null && save?.relicPickPending === false, 'fresh save has no relic pick pending');
   await page.waitForTimeout(3500); // let autos land so lunge/'*' feedback is in frame
   await shot(page, 'ash-gate-first-run-feedback');
 
@@ -198,8 +239,8 @@ try {
   check(save.unlockedSpells.includes('zealous-mending'), 'level 2 auto-granted Zealous Mending (no spend UI)');
   await shot(page, 'hub-level-up-ribbon');
 
-  // ---- Stage M: v1 save migrates to v2 with no progress lost -----------------
-  console.log('Stage M: raw v1 payload → boot → migrated v3 save');
+  // ---- Stage M: v1 save migrates to v4 with no progress lost -----------------
+  console.log('Stage M: raw v1 payload → boot → migrated v4 save');
   await seedSave(page, {
     version: 1,
     tutorialDone: true,
@@ -212,14 +253,97 @@ try {
     clearedDungeons: ['ash-gate'],
   });
   save = await readSave(page);
-  check(save?.version === 3, 'v1 payload migrated to version 3 on boot');
+  check(save?.version === 4, 'v1 payload migrated to version 4 on boot');
   check(save?.combatPaceTenths === 10, 'migration: default combat pace is 1×');
   check(save?.treeRanks?.['deep-reserves'] === 1, "migration: 'max-mana-1' → deep-reserves rank 1");
   check(save?.gold === 8, `migration: retired vigil-deep-focus refunded 5g (gold=${save?.gold}, expected 8)`);
   check(save?.treeRanks?.['vigil-oath'] === 1, 'migration: existing subclass owns vigil-oath at rank 1');
   check(save?.subclass === 'vigil' && save?.rubies === 0, 'migration: subclass kept, no ruby charged');
   check(save?.xp === 12 && save?.clearedDungeons?.includes('ash-gate'), 'migration: xp + clears carried over');
+  check(save?.relicId === null, 'migration: v1→v4 adds relicId: null');
+  check(save?.relicPickPending === false, 'migration: v1→v4 adds relicPickPending: false');
   await shot(page, 'hub-after-migration');
+
+  // ---- Stage M2: v3 save migrates to v4 (relic fields added) -----------------
+  console.log('Stage M2: v3 payload → boot → migrated v4 save (relic fields added)');
+  await seedSave(page, {
+    version: 3,
+    tutorialDone: true,
+    gold: 12,
+    xp: 20,
+    rubies: 1,
+    unlockedSpells: ['solemn-mend', 'zealous-mending'],
+    treeRanks: { 'deep-reserves': 2 },
+    subclass: null,
+    clearedDungeons: ['ash-gate'],
+    combatPaceTenths: 15,
+  });
+  save = await readSave(page);
+  check(save?.version === 4, 'v3 payload migrated to version 4 on boot (no fresh-save wipe)');
+  check(save?.relicId === null, 'migration: v3→v4 adds relicId: null');
+  check(save?.relicPickPending === false, 'migration: v3→v4 adds relicPickPending: false');
+  check(save?.gold === 12 && save?.xp === 20 && save?.rubies === 1, 'migration: v3 currencies preserved');
+  check(save?.combatPaceTenths === 15, 'migration: v3 combat pace preserved (not reset to default)');
+  check(save?.treeRanks?.['deep-reserves'] === 2, 'migration: v3 treeRanks preserved');
+  await shot(page, 'hub-after-v3-migration');
+
+  // ---- Stage Relic: first Ash Gate clear → pick 1 of 3 → persists -----------
+  console.log('Stage Relic: relicPickPending routes Hub → RelicScene → pick → persists, never re-offered');
+  await seedSave(page, baseSave({ clearedDungeons: ['ash-gate'], relicPickPending: true }));
+  save = await readSave(page);
+  check(save?.relicPickPending === true && save?.relicId === null, 'seeded state: pick pending, nothing chosen yet');
+  await shot(page, 'relic-scene-cards');
+
+  const card2 = UI.relicCard(1); // pick the 2nd of 3 cards (Triage Bell — see data/relics.ts RELICS order)
+  await page.mouse.click(card2.x, card2.y);
+  await page.waitForTimeout(500);
+  save = await readSave(page);
+  check(save?.relicId === 'triage-bell', `picking card 2 sets relicId (relicId=${save?.relicId}, expected triage-bell)`);
+  check(save?.relicPickPending === false, 'relic pick clears relicPickPending');
+  await shot(page, 'hub-with-relic-icon');
+
+  // Second hub visit (real scene nav, not just a reload): still hub, never re-offered.
+  await page.mouse.click(UI.hubTree.x, UI.hubTree.y);
+  await page.waitForTimeout(500);
+  await page.mouse.click(UI.treeBack.x, UI.treeBack.y);
+  await page.waitForTimeout(500);
+  save = await readSave(page);
+  check(save?.relicId === 'triage-bell' && save?.relicPickPending === false, 'relic choice persists across a second hub visit');
+  await shot(page, 'hub-relic-not-reoffered');
+
+  // A fresh boot (full reload) also lands on the normal Hub, not RelicScene, again.
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForTimeout(800);
+  save = await readSave(page);
+  check(save?.relicId === 'triage-bell', 'relic choice survives a full reload without being re-offered');
+  await shot(page, 'hub-relic-after-reload');
+
+  // ---- Stage D2: Ash Gate clear unlocks Iron Pass (not yet The Maw) --------
+  console.log('Stage D2: Ash-Gate-cleared save → Iron Pass unlocked on hub, The Maw still gated');
+  await seedSave(page, baseSave({ clearedDungeons: ['ash-gate'] }));
+  await shot(page, 'hub-iron-pass-unlocked'); // visual: Iron Pass button present, no Maw button below it
+
+  // Clicking where The Maw would sit is a no-op — nothing is registered there yet.
+  await page.mouse.click(UI.hubMaw.x, UI.hubMaw.y);
+  await page.waitForTimeout(400);
+  save = await readSave(page);
+  check(
+    save?.clearedDungeons?.length === 1 && save.gold === 0 && save.xp === 0,
+    'The Maw slot is inert before Iron Pass is cleared (save unchanged)',
+  );
+
+  await page.mouse.click(UI.hubIronPass.x, UI.hubIronPass.y);
+  await page.waitForTimeout(1200);
+  await shot(page, 'iron-pass-combat-entered'); // visual: Iron Pass encounter running (Iron Husk wave)
+  // No need to play this out live — Iron Pass's clearability is an engine-level
+  // gate (balance.test.ts gates 6/7). Reload to bail out without winning/wiping.
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForTimeout(800);
+  save = await readSave(page);
+  check(
+    save?.clearedDungeons?.length === 1 && !save.clearedDungeons.includes('iron-pass'),
+    'leaving Iron Pass mid-fight records neither a clear nor a wipe',
+  );
 
   // ---- Stage B: post-first-clear → tree graph → oath in-tree -----------------
   console.log('Stage B: seeded post-first-clear → Deep Reserves ranks → Vigil oath in-tree');
@@ -286,8 +410,76 @@ try {
   await page.waitForTimeout(600);
   await shot(page, 'hub-with-oath');
 
+  // ---- Stage B3: tree layer 2 (mana focus) + §D4 rebalance ------------------
+  console.log('Stage B3: sworn oath + prereq node → scroll → buy a layer-2 passive + its CD node');
+  await seedSave(
+    page,
+    baseSave({
+      gold: 13,
+      unlockedSpells: ['solemn-mend', 'zealous-mending'],
+      subclass: 'vigil',
+      treeRanks: { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-patient-vow': 1 },
+    }),
+  );
+  await page.mouse.click(UI.hubTree.x, UI.hubTree.y);
+  await page.waitForTimeout(600);
+
+  // Scroll to layer 2 (world y 650/800, past the 540-tall viewport): hover the
+  // canvas, then wheel down enough to saturate the clamp (max scroll 360).
+  await page.mouse.move(UI.treeCanvasCenter.x, UI.treeCanvasCenter.y);
+  await page.mouse.wheel(0, 720);
+  await page.waitForTimeout(400);
+  await shot(page, 'tree-layer2-scrolled');
+
+  await page.mouse.click(UI.treeVigilDeepWell.x, UI.treeVigilDeepWell.y);
+  await page.waitForTimeout(400);
+  save = await readSave(page);
+  check(save.treeRanks['vigil-deep-well'] === 1, 'bought Deep Well (layer-2 mana passive)');
+  check(save.gold === 8, `gold after Deep Well (gold=${save.gold}, expected 8)`);
+
+  await page.mouse.click(UI.treeVigilStillWaters.x, UI.treeVigilStillWaters.y);
+  await page.waitForTimeout(400);
+  save = await readSave(page);
+  check(save.treeRanks['vigil-still-waters'] === 1, 'bought Still Waters (layer-2 CD grant node)');
+  check(save.gold === 0, `gold after Still Waters (gold=${save.gold}, expected 0)`);
+  await shot(page, 'tree-layer2-bought');
+
+  await page.mouse.click(UI.treeBack.x, UI.treeBack.y);
+  await page.waitForTimeout(400);
+
+  // §D4 rebalance: zealot-steady-hands takes the retired zealot-desperate-zeal
+  // slot (same position, no scroll) — separate lean seed, own branch is enough.
+  await seedSave(
+    page,
+    baseSave({
+      gold: 6,
+      unlockedSpells: ['solemn-mend', 'zealous-mending'],
+      subclass: 'zealot',
+      treeRanks: { 'deep-reserves': 1, 'zealot-oath': 1 },
+    }),
+  );
+  await page.mouse.click(UI.hubTree.x, UI.hubTree.y);
+  await page.waitForTimeout(600);
+  await page.mouse.click(UI.treeZealotSteadyHands.x, UI.treeZealotSteadyHands.y);
+  await page.waitForTimeout(400);
+  save = await readSave(page);
+  check(save.treeRanks['zealot-steady-hands'] === 1, 'Steady Hands purchasable at the retired Desperate Zeal slot');
+  check(save.gold === 1, `gold after Steady Hands (gold=${save.gold}, expected 1)`);
+  await shot(page, 'tree-zealot-steady-hands-rebalance');
+
   // ---- Stage B2: Vigil kit in combat — tooltip reflects tree modifiers -------
   console.log('Stage B2: combat with the Vigil kit → pace toggle + tooltip + feedback');
+  await seedSave(
+    page,
+    baseSave({
+      gold: 0,
+      xp: 12,
+      unlockedSpells: ['solemn-mend', 'zealous-mending'],
+      subclass: 'vigil',
+      treeRanks: { 'deep-reserves': 2, 'vigil-oath': 1, 'vigil-patient-vow': 1, 'warped-tempo-via-zealot': 1 },
+      clearedDungeons: ['ash-gate'],
+    }),
+  );
   await page.mouse.click(UI.hubAshGate.x, UI.hubAshGate.y);
   await page.waitForTimeout(1200);
   await page.mouse.click(UI.combatPaceToggle.x, UI.combatPaceToggle.y);
@@ -307,10 +499,12 @@ try {
   await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(800);
 
-  // ---- Stage C: The Maw (unwinnable sandbox) --------------------------------
-  console.log('Stage C: The Maw — enter, get flattened, return');
+  // ---- Stage C: Maw gating (§D1) — gated on Iron Pass, still unwinnable -----
+  console.log('Stage C: Maw gating — absent after Ash Gate alone, present + unwinnable after Iron Pass too');
+  await seedSave(page, baseSave({ clearedDungeons: ['ash-gate', 'iron-pass'] }));
   save = await readSave(page);
   const xpBeforeMaw = save.xp;
+  await shot(page, 'hub-maw-unlocked'); // visual: The Maw button now present below Iron Pass
   await page.mouse.click(UI.hubMaw.x, UI.hubMaw.y);
   await page.waitForTimeout(1000);
   await shot(page, 'maw-combat-start');
@@ -333,4 +527,4 @@ if (failures.length > 0) {
   for (const f of failures) console.error(`  - ${f}`);
   process.exit(1);
 }
-console.log('\nJOURNEY PASS: full Phase-2 player journey verified in-browser');
+console.log('\nJOURNEY PASS: full Alpha 0.1 player journey verified in-browser');

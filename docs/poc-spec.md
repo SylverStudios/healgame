@@ -1,6 +1,6 @@
 # Healgame — PoC Spec (locked)
 
-Status: current · Authority: PoC baseline (phase amendments in poc-qa / handoffs win) · Last verified: 2026-07-10
+Status: current · Authority: PoC baseline (phase amendments in poc-qa / handoffs win) · Last verified: 2026-07-12
 
 **PoC implementation details.** Wins on PoC conflicts unless a later phase
 handoff or `poc-qa.md` amendment says otherwise. Long-term design: [`GDD.md`](./GDD.md).
@@ -121,7 +121,7 @@ Keep low; retune in play. All integers.
 | Gold per enemy | 1 |
 | XP per enemy | 1 (level thresholds TBD — e.g. level 2 at 10 XP) |
 
-**Second heal (XP unlock) draft:** Zealous Mending — heal **5**, mana **8**, cast **1s** (faster, less efficient).  
+**Second heal (XP unlock) draft:** Zealous Mending — heal **6**, mana **6**, cast **1s** (faster tempo tool; same heal-per-mana as Solemn Mend). Tuned 2026-07-12 — see `poc-qa.md` playtest retune.  
 **Tree unlock draft:** pick one small node (e.g. +max mana **5**, or Solemn Mend cost **4** instead of 5) — exact node TBD in tasking.  
 **Ruby subclass:** see §6.
 
@@ -133,9 +133,9 @@ Dungeon 2 boss: absurd HP / damage so the party cannot win with PoC power. Sandb
 
 | Channel | What it does in PoC |
 |---------|---------------------|
-| **XP / level** | At a level threshold, **auto-grant** the second skill (Zealous Mending). No spend UI. |
-| **Gold** | Spend on **spell tree** nodes (at least one unlockable skill/perk for PoC). |
-| **Ruby** | **One** sink: **subclass split** after Ash Gate clear. |
+| **XP / level** | **Kit breadth.** At a level threshold, **auto-grant** a skill (PoC: Zealous Mending at Lv 2). No spend UI. Further XP has no extra sinks yet. |
+| **Gold** | **Tree growth.** Spend on **spell tree** nodes (Deep Reserves, forsaken-path tempo, …). |
+| **Ruby** | **Branching power.** **One** PoC sink: **subclass oath** after Ash Gate clear (scarce; first-clear only). |
 | **Hub buffs** | **Out of PoC.** |
 | **Respec** | **None.** Restart = new save / wipe all progress. |
 

@@ -31,6 +31,48 @@ export const GATE_WARDEN = {
 } as const;
 
 /**
+ * Iron Pass (Dungeon 2, alpha-0.1-handoff §D2) trash: same "Ash Husk" template
+ * (reskinned "Iron Husk" in data only), harder-hitting than Ash Gate's global
+ * `TRASH` (1 dmg / 3000ms) per the handoff's "bump damage +1 vs Ash Gate feel"
+ * guidance. Wired in via `EnemyGroupDef`'s per-group `autoDamage`/
+ * `swingIntervalMs` override (see `encounters.ts` IRON_PASS waves) — the
+ * engine falls back to global `TRASH` only when a group omits these fields.
+ */
+export const IRON_TRASH = {
+  autoDamage: 2,
+  swingIntervalMs: 3000,
+} as const;
+
+/**
+ * Iron Pass boss (alpha-0.1-handoff §D3): "Spire Lancer" — the Tunnel Vision
+ * cast (3s telegraph, then a 10s channel ticking 2 damage/s into one focused
+ * non-tank party member, ≈2x that unit's 10hp maxHp if unhealed) is unchanged
+ * from the handoff draft; `hp`/`autoDamage` are retuned (chunk 9a bot tune —
+ * see balance.test.ts gates 5/6). Draft was hp 170 / autoDamage 4 per 3.5s
+ * swing (same cadence feel as Gate Warden); the scripted-bot diagnostic
+ * showed the boss's own auto-attack chip damage on the tank (compounding with
+ * healing the Tunnel Vision target) wiped a maxed build well before 3 party
+ * members could survive to victory. autoDamage 3 eases that passive tank
+ * pressure; hp 190 keeps the fight long enough to land 2 Tunnel Visions
+ * (design's "ideally 2") while landing a clean >=3-survivors win for both
+ * maxed builds — hp above ~195 starts costing the 3rd survivor, hp below
+ * ~185 wins with the full party untouched (no real tension), so 190 sits in
+ * the gate's margin on both sides. First telegraph at 8s into the boss
+ * fight, then every 30s (start-to-start cadence — see combat/README.md).
+ */
+export const SPIRE_LANCER = {
+  hp: 190,
+  autoDamage: 3,
+  swingIntervalMs: 3500,
+  telegraphMs: 3000,
+  firstCastAtMs: 8000,
+  intervalMs: 30_000,
+  channelMs: 10_000,
+  tickMs: 1000,
+  damagePerTick: 2,
+} as const;
+
+/**
  * Dungeon 2 boss (poc-spec §1 item 8, §7): "insanely overpowered" on purpose
  * — the party cannot win with PoC power. Auto damage 3 per 3.5s; Extinction is
  * a 10s named cast dealing 10 damage to every living party member, first at
@@ -59,7 +101,7 @@ export const MERCS = {
 
 export const SPELLS = {
   solemnMend: { id: 'solemn-mend', name: 'Solemn Mend', heal: 5, mana: 5, castMs: 2000 },
-  zealousMending: { id: 'zealous-mending', name: 'Zealous Mending', heal: 5, mana: 8, castMs: 1000 },
+  zealousMending: { id: 'zealous-mending', name: 'Zealous Mending', heal: 6, mana: 6, castMs: 1000 },
   /** Vigil subclass spell (phase-2-handoff): slow, efficient. Granted by the vigil-oath tree node. */
   solemnVigil: { id: 'solemn-vigil', name: 'Solemn Vigil', heal: 9, mana: 7, castMs: 3000 },
   /** Zealot subclass spell (phase-2-handoff): fast, pricey per point. Granted by the zealot-oath tree node. */
@@ -70,6 +112,11 @@ export const REWARDS = {
   goldPerEnemy: 1,
   xpPerEnemy: 1,
   rubyPerFirstClear: 1,
+  /**
+   * Alpha 0.1 §D1: rubies stay Ash-Gate-only — an Iron Pass first clear
+   * records the clear (unlocking The Maw) but grants no ruby.
+   */
+  rubyFirstClearDungeonIds: ['ash-gate'],
 } as const;
 
 /** Micro-choice (poc-spec §10.1): level 2 at 10 XP; only level 2 matters for PoC. */
