@@ -66,8 +66,9 @@ const TOOLTIP_MAX_WIDTH = 280;
 const TOOLTIP_DEPTH = 300;
 
 /**
- * Presentation overrides for the live SPELL_TREE (journey click targets).
+ * Presentation overrides for the live SPELL_TREE (node placement).
  * Any other config falls through to layoutSpots auto-placement.
+ * Journey clicks nodes by `treeNode:<spotId>` name, not by these coords.
  */
 const SPELL_TREE_POSITIONS: Readonly<Record<string, SpotPosition>> = {
   'deep-reserves': { x: 480, y: 130 },
@@ -348,7 +349,8 @@ export class TreeScene extends Phaser.Scene {
       .rectangle(pos.x, pos.y, NODE_WIDTH, NODE_HEIGHT, bgColor)
       .setStrokeStyle(2, borderColor)
       .setAlpha(alpha)
-      .setInteractive({ useHandCursor: purchasable });
+      .setInteractive({ useHandCursor: purchasable })
+      .setName(`treeNode:${spot.id}`);
 
     bg.on('pointerover', () => this.showTooltip(spot, pos));
     bg.on('pointerout', () => this.hideTooltip());
@@ -486,7 +488,8 @@ export class TreeScene extends Phaser.Scene {
       .rectangle(x, y, 160, 44, BUTTON_COLOR)
       .setStrokeStyle(2, BORDER_COLOR)
       .setInteractive({ useHandCursor: true })
-      .setScrollFactor(0);
+      .setScrollFactor(0)
+      .setName('treeBack');
     this.add
       .text(x, y, 'Back', { fontFamily: FONT, fontSize: '16px', color: TEXT_COLOR })
       .setOrigin(0.5)

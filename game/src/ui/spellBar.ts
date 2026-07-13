@@ -77,7 +77,8 @@ class SpellButton {
     this.bg = scene.add
       .rectangle(x, y, BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_BG_COLOR)
       .setStrokeStyle(BUTTON_BORDER_WIDTH, BUTTON_BORDER_COLOR)
-      .setInteractive({ useHandCursor: true });
+      .setInteractive({ useHandCursor: true })
+      .setName(`combatSpell:${spell.id}`);
     this.bg.on('pointerdown', () => {
       if (this.enabled) onClick(this.spellId);
     });

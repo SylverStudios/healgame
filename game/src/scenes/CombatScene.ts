@@ -659,6 +659,7 @@ export class CombatScene extends Phaser.Scene {
       .setStrokeStyle(1, 0x0a0605)
       .setDepth(OVERLAY_DEPTH + 1)
       .setInteractive({ useHandCursor: true })
+      .setName('combatReturn')
       .on('pointerdown', () => {
         const combatResult: CombatResult = { encounterId: this.sceneData.encounterId, status, gold, xp };
         this.scene.start(this.sceneData.returnTo, { combatResult });

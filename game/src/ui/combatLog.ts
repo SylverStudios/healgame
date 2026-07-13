@@ -59,7 +59,8 @@ export class CombatLog {
       })
       .setOrigin(1, 0)
       .setDepth(LOG_DEPTH)
-      .setInteractive({ useHandCursor: true });
+      .setInteractive({ useHandCursor: true })
+      .setName('combatLogToggle');
     this.headerText.on('pointerdown', () => this.toggle());
 
     this.panelBg = scene.add

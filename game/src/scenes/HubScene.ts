@@ -148,20 +148,28 @@ export class HubScene extends Phaser.Scene {
           ? height / 2 - 15
           : height / 2 + 180;
       const suffix = dungeon.order === 1 ? '' : ` (Dungeon ${dungeon.order})`;
-      this.makeButton(x, y, compactDungeonGrid ? 260 : 300, compactDungeonGrid ? 44 : 52, `Enter ${dungeon.name}${suffix}`, () => {
-        const combatData: CombatSceneData = {
-          encounterId: dungeon.id,
-          loadout: loadoutFromSave(save),
-          returnTo: SceneKeys.Hub,
-        };
-        this.scene.start(SceneKeys.Combat, combatData);
-      });
+      this.makeButton(
+        x,
+        y,
+        compactDungeonGrid ? 260 : 300,
+        compactDungeonGrid ? 44 : 52,
+        `Enter ${dungeon.name}${suffix}`,
+        () => {
+          const combatData: CombatSceneData = {
+            encounterId: dungeon.id,
+            loadout: loadoutFromSave(save),
+            returnTo: SceneKeys.Hub,
+          };
+          this.scene.start(SceneKeys.Combat, combatData);
+        },
+        hubDungeonButtonName(dungeon.id),
+      );
     });
 
     const treeY = compactDungeonGrid ? 390 : height / 2 + 50;
     this.makeButton(centerX, treeY, 300, 52, 'Spell Tree', () => {
       this.scene.start(SceneKeys.Tree);
-    });
+    }, 'hubTree');
 
     if (save.subclass !== null) {
       const label = save.subclass === 'vigil' ? 'Path of the Vigil' : 'Path of the Zealot';
@@ -177,7 +185,8 @@ export class HubScene extends Phaser.Scene {
     const label = this.add
       .text(x, y, 'Restart (wipe save)', { fontFamily: FONT, fontSize: '14px', color: DIM_COLOR })
       .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
+      .setInteractive({ useHandCursor: true })
+      .setName('hubRestart');
 
     label.on('pointerdown', () => {
       if (!this.restartArmed) {
@@ -204,7 +213,8 @@ export class HubScene extends Phaser.Scene {
     const icon = this.add
       .circle(x, y, RELIC_ICON_RADIUS, color)
       .setStrokeStyle(2, RELIC_ICON_BORDER)
-      .setInteractive({ useHandCursor: true });
+      .setInteractive({ useHandCursor: true })
+      .setName('hubRelicIcon');
 
     const tooltipBg = this.add
       .rectangle(0, 0, 10, 10, RELIC_TOOLTIP_BG)
@@ -243,12 +253,35 @@ export class HubScene extends Phaser.Scene {
     icon.on('pointerout', () => tooltip.setVisible(false));
   }
 
-  private makeButton(x: number, y: number, w: number, h: number, label: string, onClick: () => void): void {
+  private makeButton(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    label: string,
+    onClick: () => void,
+    name: string,
+  ): void {
     const rect = this.add
       .rectangle(x, y, w, h, BUTTON_COLOR)
       .setStrokeStyle(2, BORDER_COLOR)
-      .setInteractive({ useHandCursor: true });
+      .setInteractive({ useHandCursor: true })
+      .setName(name);
     this.add.text(x, y, label, { fontFamily: FONT, fontSize: '18px', color: TEXT_COLOR }).setOrigin(0.5);
     rect.on('pointerdown', onClick);
+  }
+}
+
+/** Journey/semantic names for hub dungeon buttons (docs/semantic-targets-handoff.md). */
+function hubDungeonButtonName(dungeonId: string): string {
+  switch (dungeonId) {
+    case 'ash-gate':
+      return 'hubAshGate';
+    case 'iron-pass':
+      return 'hubIronPass';
+    case 'the-maw':
+      return 'hubMaw';
+    default:
+      return `hubDungeon:${dungeonId}`;
   }
 }

@@ -62,7 +62,8 @@ export class TutorialScene extends Phaser.Scene {
     const button = this.add
       .rectangle(width / 2, buttonY, 340, 74, BUTTON_COLOR)
       .setStrokeStyle(2, BORDER_COLOR)
-      .setInteractive({ useHandCursor: true });
+      .setInteractive({ useHandCursor: true })
+      .setName('tutorialLearn');
     this.add
       .text(width / 2, buttonY, 'Learn Solemn Mend', { fontFamily: FONT, fontSize: '20px', color: ACCENT_COLOR })
       .setOrigin(0.5);

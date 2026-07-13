@@ -58,45 +58,27 @@ mkdirSync(shotsDir, { recursive: true });
 const PORT = 4174;
 const SAVE_KEY = 'healgame-save-v1';
 
-// Scene layout constants (must match the scenes' layout constants; 960x540 viewport = 1:1 mapping)
-const UI = {
-  tutorialLearn: { x: 480, y: 430 },
-  // Side-view facing line: tank is the rightmost party unit; 64px body is
-  // bottom-aligned to GROUND_Y=340 (body spans y 276-340, centered on x 380).
-  combatTank: { x: 380, y: 308 },
-  combatReturn: { x: 480, y: 330 },
-  // Spell bar: buttons 160w + 14 gap centered on 480, y 502; slot i of n.
-  combatSpellSlot: (i, n) => ({ x: 480 - ((n - 1) * 174) / 2 + i * 174, y: 502 }),
-  hubAshGate: { x: 480, y: 255 },
-  hubTree: { x: 480, y: 320 },
-  // With two unlocked dungeons, Iron Pass keeps the old Maw slot. Once all
-  // three unlock, HubScene reflows them into a centered three-column row:
-  // Ash x180, Iron x480, Maw x780, all y240.
-  hubIronPass: { x: 480, y: 450 },
-  hubMaw: { x: 780, y: 240 },
-  // Alpha 0.1 §D7: top-right relic icon (24px diamond/circle), margin 30.
-  hubRelicIcon: { x: 930, y: 30 },
-  // TreeScene node graph (NODE_POSITIONS in TreeScene.ts)
-  treeDeepReserves: { x: 480, y: 130 },
-  treeVigilOath: { x: 260, y: 260 },
-  treeZealotOath: { x: 700, y: 260 },
-  treePatientVow: { x: 150, y: 400 },
-  // Alpha 0.1 §D4 rebalance: zealot-steady-hands takes the retired
-  // zealot-desperate-zeal slot — same position, no scroll needed.
-  treeZealotSteadyHands: { x: 820, y: 400 },
-  treeBack: { x: 120, y: 504 },
-  // Alpha 0.1 §D5 tree layer 2: world y 650/800, below the 540-tall
-  // viewport. TreeScene scrolls (WHEEL_SCROLL_SCALE 0.5, max scroll
-  // 360 at WORLD_HEIGHT 900); `page.mouse.wheel(0, 720)` while hovering
-  // the canvas saturates scrollY at 360. Screen coords below = world y − 360.
-  treeCanvasCenter: { x: 480, y: 270 },
-  treeVigilDeepWell: { x: 150, y: 290 }, // world (150, 650)
-  treeVigilStillWaters: { x: 265, y: 440 }, // world (265, 800)
-  // CombatScene pace toggle (bottom-left; PaceToggle origin bottom-left at 20,532).
-  combatPaceToggle: { x: 48, y: 516 },
-  // RelicScene: 3 cards centered at (180,290) / (480,290) / (780,290).
-  relicCard: (i) => ({ x: 180 + i * 300, y: 290 }),
-};
+/** Resolve a semantic GameObject name via window.__healgame (src/debug/testHooks.ts). */
+const locate = (page, name) =>
+  page.evaluate((n) => window.__healgame?.locate(n) ?? null, name);
+
+async function clickNamed(page, name) {
+  const pos = await locate(page, name);
+  if (!pos) {
+    const names = await page.evaluate(() => window.__healgame?.list() ?? []);
+    throw new Error(`no visible target "${name}"; visible: ${names.join(', ')}`);
+  }
+  await page.mouse.click(pos.x, pos.y);
+}
+
+async function hoverNamed(page, name) {
+  const pos = await locate(page, name);
+  if (!pos) {
+    const names = await page.evaluate(() => window.__healgame?.list() ?? []);
+    throw new Error(`no visible target "${name}"; visible: ${names.join(', ')}`);
+  }
+  await page.mouse.move(pos.x, pos.y);
+}
 
 function startPreview() {
   return new Promise((resolve, reject) => {
@@ -177,16 +159,17 @@ function baseSave(overrides) {
 
 /**
  * Naive combat loop: target the tank, then every 2s press "1" (cast) and
- * blind-click where the result overlay's Return button will appear (inert
- * during the fight). Ends when `until(save)` first holds; the loop's blind
- * Return click is what moves wipe → hub, where the result gets applied.
+ * conditionally click Return when the result overlay exists (locate null
+ * mid-fight). Ends when `until(save)` first holds.
  */
 async function playCombat(page, until, timeoutMs = 180_000) {
-  await page.mouse.click(UI.combatTank.x, UI.combatTank.y);
+  await clickNamed(page, 'combatAlly:tank');
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     await page.keyboard.press('1');
-    await page.mouse.click(UI.combatReturn.x, UI.combatReturn.y);
+    if (await locate(page, 'combatReturn')) {
+      await clickNamed(page, 'combatReturn');
+    }
     await page.waitForTimeout(2000);
     const save = await readSave(page);
     if (save && until(save)) return save;
@@ -213,7 +196,7 @@ try {
   await shot(page, 'tutorial');
   check((await readSave(page)) === null, 'fresh boot has no save');
 
-  await page.mouse.click(UI.tutorialLearn.x, UI.tutorialLearn.y);
+  await clickNamed(page, 'tutorialLearn');
   await page.waitForTimeout(800);
   let save = await readSave(page);
   check(save?.version === 4, 'new saves are written as v4');
@@ -234,7 +217,7 @@ try {
   // ---- Stage A2: level ding auto-grants Zealous Mending ----------------------
   console.log('Stage A2: run that crosses 10 XP → Zealous Mending auto-grant');
   await seedSave(page, baseSave({ gold: 3, xp: 8 }));
-  await page.mouse.click(UI.hubAshGate.x, UI.hubAshGate.y);
+  await clickNamed(page, 'hubAshGate');
   await page.waitForTimeout(1000);
   save = await playCombat(page, (s) => s.xp >= 10);
   check(save.unlockedSpells.includes('zealous-mending'), 'level 2 auto-granted Zealous Mending (no spend UI)');
@@ -295,8 +278,9 @@ try {
   check(save?.relicPickPending === true && save?.relicId === null, 'seeded state: pick pending, nothing chosen yet');
   await shot(page, 'relic-scene-cards');
 
-  const card2 = UI.relicCard(1); // pick the 2nd of 3 cards (Triage Bell — see data/relics.ts RELICS order)
-  await page.mouse.click(card2.x, card2.y);
+  const card2 = await locate(page, 'relicCard:triage-bell'); // 2nd of 3 — see data/relics.ts RELICS order
+  check(card2 !== null, 'RelicScene exposes relicCard:triage-bell');
+  await clickNamed(page, 'relicCard:triage-bell');
   await page.waitForTimeout(500);
   save = await readSave(page);
   check(save?.relicId === 'triage-bell', `picking card 2 sets relicId (relicId=${save?.relicId}, expected triage-bell)`);
@@ -304,9 +288,9 @@ try {
   await shot(page, 'hub-with-relic-icon');
 
   // Second hub visit (real scene nav, not just a reload): still hub, never re-offered.
-  await page.mouse.click(UI.hubTree.x, UI.hubTree.y);
+  await clickNamed(page, 'hubTree');
   await page.waitForTimeout(500);
-  await page.mouse.click(UI.treeBack.x, UI.treeBack.y);
+  await clickNamed(page, 'treeBack');
   await page.waitForTimeout(500);
   save = await readSave(page);
   check(save?.relicId === 'triage-bell' && save?.relicPickPending === false, 'relic choice persists across a second hub visit');
@@ -324,16 +308,11 @@ try {
   await seedSave(page, baseSave({ clearedDungeons: ['ash-gate'] }));
   await shot(page, 'hub-iron-pass-unlocked'); // visual: Iron Pass button present, no Maw button below it
 
-  // Clicking where The Maw would sit is a no-op — nothing is registered there yet.
-  await page.mouse.click(UI.hubMaw.x, UI.hubMaw.y);
-  await page.waitForTimeout(400);
-  save = await readSave(page);
-  check(
-    save?.clearedDungeons?.length === 1 && save.gold === 0 && save.xp === 0,
-    'The Maw slot is inert before Iron Pass is cleared (save unchanged)',
-  );
+  // The Maw button must not exist yet — locate is null (not an inert pixel click).
+  check((await locate(page, 'hubMaw')) === null, 'The Maw button absent before Iron Pass is cleared');
+  check((await locate(page, 'hubIronPass')) !== null, 'Iron Pass button present after Ash Gate clear');
 
-  await page.mouse.click(UI.hubIronPass.x, UI.hubIronPass.y);
+  await clickNamed(page, 'hubIronPass');
   await page.waitForTimeout(1200);
   await shot(page, 'iron-pass-combat-entered'); // visual: Iron Pass encounter running (Iron Husk wave)
   // No need to play this out live — Iron Pass's clearability is an engine-level
@@ -360,28 +339,28 @@ try {
   );
   await shot(page, 'hub-post-first-clear');
 
-  await page.mouse.click(UI.hubTree.x, UI.hubTree.y);
+  await clickNamed(page, 'hubTree');
   await page.waitForTimeout(600);
   await shot(page, 'tree-graph-before-buy');
 
   // Multi-rank root: two ranks of Deep Reserves (5g each).
-  await page.mouse.click(UI.treeDeepReserves.x, UI.treeDeepReserves.y);
+  await clickNamed(page, 'treeNode:deep-reserves');
   await page.waitForTimeout(400);
   save = await readSave(page);
   check(save.treeRanks['deep-reserves'] === 1, 'bought Deep Reserves rank 1');
-  await page.mouse.click(UI.treeDeepReserves.x, UI.treeDeepReserves.y);
+  await clickNamed(page, 'treeNode:deep-reserves');
   await page.waitForTimeout(400);
   save = await readSave(page);
   check(save.treeRanks['deep-reserves'] === 2, 'bought Deep Reserves rank 2 (multi-rank node)');
   check(save.gold === 7, `gold spent per rank (gold=${save.gold}, expected 7)`);
 
   // Oath is two-click: first click only ARMS (no purchase yet).
-  await page.mouse.click(UI.treeVigilOath.x, UI.treeVigilOath.y);
+  await clickNamed(page, 'treeNode:vigil-oath');
   await page.waitForTimeout(400);
   save = await readSave(page);
   check(!save.treeRanks['vigil-oath'] && save.rubies === 1, 'first oath click arms only — nothing bought');
   await shot(page, 'tree-vigil-oath-armed');
-  await page.mouse.click(UI.treeVigilOath.x, UI.treeVigilOath.y);
+  await clickNamed(page, 'treeNode:vigil-oath');
   await page.waitForTimeout(400);
   save = await readSave(page);
   check(save.treeRanks['vigil-oath'] === 1, 'second click swears the Vigil oath in-tree');
@@ -391,7 +370,7 @@ try {
   await shot(page, 'tree-zealot-forsaken');
 
   // Rival spot offers forsaken-path Warped Tempo (not the Zealot oath).
-  await page.mouse.click(UI.treeZealotOath.x, UI.treeZealotOath.y);
+  await clickNamed(page, 'treeNode:zealot-oath');
   await page.waitForTimeout(400);
   save = await readSave(page);
   check(!save.treeRanks['zealot-oath'], 'rival oath node was not purchased');
@@ -400,14 +379,14 @@ try {
   await shot(page, 'tree-warped-tempo-owned');
 
   // Follow-up branch node (3g) unlocked by the oath.
-  await page.mouse.click(UI.treePatientVow.x, UI.treePatientVow.y);
+  await clickNamed(page, 'treeNode:vigil-patient-vow');
   await page.waitForTimeout(400);
   save = await readSave(page);
   check(save.treeRanks['vigil-patient-vow'] === 1, 'bought Patient Vow rank 1 behind the oath');
   check(save.gold === 0, `gold spent on follow-up (gold=${save.gold}, expected 0)`);
   await shot(page, 'tree-vigil-branch-owned');
 
-  await page.mouse.click(UI.treeBack.x, UI.treeBack.y);
+  await clickNamed(page, 'treeBack');
   await page.waitForTimeout(600);
   await shot(page, 'hub-with-oath');
 
@@ -422,30 +401,31 @@ try {
       treeRanks: { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-patient-vow': 1 },
     }),
   );
-  await page.mouse.click(UI.hubTree.x, UI.hubTree.y);
+  await clickNamed(page, 'hubTree');
   await page.waitForTimeout(600);
 
-  // Scroll to layer 2 (world y 650/800, past the 540-tall viewport): hover the
-  // canvas, then wheel down enough to saturate the clamp (max scroll 360).
-  await page.mouse.move(UI.treeCanvasCenter.x, UI.treeCanvasCenter.y);
+  // Scroll to layer 2: hover any on-screen tree control, then wheel enough
+  // to saturate the clamp (WORLD_HEIGHT 900 → max scroll 360). locate() then
+  // converts the scrolled world position to screen px for the click.
+  await hoverNamed(page, 'treeBack');
   await page.mouse.wheel(0, 720);
   await page.waitForTimeout(400);
   await shot(page, 'tree-layer2-scrolled');
 
-  await page.mouse.click(UI.treeVigilDeepWell.x, UI.treeVigilDeepWell.y);
+  await clickNamed(page, 'treeNode:vigil-deep-well');
   await page.waitForTimeout(400);
   save = await readSave(page);
   check(save.treeRanks['vigil-deep-well'] === 1, 'bought Deep Well (layer-2 mana passive)');
   check(save.gold === 8, `gold after Deep Well (gold=${save.gold}, expected 8)`);
 
-  await page.mouse.click(UI.treeVigilStillWaters.x, UI.treeVigilStillWaters.y);
+  await clickNamed(page, 'treeNode:vigil-still-waters');
   await page.waitForTimeout(400);
   save = await readSave(page);
   check(save.treeRanks['vigil-still-waters'] === 1, 'bought Still Waters (layer-2 CD grant node)');
   check(save.gold === 0, `gold after Still Waters (gold=${save.gold}, expected 0)`);
   await shot(page, 'tree-layer2-bought');
 
-  await page.mouse.click(UI.treeBack.x, UI.treeBack.y);
+  await clickNamed(page, 'treeBack');
   await page.waitForTimeout(400);
 
   // §D4 rebalance: zealot-steady-hands takes the retired zealot-desperate-zeal
@@ -459,9 +439,9 @@ try {
       treeRanks: { 'deep-reserves': 1, 'zealot-oath': 1 },
     }),
   );
-  await page.mouse.click(UI.hubTree.x, UI.hubTree.y);
+  await clickNamed(page, 'hubTree');
   await page.waitForTimeout(600);
-  await page.mouse.click(UI.treeZealotSteadyHands.x, UI.treeZealotSteadyHands.y);
+  await clickNamed(page, 'treeNode:zealot-steady-hands');
   await page.waitForTimeout(400);
   save = await readSave(page);
   check(save.treeRanks['zealot-steady-hands'] === 1, 'Steady Hands purchasable at the retired Desperate Zeal slot');
@@ -481,18 +461,17 @@ try {
       clearedDungeons: ['ash-gate'],
     }),
   );
-  await page.mouse.click(UI.hubAshGate.x, UI.hubAshGate.y);
+  await clickNamed(page, 'hubAshGate');
   await page.waitForTimeout(1200);
-  await page.mouse.click(UI.combatPaceToggle.x, UI.combatPaceToggle.y);
+  await clickNamed(page, 'combatPaceToggle');
   await page.waitForTimeout(300);
   save = await readSave(page);
   check(save.combatPaceTenths === 15, 'pace toggle persisted 1.5× selection');
   await shot(page, 'combat-pace-15x');
-  const vigilSlot = UI.combatSpellSlot(2, 3); // solemn-mend, zealous-mending, solemn-vigil
-  await page.mouse.move(vigilSlot.x, vigilSlot.y);
+  await hoverNamed(page, 'combatSpell:solemn-vigil');
   await page.waitForTimeout(400);
   await shot(page, 'combat-solemn-vigil-tooltip');
-  await page.mouse.move(480, 270); // off the button
+  await page.mouse.move(480, 270); // off the button (viewport center; not a layout target)
   await page.waitForTimeout(4000); // let autos land for feedback frame
   await shot(page, 'combat-feedback-midfight');
   save = await playCombat(page, (s) => s.xp > 12);
@@ -506,7 +485,8 @@ try {
   save = await readSave(page);
   const xpBeforeMaw = save.xp;
   await shot(page, 'hub-maw-unlocked'); // visual: The Maw button now present below Iron Pass
-  await page.mouse.click(UI.hubMaw.x, UI.hubMaw.y);
+  check((await locate(page, 'hubMaw')) !== null, 'The Maw button present after Iron Pass clear');
+  await clickNamed(page, 'hubMaw');
   await page.waitForTimeout(1000);
   await shot(page, 'maw-combat-start');
   await page.waitForTimeout(24_000);

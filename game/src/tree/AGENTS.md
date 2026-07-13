@@ -52,8 +52,9 @@ paths — do not extend them.
 6. Combat never sees the graph — only `CombatMods` (`spells` with castMod
    baked in, `bonusMaxMana`, `synergies`, `missingHealthBonuses`,
    `paceMultipliersTenths`, `cooldowns`).
-7. Changing TreeScene click positions → update the `UI` table in
-   `scripts/journey.mjs`.
+7. New interactive TreeScene controls need a stable `setName` (nodes are
+   `treeNode:<spotId>`); journey clicks by name via `__healgame.locate` —
+   do not reintroduce a coordinate table in `journey.mjs`.
 8. **`grantCooldown` effect** (Alpha 0.1 §D6): `{ kind: 'grantCooldown';
    cooldownId: string }` resolves via `cooldownById` (`data/cooldowns.ts`)
    into `CombatMods.cooldowns` (deduped by id; unknown id ignored, same as an
@@ -75,14 +76,10 @@ lives in world space at y 650 (4 passives) and y 800 (2 CD-grant nodes),
 inside a `WORLD_HEIGHT = 900` camera bounds; HUD chrome (title, wallet,
 status/feedback lines, back button) is pinned via `setScrollFactor(0)` so it
 stays on-screen while tree content pans. Scroll input is mouse wheel only
-(`this.input.on('wheel', ...)`, clamped `0..WORLD_HEIGHT-height`). This did
-**not** move any previously-pinned node position — `journey.mjs`'s existing
-`treeDeepReserves` / `treeVigilOath` / `treeZealotOath` / `treePatientVow` /
-`treeBack` coordinates are unchanged (scrollY starts at 0, chrome is screen-
-fixed). To reach layer 2 from a script: hover the canvas, `page.mouse.wheel
-(0, dy)` with `dy` large enough to hit max scroll (360), then click at
-`worldY - scrollY` for the target node (e.g. `vigil-deep-well` world (150,
-650) → screen (150, 290) at max scroll).
+(`this.input.on('wheel', ...)`, clamped `0..WORLD_HEIGHT-height`). Journey
+reaches layer 2 by hovering a named tree control, wheeling to max scroll, then
+`clickNamed('treeNode:vigil-deep-well')` (etc.) — `locate` converts world
+bounds through camera scroll, so journey does not hard-code screen y.
 
 ## Gates
 
