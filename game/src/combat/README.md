@@ -1,6 +1,6 @@
 # Combat engine (Chunk 1)
 
-Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-07-10
+Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-07-12
 
 Pure, deterministic TypeScript. No Phaser, no wall-clock, no randomness — driven
 entirely by `advance(dtMs)`. Chunk 2 builds the Phaser view against exactly
@@ -29,9 +29,10 @@ engine.state: Readonly<CombatState>
 engine.rewards: { gold, xp }          // accrued per kill, immediately, even on a later wipe
 ```
 
-Data: `data/spells.ts` (`ALL_SPELLS`, sourced from `constants.ts`) and
-`data/encounters.ts` (`ASH_GATE`). Enemy HP isn't in poc-spec — it's draft data
-in `encounters.ts`, expected to be retuned.
+Data: `data/spells.ts` (`ALL_SPELLS`, sourced from `constants.ts`) and the
+typed catalogs documented in `data/README.md`. `data/encounters.ts` validates
+and compiles the ordered dungeon catalog into the engine's resolved
+`EncounterDef` input. The engine never performs authoring-catalog lookups.
 
 ## Rule decisions
 
@@ -142,12 +143,14 @@ in `encounters.ts`, expected to be retuned.
   offsets. Tank and DPS mercs differ (`MERCS.tankSwingIntervalMs` /
   `dpsSwingIntervalMs` in `data/constants.ts`); the two DPS mercs share the
   same interval and so swing in sync with each other, but not with the tank.
-  Trash (`TRASH.swingIntervalMs`) and each encounter's boss
-  (`BossDef.swingIntervalMs`, e.g. `GATE_WARDEN`/`HOLLOW_KING`) each have their
-  own interval too, deliberately desynced from the trash cadence so
-  simultaneous full-party swing ticks are rare. `swingTimers` is seeded from
-  the unit's role/encounter interval at spawn and reset to that same interval
-  after every swing.
+  Every compiled enemy group and boss carries its effective authored damage
+  and swing interval. `swingTimers` is seeded from that resolved value at spawn
+  and reset to the same interval after every swing. Synthetic legacy test
+  encounters may omit trash values and fall back to `TRASH`.
+- **Mob identity**: catalog-spawned enemies expose a stable `Unit.mobId`
+  independently of generated per-wave `Unit.id`. Presentation uses `mobId` to
+  resolve `MobDef.visualKey`; combat decisions use only resolved encounter
+  values.
 - **Boss cast union** (Alpha 0.1 §D3): `BossDef.cast` is a discriminated union,
   `BossCastDef = PartyAoECastDef | TunnelVisionCastDef`. `kind` is optional on
   `PartyAoECastDef` (defaults to that arm) so every pre-existing encounter
@@ -250,8 +253,9 @@ in `encounters.ts`, expected to be retuned.
 - **Waves/victory/wipe**: a wave clears (and the next spawns) the instant its
   last enemy dies; victory on boss hp 0; wipe the instant all 4 party members
   are dead. `advance()` is a no-op once `status !== 'running'`.
-- **Rewards**: credited instantly per kill (trash and boss both count),
-  regardless of a later wipe.
+- **Rewards**: compiled dungeon gold/XP values are credited instantly per kill
+  (trash and boss both count), regardless of a later wipe. Synthetic legacy
+  encounters may omit them and fall back to `REWARDS`.
 
 ## Determinism
 

@@ -51,6 +51,31 @@ describe('auto-attack cadence', () => {
     expect(hits[0]!.amount).toBe(2);
   });
 
+  it('uses resolved per-group stats and exposes stable mob identity', () => {
+    const encounter = makeTestEncounter({
+      waves: [
+        {
+          enemies: [
+            {
+              mobId: 'catalog-dummy',
+              name: 'Catalog Dummy',
+              hp: 1000,
+              count: 1,
+              autoDamage: 3,
+              swingIntervalMs: 2000,
+            },
+          ],
+        },
+      ],
+    });
+    const engine = new CombatEngine(encounter, TEST_SPELLS);
+
+    expect(engine.state.enemies[0]?.mobId).toBe('catalog-dummy');
+    const hits = damages(engine.advance(4000)).filter((event) => event.sourceId === 'w0-0-0');
+    expect(hits).toHaveLength(2);
+    expect(hits.every((event) => event.amount === 3)).toBe(true);
+  });
+
   it('once the tank dies, enemy autos fall through to a living DPS, then the healer', () => {
     // Tank has 20 hp and takes 1 dmg/3s from a single dummy -> dies after 20 swings (60s),
     // but the dummy is being killed by mercs too, so give it effectively unkillable hp and
@@ -96,6 +121,7 @@ describe('wave progression', () => {
     expect(engine.state.enemies).toHaveLength(1);
     expect(engine.state.enemies[0]!.role).toBe('boss');
     expect(engine.state.enemies[0]!.name).toBe('Test Boss');
+    expect(engine.state.enemies[0]!.mobId).toBe('test-boss');
   });
 });
 
@@ -204,6 +230,18 @@ describe('victory / wipe detection', () => {
 });
 
 describe('reward accrual', () => {
+  it('uses resolved per-encounter gold and xp rewards', () => {
+    const encounter = makeTestEncounter({
+      goldPerEnemy: 3,
+      xpPerEnemy: 5,
+      waves: [{ enemies: [{ name: 'Weak', hp: 1, count: 1 }] }],
+    });
+    const engine = new CombatEngine(encounter, TEST_SPELLS);
+
+    engine.advance(1000);
+    expect(engine.rewards).toEqual({ gold: 3, xp: 5 });
+  });
+
   it('grants gold + xp immediately on each kill, even counting kills from a run that later wipes', () => {
     const encounter = makeTestEncounter({
       waves: [{ enemies: [{ name: 'Weak', hp: 1, count: 2 }] }, { enemies: [{ name: 'Deadly', hp: 1_000_000, count: 1 }] }],

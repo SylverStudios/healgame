@@ -1,11 +1,12 @@
 # AGENTS.md — healgame documentation system
 
-Status: current · Authority: doc conventions for all agents · Last verified: 2026-07-12
+Status: current · Authority: doc conventions for all agents · Last verified: 2026-07-13
 
 How we keep docs trustworthy. Operating rules for the game itself live in
 [`CLAUDE.md`](CLAUDE.md). Module contracts live next to code (e.g.
 [`game/src/tree/AGENTS.md`](game/src/tree/AGENTS.md),
-[`game/src/combat/README.md`](game/src/combat/README.md)).
+[`game/src/combat/README.md`](game/src/combat/README.md), and
+[`game/src/data/README.md`](game/src/data/README.md)).
 
 ## Frontmatter (required on every doc)
 
@@ -29,13 +30,13 @@ to [`docs/poc-qa.md`](docs/poc-qa.md).
 
 ## Authority (highest wins)
 
-1. Active phase handoff (`docs/*-handoff.md` with `Status: planning`, e.g.
-   [`docs/alpha-0.1-handoff.md`](docs/alpha-0.1-handoff.md))
+1. Any active phase handoff (`docs/*-handoff.md` with `Status: planning`)
 2. [`docs/poc-spec.md`](docs/poc-spec.md) — PoC baseline (phase amendments win)
 3. [`docs/poc-qa.md`](docs/poc-qa.md) — decided micro-choices + QA log
 4. Colocated module docs — win for that module:
    - [`game/src/tree/AGENTS.md`](game/src/tree/AGENTS.md)
    - [`game/src/combat/README.md`](game/src/combat/README.md)
+   - [`game/src/data/README.md`](game/src/data/README.md)
 5. [`CLAUDE.md`](CLAUDE.md) — gates, hard rules, working style
 6. Historical handoffs / outcomes — lessons only
 7. [`docs/tech-options.md`](docs/tech-options.md) — stack rationale
@@ -63,7 +64,8 @@ agents should prefer `verify`.
 | Kind | Location |
 |------|----------|
 | Living rules | `CLAUDE.md`, `docs/poc-spec.md`, `docs/poc-qa.md` |
-| Active mission | `docs/alpha-0.1-handoff.md` (`Status: planning`) |
+| Active mission | None; check `docs/*-handoff.md` for a future `Status: planning` handoff |
+| Latest shipped phase | `docs/alpha-0.1-handoff.md` (`Status: historical`) |
 | PoC retrospective | `docs/poc-changelog.md` (`Status: historical`, frozen) |
 | Module contracts | Colocated `AGENTS.md` / `README.md` |
 | Historical | Bannered handoffs / outcomes (or `docs/archive/`) |
@@ -82,6 +84,7 @@ agents should prefer `verify`.
   |--------|-------------|
   | Tree service / wiring | `game/src/tree/AGENTS.md` |
   | Combat rules | `game/src/combat/README.md`; balance shape → `poc-qa.md` |
+  | Dungeon/mob/ability content pipeline | `game/src/data/README.md` |
   | Save shape | `save.ts` header + `poc-qa.md` note; bump version per CLAUDE.md |
   | Scene layout | `scripts/journey.mjs` `UI` table |
   | Phase complete | Append `poc-qa.md`; mark handoff `historical` |

@@ -10,11 +10,11 @@
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { loadSave, resetSave, saveGame, type SaveData } from '../save/save';
-import { applyCombatResult, isIronPassUnlocked, isMawUnlocked, type HubNotice } from '../meta/progression';
+import { applyCombatResult, isDungeonUnlocked, type HubNotice } from '../meta/progression';
 import { loadoutFromSave } from '../data/spellTree';
 import { relicById } from '../data/relics';
 import { levelForXp, SPELLS, XP_LEVEL_2_THRESHOLD } from '../data/constants';
-import { ASH_GATE, IRON_PASS, THE_MAW } from '../data/encounters';
+import { ORDERED_DUNGEONS } from '../data/dungeons';
 import type { CombatResult, CombatSceneData } from './CombatScene';
 
 interface HubSceneData {
@@ -129,47 +129,45 @@ export class HubScene extends Phaser.Scene {
   private buildButtons(save: SaveData): void {
     const { width, height } = this.scale;
     const centerX = width / 2;
+    const unlockedDungeons = ORDERED_DUNGEONS.filter((dungeon) =>
+      isDungeonUnlocked(save, dungeon.id),
+    );
+    const compactDungeonGrid = unlockedDungeons.length > 2;
+    const compactColumns = 3;
+    const compactRows = Math.ceil(unlockedDungeons.length / compactColumns);
 
-    this.makeButton(centerX, height / 2 - 15, 300, 52, 'Enter Ash Gate', () => {
-      const combatData: CombatSceneData = {
-        encounterId: ASH_GATE.id,
-        loadout: loadoutFromSave(save),
-        returnTo: SceneKeys.Hub,
-      };
-      this.scene.start(SceneKeys.Combat, combatData);
+    unlockedDungeons.forEach((dungeon, visibleIndex) => {
+      // Keep today's one/two-dungeon journey targets exact. Three or more
+      // unlocked entries reflow into a bounded three-column grid.
+      const column = visibleIndex % compactColumns;
+      const row = Math.floor(visibleIndex / compactColumns);
+      const x = compactDungeonGrid ? centerX + (column - 1) * 300 : centerX;
+      const y = compactDungeonGrid
+        ? 240 + (row - (compactRows - 1) / 2) * 52
+        : dungeon.order === 1
+          ? height / 2 - 15
+          : height / 2 + 180;
+      const suffix = dungeon.order === 1 ? '' : ` (Dungeon ${dungeon.order})`;
+      this.makeButton(x, y, compactDungeonGrid ? 260 : 300, compactDungeonGrid ? 44 : 52, `Enter ${dungeon.name}${suffix}`, () => {
+        const combatData: CombatSceneData = {
+          encounterId: dungeon.id,
+          loadout: loadoutFromSave(save),
+          returnTo: SceneKeys.Hub,
+        };
+        this.scene.start(SceneKeys.Combat, combatData);
+      });
     });
 
-    this.makeButton(centerX, height / 2 + 50, 300, 52, 'Spell Tree', () => {
+    const treeY = compactDungeonGrid ? 390 : height / 2 + 50;
+    this.makeButton(centerX, treeY, 300, 52, 'Spell Tree', () => {
       this.scene.start(SceneKeys.Tree);
     });
 
     if (save.subclass !== null) {
       const label = save.subclass === 'vigil' ? 'Path of the Vigil' : 'Path of the Zealot';
       this.add
-        .text(centerX, height / 2 + 115, `Oath: ${label}`, { fontFamily: FONT, fontSize: '16px', color: ACCENT_COLOR })
+        .text(centerX, compactDungeonGrid ? 445 : height / 2 + 115, `Oath: ${label}`, { fontFamily: FONT, fontSize: '16px', color: ACCENT_COLOR })
         .setOrigin(0.5);
-    }
-
-    if (isIronPassUnlocked(save)) {
-      this.makeButton(centerX, height / 2 + 180, 300, 52, 'Enter Iron Pass (Dungeon 2)', () => {
-        const combatData: CombatSceneData = {
-          encounterId: IRON_PASS.id,
-          loadout: loadoutFromSave(save),
-          returnTo: SceneKeys.Hub,
-        };
-        this.scene.start(SceneKeys.Combat, combatData);
-      });
-    }
-
-    if (isMawUnlocked(save)) {
-      this.makeButton(centerX, height / 2 + 245, 300, 52, 'Enter The Maw (Dungeon 3)', () => {
-        const combatData: CombatSceneData = {
-          encounterId: THE_MAW.id,
-          loadout: loadoutFromSave(save),
-          returnTo: SceneKeys.Hub,
-        };
-        this.scene.start(SceneKeys.Combat, combatData);
-      });
     }
 
     this.buildRestartControl(centerX, height - 36);

@@ -19,72 +19,7 @@ export const TRASH = {
   swingIntervalMs: 3000,
 } as const;
 
-export const GATE_WARDEN = {
-  // Phase 3 (handoff §B) retune: bumped from 3 (see balance.test.ts gates —
-  // the starting kit must never cruise to a full-party clear).
-  autoDamage: 4,
-  // Phase 3 (handoff §B): desynced from TRASH's 3000ms so boss/trash swings
-  // don't line up every tick.
-  swingIntervalMs: 3500,
-  bonehowlCastMs: 10_000,
-  bonehowlPartyDamage: 4,
-} as const;
-
-/**
- * Iron Pass (Dungeon 2, alpha-0.1-handoff §D2) trash: same "Ash Husk" template
- * (reskinned "Iron Husk" in data only), harder-hitting than Ash Gate's global
- * `TRASH` (1 dmg / 3000ms) per the handoff's "bump damage +1 vs Ash Gate feel"
- * guidance. Wired in via `EnemyGroupDef`'s per-group `autoDamage`/
- * `swingIntervalMs` override (see `encounters.ts` IRON_PASS waves) — the
- * engine falls back to global `TRASH` only when a group omits these fields.
- */
-export const IRON_TRASH = {
-  autoDamage: 2,
-  swingIntervalMs: 3000,
-} as const;
-
-/**
- * Iron Pass boss (alpha-0.1-handoff §D3): "Spire Lancer" — the Tunnel Vision
- * cast (3s telegraph, then a 10s channel ticking 2 damage/s into one focused
- * non-tank party member, ≈2x that unit's 10hp maxHp if unhealed) is unchanged
- * from the handoff draft; `hp`/`autoDamage` are retuned (chunk 9a bot tune —
- * see balance.test.ts gates 5/6). Draft was hp 170 / autoDamage 4 per 3.5s
- * swing (same cadence feel as Gate Warden); the scripted-bot diagnostic
- * showed the boss's own auto-attack chip damage on the tank (compounding with
- * healing the Tunnel Vision target) wiped a maxed build well before 3 party
- * members could survive to victory. autoDamage 3 eases that passive tank
- * pressure; hp 190 keeps the fight long enough to land 2 Tunnel Visions
- * (design's "ideally 2") while landing a clean >=3-survivors win for both
- * maxed builds — hp above ~195 starts costing the 3rd survivor, hp below
- * ~185 wins with the full party untouched (no real tension), so 190 sits in
- * the gate's margin on both sides. First telegraph at 8s into the boss
- * fight, then every 30s (start-to-start cadence — see combat/README.md).
- */
-export const SPIRE_LANCER = {
-  hp: 190,
-  autoDamage: 3,
-  swingIntervalMs: 3500,
-  telegraphMs: 3000,
-  firstCastAtMs: 8000,
-  intervalMs: 30_000,
-  channelMs: 10_000,
-  tickMs: 1000,
-  damagePerTick: 2,
-} as const;
-
-/**
- * Dungeon 2 boss (poc-spec §1 item 8, §7): "insanely overpowered" on purpose
- * — the party cannot win with PoC power. Auto damage 3 per 3.5s; Extinction is
- * a 10s named cast dealing 10 damage to every living party member, first at
- * 15s into the boss fight then every 25s thereafter.
- */
-export const HOLLOW_KING = {
-  hp: 999,
-  autoDamage: 3,
-  swingIntervalMs: 3500,
-  extinctionCastMs: 10_000,
-  extinctionPartyDamage: 10,
-} as const;
+/** Enemy stats and mechanics live in data/mobs/, enemyAbilities/, and dungeons/. */
 
 /**
  * Mercs (tank + 2 DPS) auto-attack only (poc-spec §2 row 10). Draft damage,

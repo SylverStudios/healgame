@@ -1,6 +1,6 @@
 # CLAUDE.md — operating healgame
 
-Status: current · Authority: gates, hard rules, working style · Last verified: 2026-07-12
+Status: current · Authority: gates, hard rules, working style · Last verified: 2026-07-13
 
 healgame is a healer-focused auto-battler PoC: Phaser 3 + TypeScript (strict) +
 Vite. The game lives in `game/`; design docs in `docs/`. Doc conventions and
@@ -13,7 +13,8 @@ Full list in [`AGENTS.md`](AGENTS.md). Short form:
 1. Active phase handoff (`Status: planning`) — wins that phase's scope
 2. `docs/poc-spec.md` — PoC baseline (phase amendments in poc-qa / handoffs win)
 3. `docs/poc-qa.md` — decided micro-choices + tuning log
-4. Module docs — `game/src/tree/AGENTS.md`, `game/src/combat/README.md`
+4. Module docs — `game/src/tree/AGENTS.md`, `game/src/combat/README.md`,
+   `game/src/data/README.md`
 5. This file — gates and hard rules
 6. Historical handoffs / `docs/tech-options.md` / `docs/GDD.md` / research — lower
 
@@ -25,6 +26,10 @@ Full list in [`AGENTS.md`](AGENTS.md). Short form:
 | `npm run verify` | **The gate**: typecheck + lint + test + build + smoke + journey |
 | `npm run verify:fast` | Same without journey (~5 min faster) |
 | `npm run test:watch` | Vitest watch mode while developing |
+| `npm run content -- validate` | Validate all dungeon, mob, and enemy-ability data |
+| `npm run content -- list` | List dungeon order and unlock prerequisites |
+| `npm run content -- preview <id>` | Print one resolved dungeon definition |
+| `npm run content -- preview --all` | Print the resolved ordered dungeon catalog |
 
 `verify` is implemented by `scripts/verify.mjs` — one entry point for local
 and CI. Passing stages print one line; failures dump captured output. Individual
@@ -43,8 +48,9 @@ game/src/
             Public API + rule decisions: combat/README.md
   tree/     config-driven skill-tree service (opaque state, update/view).
             Agent contract: tree/AGENTS.md
-  data/     ALL gameplay numbers as data: constants, spells, encounters,
-            spellTree.ts (live SPELL_TREE + loadoutFromSave).
+  data/     ALL gameplay numbers as data: constants, spells, typed enemy
+            abilities/mobs/dungeons compiled into encounters, spellTree.ts
+            (live SPELL_TREE + loadoutFromSave). Authoring: data/README.md
             tree.ts = legacy TREE_NODES (deprecated; tests only)
   meta/     pure progression (rewards, buildLoadout alias, dungeon unlock).
             purchaseNode is deprecated — TreeScene uses tree.update

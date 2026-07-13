@@ -1,0 +1,53 @@
+import { ASH_GATE_DUNGEON } from './ashGate';
+import { IRON_PASS_DUNGEON } from './ironPass';
+import { THE_MAW_DUNGEON } from './theMaw';
+import type { DungeonDef } from '../content/types';
+
+export { ASH_GATE_DUNGEON } from './ashGate';
+export { IRON_PASS_DUNGEON } from './ironPass';
+export { THE_MAW_DUNGEON } from './theMaw';
+
+export const DUNGEON_ORDER = ['ash-gate', 'iron-pass', 'the-maw'] as const;
+
+export const DUNGEONS = [
+  ASH_GATE_DUNGEON,
+  IRON_PASS_DUNGEON,
+  THE_MAW_DUNGEON,
+] as const satisfies readonly DungeonDef[];
+
+export const DUNGEON_REGISTRY: Readonly<Record<string, DungeonDef>> = Object.freeze(
+  Object.fromEntries(DUNGEONS.map((dungeon) => [dungeon.id, dungeon])),
+);
+
+/** Stable-id lookup. Unknown or retired ids intentionally return undefined. */
+export function getDungeonById(id: string): DungeonDef | undefined {
+  return Object.prototype.hasOwnProperty.call(DUNGEON_REGISTRY, id) ? DUNGEON_REGISTRY[id] : undefined;
+}
+
+/** Dungeons in explicit progression order, independent of module declaration order. */
+export const ORDERED_DUNGEONS: readonly DungeonDef[] = Object.freeze(
+  DUNGEON_ORDER.map((id) => {
+    const dungeon = getDungeonById(id);
+    if (dungeon === undefined) {
+      throw new Error(`Dungeon order references unknown dungeon "${id}"`);
+    }
+    return dungeon;
+  }),
+);
+
+/**
+ * Pure unlock check over stable cleared dungeon ids. Unknown dungeon ids are
+ * not unlocked; callers can use getDungeonById when they need to distinguish
+ * unknown content from a known-but-locked dungeon.
+ */
+export function isDungeonIdUnlocked(id: string, clearedDungeonIds: readonly string[]): boolean {
+  const dungeon = getDungeonById(id);
+  if (dungeon === undefined) return false;
+
+  switch (dungeon.unlock.kind) {
+    case 'always':
+      return true;
+    case 'dungeonClear':
+      return clearedDungeonIds.includes(dungeon.unlock.dungeonId);
+  }
+}

@@ -1,7 +1,7 @@
 /**
  * Test-only fixtures: a small, hand-tuned encounter so unit tests can reason
  * about exact hp/mana/timing numbers without depending on the real Ash Gate
- * draft balance in data/encounters.ts (which is expected to get retuned).
+ * balance compiled from data/mobs/, enemyAbilities/, and dungeons/.
  */
 
 import type { EncounterDef, SpellDef } from './types';

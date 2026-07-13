@@ -7,6 +7,8 @@ export type UnitRole = 'tank' | 'dps' | 'healer' | 'enemy' | 'boss';
 
 export interface Unit {
   id: string;
+  /** Stable authored mob identity when this unit was spawned from catalog content. */
+  mobId?: string;
   name: string;
   role: UnitRole;
   hp: number;
@@ -204,10 +206,14 @@ export interface CombatState {
  * Gate); omitted = TRASH fallback.
  */
 export interface EnemyGroupDef {
+  /** Catalog identity. Optional only for compatibility with synthetic test encounters. */
+  mobId?: string;
   name: string;
   hp: number;
   count: number;
+  /** Falls back to the legacy trash constant for synthetic encounters. */
   autoDamage?: number;
+  /** Falls back to the legacy trash constant for synthetic encounters. */
   swingIntervalMs?: number;
 }
 
@@ -265,6 +271,10 @@ export interface BossDef {
 export interface EncounterDef {
   id: string;
   name: string;
+  /** Resolved catalog rewards; legacy synthetic encounters fall back to reward constants. */
+  goldPerEnemy?: number;
+  xpPerEnemy?: number;
+  rubyPerFirstClear?: number;
   waves: WaveDef[];
   boss: BossDef;
 }

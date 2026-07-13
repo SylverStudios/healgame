@@ -86,6 +86,8 @@ export class CombatEngine {
 
   /** Countdown timers for every unit with an auto-attack (mercs + enemies/boss). Entry removed on death. */
   private readonly swingTimers = new Map<string, number>();
+  /** Effective authored combat stats, keyed by deterministic spawned unit id. */
+  private readonly enemyStats = new Map<string, { autoDamage: number; swingIntervalMs: number }>();
 
   private playerCast: CastState | null = null;
   /** Mana actually reserved for the active playerCast at cast start — may be less than
@@ -103,9 +105,6 @@ export class CombatEngine {
   private bossFocusState: BossFocusState | null = null;
   /** Deterministic round-robin cursor into the eligible (non-tank, living) focus targets; never Math.random. */
   private focusIndex = 0;
-
-  /** Per-trash-unit swing stats (EnemyGroupDef overrides resolved at spawn; TRASH fallback). */
-  private trashStats = new Map<string, { autoDamage: number; swingIntervalMs: number }>();
 
   private waveIndex = 0;
   private status: CombatStatus = 'running';
@@ -405,11 +404,7 @@ export class CombatEngine {
         if (remaining === undefined || remaining > 0) continue;
         this.resolveEnemySwing(enemy.id, events);
         if (this.swingTimers.has(enemy.id)) {
-          const interval =
-            enemy.role === 'boss'
-              ? this.encounter.boss.swingIntervalMs
-              : (this.trashStats.get(enemy.id)?.swingIntervalMs ?? TRASH.swingIntervalMs);
-          this.swingTimers.set(enemy.id, interval);
+          this.swingTimers.set(enemy.id, this.enemyStatsFor(enemy.id).swingIntervalMs);
         }
       }
     }
@@ -590,11 +585,7 @@ export class CombatEngine {
     if (!enemy || !enemy.alive) return;
     const target = this.pickAllyTarget();
     if (!target) return;
-    const dmg =
-      enemy.role === 'boss'
-        ? this.encounter.boss.autoDamage
-        : (this.trashStats.get(enemy.id)?.autoDamage ?? TRASH.autoDamage);
-    this.applyDamageToUnit(target, dmg, enemy.id, events);
+    this.applyDamageToUnit(target, this.enemyStatsFor(enemy.id).autoDamage, enemy.id, events);
   }
 
   /** Locked micro-choice (poc-spec §10.4): enemies/boss auto-attack the tank only; DPS then healer once the tank is dead. */
@@ -747,14 +738,26 @@ export class CombatEngine {
     if (!wave) return;
     const enemies: Unit[] = [];
     wave.enemies.forEach((group, gi) => {
-      const autoDamage = group.autoDamage ?? TRASH.autoDamage;
-      const swingIntervalMs = group.swingIntervalMs ?? TRASH.swingIntervalMs;
       for (let i = 0; i < group.count; i++) {
         const id = `w${index}-${gi}-${i}`;
-        const unit: Unit = { id, name: group.name, role: 'enemy', hp: group.hp, maxHp: group.hp, mana: 0, maxMana: 0, alive: true };
+        const unit: Unit = {
+          id,
+          ...(group.mobId === undefined ? {} : { mobId: group.mobId }),
+          name: group.name,
+          role: 'enemy',
+          hp: group.hp,
+          maxHp: group.hp,
+          mana: 0,
+          maxMana: 0,
+          alive: true,
+        };
+        const stats = {
+          autoDamage: group.autoDamage ?? TRASH.autoDamage,
+          swingIntervalMs: group.swingIntervalMs ?? TRASH.swingIntervalMs,
+        };
         enemies.push(unit);
-        this.trashStats.set(id, { autoDamage, swingIntervalMs });
-        this.swingTimers.set(id, swingIntervalMs);
+        this.enemyStats.set(id, stats);
+        this.swingTimers.set(id, stats.swingIntervalMs);
       }
     });
     this.activeEnemies = enemies;
@@ -762,9 +765,23 @@ export class CombatEngine {
 
   private spawnBoss(): void {
     const b = this.encounter.boss;
-    const boss: Unit = { id: b.id, name: b.name, role: 'boss', hp: b.hp, maxHp: b.hp, mana: 0, maxMana: 0, alive: true };
+    const boss: Unit = {
+      id: b.id,
+      mobId: b.id,
+      name: b.name,
+      role: 'boss',
+      hp: b.hp,
+      maxHp: b.hp,
+      mana: 0,
+      maxMana: 0,
+      alive: true,
+    };
     this.boss = boss;
     this.activeEnemies = [boss];
+    this.enemyStats.set(b.id, {
+      autoDamage: b.autoDamage,
+      swingIntervalMs: b.swingIntervalMs,
+    });
     this.swingTimers.set(b.id, b.swingIntervalMs);
     if (b.cast) this.bossCastTimerRemainingMs = b.cast.firstCastAtMs;
   }
@@ -773,9 +790,10 @@ export class CombatEngine {
     unit.alive = false;
     unit.hp = 0;
     this.swingTimers.delete(unit.id);
+    this.enemyStats.delete(unit.id);
     events.push({ type: 'unitDied', unitId: unit.id });
-    this.rewardsGold += REWARDS.goldPerEnemy;
-    this.rewardsXp += REWARDS.xpPerEnemy;
+    this.rewardsGold += this.encounter.goldPerEnemy ?? REWARDS.goldPerEnemy;
+    this.rewardsXp += this.encounter.xpPerEnemy ?? REWARDS.xpPerEnemy;
     this.checkWaveOrVictory(events);
   }
 
@@ -838,5 +856,11 @@ export class CombatEngine {
       }
     }
     return Math.max(0, spell.mana - reduction);
+  }
+
+  private enemyStatsFor(id: string): { autoDamage: number; swingIntervalMs: number } {
+    const stats = this.enemyStats.get(id);
+    if (stats === undefined) throw new Error(`Missing combat stats for enemy "${id}"`);
+    return stats;
   }
 }
