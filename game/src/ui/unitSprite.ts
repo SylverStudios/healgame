@@ -74,6 +74,20 @@ function floatFontPx(amount: number): string {
   return `${px}px`;
 }
 
+/**
+ * Boss-focus "brand" (alpha-0.1-handoff §D3/§D9): crimson rectangle hovering
+ * above the unit while a Tunnel Vision channel targets it. Distinct from the
+ * player's heal-target indicator in both shape (rect vs chevron/halo) and
+ * color (crimson vs gold) — the two can stack on the same unit.
+ */
+const FOCUS_MARKER_WIDTH = 14;
+const FOCUS_MARKER_HEIGHT = 10;
+/** Gap between the heal-target chevron's slot and the focus brand. */
+const FOCUS_MARKER_GAP = 6;
+const FOCUS_MARKER_COLOR = 0xc23b22;
+const FOCUS_MARKER_MIN_ALPHA = 0.35;
+const FOCUS_PULSE_MS = 450;
+
 const HALO_FILL_COLOR = 0xf2c14e;
 const HALO_FILL_ALPHA = 0.28;
 const HALO_STROKE_COLOR = 0x8a7868;
@@ -122,6 +136,8 @@ export class UnitSprite {
   private readonly targetMarker: Phaser.GameObjects.Triangle;
   /** Ember/iron ellipse under the unit's feet when targeted (handoff §M). */
   private readonly targetHalo: Phaser.GameObjects.Ellipse;
+  /** Crimson brand shown while a boss focus channel (Tunnel Vision) targets this unit. */
+  private readonly bossFocusMarker: Phaser.GameObjects.Rectangle;
 
   /** Standalone floating texts (hit markers / heal floats) not parented to the container. */
   private readonly activeFloats = new Set<Phaser.GameObjects.Text>();
@@ -214,6 +230,14 @@ export class UnitSprite {
       .setVisible(false);
     this.container.add(this.targetMarker);
 
+    // Above the chevron's slot so a heal-targeted AND boss-focused unit shows both.
+    const focusY = markerTipY - TARGET_MARKER_HEIGHT - FOCUS_MARKER_GAP - FOCUS_MARKER_HEIGHT / 2;
+    this.bossFocusMarker = scene.add
+      .rectangle(0, focusY, FOCUS_MARKER_WIDTH, FOCUS_MARKER_HEIGHT, FOCUS_MARKER_COLOR)
+      .setStrokeStyle(1, 0x0a0605)
+      .setVisible(false);
+    this.container.add(this.bossFocusMarker);
+
     const feetY = y + height / 2;
     this.targetHalo = scene.add
       .ellipse(x, feetY + 4, HALO_WIDTH, HALO_HEIGHT, HALO_FILL_COLOR, HALO_FILL_ALPHA)
@@ -250,12 +274,32 @@ export class UnitSprite {
       this.manaBar?.setVisible(false);
       this.targetMarker.setVisible(false);
       this.targetHalo.setVisible(false);
+      // Engine ends the channel on target death (bossFocusEnded), but hide
+      // defensively so a dead unit never wears the brand for a frame.
+      this.setBossFocused(false);
     }
   }
 
   setTargeted(isTargeted: boolean): void {
     this.targetMarker.setVisible(isTargeted && this.alive);
     this.targetHalo.setVisible(isTargeted && this.alive);
+  }
+
+  /** Show/hide the crimson boss-focus brand (Tunnel Vision channel), with a slow alpha pulse. */
+  setBossFocused(isFocused: boolean): void {
+    this.scene.tweens.killTweensOf(this.bossFocusMarker);
+    this.bossFocusMarker.setAlpha(1);
+    const show = isFocused && this.alive;
+    this.bossFocusMarker.setVisible(show);
+    if (show) {
+      this.scene.tweens.add({
+        targets: this.bossFocusMarker,
+        alpha: FOCUS_MARKER_MIN_ALPHA,
+        duration: FOCUS_PULSE_MS,
+        yoyo: true,
+        repeat: -1,
+      });
+    }
   }
 
   /** Fixed home-position X, used by the scene to compute lunge direction between two sprites. */
@@ -358,6 +402,7 @@ export class UnitSprite {
    *  rebuild (waveStarted rebuilds the enemy roster) can never touch a dead game object. */
   destroy(): void {
     this.scene.tweens.killTweensOf(this.container);
+    this.scene.tweens.killTweensOf(this.bossFocusMarker);
     for (const float of this.activeFloats) {
       this.scene.tweens.killTweensOf(float);
       float.destroy();

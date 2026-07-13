@@ -8,12 +8,18 @@
  * intentionally stays 'healgame-save-v1' — loadSave migrates v1 payloads.
  *
  * v3: `combatPaceTenths` — selected combat pace multiplier (10 = 1×, 15 = 1.5×).
+ *
+ * v4 (alpha-0.1-handoff §D7): `relicId` — the player's one locked-in relic
+ * pick (`data/relics.ts`), chosen once via `RelicScene` after the first-ever
+ * Ash Gate clear and never offered again; `relicPickPending` — transient flag
+ * set by `applyCombatResult` on that first clear, cleared the instant the
+ * pick is made. Restart wipes both (fresh save = null/false).
  */
 
 export type SubclassId = 'vigil' | 'zealot';
 
 export interface SaveData {
-  version: 3;
+  version: 4;
   tutorialDone: boolean;
   gold: number;
   xp: number;
@@ -28,6 +34,10 @@ export interface SaveData {
   clearedDungeons: string[];
   /** Selected combat pace multiplier in tenths (10 = 1×, 15 = 1.5×). */
   combatPaceTenths: number;
+  /** Chosen relic id (data/relics.ts), or null before the pick / after a restart. */
+  relicId: string | null;
+  /** True right after the first-ever Ash Gate clear until RelicScene resolves the pick. */
+  relicPickPending: boolean;
 }
 
 /** The v1 shape, kept only so loadSave can migrate old payloads. */
@@ -56,9 +66,23 @@ interface SaveDataV2 {
   clearedDungeons: string[];
 }
 
+/** v3 shape — migrated to v4 on load (adds relicId/relicPickPending). */
+interface SaveDataV3 {
+  version: 3;
+  tutorialDone: boolean;
+  gold: number;
+  xp: number;
+  rubies: number;
+  unlockedSpells: string[];
+  treeRanks: Record<string, number>;
+  subclass: SubclassId | null;
+  clearedDungeons: string[];
+  combatPaceTenths: number;
+}
+
 export function newSaveData(): SaveData {
   return {
-    version: 3,
+    version: 4,
     tutorialDone: false,
     gold: 0,
     xp: 0,
@@ -68,6 +92,8 @@ export function newSaveData(): SaveData {
     subclass: null,
     clearedDungeons: [],
     combatPaceTenths: 10,
+    relicId: null,
+    relicPickPending: false,
   };
 }
 
@@ -92,21 +118,23 @@ function migrateV1(v1: SaveDataV1): SaveData {
   }
   if (v1.subclass !== null) treeRanks[`${v1.subclass}-oath`] = 1;
 
-  return migrateV2({
-    version: 2,
-    tutorialDone: v1.tutorialDone,
-    gold,
-    xp: v1.xp,
-    rubies: v1.rubies,
-    unlockedSpells: [...v1.unlockedSpells],
-    treeRanks,
-    subclass: v1.subclass,
-    clearedDungeons: [...v1.clearedDungeons],
-  });
+  return migrateV3(
+    migrateV2({
+      version: 2,
+      tutorialDone: v1.tutorialDone,
+      gold,
+      xp: v1.xp,
+      rubies: v1.rubies,
+      unlockedSpells: [...v1.unlockedSpells],
+      treeRanks,
+      subclass: v1.subclass,
+      clearedDungeons: [...v1.clearedDungeons],
+    }),
+  );
 }
 
 /** v2 → v3: add default combat pace (1×). */
-function migrateV2(v2: SaveDataV2): SaveData {
+function migrateV2(v2: SaveDataV2): SaveDataV3 {
   return {
     version: 3,
     tutorialDone: v2.tutorialDone,
@@ -118,6 +146,24 @@ function migrateV2(v2: SaveDataV2): SaveData {
     subclass: v2.subclass,
     clearedDungeons: [...v2.clearedDungeons],
     combatPaceTenths: 10,
+  };
+}
+
+/** v3 → v4 (alpha-0.1-handoff §D7): add the relic pick fields, both unset. */
+function migrateV3(v3: SaveDataV3): SaveData {
+  return {
+    version: 4,
+    tutorialDone: v3.tutorialDone,
+    gold: v3.gold,
+    xp: v3.xp,
+    rubies: v3.rubies,
+    unlockedSpells: [...v3.unlockedSpells],
+    treeRanks: { ...v3.treeRanks },
+    subclass: v3.subclass,
+    clearedDungeons: [...v3.clearedDungeons],
+    combatPaceTenths: v3.combatPaceTenths,
+    relicId: null,
+    relicPickPending: false,
   };
 }
 
@@ -140,8 +186,13 @@ export function loadSave(store: KeyValueStore | null = defaultStore()): SaveData
   try {
     const parsed: unknown = JSON.parse(raw);
     if (isSaveData(parsed)) return parsed;
+    if (isSaveDataV3(parsed)) {
+      const migrated = migrateV3(parsed);
+      saveGame(migrated, store);
+      return migrated;
+    }
     if (isSaveDataV2(parsed)) {
-      const migrated = migrateV2(parsed);
+      const migrated = migrateV3(migrateV2(parsed));
       saveGame(migrated, store);
       return migrated;
     }
@@ -178,6 +229,18 @@ function hasBaseShape(v: Record<string, unknown>): boolean {
 }
 
 function isSaveData(value: unknown): value is SaveData {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (v.version !== 4 || !hasBaseShape(v)) return false;
+  const ranks = v.treeRanks;
+  if (typeof ranks !== 'object' || ranks === null || Array.isArray(ranks)) return false;
+  if (!Object.values(ranks).every((r) => typeof r === 'number')) return false;
+  if (typeof v.combatPaceTenths !== 'number') return false;
+  if (v.relicId !== null && typeof v.relicId !== 'string') return false;
+  return typeof v.relicPickPending === 'boolean';
+}
+
+function isSaveDataV3(value: unknown): value is SaveDataV3 {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
   if (v.version !== 3 || !hasBaseShape(v)) return false;

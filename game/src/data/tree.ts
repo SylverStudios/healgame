@@ -39,11 +39,11 @@ export const TREE_NODES: TreeNode[] = [
   {
     id: 'deep-reserves',
     name: 'Deep Reserves',
-    description: '+2 max mana per rank',
+    description: '+5 max mana per rank',
     cost: { currency: 'gold', amount: 5 },
     maxRanks: 5,
     requires: [],
-    effect: { kind: 'bonusMaxMana', amountPerRank: 2 },
+    effect: { kind: 'bonusMaxMana', amountPerRank: 5 },
   },
   {
     id: 'vigil-oath',

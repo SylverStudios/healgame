@@ -37,16 +37,18 @@ describe('save', () => {
   it('returns a fresh save when nothing is stored', () => {
     const save = loadSave(memoryStore());
     expect(save).toEqual(newSaveData());
-    expect(save.version).toBe(3);
+    expect(save.version).toBe(4);
     expect(save.tutorialDone).toBe(false);
     expect(save.subclass).toBeNull();
     expect(save.combatPaceTenths).toBe(10);
+    expect(save.relicId).toBeNull();
+    expect(save.relicPickPending).toBe(false);
   });
 
-  it('round-trips a full v3 save', () => {
+  it('round-trips a full v4 save', () => {
     const store = memoryStore();
     const data: SaveData = {
-      version: 3,
+      version: 4,
       tutorialDone: true,
       gold: 7,
       xp: 12,
@@ -56,9 +58,34 @@ describe('save', () => {
       subclass: 'vigil',
       clearedDungeons: ['ash-gate'],
       combatPaceTenths: 15,
+      relicId: 'ember-ledger',
+      relicPickPending: false,
     };
     saveGame(data, store);
     expect(loadSave(store)).toEqual(data);
+  });
+
+  it('round-trips a v3 save via migration (adds relicId: null, relicPickPending: false)', () => {
+    const store = memoryStore();
+    const data = {
+      version: 3,
+      tutorialDone: true,
+      gold: 7,
+      xp: 12,
+      rubies: 0,
+      unlockedSpells: ['solemn-mend', 'zealous-mending'],
+      treeRanks: { 'deep-reserves': 3, 'vigil-oath': 1 },
+      subclass: 'vigil' as const,
+      clearedDungeons: ['ash-gate'],
+      combatPaceTenths: 15,
+    };
+    store.setItem('healgame-save-v1', JSON.stringify(data));
+    const loaded = loadSave(store);
+    expect(loaded.version).toBe(4);
+    expect(loaded.combatPaceTenths).toBe(15);
+    expect(loaded.treeRanks).toEqual(data.treeRanks);
+    expect(loaded.relicId).toBeNull();
+    expect(loaded.relicPickPending).toBe(false);
   });
 
   it('round-trips a full v2 save via migration', () => {
@@ -76,9 +103,11 @@ describe('save', () => {
     };
     store.setItem('healgame-save-v1', JSON.stringify(data));
     const loaded = loadSave(store);
-    expect(loaded.version).toBe(3);
+    expect(loaded.version).toBe(4);
     expect(loaded.combatPaceTenths).toBe(10);
     expect(loaded.treeRanks).toEqual(data.treeRanks);
+    expect(loaded.relicId).toBeNull();
+    expect(loaded.relicPickPending).toBe(false);
   });
 
   it('resetSave wipes everything (restart, no respec)', () => {
@@ -99,6 +128,11 @@ describe('save', () => {
     expect(loadSave(store)).toEqual(newSaveData());
     store.setItem('healgame-save-v1', JSON.stringify({ version: 2, treeRanks: 'nope' }));
     expect(loadSave(store)).toEqual(newSaveData());
+    store.setItem(
+      'healgame-save-v1',
+      JSON.stringify({ ...newSaveData(), version: 4, relicPickPending: 'nope' }),
+    );
+    expect(loadSave(store)).toEqual(newSaveData());
   });
 
   it('works without any storage (SSR/tests)', () => {
@@ -108,12 +142,12 @@ describe('save', () => {
   });
 });
 
-describe('v1 → v3 migration', () => {
+describe('v1 → v4 migration', () => {
   it('carries plain progress over losslessly', () => {
     const store = memoryStore();
     store.setItem('healgame-save-v1', v1Payload());
     const save = loadSave(store);
-    expect(save.version).toBe(3);
+    expect(save.version).toBe(4);
     expect(save.combatPaceTenths).toBe(10);
     expect(save.tutorialDone).toBe(true);
     expect(save.gold).toBe(7);
@@ -123,6 +157,8 @@ describe('v1 → v3 migration', () => {
     expect(save.treeRanks).toEqual({});
     expect(save.subclass).toBeNull();
     expect(save.clearedDungeons).toEqual(['ash-gate']);
+    expect(save.relicId).toBeNull();
+    expect(save.relicPickPending).toBe(false);
   });
 
   it("maps 'max-mana-1' to deep-reserves rank 1", () => {

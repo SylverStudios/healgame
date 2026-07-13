@@ -34,7 +34,7 @@ export function makeTestEncounter(overrides: Partial<EncounterDef> = {}): Encoun
 }
 
 export const TEST_SOLEMN_MEND: SpellDef = { id: 'solemn-mend', name: 'Solemn Mend', heal: 5, mana: 5, castMs: 2000 };
-export const TEST_ZEALOUS_MENDING: SpellDef = { id: 'zealous-mending', name: 'Zealous Mending', heal: 5, mana: 8, castMs: 1000 };
+export const TEST_ZEALOUS_MENDING: SpellDef = { id: 'zealous-mending', name: 'Zealous Mending', heal: 6, mana: 6, castMs: 1000 };
 /** Extra test-only spell (Chunk 1 effects tests) so a synergy-consumption test can arm two
  * independent entries with two distinct trigger spells feeding the same buffed spell. */
 export const TEST_MINOR_SPELL: SpellDef = { id: 'test-minor', name: 'Minor Spell', heal: 2, mana: 2, castMs: 500 };

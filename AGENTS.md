@@ -29,7 +29,8 @@ to [`docs/poc-qa.md`](docs/poc-qa.md).
 
 ## Authority (highest wins)
 
-1. Active phase handoff (`docs/phase-*-handoff.md` with `Status: planning`)
+1. Active phase handoff (`docs/*-handoff.md` with `Status: planning`, e.g.
+   [`docs/alpha-0.1-handoff.md`](docs/alpha-0.1-handoff.md))
 2. [`docs/poc-spec.md`](docs/poc-spec.md) — PoC baseline (phase amendments win)
 3. [`docs/poc-qa.md`](docs/poc-qa.md) — decided micro-choices + QA log
 4. Colocated module docs — win for that module:
@@ -62,7 +63,8 @@ agents should prefer `verify`.
 | Kind | Location |
 |------|----------|
 | Living rules | `CLAUDE.md`, `docs/poc-spec.md`, `docs/poc-qa.md` |
-| Active mission | `docs/<phase>-handoff.md` (`Status: planning`) |
+| Active mission | `docs/alpha-0.1-handoff.md` (`Status: planning`) |
+| PoC retrospective | `docs/poc-changelog.md` (`Status: historical`, frozen) |
 | Module contracts | Colocated `AGENTS.md` / `README.md` |
 | Historical | Bannered handoffs / outcomes (or `docs/archive/`) |
 | Research | `docs/research/` |

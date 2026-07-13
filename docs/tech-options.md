@@ -1,9 +1,13 @@
 # healgame — Tech Options for PoC
 
-**Status:** Decision aid (not locked)  
+Status: historical · Authority: none — stack decision aid (Phaser shipped) · Last verified: 2026-07-12
+
 **Date:** 2026-07-08  
 **Constraint:** Most of the PoC will be coded by a **Fable / Cursor coding agent**  
 **Authority for gameplay:** [`poc-spec.md`](./poc-spec.md)
+
+**Outcome:** Option A (Phaser 3 + TypeScript + Vite) shipped. Keep this file for
+rationale only — do not re-litigate the stack.
 
 ---
 
@@ -16,7 +20,7 @@ This is **not** a physics platformer or open world. It is:
 | 2D side-view battle line | Units stand still; no pathfinding |
 | Click targeting + spell bar | UI-heavy healer fantasy |
 | Timers | GCD, cast bars (~2s heals, ~10s boss casts), auto-attack intervals |
-| Simple scenes | Tutorial → combat → hub → tree → subclass |
+| Simple scenes | Tutorial → combat → hub → spell tree |
 | Persist | Single local save (localStorage / file) |
 | Temp art | Placeholders OK until separate art/UI slice |
 | Fast agent iteration | Preview in browser, TypeScript types, lots of examples online |

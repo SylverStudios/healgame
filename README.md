@@ -38,11 +38,13 @@ Doc conventions + authority: [`AGENTS.md`](AGENTS.md). Operating rules:
 | [Tree AGENTS](game/src/tree/AGENTS.md) | Config-driven skill-tree service |
 | [Combat README](game/src/combat/README.md) | Engine API + rule decisions |
 | [Unit art](docs/unit-art.md) | Kenney tile mapping |
-| [Phase 1 outcome](docs/phase-1-poc-outcome.md) | Historical retrospective |
-| [Phase 2 handoff](docs/phase-2-handoff.md) | Historical — what Phase 2 shipped |
-| [Tech options](docs/tech-options.md) | Stack comparison |
 | [GDD](docs/GDD.md) | Long-term design only |
+| [Tech options](docs/tech-options.md) | Stack comparison (historical decision aid) |
 | [Kale research](docs/research/master-healer-kale.md) | Inspiration |
+
+Shipped phase handoffs (historical only): Phase 1 outcome, Phase 2, Phase 3
+combat UX, side-view layout, combat juice — see `docs/*-handoff.md` /
+`docs/phase-1-poc-outcome.md`.
 
 ## PoC in one breath
 

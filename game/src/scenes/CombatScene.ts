@@ -27,6 +27,7 @@ import { CombatLog } from '../ui/combatLog';
 import { shakeBossImpact, showCastBeam, showHealRipple } from '../ui/combatFx';
 import { PaceToggle } from '../ui/paceToggle';
 import { loadSave, saveGame } from '../save/save';
+import { relicById } from '../data/relics';
 import type { CombatMods } from '../data/spellTree';
 
 /** Pinned contract: callers pass fully resolved CombatMods (from loadoutFromSave). */
@@ -186,10 +187,19 @@ export class CombatScene extends Phaser.Scene {
 
     const spells = this.sceneData.loadout.spells;
 
+    // Loaded once up front: the relic feeds the engine at construction, and
+    // the same save is reused below for the pace toggle (avoids a second
+    // redundant loadSave() call).
+    const save = loadSave();
+
     this.engine = new CombatEngine(encounter, spells, {
       bonusMaxMana: this.sceneData.loadout.bonusMaxMana,
       synergies: this.sceneData.loadout.synergies,
       missingHealthBonuses: this.sceneData.loadout.missingHealthBonuses,
+      missingHealthPctBonuses: this.sceneData.loadout.missingHealthPctBonuses,
+      fullHealthBonuses: this.sceneData.loadout.fullHealthBonuses,
+      cooldowns: this.sceneData.loadout.cooldowns,
+      relic: relicById(save.relicId),
     });
 
     this.buildGroundLine();
@@ -206,11 +216,12 @@ export class CombatScene extends Phaser.Scene {
       this.sceneData.loadout,
       (spellId) => this.onSpellCast(spellId),
       VIEW_WIDTH,
+      this.sceneData.loadout.cooldowns,
+      (cooldownId) => this.onCooldownActivate(cooldownId),
     );
     this.registerHotkeys(spells);
     this.registerEscapeKey();
 
-    const save = loadSave();
     const available = this.sceneData.loadout.paceMultipliersTenths;
     this.combatPaceTenths = available.includes(save.combatPaceTenths) ? save.combatPaceTenths : 10;
     this.paceToggle = new PaceToggle(this, PACE_TOGGLE_X, PACE_TOGGLE_Y, (tenths) => {
@@ -406,6 +417,14 @@ export class CombatScene extends Phaser.Scene {
     this.syncView();
   }
 
+  /** Cooldowns are off-GCD (Alpha 0.1 §D6) — no busy/target checks here; the engine itself
+   *  silently ignores unknown ids and re-activation while still on cooldown. */
+  private onCooldownActivate(cooldownId: string): void {
+    if (this.engine.state.status !== 'running') return;
+    this.engine.activateCooldown(cooldownId);
+    this.syncView();
+  }
+
   // ---- event feedback --------------------------------------------------------
 
   private handleEvents(events: CombatEvent[]): void {
@@ -454,6 +473,28 @@ export class CombatScene extends Phaser.Scene {
         case 'bossCastFinished':
           shakeBossImpact(this);
           break;
+        case 'bossFocusStarted': {
+          // Tunnel Vision channel begins on one party member (alpha-0.1 §D3).
+          // The telegraph's bossCastFinished already fired the small shake.
+          this.findSprite(event.targetId)?.setBossFocused(true);
+          this.combatLog.push(
+            `${this.formatTimestamp()} ${this.encounter.boss.name} fixates on ${this.resolveUnitName(event.targetId)} — ${event.name}!`,
+          );
+          break;
+        }
+        // No bossFocusTick case: tick HP loss arrives as a normal 'damage'
+        // event (float + log line), and 10 extra lines/shakes in 10s is noise.
+        case 'bossFocusEnded': {
+          this.findSprite(event.targetId)?.setBossFocused(false);
+          this.combatLog.push(`${this.formatTimestamp()} ${event.name} ends.`);
+          break;
+        }
+        case 'cooldownActivated':
+          this.combatLog.push(`${this.formatTimestamp()} ${event.name} activated!`);
+          break;
+        case 'relicTriggered':
+          this.combatLog.push(`${this.formatTimestamp()} ${event.name} triggers!`);
+          break;
         case 'castCancelled': {
           const spellName = this.resolveSpellName(event.spellId);
           if (event.reason === 'escape') {
@@ -469,6 +510,10 @@ export class CombatScene extends Phaser.Scene {
           this.rebuildEnemies(this.engine.state.enemies);
           break;
         case 'combatEnded':
+          // A channel can be live when the fight ends (e.g. boss dies mid-
+          // Tunnel-Vision) — the engine stops before emitting bossFocusEnded,
+          // so clear any lingering brand before the overlay.
+          this.partySprites.forEach((sprite) => sprite.setBossFocused(false));
           if (isFinalStatus(event.status)) this.showResultOverlay(event.status);
           break;
         default:
@@ -511,6 +556,7 @@ export class CombatScene extends Phaser.Scene {
     const healer = state.party.find((u) => u.role === 'healer');
     this.spellBar.setState(healer?.mana ?? 0, state.targetId !== null, state.status === 'running');
     this.spellBar.setArmedSpellIds(state.armedBuffedSpellIds);
+    this.spellBar.updateCooldowns(state.cooldowns);
     this.syncHealerRune(state);
 
     this.waveText.setText(

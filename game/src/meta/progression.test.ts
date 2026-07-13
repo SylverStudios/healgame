@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   applyCombatResult,
   buildLoadout,
-  isDungeon2Unlocked,
+  isIronPassUnlocked,
+  isMawUnlocked,
   nodeStatus,
   purchaseNode,
 } from './progression';
 import { newSaveData, type SaveData } from '../save/save';
 import { SPELLS, XP_LEVEL_2_THRESHOLD } from '../data/constants';
-import { THE_MAW } from '../data/encounters';
+import { IRON_PASS, THE_MAW } from '../data/encounters';
 import type { CombatResult } from '../scenes/CombatScene';
 
 function save(overrides: Partial<SaveData> = {}): SaveData {
@@ -65,11 +66,44 @@ describe('applyCombatResult', () => {
     expect(notices).toEqual([]);
   });
 
+  it('records an iron-pass first clear (unlocking The Maw) but grants no ruby — §D1', () => {
+    const s = save({ clearedDungeons: ['ash-gate'], rubies: 1 });
+    const notices = applyCombatResult(s, result({ status: 'victory', encounterId: 'iron-pass' }));
+    expect(s.rubies).toBe(1);
+    expect(s.clearedDungeons).toEqual(['ash-gate', 'iron-pass']);
+    expect(notices).toEqual([{ kind: 'firstClear', text: 'FIRST CLEAR!' }]);
+  });
+
   it('does not grant a ruby on a wipe', () => {
     const s = save();
     applyCombatResult(s, result({ status: 'wipe', encounterId: 'ash-gate' }));
     expect(s.rubies).toBe(0);
     expect(s.clearedDungeons).toEqual([]);
+  });
+
+  it('queues the relic pick on the first-ever Ash Gate clear (Alpha 0.1 §D7)', () => {
+    const s = save();
+    expect(s.relicPickPending).toBe(false);
+    applyCombatResult(s, result({ status: 'victory', encounterId: 'ash-gate' }));
+    expect(s.relicPickPending).toBe(true);
+  });
+
+  it('does not re-queue the relic pick on a replay Ash Gate victory', () => {
+    const s = save({ clearedDungeons: ['ash-gate'], relicPickPending: false });
+    applyCombatResult(s, result({ status: 'victory', encounterId: 'ash-gate' }));
+    expect(s.relicPickPending).toBe(false);
+  });
+
+  it('never queues the relic pick on an Iron Pass (or other) first clear', () => {
+    const s = save({ clearedDungeons: ['ash-gate'] });
+    applyCombatResult(s, result({ status: 'victory', encounterId: 'iron-pass' }));
+    expect(s.relicPickPending).toBe(false);
+  });
+
+  it('does not queue the relic pick on an Ash Gate wipe', () => {
+    const s = save();
+    applyCombatResult(s, result({ status: 'wipe', encounterId: 'ash-gate' }));
+    expect(s.relicPickPending).toBe(false);
   });
 });
 
@@ -98,8 +132,8 @@ describe('buildLoadout', () => {
   });
 
   it('scales bonusMaxMana with deep-reserves ranks', () => {
-    expect(buildLoadout(save({ treeRanks: { 'deep-reserves': 1 } })).bonusMaxMana).toBe(2);
-    expect(buildLoadout(save({ treeRanks: { 'deep-reserves': 5 } })).bonusMaxMana).toBe(10);
+    expect(buildLoadout(save({ treeRanks: { 'deep-reserves': 1 } })).bonusMaxMana).toBe(5);
+    expect(buildLoadout(save({ treeRanks: { 'deep-reserves': 5 } })).bonusMaxMana).toBe(25);
   });
 
   it('emits synergies scaled by ranks', () => {
@@ -109,10 +143,10 @@ describe('buildLoadout', () => {
     ]);
   });
 
-  it('emits missing-health bonuses', () => {
-    const s = save({ treeRanks: { 'zealot-oath': 1, 'zealot-desperate-zeal': 1 }, subclass: 'zealot' });
-    expect(buildLoadout(s).missingHealthBonuses).toEqual([
-      { spellId: 'zealous-flare', healPer10PctMissing: 1 },
+  it('emits full-health bonuses from Steady Hands (Alpha 0.1 §D4, replaces retired Desperate Zeal)', () => {
+    const s = save({ treeRanks: { 'zealot-oath': 1, 'zealot-steady-hands': 1 }, subclass: 'zealot' });
+    expect(buildLoadout(s).fullHealthBonuses).toEqual([
+      { spellId: 'zealous-mending', hpPctAtLeast: 80, bonusHeal: 1 },
     ]);
   });
 
@@ -251,13 +285,55 @@ describe('nodeStatus', () => {
   });
 });
 
-describe('isDungeon2Unlocked', () => {
+describe('isIronPassUnlocked', () => {
   it('is false on a fresh save', () => {
-    expect(isDungeon2Unlocked(save())).toBe(false);
+    expect(isIronPassUnlocked(save())).toBe(false);
   });
 
   it('is true once ash-gate has been cleared', () => {
-    expect(isDungeon2Unlocked(save({ clearedDungeons: ['ash-gate'] }))).toBe(true);
+    expect(isIronPassUnlocked(save({ clearedDungeons: ['ash-gate'] }))).toBe(true);
+  });
+});
+
+describe('isMawUnlocked', () => {
+  it('is false on a fresh save', () => {
+    expect(isMawUnlocked(save())).toBe(false);
+  });
+
+  it('is still false after only ash-gate has been cleared', () => {
+    expect(isMawUnlocked(save({ clearedDungeons: ['ash-gate'] }))).toBe(false);
+  });
+
+  it('is true once iron-pass has been cleared', () => {
+    expect(isMawUnlocked(save({ clearedDungeons: ['ash-gate', 'iron-pass'] }))).toBe(true);
+  });
+});
+
+describe('IRON_PASS data sanity', () => {
+  it('has four trash waves with the bot-tuned counts/hp (chunk 9a — see combat/balance.test.ts)', () => {
+    expect(IRON_PASS.waves).toHaveLength(4);
+    const shapes = IRON_PASS.waves.map((w) => ({
+      count: w.enemies[0]?.count,
+      hp: w.enemies[0]?.hp,
+    }));
+    expect(shapes).toEqual([
+      { count: 2, hp: 9 },
+      { count: 3, hp: 9 },
+      { count: 3, hp: 10 },
+      { count: 4, hp: 10 },
+    ]);
+  });
+
+  it('has a boss cast of kind tunnelVision with the drafted cadence', () => {
+    const cast = IRON_PASS.boss.cast;
+    expect(cast?.name).toBe('Tunnel Vision');
+    if (!cast || cast.kind !== 'tunnelVision') throw new Error('Tunnel Vision must be a tunnelVision cast');
+    expect(cast.telegraphMs).toBe(3000);
+    expect(cast.firstCastAtMs).toBe(8000);
+    expect(cast.intervalMs).toBe(30_000);
+    expect(cast.channelMs).toBe(10_000);
+    expect(cast.tickMs).toBe(1000);
+    expect(cast.damagePerTick).toBe(2);
   });
 });
 
@@ -267,9 +343,11 @@ describe('THE_MAW data sanity', () => {
   });
 
   it('has a named party-wide cast (Extinction) defined', () => {
-    expect(THE_MAW.boss.cast?.name).toBe('Extinction');
-    expect(THE_MAW.boss.cast?.partyDamage).toBeGreaterThan(0);
-    expect(THE_MAW.boss.cast?.castMs).toBe(10_000);
+    const cast = THE_MAW.boss.cast;
+    expect(cast?.name).toBe('Extinction');
+    if (!cast || cast.kind === 'tunnelVision') throw new Error('Extinction must be a party-AoE cast');
+    expect(cast.partyDamage).toBeGreaterThan(0);
+    expect(cast.castMs).toBe(10_000);
   });
 
   it('includes a light trash wave so grinding still pays gold/xp', () => {
