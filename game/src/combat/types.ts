@@ -113,6 +113,25 @@ export interface CooldownState {
   activeRemainingMs: number;
 }
 
+/**
+ * A relic's gameplay effect (Alpha 0.1 §D7 — one-time pick of 1-of-3 run
+ * modifiers, locked for the save). Relics are **not** tree nodes: they're
+ * resolved from `save.relicId` (`data/relics.ts`) and passed into the engine
+ * separately, alongside the tree-derived `CombatEngineOptions`.
+ */
+export type RelicEffect =
+  | { kind: 'overhealManaRestore'; mana: number }
+  | { kind: 'thresholdHealMod'; thresholdPct: number; bonusBelow: number; penaltyAtOrAbove: number; minHeal: number }
+  | { kind: 'manaRegenTradeoff'; maxManaDelta: number; regenIntervalMs: number; regenAmount: number };
+
+/** Data-driven relic definition (instances live in data/relics.ts). */
+export interface RelicDef {
+  id: string;
+  name: string;
+  description: string;
+  effect: RelicEffect;
+}
+
 export interface CombatEngineOptions {
   /** Adds to the healer's max AND starting mana (e.g. Deep Reserves). */
   bonusMaxMana?: number;
@@ -122,6 +141,8 @@ export interface CombatEngineOptions {
   fullHealthBonuses?: FullHealthBonusRule[];
   /** Alpha 0.1 §D6: cooldowns granted by the tree (e.g. Still Waters, Frenzied Liturgy). */
   cooldowns?: CooldownDef[];
+  /** Alpha 0.1 §D7: the player's one locked-in relic pick, if any (resolved from save.relicId). */
+  relic?: RelicDef | undefined;
 }
 
 export interface CastState {
@@ -152,6 +173,10 @@ export type CombatEvent =
   | { type: 'bossFocusEnded'; targetId: string; name: string }
   | { type: 'cooldownActivated'; id: string; name: string }
   | { type: 'cooldownBuffEnded'; id: string }
+  /** Alpha 0.1 §D7: emitted on Ember Ledger's once-per-combat overheal restore and on each
+   *  Still Reservoir regen tick. NOT emitted for Triage Bell (its heal mods already show in
+   *  the heal numbers). */
+  | { type: 'relicTriggered'; id: string; name: string }
   | { type: 'unitDied'; unitId: string }
   | { type: 'waveStarted'; waveIndex: number }
   | { type: 'combatEnded'; status: CombatStatus };

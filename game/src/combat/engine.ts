@@ -21,6 +21,7 @@ import type {
   FullHealthBonusRule,
   MissingHealthBonusRule,
   MissingHealthPctBonusRule,
+  RelicDef,
   SpellDef,
   SynergyRule,
   TunnelVisionCastDef,
@@ -70,6 +71,14 @@ export class CombatEngine {
   private readonly fullHealthBonuses: FullHealthBonusRule[];
   /** Cooldown runtime state, same order as options.cooldowns (Alpha 0.1 §D6). */
   private readonly cooldowns: CooldownRuntime[];
+  /** Alpha 0.1 §D7: the equipped relic, cloned (effect object too) so this instance's mutable
+   *  runtime fields never touch the caller's object. Undefined when none equipped. */
+  private readonly relic?: RelicDef | undefined;
+  /** overhealManaRestore (Ember Ledger): fires once per combat, on the first overheal. */
+  private emberLedgerFired = false;
+  /** manaRegenTradeoff (Still Reservoir): countdown to the next regen tick; null when no such
+   *  relic is equipped, so the timer/tick logic below is fully inert without one. */
+  private relicRegenRemainingMs: number | null = null;
 
   private party: Unit[] = [];
   private activeEnemies: Unit[] = [];
@@ -111,9 +120,19 @@ export class CombatEngine {
     this.encounter = encounter;
     this.spells = spells;
 
+    // Alpha 0.1 §D7: the equipped relic, cloned (effect object too) so this instance's
+    // mutable runtime fields never touch the caller's object.
+    this.relic = options?.relic ? { ...options.relic, effect: { ...options.relic.effect } } : undefined;
+
     // Authorized Chunk 3 extension: a spell-tree node (e.g. Deep Reserves) can grant
     // the healer bonus max mana, applied to both max and starting mana here.
-    const healerMana = PARTY.startingMana + (options?.bonusMaxMana ?? 0);
+    let healerMana = PARTY.startingMana + (options?.bonusMaxMana ?? 0);
+    // Still Reservoir (manaRegenTradeoff, §D7/§D8): -5 max/starting mana (floored at 1
+    // defensively), plus a regen timer that starts counting down from t=0.
+    if (this.relic?.effect.kind === 'manaRegenTradeoff') {
+      healerMana = Math.max(1, healerMana + this.relic.effect.maxManaDelta);
+      this.relicRegenRemainingMs = this.relic.effect.regenIntervalMs;
+    }
 
     // Chunk 1 (phase-2-handoff): synergy + missing-health bonus rules, cloned so the
     // engine's mutable `armed` state never touches the caller's arrays.
@@ -299,6 +318,7 @@ export class CombatEngine {
       if (cd.remainingCooldownMs > 0) min = Math.min(min, cd.remainingCooldownMs);
       if (cd.buffRemainingMs > 0) min = Math.min(min, cd.buffRemainingMs);
     }
+    if (this.relicRegenRemainingMs !== null) min = Math.min(min, this.relicRegenRemainingMs);
     return min;
   }
 
@@ -313,6 +333,7 @@ export class CombatEngine {
       this.bossFocusState.remainingMs -= step;
       this.bossFocusState.tickRemainingMs -= step;
     }
+    if (this.relicRegenRemainingMs !== null) this.relicRegenRemainingMs -= step;
     // Cooldown timers (Alpha 0.1 §D6): plain cooldown countdown (no event on reaching
     // ready — the UI reads remainingCooldownMs === 0 off state) and manaCostReduction
     // buff windows, which emit cooldownBuffEnded exactly once on expiry (below). The
@@ -331,6 +352,21 @@ export class CombatEngine {
 
     // 1. cooldown buff windows that expired this tick (Frenzied Liturgy)
     for (const id of expiredBuffCooldownIds) events.push({ type: 'cooldownBuffEnded', id });
+    // 1b. Still Reservoir regen tick (§D7/§D8): fires every regenIntervalMs of sim time,
+    // unconditionally — independent of cast/busy state, mana being full, or combat status
+    // (it just keeps ticking for the whole fight). Reset-on-fire mirrors the swing-timer
+    // pattern elsewhere in this method.
+    if (
+      this.relicRegenRemainingMs !== null &&
+      this.relicRegenRemainingMs <= 0 &&
+      this.relic?.effect.kind === 'manaRegenTradeoff'
+    ) {
+      const eff = this.relic.effect;
+      this.relicRegenRemainingMs = eff.regenIntervalMs;
+      const healer = this.getUnit('healer')!;
+      healer.mana = Math.min(healer.maxMana, healer.mana + eff.regenAmount);
+      events.push({ type: 'relicTriggered', id: this.relic.id, name: this.relic.name });
+    }
     // 2. player cast completes
     if (this.playerCast && this.playerCast.remainingMs <= 0) {
       this.completePlayerCast(events);
@@ -496,11 +532,29 @@ export class CombatEngine {
           fullHealthBonus += fh.bonusHeal;
         }
       }
-      const raw = spell.heal + synergyBonus + missingHealthBonus + missingHealthPctBonus + fullHealthBonus;
+      let raw = spell.heal + synergyBonus + missingHealthBonus + missingHealthPctBonus + fullHealthBonus;
+      // Relic: Triage Bell (thresholdHealMod, §D7/§D8) — modifies the FINAL raw sum, after
+      // every tree bonus above. Pre-heal threshold check, same hp/maxHp read as the bands above.
+      if (this.relic?.effect.kind === 'thresholdHealMod') {
+        const eff = this.relic.effect;
+        raw =
+          target.hp * 100 < eff.thresholdPct * target.maxHp
+            ? raw + eff.bonusBelow
+            : Math.max(eff.minHeal, raw - eff.penaltyAtOrAbove);
+      }
       const applied = Math.min(raw, missing);
       const overheal = raw - applied;
       target.hp += applied;
       events.push({ type: 'heal', targetId: target.id, amount: applied, overheal, spellId: spell.id });
+      // Relic: Ember Ledger (overhealManaRestore, §D7/§D8) — once per combat, on the FIRST
+      // heal event with overheal > 0: restore mana (clamped to max) and emit relicTriggered.
+      // Fires even if mana is already full (the charge is still spent — locked, deterministic).
+      if (!this.emberLedgerFired && this.relic?.effect.kind === 'overhealManaRestore' && overheal > 0) {
+        this.emberLedgerFired = true;
+        const healer = this.getUnit('healer')!;
+        healer.mana = Math.min(healer.maxMana, healer.mana + this.relic.effect.mana);
+        events.push({ type: 'relicTriggered', id: this.relic.id, name: this.relic.name });
+      }
     }
   }
 

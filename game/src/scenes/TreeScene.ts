@@ -45,6 +45,19 @@ const FONT = 'monospace';
 const NODE_WIDTH = 200;
 const NODE_HEIGHT = 70;
 
+/**
+ * Alpha 0.1 §D5 tree layer 2 sits below the branch rows (world y 650/800),
+ * past the 960×540 base canvas (see main.ts) which has no room left after
+ * the existing rows (deep-reserves 130 → oaths 260 → branch follow-ups 400 →
+ * graven-scale 550). TreeScene now scrolls: world content (nodes/edges) pans
+ * under a screen-fixed HUD (title/wallet/status/back button via
+ * `setScrollFactor(0)`), driven by mouse wheel. `journey.mjs` reaches layer 2
+ * via `page.mouse.wheel(0, dy)` while hovering the canvas, then clicks the
+ * resulting on-screen position (world y − scrollY).
+ */
+const WORLD_HEIGHT = 900;
+const WHEEL_SCROLL_SCALE = 0.5;
+
 const TOOLTIP_BG = 0x241a15;
 const TOOLTIP_BORDER = 0x0a0605;
 const TOOLTIP_PADDING = 8;
@@ -65,6 +78,13 @@ const SPELL_TREE_POSITIONS: Readonly<Record<string, SpotPosition>> = {
   'vigil-graven-scale': { x: 150, y: 550 },
   'zealot-fervent-chain': { x: 590, y: 400 },
   'zealot-steady-hands': { x: 820, y: 400 },
+  // Layer 2 (Alpha 0.1 §D5) — below the branch row, reached via scroll.
+  'vigil-deep-well': { x: 150, y: 650 },
+  'vigil-thrift': { x: 380, y: 650 },
+  'zealot-quick-breath': { x: 590, y: 650 },
+  'zealot-spendthrift-grace': { x: 820, y: 650 },
+  'vigil-still-waters': { x: 265, y: 800 },
+  'zealot-frenzied-liturgy': { x: 705, y: 800 },
 };
 
 function asContent(raw: unknown): SpellTreeContent | null {
@@ -140,17 +160,41 @@ export class TreeScene extends Phaser.Scene {
 
     const { width, height } = this.scale;
 
+    // Tree content (nodes/edges) lives in a world taller than the viewport
+    // (layer 2 sits below the fold); the camera scrolls over it via wheel.
+    // The bg catch-rect below scrolls with the world (default scrollFactor 1)
+    // so pointerdown-to-disarm still fires anywhere in the scrolled view.
+    this.cameras.main.setBounds(0, 0, width, WORLD_HEIGHT);
+    this.input.on(
+      'wheel',
+      (
+        _pointer: Phaser.Input.Pointer,
+        _objects: unknown,
+        _dx: number,
+        dy: number,
+      ) => {
+        const maxScroll = Math.max(0, WORLD_HEIGHT - height);
+        this.cameras.main.scrollY = Phaser.Math.Clamp(
+          this.cameras.main.scrollY + dy * WHEEL_SCROLL_SCALE,
+          0,
+          maxScroll,
+        );
+      },
+    );
+
     this.add
-      .rectangle(width / 2, height / 2, width, height, BG_COLOR)
+      .rectangle(width / 2, WORLD_HEIGHT / 2, width, WORLD_HEIGHT, BG_COLOR)
       .setInteractive()
       .on('pointerdown', () => this.disarmAndRerenderIfNeeded());
 
     this.add
       .text(width / 2, 34, 'Spell Tree', { fontFamily: FONT, fontSize: '26px', color: TEXT_COLOR })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setScrollFactor(0);
     this.headerText = this.add
       .text(width / 2, 64, '', { fontFamily: FONT, fontSize: '15px', color: ACCENT_COLOR })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setScrollFactor(0);
 
     this.statusText = this.add
       .text(width / 2, 470, '', {
@@ -160,7 +204,8 @@ export class TreeScene extends Phaser.Scene {
         align: 'center',
         wordWrap: { width: 860 },
       })
-      .setOrigin(0.5, 1);
+      .setOrigin(0.5, 1)
+      .setScrollFactor(0);
 
     this.feedbackText = this.add
       .text(width / 2, 488, '', {
@@ -169,7 +214,8 @@ export class TreeScene extends Phaser.Scene {
         color: DANGER_COLOR,
         align: 'center',
       })
-      .setOrigin(0.5, 0);
+      .setOrigin(0.5, 0)
+      .setScrollFactor(0);
 
     this.nodesContainer = this.add.container(0, 0);
 
@@ -340,7 +386,12 @@ export class TreeScene extends Phaser.Scene {
     }
   }
 
-  /** Shows the node-anchored tooltip above the node; flips below if that would clip the canvas top. */
+  /**
+   * Shows the node-anchored tooltip above the node; flips below if that would
+   * clip the canvas top. `pos` is world-space (tooltipContainer scrolls with
+   * the tree, scrollFactor 1 default) but the above/below flip decision needs
+   * screen-space, so it's computed relative to the camera's current scrollY.
+   */
   private showTooltip(spot: SpotView, pos: SpotPosition): void {
     this.tooltipText.setText(spotDescription(spot));
     const panelWidth = this.tooltipText.width + TOOLTIP_PADDING * 2;
@@ -349,11 +400,17 @@ export class TreeScene extends Phaser.Scene {
 
     const canvasWidth = this.scale.width;
     const canvasHeight = this.scale.height;
+    const scrollY = this.cameras.main.scrollY;
+    const screenY = pos.y - scrollY;
+
     const x = Phaser.Math.Clamp(pos.x - panelWidth / 2, 0, Math.max(0, canvasWidth - panelWidth));
 
-    const above = pos.y - NODE_HEIGHT / 2 - TOOLTIP_GAP - panelHeight;
-    const y =
-      above >= 0 ? above : Phaser.Math.Clamp(pos.y + NODE_HEIGHT / 2 + TOOLTIP_GAP, 0, canvasHeight - panelHeight);
+    const aboveScreen = screenY - NODE_HEIGHT / 2 - TOOLTIP_GAP - panelHeight;
+    const screenY2 =
+      aboveScreen >= 0
+        ? aboveScreen
+        : Phaser.Math.Clamp(screenY + NODE_HEIGHT / 2 + TOOLTIP_GAP, 0, canvasHeight - panelHeight);
+    const y = screenY2 + scrollY;
 
     this.tooltipContainer.setPosition(x, y);
     this.tooltipContainer.setVisible(true);
@@ -428,8 +485,12 @@ export class TreeScene extends Phaser.Scene {
     const rect = this.add
       .rectangle(x, y, 160, 44, BUTTON_COLOR)
       .setStrokeStyle(2, BORDER_COLOR)
-      .setInteractive({ useHandCursor: true });
-    this.add.text(x, y, 'Back', { fontFamily: FONT, fontSize: '16px', color: TEXT_COLOR }).setOrigin(0.5);
+      .setInteractive({ useHandCursor: true })
+      .setScrollFactor(0);
+    this.add
+      .text(x, y, 'Back', { fontFamily: FONT, fontSize: '16px', color: TEXT_COLOR })
+      .setOrigin(0.5)
+      .setScrollFactor(0);
     rect.on('pointerdown', () => this.scene.start(SceneKeys.Hub));
   }
 }

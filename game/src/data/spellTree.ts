@@ -11,6 +11,7 @@
 
 import { SPELLS } from './constants';
 import { spellById } from './spells';
+import { STILL_WATERS, FRENZIED_LITURGY, cooldownById } from './cooldowns';
 import type {
   SpellDef,
   SynergyRule,
@@ -42,7 +43,8 @@ export type SpellTreeEffect =
   | { kind: 'missingHealthPctBonus'; spellId: string; pctPer10PctMissing: number }
   | { kind: 'fullHealthBonus'; spellId: string; hpPctAtLeast: number; bonusHeal: number }
   | { kind: 'castMod'; spellId: string; castMsDelta: number; manaDelta: number }
-  | { kind: 'combatPace'; multiplierTenths: number };
+  | { kind: 'combatPace'; multiplierTenths: number }
+  | { kind: 'grantCooldown'; cooldownId: string };
 
 /** Opaque-to-tree payload: display + effect (+ optional subclass tag for oaths). */
 export interface SpellTreeContent {
@@ -268,6 +270,104 @@ const steadyHands: NodeDef = {
   }),
 };
 
+/**
+ * Alpha 0.1 §D5: tree layer 2 (mana focus). Each node requires owning at
+ * least one existing branch node on its side — `mode: 'any'` (patient-vow
+ * rank 1 OR measured-devotion for Vigil; fervent-chain rank 1 OR steady-hands
+ * for Zealot) — so either follow-up path into the branch unlocks layer 2.
+ */
+const VIGIL_LAYER2_REQUIRES: NodeDef['requires'] = {
+  mode: 'any',
+  nodes: ['vigil-patient-vow-1', 'vigil-measured-devotion'],
+};
+
+const ZEALOT_LAYER2_REQUIRES: NodeDef['requires'] = {
+  mode: 'any',
+  nodes: ['zealot-fervent-chain-1', 'zealot-steady-hands'],
+};
+
+const vigilDeepWell: NodeDef = {
+  id: 'vigil-deep-well',
+  requires: VIGIL_LAYER2_REQUIRES,
+  cost: { currency: 'gold', amount: 5 },
+  content: content({
+    name: 'Deep Well',
+    description: '+4 max mana',
+    subclass: 'vigil',
+    effect: { kind: 'bonusMaxMana', amount: 4 },
+  }),
+};
+
+const vigilThrift: NodeDef = {
+  id: 'vigil-thrift',
+  requires: VIGIL_LAYER2_REQUIRES,
+  cost: { currency: 'gold', amount: 6 },
+  content: content({
+    name: 'Thrift',
+    description: `${SPELLS.solemnMend.name} costs 1 less mana (${SPELLS.solemnMend.mana} → ${SPELLS.solemnMend.mana - 1})`,
+    subclass: 'vigil',
+    effect: {
+      kind: 'castMod',
+      spellId: SPELLS.solemnMend.id,
+      castMsDelta: 0,
+      manaDelta: -1,
+    },
+  }),
+};
+
+const vigilStillWaters: NodeDef = {
+  id: 'vigil-still-waters',
+  requires: VIGIL_LAYER2_REQUIRES,
+  cost: { currency: 'gold', amount: 8 },
+  content: content({
+    name: 'Still Waters',
+    description: `Grants ${STILL_WATERS.name} (${s(STILL_WATERS.cooldownMs)}): ${STILL_WATERS.description}`,
+    subclass: 'vigil',
+    effect: { kind: 'grantCooldown', cooldownId: STILL_WATERS.id },
+  }),
+};
+
+const zealotQuickBreath: NodeDef = {
+  id: 'zealot-quick-breath',
+  requires: ZEALOT_LAYER2_REQUIRES,
+  cost: { currency: 'gold', amount: 5 },
+  content: content({
+    name: 'Quick Breath',
+    description: `${SPELLS.zealousFlare.name} casts 200ms faster (${s(SPELLS.zealousFlare.castMs)} → ${s(SPELLS.zealousFlare.castMs - 200)})`,
+    subclass: 'zealot',
+    effect: {
+      kind: 'castMod',
+      spellId: SPELLS.zealousFlare.id,
+      castMsDelta: -200,
+      manaDelta: 0,
+    },
+  }),
+};
+
+const zealotSpendthriftGrace: NodeDef = {
+  id: 'zealot-spendthrift-grace',
+  requires: ZEALOT_LAYER2_REQUIRES,
+  cost: { currency: 'gold', amount: 6 },
+  content: content({
+    name: 'Spendthrift Grace',
+    description: '+3 max mana',
+    subclass: 'zealot',
+    effect: { kind: 'bonusMaxMana', amount: 3 },
+  }),
+};
+
+const zealotFrenziedLiturgy: NodeDef = {
+  id: 'zealot-frenzied-liturgy',
+  requires: ZEALOT_LAYER2_REQUIRES,
+  cost: { currency: 'gold', amount: 8 },
+  content: content({
+    name: 'Frenzied Liturgy',
+    description: `Grants ${FRENZIED_LITURGY.name} (${s(FRENZIED_LITURGY.cooldownMs)}): ${FRENZIED_LITURGY.description}`,
+    subclass: 'zealot',
+    effect: { kind: 'grantCooldown', cooldownId: FRENZIED_LITURGY.id },
+  }),
+};
+
 /** Authoritative spell-tree config for the new service. */
 export const SPELL_TREE: TreeConfig = {
   nodes: [
@@ -281,6 +381,12 @@ export const SPELL_TREE: TreeConfig = {
     gravenScale,
     ...ferventChain.nodes,
     steadyHands,
+    vigilDeepWell,
+    vigilThrift,
+    vigilStillWaters,
+    zealotQuickBreath,
+    zealotSpendthriftGrace,
+    zealotFrenziedLiturgy,
   ],
   spots: [
     deepReserves.spot,
@@ -291,6 +397,12 @@ export const SPELL_TREE: TreeConfig = {
     { id: 'vigil-graven-scale', chain: ['vigil-graven-scale'] },
     ferventChain.spot,
     { id: 'zealot-steady-hands', chain: ['zealot-steady-hands'] },
+    { id: 'vigil-deep-well', chain: ['vigil-deep-well'] },
+    { id: 'vigil-thrift', chain: ['vigil-thrift'] },
+    { id: 'vigil-still-waters', chain: ['vigil-still-waters'] },
+    { id: 'zealot-quick-breath', chain: ['zealot-quick-breath'] },
+    { id: 'zealot-spendthrift-grace', chain: ['zealot-spendthrift-grace'] },
+    { id: 'zealot-frenzied-liturgy', chain: ['zealot-frenzied-liturgy'] },
   ],
 };
 
@@ -316,6 +428,7 @@ export function resolveCombatMods(
   const fullHealthMap = new Map<string, FullHealthBonusRule>();
   const castMods: Extract<SpellTreeEffect, { kind: 'castMod' }>[] = [];
   const paceTenths = new Set<number>([10]);
+  const cooldownMap = new Map<string, CooldownDef>();
 
   for (const { effect } of contents) {
     switch (effect.kind) {
@@ -379,6 +492,12 @@ export function resolveCombatMods(
       case 'combatPace':
         paceTenths.add(effect.multiplierTenths);
         break;
+      case 'grantCooldown': {
+        // Unknown cooldown ids are ignored, same as unknown spell ids above.
+        const def = cooldownById(effect.cooldownId);
+        if (def) cooldownMap.set(def.id, def);
+        break;
+      }
     }
   }
 
@@ -403,9 +522,7 @@ export function resolveCombatMods(
     missingHealthPctBonuses: [...missingPctMap.values()],
     fullHealthBonuses: [...fullHealthMap.values()],
     paceMultipliersTenths: [...paceTenths].sort((a, b) => a - b),
-    // Chunk 7 adds the grantCooldown SpellTreeEffect kind that populates this; chunk 6 only
-    // wires the plumbing (engine + data/cooldowns.ts + spellBar UI) with an always-empty list.
-    cooldowns: [],
+    cooldowns: [...cooldownMap.values()],
   };
 }
 
@@ -482,6 +599,12 @@ export function ownedIdsFromLegacyRanks(treeRanks: Record<string, number>): stri
   if ((treeRanks['zealot-steady-hands'] ?? 0) > 0) owned.push('zealot-steady-hands');
   if ((treeRanks['warped-tempo-via-vigil'] ?? 0) > 0) owned.push('warped-tempo-via-vigil');
   if ((treeRanks['warped-tempo-via-zealot'] ?? 0) > 0) owned.push('warped-tempo-via-zealot');
+  if ((treeRanks['vigil-deep-well'] ?? 0) > 0) owned.push('vigil-deep-well');
+  if ((treeRanks['vigil-thrift'] ?? 0) > 0) owned.push('vigil-thrift');
+  if ((treeRanks['vigil-still-waters'] ?? 0) > 0) owned.push('vigil-still-waters');
+  if ((treeRanks['zealot-quick-breath'] ?? 0) > 0) owned.push('zealot-quick-breath');
+  if ((treeRanks['zealot-spendthrift-grace'] ?? 0) > 0) owned.push('zealot-spendthrift-grace');
+  if ((treeRanks['zealot-frenzied-liturgy'] ?? 0) > 0) owned.push('zealot-frenzied-liturgy');
   return owned;
 }
 
@@ -513,6 +636,12 @@ const SINGLE_NODES = [
   'zealot-steady-hands',
   'warped-tempo-via-vigil',
   'warped-tempo-via-zealot',
+  'vigil-deep-well',
+  'vigil-thrift',
+  'vigil-still-waters',
+  'zealot-quick-breath',
+  'zealot-spendthrift-grace',
+  'zealot-frenzied-liturgy',
 ] as const;
 
 /**

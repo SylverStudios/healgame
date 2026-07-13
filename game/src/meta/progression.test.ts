@@ -80,6 +80,31 @@ describe('applyCombatResult', () => {
     expect(s.rubies).toBe(0);
     expect(s.clearedDungeons).toEqual([]);
   });
+
+  it('queues the relic pick on the first-ever Ash Gate clear (Alpha 0.1 §D7)', () => {
+    const s = save();
+    expect(s.relicPickPending).toBe(false);
+    applyCombatResult(s, result({ status: 'victory', encounterId: 'ash-gate' }));
+    expect(s.relicPickPending).toBe(true);
+  });
+
+  it('does not re-queue the relic pick on a replay Ash Gate victory', () => {
+    const s = save({ clearedDungeons: ['ash-gate'], relicPickPending: false });
+    applyCombatResult(s, result({ status: 'victory', encounterId: 'ash-gate' }));
+    expect(s.relicPickPending).toBe(false);
+  });
+
+  it('never queues the relic pick on an Iron Pass (or other) first clear', () => {
+    const s = save({ clearedDungeons: ['ash-gate'] });
+    applyCombatResult(s, result({ status: 'victory', encounterId: 'iron-pass' }));
+    expect(s.relicPickPending).toBe(false);
+  });
+
+  it('does not queue the relic pick on an Ash Gate wipe', () => {
+    const s = save();
+    applyCombatResult(s, result({ status: 'wipe', encounterId: 'ash-gate' }));
+    expect(s.relicPickPending).toBe(false);
+  });
 });
 
 describe('buildLoadout', () => {

@@ -49,6 +49,10 @@ export function applyCombatResult(save: SaveData, result: CombatResult): HubNoti
     // record (Iron Pass clear is what unlocks The Maw) but pay no ruby.
     const grantsRuby = (REWARDS.rubyFirstClearDungeonIds as readonly string[]).includes(result.encounterId);
     if (grantsRuby) save.rubies += REWARDS.rubyPerFirstClear;
+    // Alpha 0.1 §D7: the FIRST-ever Ash Gate clear also queues the relic pick
+    // (HubScene routes to RelicScene before building the hub UI). Iron
+    // Pass/other first clears never set this flag.
+    if (result.encounterId === 'ash-gate') save.relicPickPending = true;
     notices.push({
       kind: 'firstClear',
       text: grantsRuby ? `FIRST CLEAR — +${REWARDS.rubyPerFirstClear} Ruby` : 'FIRST CLEAR!',

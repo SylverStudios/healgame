@@ -37,7 +37,7 @@ const BASE_KIT: SpellDef[] = [SPELLS.solemnMend];
 /** Minimal synthetic SaveData for loadoutFromSave — only the fields the two maxed builds below need. */
 function makeSave(overrides: Partial<SaveData>): SaveData {
   return {
-    version: 3,
+    version: 4,
     tutorialDone: true,
     gold: 0,
     xp: 0,
@@ -47,6 +47,8 @@ function makeSave(overrides: Partial<SaveData>): SaveData {
     subclass: null,
     clearedDungeons: [],
     combatPaceTenths: 10,
+    relicId: null,
+    relicPickPending: false,
     ...overrides,
   };
 }

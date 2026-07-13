@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { buildLoadout } from '../meta/progression';
 import { newSaveData, type SaveData } from '../save/save';
 import { SPELLS } from './constants';
+import { STILL_WATERS, FRENZIED_LITURGY } from './cooldowns';
 import {
   SPELL_TREE,
   combatModsFromTree,
@@ -37,6 +38,12 @@ describe('SPELL_TREE config', () => {
       'vigil-graven-scale',
       'zealot-fervent-chain',
       'zealot-steady-hands',
+      'vigil-deep-well',
+      'vigil-thrift',
+      'vigil-still-waters',
+      'zealot-quick-breath',
+      'zealot-spendthrift-grace',
+      'zealot-frenzied-liturgy',
     ]);
   });
 
@@ -188,6 +195,233 @@ describe('resolveCombatMods', () => {
     expect(vigil?.castMs).toBe(SPELLS.solemnVigil.castMs + 1000);
     expect(vigil?.mana).toBe(SPELLS.solemnVigil.mana - 3);
     expect(SPELLS.solemnVigil.castMs).toBe(3000); // catalog untouched
+  });
+});
+
+describe('tree layer 2 (Alpha 0.1 §D5)', () => {
+  const VIGIL_LAYER2_SPOTS = ['vigil-deep-well', 'vigil-thrift', 'vigil-still-waters'];
+  const ZEALOT_LAYER2_SPOTS = ['zealot-quick-breath', 'zealot-spendthrift-grace', 'zealot-frenzied-liturgy'];
+
+  it('locks Vigil layer 2 without any owned branch node', () => {
+    const state = treeStateFromLegacy(
+      { 'deep-reserves': 1, 'vigil-oath': 1 },
+      { gold: 100, ruby: 0 },
+    );
+    const spots = view(SPELL_TREE, state).spots;
+    for (const id of VIGIL_LAYER2_SPOTS) {
+      expect(spots.find((s) => s.id === id)?.status).toBe('locked');
+    }
+  });
+
+  it('unlocks Vigil layer 2 via patient-vow rank 1 alone', () => {
+    const state = treeStateFromLegacy(
+      { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-patient-vow': 1 },
+      { gold: 100, ruby: 0 },
+    );
+    const spots = view(SPELL_TREE, state).spots;
+    for (const id of VIGIL_LAYER2_SPOTS) {
+      expect(spots.find((s) => s.id === id)?.status).toBe('affordable');
+    }
+  });
+
+  it('unlocks Vigil layer 2 via measured-devotion alone (any-of prereq)', () => {
+    const state = treeStateFromLegacy(
+      { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-measured-devotion': 1 },
+      { gold: 100, ruby: 0 },
+    );
+    const spots = view(SPELL_TREE, state).spots;
+    for (const id of VIGIL_LAYER2_SPOTS) {
+      expect(spots.find((s) => s.id === id)?.status).toBe('affordable');
+    }
+  });
+
+  it('locks Zealot layer 2 without any owned branch node', () => {
+    const state = treeStateFromLegacy(
+      { 'deep-reserves': 1, 'zealot-oath': 1 },
+      { gold: 100, ruby: 0 },
+    );
+    const spots = view(SPELL_TREE, state).spots;
+    for (const id of ZEALOT_LAYER2_SPOTS) {
+      expect(spots.find((s) => s.id === id)?.status).toBe('locked');
+    }
+  });
+
+  it('unlocks Zealot layer 2 via fervent-chain rank 1 alone', () => {
+    const state = treeStateFromLegacy(
+      { 'deep-reserves': 1, 'zealot-oath': 1, 'zealot-fervent-chain': 1 },
+      { gold: 100, ruby: 0 },
+    );
+    const spots = view(SPELL_TREE, state).spots;
+    for (const id of ZEALOT_LAYER2_SPOTS) {
+      expect(spots.find((s) => s.id === id)?.status).toBe('affordable');
+    }
+  });
+
+  it('unlocks Zealot layer 2 via steady-hands alone (any-of prereq)', () => {
+    const state = treeStateFromLegacy(
+      { 'deep-reserves': 1, 'zealot-oath': 1, 'zealot-steady-hands': 1 },
+      { gold: 100, ruby: 0 },
+    );
+    const spots = view(SPELL_TREE, state).spots;
+    for (const id of ZEALOT_LAYER2_SPOTS) {
+      expect(spots.find((s) => s.id === id)?.status).toBe('affordable');
+    }
+  });
+
+  it('vigil-deep-well and zealot-spendthrift-grace bonusMaxMana sum with Deep Reserves', () => {
+    const mods = resolveCombatMods(
+      [
+        { name: 'Deep Reserves', description: '', effect: { kind: 'bonusMaxMana', amount: 5 } },
+        { name: 'Deep Well', description: '', effect: { kind: 'bonusMaxMana', amount: 4 } },
+        { name: 'Spendthrift Grace', description: '', effect: { kind: 'bonusMaxMana', amount: 3 } },
+      ],
+      ['solemn-mend'],
+    );
+    expect(mods.bonusMaxMana).toBe(12);
+  });
+
+  it('vigil-thrift castMod reduces Solemn Mend mana by 1', () => {
+    const mods = resolveCombatMods(
+      [
+        {
+          name: 'Thrift',
+          description: '',
+          effect: {
+            kind: 'castMod',
+            spellId: SPELLS.solemnMend.id,
+            castMsDelta: 0,
+            manaDelta: -1,
+          },
+        },
+      ],
+      [SPELLS.solemnMend.id],
+    );
+    const mend = mods.spells.find((sp) => sp.id === SPELLS.solemnMend.id);
+    expect(mend?.mana).toBe(SPELLS.solemnMend.mana - 1);
+    expect(mend?.castMs).toBe(SPELLS.solemnMend.castMs);
+  });
+
+  it('zealot-quick-breath castMod reduces Zealous Flare castMs by 200', () => {
+    const mods = resolveCombatMods(
+      [
+        {
+          name: 'Quick Breath',
+          description: '',
+          effect: {
+            kind: 'castMod',
+            spellId: SPELLS.zealousFlare.id,
+            castMsDelta: -200,
+            manaDelta: 0,
+          },
+        },
+      ],
+      [SPELLS.zealousFlare.id],
+    );
+    const flare = mods.spells.find((sp) => sp.id === SPELLS.zealousFlare.id);
+    expect(flare?.castMs).toBe(SPELLS.zealousFlare.castMs - 200);
+    expect(flare?.mana).toBe(SPELLS.zealousFlare.mana);
+  });
+
+  it('grantCooldown resolves the full CooldownDef into CombatMods.cooldowns', () => {
+    const mods = resolveCombatMods(
+      [
+        {
+          name: 'Still Waters',
+          description: '',
+          effect: { kind: 'grantCooldown', cooldownId: STILL_WATERS.id },
+        },
+        {
+          name: 'Frenzied Liturgy',
+          description: '',
+          effect: { kind: 'grantCooldown', cooldownId: FRENZIED_LITURGY.id },
+        },
+      ],
+      ['solemn-mend'],
+    );
+    expect(mods.cooldowns).toEqual([STILL_WATERS, FRENZIED_LITURGY]);
+  });
+
+  it('dedupes grantCooldown by id', () => {
+    const mods = resolveCombatMods(
+      [
+        {
+          name: 'Still Waters',
+          description: '',
+          effect: { kind: 'grantCooldown', cooldownId: STILL_WATERS.id },
+        },
+        {
+          name: 'Still Waters (dup)',
+          description: '',
+          effect: { kind: 'grantCooldown', cooldownId: STILL_WATERS.id },
+        },
+      ],
+      ['solemn-mend'],
+    );
+    expect(mods.cooldowns).toEqual([STILL_WATERS]);
+  });
+
+  it('ignores an unknown grantCooldown id, like unknown spell ids', () => {
+    const mods = resolveCombatMods(
+      [
+        {
+          name: 'Bogus',
+          description: '',
+          effect: { kind: 'grantCooldown', cooldownId: 'not-a-real-cooldown' },
+        },
+      ],
+      ['solemn-mend'],
+    );
+    expect(mods.cooldowns).toEqual([]);
+  });
+
+  it('combatModsFromTree yields Still Waters cooldown for a purchased vigil-still-waters', () => {
+    const state = treeStateFromLegacy(
+      {
+        'deep-reserves': 1,
+        'vigil-oath': 1,
+        'vigil-patient-vow': 1,
+        'vigil-still-waters': 1,
+      },
+      { gold: 0, ruby: 0 },
+    );
+    const mods = combatModsFromTree(state, ['solemn-mend']);
+    expect(mods.cooldowns).toEqual([STILL_WATERS]);
+  });
+
+  it('combatModsFromTree yields Frenzied Liturgy cooldown for a purchased zealot-frenzied-liturgy', () => {
+    const state = treeStateFromLegacy(
+      {
+        'deep-reserves': 1,
+        'zealot-oath': 1,
+        'zealot-steady-hands': 1,
+        'zealot-frenzied-liturgy': 1,
+      },
+      { gold: 0, ruby: 0 },
+    );
+    const mods = combatModsFromTree(state, ['zealous-mending']);
+    expect(mods.cooldowns).toEqual([FRENZIED_LITURGY]);
+  });
+
+  it('round-trips all six layer-2 node ids through the legacy bridge', () => {
+    const ranks = {
+      'deep-reserves': 1,
+      'vigil-oath': 1,
+      'vigil-patient-vow': 1,
+      'vigil-deep-well': 1,
+      'vigil-thrift': 1,
+      'vigil-still-waters': 1,
+    };
+    expect(legacyRanksFromOwned(ownedIdsFromLegacyRanks(ranks))).toEqual(ranks);
+
+    const zealotRanks = {
+      'deep-reserves': 1,
+      'zealot-oath': 1,
+      'zealot-fervent-chain': 1,
+      'zealot-quick-breath': 1,
+      'zealot-spendthrift-grace': 1,
+      'zealot-frenzied-liturgy': 1,
+    };
+    expect(legacyRanksFromOwned(ownedIdsFromLegacyRanks(zealotRanks))).toEqual(zealotRanks);
   });
 });
 

@@ -4,6 +4,7 @@ export const SceneKeys = {
   Combat: 'Combat',
   Hub: 'Hub',
   Tree: 'Tree',
+  Relic: 'Relic',
 } as const;
 
 export type SceneKey = (typeof SceneKeys)[keyof typeof SceneKeys];
