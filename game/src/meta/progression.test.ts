@@ -310,17 +310,17 @@ describe('isMawUnlocked', () => {
 });
 
 describe('IRON_PASS data sanity', () => {
-  it('has four trash waves with the drafted counts/hp', () => {
+  it('has four trash waves with the bot-tuned counts/hp (chunk 9a — see combat/balance.test.ts)', () => {
     expect(IRON_PASS.waves).toHaveLength(4);
     const shapes = IRON_PASS.waves.map((w) => ({
       count: w.enemies[0]?.count,
       hp: w.enemies[0]?.hp,
     }));
     expect(shapes).toEqual([
-      { count: 2, hp: 14 },
-      { count: 3, hp: 14 },
-      { count: 3, hp: 16 },
-      { count: 4, hp: 16 },
+      { count: 2, hp: 9 },
+      { count: 3, hp: 9 },
+      { count: 3, hp: 10 },
+      { count: 4, hp: 10 },
     ]);
   });
 

@@ -50,13 +50,21 @@ export const ASH_GATE: EncounterDef = {
 export const IRON_PASS: EncounterDef = {
   id: 'iron-pass',
   name: 'Iron Pass',
-  // Iron Husks swing off IRON_TRASH (2 dmg / 3.0s), harder than the global
-  // TRASH constants Ash Gate uses — per-group override, see EnemyGroupDef.
+  // Iron Husks swing off IRON_TRASH (2 dmg / 3.0s), harder-hitting than the
+  // global TRASH constants Ash Gate uses — per-group override, see
+  // EnemyGroupDef. HP retuned down from the handoff's draft table (chunk 9a
+  // bot tune — see balance.test.ts gates 5/6): the draft's 2/3/3/4 waves at
+  // 14/14/16/16 hp (182 total trash hp) cost a maxed healer ~32-38 of their
+  // ~48-49 max mana before the boss even spawned, leaving too little to
+  // survive Spire Lancer's Tunnel Vision. 115 total trash hp keeps the "hits
+  // harder than Ash Gate" per-swing feel (still ~2.1x Ash Gate's 55 total
+  // trash hp at 2x the per-hit damage) while leaving a maxed Vigil/Zealot
+  // build enough mana to clear the boss with >=3 party members standing.
   waves: [
-    { enemies: [{ name: 'Iron Husk', hp: 14, count: 2, ...IRON_TRASH }] },
-    { enemies: [{ name: 'Iron Husk', hp: 14, count: 3, ...IRON_TRASH }] },
-    { enemies: [{ name: 'Iron Husk', hp: 16, count: 3, ...IRON_TRASH }] },
-    { enemies: [{ name: 'Iron Husk', hp: 16, count: 4, ...IRON_TRASH }] },
+    { enemies: [{ name: 'Iron Husk', hp: 9, count: 2, ...IRON_TRASH }] },
+    { enemies: [{ name: 'Iron Husk', hp: 9, count: 3, ...IRON_TRASH }] },
+    { enemies: [{ name: 'Iron Husk', hp: 10, count: 3, ...IRON_TRASH }] },
+    { enemies: [{ name: 'Iron Husk', hp: 10, count: 4, ...IRON_TRASH }] },
   ],
   boss: {
     id: 'spire-lancer',
