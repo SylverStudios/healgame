@@ -31,6 +31,13 @@ const GLYPH_COLOR: Record<string, number> = {
   'ember-ledger': 0xe0703a,
   'triage-bell': 0xf2c14e,
   'still-reservoir': 0x6a8aa0,
+  'vital-ember': 0xd87878,
+  'bastion-plate': 0x8797a8,
+  'iron-ward': 0x6f7b86,
+  'twin-fang': 0xc86a5a,
+  quicksteel: 0x8fc7c7,
+  'warblood-gem': 0xa84f4f,
+  'vanguard-sigil': 0xb58b5d,
 };
 
 export interface RunModsBarOptions {

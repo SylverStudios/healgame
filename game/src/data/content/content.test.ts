@@ -14,10 +14,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
   {
     id: 'ash-gate',
     name: 'Ash Gate',
-    goldPerEnemy: 1,
-    goldEveryKills: 2,
     xpPerEnemy: 1,
-    rubyPerFirstClear: 1,
     waves: [
       {
         enemies: [
@@ -62,10 +59,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
   {
     id: 'iron-pass',
     name: 'Iron Pass',
-    goldPerEnemy: 1,
-    goldEveryKills: 2,
     xpPerEnemy: 1,
-    rubyPerFirstClear: 0,
     waves: [
       {
         enemies: [
@@ -137,10 +131,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
   {
     id: 'the-maw',
     name: 'The Maw',
-    goldPerEnemy: 1,
-    goldEveryKills: 2,
     xpPerEnemy: 1,
-    rubyPerFirstClear: 0,
     waves: [
       {
         enemies: [
@@ -214,7 +205,7 @@ describe('live dungeon content', () => {
       [
         'Dungeon 3: The Maw [the-maw]',
         'Unlock: clear iron-pass',
-        'Rewards: gold 1/2 enemies, XP 1/enemy, ruby 0/first clear',
+        'Rewards: XP 1/enemy, relic offer on first clear',
         'Visual: the-maw',
         'Wave 1:',
         '  2x Ash Husk [ash-husk] — HP 4, auto 1/3000ms, boss no, overrides hp=4',
@@ -228,7 +219,7 @@ describe('live dungeon content', () => {
 });
 
 describe('content diagnostics', () => {
-  it('accepts zero rewards and auto damage, including an auto-damage override', () => {
+  it('accepts zero XP rewards and auto damage, including an auto-damage override', () => {
     const zeroValues: ContentCatalogs = {
       ...CONTENT_CATALOGS,
       mobs: [
@@ -238,7 +229,7 @@ describe('content diagnostics', () => {
       dungeons: [
         {
           ...CONTENT_CATALOGS.dungeons[0],
-          rewards: { goldPerEnemy: 0, goldEveryKills: 2, xpPerEnemy: 0, rubyPerFirstClear: 0 },
+          rewards: { xpPerEnemy: 0 },
           waves: [
             {
               enemies: [
@@ -258,9 +249,7 @@ describe('content diagnostics', () => {
 
     expect(validateContent(zeroValues).errors).toEqual([]);
     const compiled = compileDungeon('ash-gate', zeroValues);
-    expect(compiled.goldPerEnemy).toBe(0);
     expect(compiled.xpPerEnemy).toBe(0);
-    expect(compiled.rubyPerFirstClear).toBe(0);
     expect(compiled.waves[0]?.enemies[0]?.autoDamage).toBe(0);
   });
 
@@ -354,7 +343,7 @@ describe('content diagnostics', () => {
         name: 'Broken',
         order: 1,
         unlock: { kind: 'dungeonClear', dungeonId: 'broken' },
-        rewards: { goldPerEnemy: 0, goldEveryKills: 2, xpPerEnemy: 1, rubyPerFirstClear: 1 },
+        rewards: { xpPerEnemy: 1 },
         visualKey: 'broken',
         waves: [
           { enemies: [{ mobId: 'boss', count: 1 }] },

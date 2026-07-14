@@ -15,6 +15,8 @@ import {
 } from '../data/spellTree';
 import { runModsFromSave } from '../data/runMods';
 import { RunModsBar } from '../ui/runModsBar';
+import { allocatedTalentPoints, availableTalentPoints } from '../meta/progression';
+import { levelForXp } from '../data/constants';
 import {
   layoutSpots,
   update,
@@ -100,8 +102,7 @@ function asContent(raw: unknown): SpellTreeContent | null {
 }
 
 function costLabel(currency: string, amount: number): string {
-  if (currency === 'gold') return `${amount}g`;
-  if (currency === 'ruby') return `${amount} ruby`;
+  if (currency === 'talent') return `${amount} point`;
   return `${amount} ${currency}`;
 }
 
@@ -157,10 +158,7 @@ export class TreeScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.setBackgroundColor(BG_COLOR);
     this.save = loadSave();
-    this.treeState = treeStateFromLegacy(this.save.treeRanks, {
-      gold: this.save.gold,
-      ruby: this.save.rubies,
-    });
+    this.treeState = treeStateFromLegacy(this.save.treeRanks, availableTalentPoints(this.save));
     this.armedSpotId = null;
     this.feedback = '';
 
@@ -302,9 +300,10 @@ export class TreeScene extends Phaser.Scene {
     this.hideTooltip();
     this.nodesContainer.removeAll(true);
     const treeView = view(SPELL_TREE, this.treeState);
-    const gold = treeView.wallet['gold'] ?? 0;
-    const ruby = treeView.wallet['ruby'] ?? 0;
-    this.headerText.setText(`Gold ${gold} (tree)    Rubies ${ruby} (oaths)`);
+    const available = treeView.wallet['talent'] ?? 0;
+    this.headerText.setText(
+      `Level ${levelForXp(this.save.xp)}   •   ${available} unplaced   •   ${allocatedTalentPoints(this.save)} placed`,
+    );
     this.statusText.setText(this.armMessage());
     this.feedbackText.setText(this.feedback);
 

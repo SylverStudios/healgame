@@ -27,7 +27,7 @@ import { CombatLog } from '../ui/combatLog';
 import { shakeBossImpact, showCastBeam, showHealRipple } from '../ui/combatFx';
 import { PaceToggle } from '../ui/paceToggle';
 import { loadSave, saveGame } from '../save/save';
-import { relicById } from '../data/relics';
+import { relicsById } from '../data/relics';
 import { runModsFromSave } from '../data/runMods';
 import { RunModsBar } from '../ui/runModsBar';
 import type { CombatMods } from '../data/spellTree';
@@ -43,7 +43,6 @@ export interface CombatSceneData {
 export interface CombatResult {
   encounterId: string;
   status: 'victory' | 'wipe';
-  gold: number;
   xp: number;
 }
 
@@ -202,7 +201,7 @@ export class CombatScene extends Phaser.Scene {
 
     const spells = this.sceneData.loadout.spells;
 
-    // Loaded once up front: the relic feeds the engine at construction, and
+    // Loaded once up front: permanent relics feed the engine at construction, and
     // the same save is reused below for the pace toggle (avoids a second
     // redundant loadSave() call).
     const save = loadSave();
@@ -214,7 +213,7 @@ export class CombatScene extends Phaser.Scene {
       missingHealthPctBonuses: this.sceneData.loadout.missingHealthPctBonuses,
       fullHealthBonuses: this.sceneData.loadout.fullHealthBonuses,
       cooldowns: this.sceneData.loadout.cooldowns,
-      relic: relicById(save.relicId),
+      relics: relicsById(save.relicIds),
     });
 
     this.buildGroundLine();
@@ -540,9 +539,6 @@ export class CombatScene extends Phaser.Scene {
         case 'cooldownActivated':
           this.combatLog.push(`${this.formatTimestamp()} ${event.name} activated!`);
           break;
-        case 'relicTriggered':
-          this.combatLog.push(`${this.formatTimestamp()} ${event.name} triggers!`);
-          break;
         case 'castCancelled': {
           const spellName = this.resolveSpellName(event.spellId);
           if (event.reason === 'escape') {
@@ -630,8 +626,8 @@ export class CombatScene extends Phaser.Scene {
         : 'Boss',
     );
 
-    const { gold, xp } = this.engine.rewards;
-    this.rewardsText.setText(`Gold ${gold}   XP ${xp}`);
+    const { xp } = this.engine.rewards;
+    this.rewardsText.setText(`XP ${xp}`);
   }
 
   private syncHealerRune(state: CombatState): void {
@@ -692,7 +688,7 @@ export class CombatScene extends Phaser.Scene {
     if (this.resultShown) return;
     this.resultShown = true;
 
-    const { gold, xp } = this.engine.rewards;
+    const { xp } = this.engine.rewards;
     const centerX = VIEW_WIDTH / 2;
     const centerY = VIEW_HEIGHT / 2;
 
@@ -711,7 +707,7 @@ export class CombatScene extends Phaser.Scene {
       .setAlpha(0);
 
     const rewardsText = this.add
-      .text(centerX, centerY - 10, `Gold +${gold}   XP +${xp}`, {
+      .text(centerX, centerY - 10, `XP +${xp}`, {
         fontFamily: HUD_FONT,
         fontSize: '18px',
         color: '#e8d8c8',
@@ -728,7 +724,7 @@ export class CombatScene extends Phaser.Scene {
       .setName('combatReturn')
       .setAlpha(0)
       .on('pointerdown', () => {
-        const combatResult: CombatResult = { encounterId: this.sceneData.encounterId, status, gold, xp };
+        const combatResult: CombatResult = { encounterId: this.sceneData.encounterId, status, xp };
         this.scene.start(this.sceneData.returnTo, { combatResult });
       });
 

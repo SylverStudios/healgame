@@ -26,7 +26,7 @@ engine.castSpell(spellId): void       // starts, queues, or is silently dropped 
 engine.cancelCast(): void             // cancel active cast (+ any queue) and refund reserved mana — see below
 engine.activateCooldown(cooldownId): void // off-GCD; see "Cooldowns" below
 engine.state: Readonly<CombatState>
-engine.rewards: { gold, xp }          // accrued per kill, immediately, even on a later wipe
+engine.rewards: { xp }                // accrued per kill, immediately, even on a later wipe
 ```
 
 Data: `data/spells.ts` (`ALL_SPELLS`, sourced from `constants.ts`) and the
@@ -257,11 +257,16 @@ and compiles the ordered dungeon catalog into the engine's resolved
 - **Waves/victory/wipe**: a wave clears (and the next spawns) the instant its
   last enemy dies; victory on boss hp 0; wipe the instant all 4 party members
   are dead. `advance()` is a no-op once `status !== 'running'`.
-- **Rewards**: XP is credited instantly per kill. Gold uses the dungeon's
-  `goldEveryKills` cadence: each Nth defeated enemy credits one
-  `goldPerEnemy` bundle (trash and boss both count). Earned rewards survive a
-  later wipe. Synthetic legacy encounters may omit these values and fall back
-  to `REWARDS`.
+- **Rewards**: XP is credited instantly per enemy kill (trash and bosses both
+  count) and survives a later wipe. Encounters may override `xpPerEnemy`;
+  synthetic encounters fall back to `REWARDS`.
+- **Permanent relic stats**: the scene resolves every saved relic and passes
+  the definitions through `CombatEngineOptions.relics`. The engine folds
+  their data-only effects at construction: max mana, timed mana regeneration,
+  flat healing, role max HP/armor/auto damage, and merc swing interval.
+  Effects stack additively; armor floors each hit at 1 and swing intervals at
+  100ms. Timed mana regeneration advances on simulation time, preserving
+  deterministic `advance(dtMs)` behavior.
 
 ## Determinism
 

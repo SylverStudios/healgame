@@ -9,7 +9,7 @@
 
 import { levelForXp, SPELLS } from '../data/constants';
 import { getDungeonById, isDungeonIdUnlocked } from '../data/dungeons';
-import { TREE_NODES, treeNodeById } from '../data/tree';
+import { chooseRelicOffers } from '../data/relics';
 import { loadoutFromSave, type CombatMods } from '../data/spellTree';
 import type { SaveData } from '../save/save';
 import type { CombatResult } from '../scenes/CombatScene';
@@ -20,27 +20,33 @@ export interface HubNotice {
 }
 
 /**
- * Applies a finished combat's rewards to the save: gold/xp always accrue
- * (even on a wipe). If this result crosses the level-2 threshold and the
- * player doesn't already have Zealous Mending, auto-unlock it (poc-spec: no
- * spend UI). If it's a victory and this is the encounter's first clear,
- * grant a ruby and record the clear. Mutates `save` in place; caller is
- * responsible for saveGame(). Returns notices describing what happened, in
- * the order they occurred, for the hub to display.
+ * XP always accrues, including on a wipe. Levels grant one tree point each;
+ * level 2 also auto-unlocks Zealous Mending. Every distinct dungeon first
+ * clear queues a stable three-relic offer.
  */
-export function applyCombatResult(save: SaveData, result: CombatResult): HubNotice[] {
+export function applyCombatResult(
+  save: SaveData,
+  result: CombatResult,
+  random: () => number = Math.random,
+): HubNotice[] {
   const notices: HubNotice[] = [];
 
   const levelBefore = levelForXp(save.xp);
-  save.gold += result.gold;
   save.xp += result.xp;
   const levelAfter = levelForXp(save.xp);
 
-  if (levelAfter > levelBefore && !save.unlockedSpells.includes(SPELLS.zealousMending.id)) {
-    save.unlockedSpells.push(SPELLS.zealousMending.id);
+  if (levelAfter > levelBefore) {
     notices.push({
       kind: 'levelUp',
-      text: `LEVEL ${levelAfter} — ${SPELLS.zealousMending.name} learned!`,
+      text: `LEVEL ${levelAfter} — +${levelAfter - levelBefore} Talent Point${levelAfter - levelBefore === 1 ? '' : 's'}`,
+    });
+  }
+
+  if (levelAfter >= 2 && !save.unlockedSpells.includes(SPELLS.zealousMending.id)) {
+    save.unlockedSpells.push(SPELLS.zealousMending.id);
+    notices.push({
+      kind: 'spellLearned',
+      text: `${SPELLS.zealousMending.name} learned!`,
     });
   }
 
@@ -50,16 +56,11 @@ export function applyCombatResult(save: SaveData, result: CombatResult): HubNoti
     dungeon !== undefined &&
     !save.clearedDungeons.includes(dungeon.id)
   ) {
-    save.rubies += dungeon.rewards.rubyPerFirstClear;
     save.clearedDungeons.push(dungeon.id);
-    // Alpha 0.1 §D7: the first Ash Gate clear queues the one-time relic pick.
-    if (dungeon.id === 'ash-gate') save.relicPickPending = true;
+    save.pendingRelicOffers = chooseRelicOffers(save.relicIds, random);
     notices.push({
       kind: 'firstClear',
-      text:
-        dungeon.rewards.rubyPerFirstClear > 0
-          ? `FIRST CLEAR — +${dungeon.rewards.rubyPerFirstClear} Ruby`
-          : 'FIRST CLEAR!',
+      text: save.pendingRelicOffers.length > 0 ? 'FIRST CLEAR — CHOOSE A RELIC' : 'FIRST CLEAR!',
     });
   }
 
@@ -77,68 +78,12 @@ export function buildLoadout(save: SaveData): Loadout {
   return loadoutFromSave(save);
 }
 
-function ranksOf(save: SaveData, nodeId: string): number {
-  return save.treeRanks[nodeId] ?? 0;
+export function allocatedTalentPoints(save: Pick<SaveData, 'treeRanks'>): number {
+  return Object.values(save.treeRanks).reduce((total, ranks) => total + Math.max(0, Math.floor(ranks)), 0);
 }
 
-/** Everything a scene needs to render one node's state. All derived, no mutation. */
-export interface TreeNodeStatus {
-  ranks: number;
-  maxed: boolean;
-  /** Every `requires` node owned at rank ≥1. */
-  requirementsMet: boolean;
-  /** A rival node in the same exclusiveGroup is owned — permanently locked. */
-  lockedByExclusive: boolean;
-  /** Can afford the next rank in the node's currency. */
-  affordable: boolean;
-  /** All of the above pass: purchaseNode would succeed right now. */
-  purchasable: boolean;
-}
-
-/**
- * @deprecated TreeScene uses the config-driven tree service. Kept for
- * progression unit tests covering the legacy TREE_NODES purchase path.
- */
-export function nodeStatus(save: SaveData, nodeId: string): TreeNodeStatus | undefined {
-  const node = treeNodeById(nodeId);
-  if (!node) return undefined;
-
-  const ranks = ranksOf(save, nodeId);
-  const maxed = ranks >= node.maxRanks;
-  const requirementsMet = node.requires.every((id) => ranksOf(save, id) >= 1);
-  const lockedByExclusive =
-    node.exclusiveGroup !== undefined &&
-    TREE_NODES.some(
-      (n) => n.id !== node.id && n.exclusiveGroup === node.exclusiveGroup && ranksOf(save, n.id) > 0,
-    );
-  const wallet = node.cost.currency === 'gold' ? save.gold : save.rubies;
-  const affordable = wallet >= node.cost.amount;
-
-  return {
-    ranks,
-    maxed,
-    requirementsMet,
-    lockedByExclusive,
-    affordable,
-    purchasable: !maxed && requirementsMet && !lockedByExclusive && affordable,
-  };
-}
-
-/**
- * @deprecated TreeScene uses tree.update. Kept for progression unit tests.
- */
-export function purchaseNode(save: SaveData, nodeId: string): boolean {
-  const node = treeNodeById(nodeId);
-  const status = nodeStatus(save, nodeId);
-  if (!node || !status?.purchasable) return false;
-
-  if (node.cost.currency === 'gold') save.gold -= node.cost.amount;
-  else save.rubies -= node.cost.amount;
-  save.treeRanks[nodeId] = status.ranks + 1;
-  if (node.exclusiveGroup === 'subclass' && node.subclass !== undefined) {
-    save.subclass = node.subclass;
-  }
-  return true;
+export function availableTalentPoints(save: Pick<SaveData, 'xp' | 'treeRanks'>): number {
+  return Math.max(0, levelForXp(save.xp) - allocatedTalentPoints(save));
 }
 
 /** Generic config-driven dungeon unlock check. Unknown ids are never unlocked. */

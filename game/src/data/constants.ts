@@ -44,21 +44,22 @@ export const SPELLS = {
 } as const;
 
 export const REWARDS = {
-  goldPerEnemy: 1,
-  /** Gold drops in integer bundles after this many defeated enemies. */
-  goldEveryKills: 2,
+  /** Every defeated enemy advances the account, including kills in a wipe. */
   xpPerEnemy: 1,
-  rubyPerFirstClear: 1,
-  /**
-   * Alpha 0.1 §D1: rubies stay Ash-Gate-only — an Iron Pass first clear
-   * records the clear (unlocking The Maw) but grants no ruby.
-   */
-  rubyFirstClearDungeonIds: ['ash-gate'],
 } as const;
 
-/** Micro-choice (poc-spec §10.1): level 2 at 10 XP; only level 2 matters for PoC. */
+/** Level 2 remains at 10 XP; later levels require 10, 20, 30… additional XP. */
 export const XP_LEVEL_2_THRESHOLD = 10;
 
+/** Total XP required to reach a level (level 1 starts at 0 XP). */
+export function xpForLevel(level: number): number {
+  const safeLevel = Math.max(1, Math.floor(level));
+  return (XP_LEVEL_2_THRESHOLD * safeLevel * (safeLevel - 1)) / 2;
+}
+
 export function levelForXp(xp: number): number {
-  return xp >= XP_LEVEL_2_THRESHOLD ? 2 : 1;
+  const safeXp = Math.max(0, Math.floor(xp));
+  let level = 1;
+  while (xpForLevel(level + 1) <= safeXp) level += 1;
+  return level;
 }

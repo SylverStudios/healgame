@@ -21,7 +21,7 @@ export function formatDungeonPreview(
         ? 'always'
         : `clear ${dungeon.unlock.dungeonId}`
     }`,
-    `Rewards: gold ${dungeon.rewards.goldPerEnemy}/${dungeon.rewards.goldEveryKills} enemies, XP ${dungeon.rewards.xpPerEnemy}/enemy, ruby ${dungeon.rewards.rubyPerFirstClear}/first clear`,
+    `Rewards: XP ${dungeon.rewards.xpPerEnemy}/enemy, relic offer on first clear`,
     `Visual: ${dungeon.visualKey}`,
   ];
 

@@ -3,6 +3,7 @@ import {
   loadSave,
   newSaveData,
   resetSave,
+  SAVE_KEY,
   saveGame,
   type KeyValueStore,
   type SaveData,
@@ -17,103 +18,59 @@ function memoryStore(): KeyValueStore {
   };
 }
 
-/** A well-formed v1 payload as Phase 1 wrote it. */
-function v1Payload(overrides: Record<string, unknown> = {}): string {
-  return JSON.stringify({
-    version: 1,
-    tutorialDone: true,
-    gold: 7,
-    xp: 12,
-    rubies: 1,
-    unlockedSpells: ['solemn-mend', 'zealous-mending'],
-    treeNodes: [],
-    subclass: null,
-    clearedDungeons: ['ash-gate'],
-    ...overrides,
-  });
+function storePayload(store: KeyValueStore, payload: Record<string, unknown>): void {
+  store.setItem(SAVE_KEY, JSON.stringify(payload));
 }
 
 describe('save', () => {
-  it('returns a fresh save when nothing is stored', () => {
+  it('returns a fresh v5 save when nothing is stored', () => {
     const save = loadSave(memoryStore());
     expect(save).toEqual(newSaveData());
-    expect(save.version).toBe(4);
-    expect(save.tutorialDone).toBe(false);
-    expect(save.subclass).toBeNull();
-    expect(save.combatPaceTenths).toBe(10);
-    expect(save.relicId).toBeNull();
-    expect(save.relicPickPending).toBe(false);
+    expect(save).toEqual({
+      version: 5,
+      tutorialDone: false,
+      xp: 0,
+      unlockedSpells: [],
+      treeRanks: {},
+      subclass: null,
+      clearedDungeons: [],
+      combatPaceTenths: 10,
+      relicIds: [],
+      pendingRelicOffers: [],
+    });
+    expect(save).not.toHaveProperty('gold');
+    expect(save).not.toHaveProperty('rubies');
   });
 
-  it('round-trips a full v4 save', () => {
+  it('round-trips a full v5 save', () => {
     const store = memoryStore();
     const data: SaveData = {
-      version: 4,
+      version: 5,
       tutorialDone: true,
-      gold: 7,
-      xp: 12,
-      rubies: 0,
+      xp: 42,
       unlockedSpells: ['solemn-mend', 'zealous-mending'],
       treeRanks: { 'deep-reserves': 3, 'vigil-oath': 1 },
       subclass: 'vigil',
       clearedDungeons: ['ash-gate'],
       combatPaceTenths: 15,
-      relicId: 'ember-ledger',
-      relicPickPending: false,
+      relicIds: ['ember-ledger', 'triage-bell'],
+      pendingRelicOffers: ['still-reservoir', 'vital-ember', 'bastion-plate'],
     };
     saveGame(data, store);
     expect(loadSave(store)).toEqual(data);
   });
 
-  it('round-trips a v3 save via migration (adds relicId: null, relicPickPending: false)', () => {
+  it('deletes the old development save key instead of migrating it', () => {
     const store = memoryStore();
-    const data = {
-      version: 3,
-      tutorialDone: true,
-      gold: 7,
-      xp: 12,
-      rubies: 0,
-      unlockedSpells: ['solemn-mend', 'zealous-mending'],
-      treeRanks: { 'deep-reserves': 3, 'vigil-oath': 1 },
-      subclass: 'vigil' as const,
-      clearedDungeons: ['ash-gate'],
-      combatPaceTenths: 15,
-    };
-    store.setItem('healgame-save-v1', JSON.stringify(data));
-    const loaded = loadSave(store);
-    expect(loaded.version).toBe(4);
-    expect(loaded.combatPaceTenths).toBe(15);
-    expect(loaded.treeRanks).toEqual(data.treeRanks);
-    expect(loaded.relicId).toBeNull();
-    expect(loaded.relicPickPending).toBe(false);
-  });
-
-  it('round-trips a full v2 save via migration', () => {
-    const store = memoryStore();
-    const data = {
-      version: 2,
-      tutorialDone: true,
-      gold: 7,
-      xp: 12,
-      rubies: 0,
-      unlockedSpells: ['solemn-mend', 'zealous-mending'],
-      treeRanks: { 'deep-reserves': 3, 'vigil-oath': 1 },
-      subclass: 'vigil' as const,
-      clearedDungeons: ['ash-gate'],
-    };
-    store.setItem('healgame-save-v1', JSON.stringify(data));
-    const loaded = loadSave(store);
-    expect(loaded.version).toBe(4);
-    expect(loaded.combatPaceTenths).toBe(10);
-    expect(loaded.treeRanks).toEqual(data.treeRanks);
-    expect(loaded.relicId).toBeNull();
-    expect(loaded.relicPickPending).toBe(false);
+    store.setItem('healgame-save-v1', JSON.stringify({ version: 4, xp: 999 }));
+    expect(loadSave(store)).toEqual(newSaveData());
+    expect(store.getItem('healgame-save-v1')).toBeNull();
   });
 
   it('resetSave wipes everything (restart, no respec)', () => {
     const store = memoryStore();
     const data = newSaveData();
-    data.gold = 5;
+    data.xp = 20;
     data.tutorialDone = true;
     saveGame(data, store);
     resetSave(store);
@@ -122,16 +79,13 @@ describe('save', () => {
 
   it('falls back to a fresh save on corrupt or unknown data', () => {
     const store = memoryStore();
-    store.setItem('healgame-save-v1', '{not json');
+    store.setItem(SAVE_KEY, '{not json');
     expect(loadSave(store)).toEqual(newSaveData());
-    store.setItem('healgame-save-v1', JSON.stringify({ version: 99 }));
+    store.setItem(SAVE_KEY, JSON.stringify({ version: 99 }));
     expect(loadSave(store)).toEqual(newSaveData());
-    store.setItem('healgame-save-v1', JSON.stringify({ version: 2, treeRanks: 'nope' }));
+    storePayload(store, { ...newSaveData(), version: 4 });
     expect(loadSave(store)).toEqual(newSaveData());
-    store.setItem(
-      'healgame-save-v1',
-      JSON.stringify({ ...newSaveData(), version: 4, relicPickPending: 'nope' }),
-    );
+    storePayload(store, { ...newSaveData(), pendingRelicOffers: 'nope' });
     expect(loadSave(store)).toEqual(newSaveData());
   });
 
@@ -139,76 +93,5 @@ describe('save', () => {
     expect(loadSave(null)).toEqual(newSaveData());
     expect(() => saveGame(newSaveData(), null)).not.toThrow();
     expect(() => resetSave(null)).not.toThrow();
-  });
-});
-
-describe('v1 → v4 migration', () => {
-  it('carries plain progress over losslessly', () => {
-    const store = memoryStore();
-    store.setItem('healgame-save-v1', v1Payload());
-    const save = loadSave(store);
-    expect(save.version).toBe(4);
-    expect(save.combatPaceTenths).toBe(10);
-    expect(save.tutorialDone).toBe(true);
-    expect(save.gold).toBe(7);
-    expect(save.xp).toBe(12);
-    expect(save.rubies).toBe(1);
-    expect(save.unlockedSpells).toEqual(['solemn-mend', 'zealous-mending']);
-    expect(save.treeRanks).toEqual({});
-    expect(save.subclass).toBeNull();
-    expect(save.clearedDungeons).toEqual(['ash-gate']);
-    expect(save.relicId).toBeNull();
-    expect(save.relicPickPending).toBe(false);
-  });
-
-  it("maps 'max-mana-1' to deep-reserves rank 1", () => {
-    const store = memoryStore();
-    store.setItem('healgame-save-v1', v1Payload({ treeNodes: ['max-mana-1'] }));
-    expect(loadSave(store).treeRanks).toEqual({ 'deep-reserves': 1 });
-  });
-
-  it('refunds 5 gold per retired branch node', () => {
-    const store = memoryStore();
-    store.setItem(
-      'healgame-save-v1',
-      v1Payload({ gold: 2, treeNodes: ['vigil-deep-focus', 'zealot-battle-fervor'] }),
-    );
-    const save = loadSave(store);
-    expect(save.gold).toBe(12);
-    expect(save.treeRanks).toEqual({});
-  });
-
-  it('maps an existing subclass to owning its oath node at rank 1, no extra ruby charge', () => {
-    const store = memoryStore();
-    store.setItem('healgame-save-v1', v1Payload({ subclass: 'zealot', rubies: 0 }));
-    const save = loadSave(store);
-    expect(save.subclass).toBe('zealot');
-    expect(save.treeRanks['zealot-oath']).toBe(1);
-    expect(save.rubies).toBe(0);
-  });
-
-  it('handles the full Phase-1 endgame save in one shot', () => {
-    const store = memoryStore();
-    store.setItem(
-      'healgame-save-v1',
-      v1Payload({
-        gold: 3,
-        subclass: 'vigil',
-        treeNodes: ['max-mana-1', 'vigil-deep-focus'],
-      }),
-    );
-    const save = loadSave(store);
-    expect(save.gold).toBe(8); // 3 + 5 refund
-    expect(save.treeRanks).toEqual({ 'deep-reserves': 1, 'vigil-oath': 1 });
-    expect(save.subclass).toBe('vigil');
-  });
-
-  it('persists the migrated save back to the store immediately', () => {
-    const store = memoryStore();
-    store.setItem('healgame-save-v1', v1Payload({ treeNodes: ['max-mana-1'] }));
-    const migrated = loadSave(store);
-    const raw = store.getItem('healgame-save-v1');
-    expect(raw).not.toBeNull();
-    expect(JSON.parse(raw ?? '')).toEqual(migrated);
   });
 });

@@ -6,10 +6,7 @@ export const IRON_PASS_DUNGEON = {
   order: 2,
   unlock: { kind: 'dungeonClear', dungeonId: 'ash-gate' },
   rewards: {
-    goldPerEnemy: 1,
-    goldEveryKills: 2,
     xpPerEnemy: 1,
-    rubyPerFirstClear: 0,
   },
   visualKey: 'iron-pass',
   waves: [

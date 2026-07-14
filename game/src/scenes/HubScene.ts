@@ -1,19 +1,24 @@
 /**
- * Hub (poc-spec §3, §5): shows currencies with roles, applies the result of
- * the combat run that just ended (if any), and is the launch point for
- * Ash Gate, the spell tree (gold + ruby oaths), Iron Pass (Dungeon 2, once
+ * Hub: shows XP/level/talent progress, applies the combat result that just
+ * ended, routes pending first-clear relic offers, and launches
+ * Ash Gate, the spell tree, Iron Pass (Dungeon 2, once
  * Ash Gate is cleared — alpha-0.1-handoff §D1), and The Maw (Dungeon 3, once
- * Iron Pass is cleared). Run mods (oath + relic) live in the shared top-right
+ * Iron Pass is cleared). Run mods (oath + relics) live in the shared top-right
  * RunModsBar. Temp art only — panels + text buttons, dark palette, monospace.
  */
 
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { loadSave, resetSave, saveGame, type SaveData } from '../save/save';
-import { applyCombatResult, isDungeonUnlocked, type HubNotice } from '../meta/progression';
+import {
+  applyCombatResult,
+  availableTalentPoints,
+  isDungeonUnlocked,
+  type HubNotice,
+} from '../meta/progression';
 import { loadoutFromSave } from '../data/spellTree';
 import { runModsFromSave } from '../data/runMods';
-import { levelForXp, SPELLS, XP_LEVEL_2_THRESHOLD } from '../data/constants';
+import { levelForXp, SPELLS, xpForLevel } from '../data/constants';
 import { ORDERED_DUNGEONS } from '../data/dungeons';
 import { RunModsBar } from '../ui/runModsBar';
 import type { CombatResult, CombatSceneData } from './CombatScene';
@@ -56,11 +61,7 @@ export class HubScene extends Phaser.Scene {
       saveGame(save);
     }
 
-    // Alpha 0.1 §D7: a just-queued relic pick routes straight to RelicScene,
-    // before any hub UI is built — it's re-checked every time Hub.create()
-    // runs, but the flag only ever comes back true once (RelicScene clears it
-    // the instant a pick is made) and restart wipes it.
-    if (save.relicPickPending) {
+    if (save.pendingRelicOffers.length > 0) {
       this.scene.start(SceneKeys.Relic);
       return;
     }
@@ -77,12 +78,11 @@ export class HubScene extends Phaser.Scene {
     const { width } = this.scale;
     const level = levelForXp(save.xp);
     const hasZealous = save.unlockedSpells.includes(SPELLS.zealousMending.id);
-    const xpLine = hasZealous
-      ? `XP ${save.xp} — ${SPELLS.zealousMending.name} unlocked`
-      : `XP ${save.xp}/${XP_LEVEL_2_THRESHOLD} → ${SPELLS.zealousMending.name}`;
+    const nextLevelXp = xpForLevel(level + 1);
+    const xpLine = `XP ${save.xp}/${nextLevelXp} → Level ${level + 1}${hasZealous ? '' : ` + ${SPELLS.zealousMending.name}`}`;
 
     this.add
-      .text(width / 2, 82, `Gold ${save.gold}   •   Rubies ${save.rubies}   •   Level ${level}`, {
+      .text(width / 2, 82, `Level ${level}   •   Talent Points ${availableTalentPoints(save)} unplaced`, {
         fontFamily: FONT,
         fontSize: '15px',
         color: TEXT_COLOR,

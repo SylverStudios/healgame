@@ -502,11 +502,10 @@ this section). Handoff status flips to historical.
 ## Journey.mjs rewrite (chunk 9b)
 
 New stages layered onto the Phase-2/3/juice flow (letters keep the existing
-convention): **M2** (v3 payload → v4 migration, relic fields added — a
-distinct branch from M's v1→v4 chain), **Relic** (seeds
-`relicPickPending: true` — the exact state `applyCombatResult` leaves right
-after a real first clear — to exercise the live Hub→RelicScene routing, pick,
-persistence, and "never re-offered" behavior without needing a scripted
+convention). The current **M** stage proves a stale save is deleted and returns
+to tutorial. **Relic** seeds `pendingRelicOffers`—the exact state
+`applyCombatResult` leaves after a first clear—to exercise the live
+Hub→RelicScene routing, pick, persistence, and cleared-offer behavior without a scripted
 live combat win), **D2** (Ash-Gate-only save → Iron Pass unlocked, The Maw
 slot inert; enters Iron Pass and bails without playing it out — Iron Pass's
 clearability is gates 5/6, not a journey job), **B3** (tree layer 2: scrolls
@@ -677,3 +676,32 @@ Gold now drops in one-gold bundles every **2 enemy kills** while XP still
 accrues every kill. Full-clear gold falls from 6→3 in Ash Gate and 13→6 in
 Iron Pass; wipe earnings remain banked. The content schema exposes this as
 `goldEveryKills`.
+
+---
+
+# XP consolidation, talent points, and stat relics (2026-07-14)
+
+This amendment supersedes the PoC spec's gold/ruby economy and one-time relic
+rules. XP is now the only currency-like progression value:
+
+- Every enemy kill grants **1 XP**, retained through wipes.
+- Level 2 remains at 10 XP. Later levels use cumulative thresholds of 30, 60,
+  100, and so on (10/20/30/40… XP between levels).
+- Each level supplies one total spell-tree allocation. Tree nodes all cost one
+  talent point; points are placements, not spendable loot. Level 6 therefore
+  supports six owned ranks/nodes, with any remainder shown as unplaced.
+- Always-available spells may unlock directly at level milestones; currently
+  only Zealous Mending unlocks at level 2.
+- Gold and rubies are removed from saves, combat rewards, dungeon content,
+  Hub UI, and tree costs.
+
+Every distinct dungeon **first clear** now queues a random offer of three
+unowned permanent relics. Replays remain valuable for XP but do not become an
+unbounded relic farm. Offers persist until one is selected. The initial pool
+uses simple visible stats—healer mana/regen/healing/health, tank
+health/armor/damage, and DPS health/damage/attack speed—rather than conditional
+proc text. Selected relics accumulate and appear in the shared run-mod bar.
+
+Save v5 deliberately rotates the local-storage key and deletes the old
+development key. There is no migration contract before release: stale or
+unrecognized payloads return the player to a fresh tutorial.

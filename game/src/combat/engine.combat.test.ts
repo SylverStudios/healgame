@@ -230,34 +230,29 @@ describe('victory / wipe detection', () => {
 });
 
 describe('reward accrual', () => {
-  it('uses resolved per-encounter gold and xp rewards', () => {
+  it('uses resolved per-encounter XP rewards', () => {
     const encounter = makeTestEncounter({
-      goldPerEnemy: 3,
-      goldEveryKills: 1,
       xpPerEnemy: 5,
       waves: [{ enemies: [{ name: 'Weak', hp: 1, count: 1 }] }],
     });
     const engine = new CombatEngine(encounter, TEST_SPELLS);
 
     engine.advance(1000);
-    expect(engine.rewards).toEqual({ gold: 3, xp: 5 });
+    expect(engine.rewards).toEqual({ xp: 5 });
   });
 
-  it('grants bundled gold every two kills while XP accrues per kill, retaining both after a wipe', () => {
+  it('accrues XP per kill and retains it after a wipe', () => {
     const encounter = makeTestEncounter({
       waves: [{ enemies: [{ name: 'Weak', hp: 1, count: 2 }] }, { enemies: [{ name: 'Deadly', hp: 1_000_000, count: 1 }] }],
     });
     const engine = new CombatEngine(encounter, TEST_SPELLS);
     // Wave 1: two 1-hp dummies die quickly to mercs.
     engine.advance(6000);
-    expect(engine.rewards.gold).toBe(1);
     expect(engine.rewards.xp).toBe(2);
 
-    // Wave 2 is unkillable in reasonable time and eventually wipes the party — rewards from
-    // the wave-1 kills must still be retained after the wipe.
+    // Wave 2 is unkillable in reasonable time and eventually wipes the party.
     engine.advance(200_000);
     expect(engine.state.status).toBe('wipe');
-    expect(engine.rewards.gold).toBe(1);
     expect(engine.rewards.xp).toBe(2);
   });
 
@@ -269,7 +264,6 @@ describe('reward accrual', () => {
     const engine = new CombatEngine(encounter, TEST_SPELLS);
     engine.advance(6000);
     expect(engine.state.status).toBe('victory');
-    expect(engine.rewards.gold).toBe(1); // one bundle after 1 trash + 1 boss
     expect(engine.rewards.xp).toBe(2);
   });
 });

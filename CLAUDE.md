@@ -1,6 +1,6 @@
 # CLAUDE.md — operating healgame
 
-Status: current · Authority: gates, hard rules, working style · Last verified: 2026-07-13
+Status: current · Authority: gates, hard rules, working style · Last verified: 2026-07-14
 
 healgame is a healer-focused auto-battler PoC: Phaser 3 + TypeScript (strict) +
 Vite. The game lives in `game/`; design docs in `docs/`. Doc conventions and
@@ -88,9 +88,9 @@ game/src/
   Journey resolves via `window.__healgame.locate(name)` — layout changes must
   **not** require journey coordinate edits. Adding a new interactive control
   means naming it and clicking it by name.
-- **Save changes**: `SaveData` is versioned (`healgame-save-v1`); if the shape
-  changes, bump the version and keep `loadSave` falling back to a fresh save
-  on unrecognized data.
+- **Save changes**: `SaveData` is versioned (`healgame-save-v5`); during
+  development, shape changes rotate the key and `loadSave` deletes stale or
+  unrecognized data instead of migrating it.
 
 ## Working style (user preferences)
 

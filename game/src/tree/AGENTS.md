@@ -30,15 +30,16 @@ TreeConfig  +  TreeState  →  update(action)  →  new state | reject + feedbac
 | Tree UI | `scenes/TreeScene.ts` — `view` + `layoutSpots` + `update` |
 | Layout | `layoutSpots(treeView, { width, overrides? })` — overrides keep journey click coords |
 | Fight start | `loadoutFromSave(save)` → `CombatMods` → `CombatScene` / engine options |
-| Save shape | still `treeRanks` + gold/rubies; bridge converts ↔ owned chain ids |
+| Save shape | `treeRanks`; level-derived unplaced talent points form the tree wallet |
 
 `buildLoadout` in `meta/progression.ts` is a thin alias of `loadoutFromSave`.
-Legacy `purchaseNode` / `TREE_NODES` (`data/tree.ts`) are deprecated test-only
-paths — do not extend them.
+Legacy `TREE_NODES` (`data/tree.ts`) is deprecated test-only data — do not
+extend it.
 
 ## Rules of thumb
 
-1. **Tune numbers in `SPELL_TREE`**, not in scenes or the engine.
+1. **Tune numbers in `SPELL_TREE`**, not in scenes or the engine. Every live
+   node costs exactly one `talent` point; total point capacity equals level.
 2. Multi-rank = spot **chain** (one content entry per purchase), not
    `maxRanks` / `amountPerRank` on the service.
 3. Prerequisites: `requires: { mode: 'all' \| 'any', nodes }`. Spot chain order

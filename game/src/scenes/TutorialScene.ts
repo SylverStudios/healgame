@@ -46,7 +46,7 @@ export class TutorialScene extends Phaser.Scene {
       '(or press its number key) to cast it on them.',
       '',
       "Ash Gate will wipe your party the first time through — that's expected.",
-      'Any gold and XP your party earns is kept even if you wipe.',
+      'XP from every enemy kill is kept even if you wipe.',
     ].join('\n');
 
     this.add

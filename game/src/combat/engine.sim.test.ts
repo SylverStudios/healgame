@@ -40,10 +40,9 @@ describe('end-to-end: scripted healer bot', () => {
     expect(ended).toHaveLength(1);
   });
 
-  it('XP tracks every kill while gold follows the two-kill bundle cadence', () => {
+  it('XP tracks every kill', () => {
     const { events, engine } = runHealerBotSim();
     const kills = events.filter((e) => e.type === 'unitDied' && !['tank', 'dps1', 'dps2', 'healer'].includes(e.unitId));
-    expect(engine.rewards.gold).toBe(Math.floor(kills.length / 2));
     expect(engine.rewards.xp).toBe(kills.length);
     expect(kills.length).toBeGreaterThan(0); // the bot should land at least one kill before any outcome
   });

@@ -42,18 +42,16 @@ const BASE_KIT: SpellDef[] = [SPELLS.solemnMend];
 /** Minimal synthetic SaveData for loadoutFromSave — only the fields the two maxed builds below need. */
 function makeSave(overrides: Partial<SaveData>): SaveData {
   return {
-    version: 4,
+    version: 5,
     tutorialDone: true,
-    gold: 0,
     xp: 0,
-    rubies: 0,
     unlockedSpells: [],
     treeRanks: {},
     subclass: null,
     clearedDungeons: [],
     combatPaceTenths: 10,
-    relicId: null,
-    relicPickPending: false,
+    relicIds: [],
+    pendingRelicOffers: [],
     ...overrides,
   };
 }
@@ -314,7 +312,7 @@ function runBuildBot(
   encounter: EncounterDef,
   loadout: CombatMods,
   style: BotStyle,
-  relic?: RelicDef,
+  relics: RelicDef[] = [],
 ): BotRun {
   return runBot(
     encounter,
@@ -326,7 +324,7 @@ function runBuildBot(
       missingHealthPctBonuses: loadout.missingHealthPctBonuses,
       fullHealthBonuses: loadout.fullHealthBonuses,
       cooldowns: loadout.cooldowns,
-      relic,
+      relics,
     },
     style,
   );
@@ -408,8 +406,8 @@ describe('The Maw is an unwinnable sandbox (poc-spec §7, alpha-0.1-handoff §D7
   });
 
   it.each(RELICS)('wipes with either maxed build even holding the $name relic', (relic) => {
-    expect(runBuildBot(THE_MAW, VIGIL_LOADOUT, 'disciplined', relic).status).toBe('wipe');
-    expect(runBuildBot(THE_MAW, VIGIL_EFFICIENCY_LOADOUT, 'disciplined', relic).status).toBe('wipe');
-    expect(runBuildBot(THE_MAW, ZEALOT_LOADOUT, 'disciplined', relic).status).toBe('wipe');
+    expect(runBuildBot(THE_MAW, VIGIL_LOADOUT, 'disciplined', [relic]).status).toBe('wipe');
+    expect(runBuildBot(THE_MAW, VIGIL_EFFICIENCY_LOADOUT, 'disciplined', [relic]).status).toBe('wipe');
+    expect(runBuildBot(THE_MAW, ZEALOT_LOADOUT, 'disciplined', [relic]).status).toBe('wipe');
   });
 });

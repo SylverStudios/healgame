@@ -1,10 +1,10 @@
 # Semantic click targets — handoff
 
 Status: historical — shipped 2026-07-13 (see poc-qa.md Semantic click targets
-section) · Authority: none — archive · Last verified: 2026-07-13
+section) · Authority: none — archive · Last verified: 2026-07-14
 
 Note: `hubRelicIcon` was superseded by `runMod:<id>` when the shared run-mods
-top bar shipped (oath + relic, Hub/Combat/Tree).
+top bar shipped (oath + cumulative relics, Hub/Combat/Tree).
 
 **Audience:** historical — the setName / `__healgame.locate` / journey-by-name
 change is live. Kept here as the design record and name inventory.

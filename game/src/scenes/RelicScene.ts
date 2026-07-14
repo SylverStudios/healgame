@@ -1,9 +1,7 @@
 /**
- * One-time relic pick (alpha-0.1-handoff §D7): shown by HubScene.create()
- * whenever `save.relicPickPending` is true (routed there before the hub UI
- * builds), which only happens once — right after the first-ever Ash Gate
- * clear. Pick 1 of 3 static cards; clicking locks the choice into
- * `save.relicId`, clears the pending flag, persists, and returns to the Hub.
+ * First-clear relic pick: Hub routes here whenever a stable three-card offer
+ * is pending. Choosing one appends a permanent stat relic, clears the offer,
+ * persists, and returns to the Hub.
  * No skip button — the player must pick. Temp art only: rects + monospace
  * text, dark palette, matching Hub/Tree conventions. Card glyphs match the
  * shared RunModsBar icon language (colored circles).
@@ -12,7 +10,7 @@
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { loadSave, saveGame } from '../save/save';
-import { RELICS } from '../data/relics';
+import { relicsById } from '../data/relics';
 import type { RelicDef } from '../combat/types';
 import { drawRunModGlyph } from '../ui/runModsBar';
 
@@ -53,8 +51,14 @@ export class RelicScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
+    const offers = relicsById(loadSave().pendingRelicOffers);
+    if (offers.length === 0) {
+      this.scene.start(SceneKeys.Hub);
+      return;
+    }
+
     const y = height / 2 + 20;
-    RELICS.forEach((relic, i) => {
+    offers.forEach((relic, i) => {
       const x = CARD_LEFT + i * (CARD_WIDTH + CARD_GAP) + CARD_WIDTH / 2;
       this.buildCard(x, y, relic);
     });
@@ -94,8 +98,9 @@ export class RelicScene extends Phaser.Scene {
 
   private pick(relic: RelicDef): void {
     const save = loadSave();
-    save.relicId = relic.id;
-    save.relicPickPending = false;
+    if (!save.pendingRelicOffers.includes(relic.id)) return;
+    if (!save.relicIds.includes(relic.id)) save.relicIds.push(relic.id);
+    save.pendingRelicOffers = [];
     saveGame(save);
     this.scene.start(SceneKeys.Hub);
   }

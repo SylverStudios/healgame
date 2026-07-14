@@ -58,8 +58,14 @@ describe('SPELL_TREE config', () => {
     expect(SPELL_TREE.spots.find((s) => s.id === 'zealot-fervent-chain')?.chain).toHaveLength(3);
   });
 
+  it('costs one talent point for every live node', () => {
+    for (const node of SPELL_TREE.nodes) {
+      expect(node.cost).toEqual({ currency: 'talent', amount: 1 });
+    }
+  });
+
   it('locks the rival oath via exclusiveGroup', () => {
-    let state = create(SPELL_TREE, { gold: 100, ruby: 2 });
+    let state = create(SPELL_TREE, { talent: 3 });
     const root = update(SPELL_TREE, state, { type: 'purchase', spotId: 'deep-reserves' });
     expect(root.ok).toBe(true);
     if (!root.ok) return;
@@ -82,7 +88,7 @@ describe('SPELL_TREE config', () => {
   });
 
   it('offers forsaken-path tempo on the rival spot after swearing an oath', () => {
-    let state = create(SPELL_TREE, { gold: 14, ruby: 2 });
+    let state = create(SPELL_TREE, { talent: 3 });
     const root = update(SPELL_TREE, state, { type: 'purchase', spotId: 'deep-reserves' });
     expect(root.ok).toBe(true);
     if (!root.ok) return;
@@ -112,10 +118,7 @@ describe('SPELL_TREE config', () => {
   });
 
   it('makes Patient Vow and Measured Devotion mutually exclusive', () => {
-    let state = treeStateFromLegacy(
-      { 'deep-reserves': 1, 'vigil-oath': 1 },
-      { gold: 100, ruby: 0 },
-    );
+    let state = treeStateFromLegacy({ 'deep-reserves': 1, 'vigil-oath': 1 }, 2);
     const power = update(SPELL_TREE, state, { type: 'purchase', spotId: 'vigil-patient-vow' });
     expect(power.ok).toBe(true);
     if (!power.ok) return;
@@ -222,10 +225,7 @@ describe('tree layer 2 (Alpha 0.1 §D5)', () => {
   const ZEALOT_LAYER2_SPOTS = ['zealot-quick-breath', 'zealot-spendthrift-grace', 'zealot-frenzied-liturgy'];
 
   it('locks Vigil layer 2 without any owned branch node', () => {
-    const state = treeStateFromLegacy(
-      { 'deep-reserves': 1, 'vigil-oath': 1 },
-      { gold: 100, ruby: 0 },
-    );
+    const state = treeStateFromLegacy({ 'deep-reserves': 1, 'vigil-oath': 1 }, 3);
     const spots = view(SPELL_TREE, state).spots;
     for (const id of VIGIL_LAYER2_SPOTS) {
       expect(spots.find((s) => s.id === id)?.status).toBe('locked');
@@ -235,7 +235,7 @@ describe('tree layer 2 (Alpha 0.1 §D5)', () => {
   it('unlocks Vigil layer 2 via patient-vow rank 1 alone', () => {
     const state = treeStateFromLegacy(
       { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-patient-vow': 1 },
-      { gold: 100, ruby: 0 },
+      3,
     );
     const spots = view(SPELL_TREE, state).spots;
     for (const id of VIGIL_LAYER2_SPOTS) {
@@ -246,7 +246,7 @@ describe('tree layer 2 (Alpha 0.1 §D5)', () => {
   it('unlocks Vigil layer 2 via measured-devotion alone (any-of prereq)', () => {
     const state = treeStateFromLegacy(
       { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-measured-devotion': 1 },
-      { gold: 100, ruby: 0 },
+      3,
     );
     const spots = view(SPELL_TREE, state).spots;
     for (const id of VIGIL_LAYER2_SPOTS) {
@@ -255,10 +255,7 @@ describe('tree layer 2 (Alpha 0.1 §D5)', () => {
   });
 
   it('locks Zealot layer 2 without any owned branch node', () => {
-    const state = treeStateFromLegacy(
-      { 'deep-reserves': 1, 'zealot-oath': 1 },
-      { gold: 100, ruby: 0 },
-    );
+    const state = treeStateFromLegacy({ 'deep-reserves': 1, 'zealot-oath': 1 }, 3);
     const spots = view(SPELL_TREE, state).spots;
     for (const id of ZEALOT_LAYER2_SPOTS) {
       expect(spots.find((s) => s.id === id)?.status).toBe('locked');
@@ -268,7 +265,7 @@ describe('tree layer 2 (Alpha 0.1 §D5)', () => {
   it('unlocks Zealot layer 2 via fervent-chain rank 1 alone', () => {
     const state = treeStateFromLegacy(
       { 'deep-reserves': 1, 'zealot-oath': 1, 'zealot-fervent-chain': 1 },
-      { gold: 100, ruby: 0 },
+      3,
     );
     const spots = view(SPELL_TREE, state).spots;
     for (const id of ZEALOT_LAYER2_SPOTS) {
@@ -279,7 +276,7 @@ describe('tree layer 2 (Alpha 0.1 §D5)', () => {
   it('unlocks Zealot layer 2 via steady-hands alone (any-of prereq)', () => {
     const state = treeStateFromLegacy(
       { 'deep-reserves': 1, 'zealot-oath': 1, 'zealot-steady-hands': 1 },
-      { gold: 100, ruby: 0 },
+      3,
     );
     const spots = view(SPELL_TREE, state).spots;
     for (const id of ZEALOT_LAYER2_SPOTS) {
@@ -401,7 +398,7 @@ describe('tree layer 2 (Alpha 0.1 §D5)', () => {
         'vigil-patient-vow': 1,
         'vigil-still-waters': 1,
       },
-      { gold: 0, ruby: 0 },
+      0,
     );
     const mods = combatModsFromTree(state, ['solemn-mend']);
     expect(mods.cooldowns).toEqual([STILL_WATERS]);
@@ -415,7 +412,7 @@ describe('tree layer 2 (Alpha 0.1 §D5)', () => {
         'zealot-steady-hands': 1,
         'zealot-frenzied-liturgy': 1,
       },
-      { gold: 0, ruby: 0 },
+      0,
     );
     const mods = combatModsFromTree(state, ['zealous-mending']);
     expect(mods.cooldowns).toEqual([FRENZIED_LITURGY]);
@@ -447,7 +444,7 @@ describe('tree layer 2 (Alpha 0.1 §D5)', () => {
 describe('parity with buildLoadout', () => {
   function expectParity(treeRanks: Record<string, number>, unlockedSpells: string[]): void {
     const legacy = buildLoadout(save({ treeRanks, unlockedSpells }));
-    const state = treeStateFromLegacy(treeRanks, { gold: 0, ruby: 0 });
+    const state = treeStateFromLegacy(treeRanks, 0);
     const next = combatModsFromTree(state, unlockedSpells);
     expect(next.bonusMaxMana).toBe(legacy.bonusMaxMana);
     expect(next.spells).toEqual(legacy.spells);
@@ -525,7 +522,7 @@ describe('parity with buildLoadout', () => {
   it('ownedContents is a flat bag combat can reduce (no layout)', () => {
     const state = treeStateFromLegacy(
       { 'deep-reserves': 2, 'zealot-oath': 1, 'zealot-steady-hands': 1 },
-      { gold: 0, ruby: 0 },
+      0,
     );
     const contents = ownedContents<SpellTreeContent>(SPELL_TREE, state);
     expect(contents.map((c) => c.effect.kind)).toEqual([
@@ -557,7 +554,7 @@ describe('parity with buildLoadout', () => {
   it('resolveCombatMods emits missingHealthPctBonus for a purchased Graven Scale', () => {
     const state = treeStateFromLegacy(
       { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-patient-vow': 1, 'vigil-graven-scale': 1 },
-      { gold: 0, ruby: 0 },
+      0,
     );
     const mods = combatModsFromTree(state, ['solemn-mend']);
     expect(mods.missingHealthPctBonuses).toEqual([{ spellId: 'solemn-vigil', pctPer10PctMissing: 5 }]);
@@ -566,7 +563,7 @@ describe('parity with buildLoadout', () => {
   it('resolveCombatMods emits fullHealthBonus for a purchased Steady Hands', () => {
     const state = treeStateFromLegacy(
       { 'deep-reserves': 1, 'zealot-oath': 1, 'zealot-steady-hands': 1 },
-      { gold: 0, ruby: 0 },
+      0,
     );
     const mods = combatModsFromTree(state, ['zealous-mending']);
     expect(mods.fullHealthBonuses).toEqual([
@@ -574,18 +571,10 @@ describe('parity with buildLoadout', () => {
     ]);
   });
 
-  it('refunds gold for legacy saves that still own the retired desperate-zeal node', () => {
-    const state = treeStateFromLegacy(
-      { 'zealot-oath': 1, 'zealot-desperate-zeal': 1 },
-      { gold: 2, ruby: 0 },
-    );
+  it('preserves available talent points while omitting retired legacy nodes', () => {
+    const state = treeStateFromLegacy({ 'zealot-oath': 1, 'zealot-desperate-zeal': 1 }, 2);
     expect(ownedOf(state)).not.toContain('zealot-desperate-zeal');
-    expect(walletOf(state)['gold']).toBe(6); // 2 on hand + 4 refunded (the retired node's old cost)
-  });
-
-  it('does not refund when the retired node was never owned', () => {
-    const state = treeStateFromLegacy({ 'zealot-oath': 1 }, { gold: 2, ruby: 0 });
-    expect(walletOf(state)['gold']).toBe(2);
+    expect(walletOf(state)['talent']).toBe(2);
   });
 
   it('loadoutFromSave matches combatModsFromTree for a maxed Vigil save', () => {
@@ -596,7 +585,7 @@ describe('parity with buildLoadout', () => {
     };
     const unlocked = ['solemn-mend', 'zealous-mending'];
     const viaSave = loadoutFromSave({ treeRanks: ranks, unlockedSpells: unlocked });
-    const viaState = combatModsFromTree(treeStateFromLegacy(ranks, { gold: 0, ruby: 0 }), unlocked);
+    const viaState = combatModsFromTree(treeStateFromLegacy(ranks, 0), unlocked);
     expect(viaSave).toEqual(viaState);
   });
 });

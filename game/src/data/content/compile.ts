@@ -72,10 +72,7 @@ function compileValidatedDungeon(
   return {
     id: dungeon.id,
     name: dungeon.name,
-    goldPerEnemy: dungeon.rewards.goldPerEnemy,
-    goldEveryKills: dungeon.rewards.goldEveryKills,
     xpPerEnemy: dungeon.rewards.xpPerEnemy,
-    rubyPerFirstClear: dungeon.rewards.rubyPerFirstClear,
     waves: dungeon.waves.slice(0, -1).map((wave) => ({
       enemies: wave.enemies.map((group) => {
         const mob = required(mobById, group.mobId, 'mob');

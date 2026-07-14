@@ -21,7 +21,6 @@ import type {
   FullHealthBonusRule,
   MissingHealthBonusRule,
   MissingHealthPctBonusRule,
-  RelicDef,
   SpellDef,
   SynergyRule,
   TunnelVisionCastDef,
@@ -60,6 +59,17 @@ interface CooldownRuntime {
   buffRemainingMs: number;
 }
 
+interface RelicStats {
+  bonusMaxMana: number;
+  bonusHealing: number;
+  manaRegenAmount: number;
+  manaRegenIntervalMs: number | null;
+  maxHp: Record<'tank' | 'dps' | 'healer', number>;
+  armor: Record<'tank' | 'dps' | 'healer', number>;
+  autoDamage: Record<'tank' | 'dps', number>;
+  swingIntervalDeltaMs: Record<'tank' | 'dps', number>;
+}
+
 export class CombatEngine {
   private readonly encounter: EncounterDef;
   private readonly spells: SpellDef[];
@@ -71,13 +81,7 @@ export class CombatEngine {
   private readonly fullHealthBonuses: FullHealthBonusRule[];
   /** Cooldown runtime state, same order as options.cooldowns (Alpha 0.1 §D6). */
   private readonly cooldowns: CooldownRuntime[];
-  /** Alpha 0.1 §D7: the equipped relic, cloned (effect object too) so this instance's mutable
-   *  runtime fields never touch the caller's object. Undefined when none equipped. */
-  private readonly relic?: RelicDef | undefined;
-  /** overhealManaRestore (Ember Ledger): fires once per combat, on the first overheal. */
-  private emberLedgerFired = false;
-  /** manaRegenTradeoff (Still Reservoir): countdown to the next regen tick; null when no such
-   *  relic is equipped, so the timer/tick logic below is fully inert without one. */
+  private readonly relicStats: RelicStats;
   private relicRegenRemainingMs: number | null = null;
 
   private party: Unit[] = [];
@@ -109,9 +113,7 @@ export class CombatEngine {
   private waveIndex = 0;
   private status: CombatStatus = 'running';
 
-  private rewardsGold = 0;
   private rewardsXp = 0;
-  private defeatedEnemies = 0;
 
   /** Events produced synchronously by commands (castSpell), flushed on the next advance(). */
   private pending: CombatEvent[] = [];
@@ -120,19 +122,50 @@ export class CombatEngine {
     this.encounter = encounter;
     this.spells = spells;
 
-    // Alpha 0.1 §D7: the equipped relic, cloned (effect object too) so this instance's
-    // mutable runtime fields never touch the caller's object.
-    this.relic = options?.relic ? { ...options.relic, effect: { ...options.relic.effect } } : undefined;
-
-    // Authorized Chunk 3 extension: a spell-tree node (e.g. Deep Reserves) can grant
-    // the healer bonus max mana, applied to both max and starting mana here.
-    let healerMana = PARTY.startingMana + (options?.bonusMaxMana ?? 0);
-    // Still Reservoir (manaRegenTradeoff, §D7/§D8): -5 max/starting mana (floored at 1
-    // defensively), plus a regen timer that starts counting down from t=0.
-    if (this.relic?.effect.kind === 'manaRegenTradeoff') {
-      healerMana = Math.max(1, healerMana + this.relic.effect.maxManaDelta);
-      this.relicRegenRemainingMs = this.relic.effect.regenIntervalMs;
+    this.relicStats = {
+      bonusMaxMana: 0,
+      bonusHealing: 0,
+      manaRegenAmount: 0,
+      manaRegenIntervalMs: null,
+      maxHp: { tank: 0, dps: 0, healer: 0 },
+      armor: { tank: 0, dps: 0, healer: 0 },
+      autoDamage: { tank: 0, dps: 0 },
+      swingIntervalDeltaMs: { tank: 0, dps: 0 },
+    };
+    for (const relic of options?.relics ?? []) {
+      for (const effect of relic.effects) {
+        switch (effect.kind) {
+          case 'bonusMaxMana':
+            this.relicStats.bonusMaxMana += effect.amount;
+            break;
+          case 'bonusHealing':
+            this.relicStats.bonusHealing += effect.amount;
+            break;
+          case 'manaRegen':
+            this.relicStats.manaRegenAmount += effect.amount;
+            this.relicStats.manaRegenIntervalMs =
+              this.relicStats.manaRegenIntervalMs === null
+                ? effect.intervalMs
+                : Math.min(this.relicStats.manaRegenIntervalMs, effect.intervalMs);
+            break;
+          case 'roleMaxHp':
+            this.relicStats.maxHp[effect.role] += effect.amount;
+            break;
+          case 'roleArmor':
+            this.relicStats.armor[effect.role] += effect.amount;
+            break;
+          case 'roleAutoDamage':
+            this.relicStats.autoDamage[effect.role] += effect.amount;
+            break;
+          case 'roleSwingInterval':
+            this.relicStats.swingIntervalDeltaMs[effect.role] += effect.deltaMs;
+            break;
+        }
+      }
     }
+
+    const healerMana = PARTY.startingMana + (options?.bonusMaxMana ?? 0) + this.relicStats.bonusMaxMana;
+    this.relicRegenRemainingMs = this.relicStats.manaRegenIntervalMs;
 
     // Chunk 1 (phase-2-handoff): synergy + missing-health bonus rules, cloned so the
     // engine's mutable `armed` state never touches the caller's arrays.
@@ -152,24 +185,27 @@ export class CombatEngine {
       buffRemainingMs: 0,
     }));
 
+    const tankHp = PARTY.tankMaxHp + this.relicStats.maxHp.tank;
+    const dpsHp = PARTY.dpsMaxHp + this.relicStats.maxHp.dps;
+    const healerHp = PARTY.healerMaxHp + this.relicStats.maxHp.healer;
     this.party = [
-      { id: 'tank', name: 'Tank', role: 'tank', hp: PARTY.tankMaxHp, maxHp: PARTY.tankMaxHp, mana: 0, maxMana: 0, alive: true },
-      { id: 'dps1', name: 'DPS 1', role: 'dps', hp: PARTY.dpsMaxHp, maxHp: PARTY.dpsMaxHp, mana: 0, maxMana: 0, alive: true },
-      { id: 'dps2', name: 'DPS 2', role: 'dps', hp: PARTY.dpsMaxHp, maxHp: PARTY.dpsMaxHp, mana: 0, maxMana: 0, alive: true },
+      { id: 'tank', name: 'Tank', role: 'tank', hp: tankHp, maxHp: tankHp, mana: 0, maxMana: 0, alive: true },
+      { id: 'dps1', name: 'DPS 1', role: 'dps', hp: dpsHp, maxHp: dpsHp, mana: 0, maxMana: 0, alive: true },
+      { id: 'dps2', name: 'DPS 2', role: 'dps', hp: dpsHp, maxHp: dpsHp, mana: 0, maxMana: 0, alive: true },
       {
         id: 'healer',
         name: 'Healer',
         role: 'healer',
-        hp: PARTY.healerMaxHp,
-        maxHp: PARTY.healerMaxHp,
+        hp: healerHp,
+        maxHp: healerHp,
         mana: healerMana,
         maxMana: healerMana,
         alive: true,
       },
     ];
     for (const u of this.party) {
-      if (u.role === 'tank') this.swingTimers.set(u.id, MERCS.tankSwingIntervalMs);
-      else if (u.role === 'dps') this.swingTimers.set(u.id, MERCS.dpsSwingIntervalMs);
+      if (u.role === 'tank') this.swingTimers.set(u.id, this.mercSwingInterval('tank'));
+      else if (u.role === 'dps') this.swingTimers.set(u.id, this.mercSwingInterval('dps'));
     }
 
     this.spawnWave(0);
@@ -298,8 +334,8 @@ export class CombatEngine {
     };
   }
 
-  get rewards(): { gold: number; xp: number } {
-    return { gold: this.rewardsGold, xp: this.rewardsXp };
+  get rewards(): { xp: number } {
+    return { xp: this.rewardsXp };
   }
 
   // ---- internal: time stepping -------------------------------------------------
@@ -352,20 +388,11 @@ export class CombatEngine {
 
     // 1. cooldown buff windows that expired this tick (Frenzied Liturgy)
     for (const id of expiredBuffCooldownIds) events.push({ type: 'cooldownBuffEnded', id });
-    // 1b. Still Reservoir regen tick (§D7/§D8): fires every regenIntervalMs of sim time,
-    // unconditionally — independent of cast/busy state, mana being full, or combat status
-    // (it just keeps ticking for the whole fight). Reset-on-fire mirrors the swing-timer
-    // pattern elsewhere in this method.
-    if (
-      this.relicRegenRemainingMs !== null &&
-      this.relicRegenRemainingMs <= 0 &&
-      this.relic?.effect.kind === 'manaRegenTradeoff'
-    ) {
-      const eff = this.relic.effect;
-      this.relicRegenRemainingMs = eff.regenIntervalMs;
+    // 1b. Permanent relic mana regeneration uses simulation time.
+    if (this.relicRegenRemainingMs !== null && this.relicRegenRemainingMs <= 0) {
+      this.relicRegenRemainingMs = this.relicStats.manaRegenIntervalMs;
       const healer = this.getUnit('healer')!;
-      healer.mana = Math.min(healer.maxMana, healer.mana + eff.regenAmount);
-      events.push({ type: 'relicTriggered', id: this.relic.id, name: this.relic.name });
+      healer.mana = Math.min(healer.maxMana, healer.mana + this.relicStats.manaRegenAmount);
     }
     // 2. player cast completes
     if (this.playerCast && this.playerCast.remainingMs <= 0) {
@@ -392,7 +419,7 @@ export class CombatEngine {
         this.resolveMercSwing(id, events);
         if (this.swingTimers.has(id)) {
           const merc = this.party.find((u) => u.id === id);
-          const interval = merc?.role === 'tank' ? MERCS.tankSwingIntervalMs : MERCS.dpsSwingIntervalMs;
+          const interval = merc?.role === 'tank' ? this.mercSwingInterval('tank') : this.mercSwingInterval('dps');
           this.swingTimers.set(id, interval);
         }
       }
@@ -528,29 +555,17 @@ export class CombatEngine {
           fullHealthBonus += fh.bonusHeal;
         }
       }
-      let raw = spell.heal + synergyBonus + missingHealthBonus + missingHealthPctBonus + fullHealthBonus;
-      // Relic: Triage Bell (thresholdHealMod, §D7/§D8) — modifies the FINAL raw sum, after
-      // every tree bonus above. Pre-heal threshold check, same hp/maxHp read as the bands above.
-      if (this.relic?.effect.kind === 'thresholdHealMod') {
-        const eff = this.relic.effect;
-        raw =
-          target.hp * 100 < eff.thresholdPct * target.maxHp
-            ? raw + eff.bonusBelow
-            : Math.max(eff.minHeal, raw - eff.penaltyAtOrAbove);
-      }
+      const raw =
+        spell.heal +
+        synergyBonus +
+        missingHealthBonus +
+        missingHealthPctBonus +
+        fullHealthBonus +
+        this.relicStats.bonusHealing;
       const applied = Math.min(raw, missing);
       const overheal = raw - applied;
       target.hp += applied;
       events.push({ type: 'heal', targetId: target.id, amount: applied, overheal, spellId: spell.id });
-      // Relic: Ember Ledger (overhealManaRestore, §D7/§D8) — once per combat, on the FIRST
-      // heal event with overheal > 0: restore mana (clamped to max) and emit relicTriggered.
-      // Fires even if mana is already full (the charge is still spent — locked, deterministic).
-      if (!this.emberLedgerFired && this.relic?.effect.kind === 'overhealManaRestore' && overheal > 0) {
-        this.emberLedgerFired = true;
-        const healer = this.getUnit('healer')!;
-        healer.mana = Math.min(healer.maxMana, healer.mana + this.relic.effect.mana);
-        events.push({ type: 'relicTriggered', id: this.relic.id, name: this.relic.name });
-      }
     }
   }
 
@@ -577,7 +592,9 @@ export class CombatEngine {
     if (!merc || !merc.alive) return;
     const target = this.activeEnemies.find((e) => e.alive);
     if (!target) return;
-    const dmg = merc.role === 'tank' ? MERCS.tankAutoDamage : MERCS.dpsAutoDamage;
+    const role = merc.role === 'tank' ? 'tank' : 'dps';
+    const baseDamage = role === 'tank' ? MERCS.tankAutoDamage : MERCS.dpsAutoDamage;
+    const dmg = baseDamage + this.relicStats.autoDamage[role];
     this.applyDamageToUnit(target, dmg, merc.id, events);
   }
 
@@ -600,9 +617,20 @@ export class CombatEngine {
     return null;
   }
 
+  private mercSwingInterval(role: 'tank' | 'dps'): number {
+    const base = role === 'tank' ? MERCS.tankSwingIntervalMs : MERCS.dpsSwingIntervalMs;
+    return Math.max(100, base + this.relicStats.swingIntervalDeltaMs[role]);
+  }
+
+  private damageAfterArmor(target: Unit, amount: number): number {
+    if (target.role !== 'tank' && target.role !== 'dps' && target.role !== 'healer') return amount;
+    return Math.max(1, amount - this.relicStats.armor[target.role]);
+  }
+
   private applyDamageToUnit(target: Unit, amount: number, sourceId: string, events: CombatEvent[]): void {
-    target.hp = Math.max(0, target.hp - amount);
-    events.push({ type: 'damage', targetId: target.id, amount, sourceId });
+    const applied = this.damageAfterArmor(target, amount);
+    target.hp = Math.max(0, target.hp - applied);
+    events.push({ type: 'damage', targetId: target.id, amount: applied, sourceId });
     if (target.hp <= 0 && target.alive) {
       if (target.role === 'enemy' || target.role === 'boss') {
         this.onEnemyDeath(target, events);
@@ -655,8 +683,9 @@ export class CombatEngine {
     const bossId = this.boss!.id;
     for (const unit of this.party) {
       if (!unit.alive) continue;
-      unit.hp = Math.max(0, unit.hp - castDef.partyDamage);
-      events.push({ type: 'damage', targetId: unit.id, amount: castDef.partyDamage, sourceId: bossId });
+      const damage = this.damageAfterArmor(unit, castDef.partyDamage);
+      unit.hp = Math.max(0, unit.hp - damage);
+      events.push({ type: 'damage', targetId: unit.id, amount: damage, sourceId: bossId });
       if (unit.hp <= 0) {
         unit.alive = false;
         this.swingTimers.delete(unit.id);
@@ -793,11 +822,6 @@ export class CombatEngine {
     this.swingTimers.delete(unit.id);
     this.enemyStats.delete(unit.id);
     events.push({ type: 'unitDied', unitId: unit.id });
-    this.defeatedEnemies += 1;
-    const goldEveryKills = this.encounter.goldEveryKills ?? REWARDS.goldEveryKills;
-    if (this.defeatedEnemies % goldEveryKills === 0) {
-      this.rewardsGold += this.encounter.goldPerEnemy ?? REWARDS.goldPerEnemy;
-    }
     this.rewardsXp += this.encounter.xpPerEnemy ?? REWARDS.xpPerEnemy;
     this.checkWaveOrVictory(events);
   }

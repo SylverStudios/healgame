@@ -2,8 +2,8 @@
  * Legacy TREE_NODES — **deprecated for live UI/combat**.
  *
  * Live config: `data/spellTree.ts` (`SPELL_TREE`). Service: `src/tree/`
- * (see `tree/AGENTS.md`). Kept for progression unit tests that still exercise
- * `purchaseNode` / `nodeStatus`. Do not extend for new features.
+ * (see `tree/AGENTS.md`). Kept only for historical data-shape tests. Do not
+ * extend for new features.
  */
 
 import type { SubclassId } from '../save/save';

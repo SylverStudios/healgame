@@ -1,6 +1,6 @@
 # Idea backlog
 
-Status: planning · Authority: none — uncommitted ideas for future exploration · Last verified: 2026-07-13
+Status: planning · Authority: none — uncommitted ideas for future exploration · Last verified: 2026-07-14
 
 These are prompts to revisit, not approved scope or implementation requirements.
 Living specs and active phase handoffs take precedence.
@@ -20,6 +20,17 @@ Living specs and active phase handoffs take precedence.
   evolution path.
 - Before committing, compare how each option affects build identity, timing,
   player choice, and the existing spell tree.
+
+## Dungeon structure and combat
+
+- Add a small dungeon map at the top of the combat screen that shows the
+  remaining enemy groups and the boss room.
+- Frame regular encounters as *pulls*, not waves, to make each dungeon feel
+  more like progressing through a *World of Warcraft* dungeon.
+- Future extension: let the player eagerly pull the next group into the current
+  fight, trading speed for the danger of overlapping encounters.
+- Supporting overlapping pulls would require a readable way to display and
+  distinguish many mobs on screen at once.
 
 ## Release process
 
