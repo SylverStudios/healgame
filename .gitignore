@@ -8,5 +8,6 @@ node_modules/
 dist/
 build/
 .cursor/
+.claude/worktrees/
 *.canvas.tsx
 /kenney_tiny-dungeon/
