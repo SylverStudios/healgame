@@ -285,6 +285,7 @@ try {
   save = await readSave(page);
   check(save?.relicId === 'triage-bell', `picking card 2 sets relicId (relicId=${save?.relicId}, expected triage-bell)`);
   check(save?.relicPickPending === false, 'relic pick clears relicPickPending');
+  check((await locate(page, 'runMod:triage-bell')) !== null, 'hub run-mods bar shows chosen relic');
   await shot(page, 'hub-with-relic-icon');
 
   // Second hub visit (real scene nav, not just a reload): still hub, never re-offered.
@@ -388,6 +389,7 @@ try {
 
   await clickNamed(page, 'treeBack');
   await page.waitForTimeout(600);
+  check((await locate(page, 'runMod:vigil-oath')) !== null, 'hub run-mods bar shows sworn oath');
   await shot(page, 'hub-with-oath');
 
   // ---- Stage B3: tree layer 2 (mana focus) + §D4 rebalance ------------------

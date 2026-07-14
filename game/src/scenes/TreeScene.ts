@@ -13,6 +13,8 @@ import {
   treeStateFromLegacy,
   type SpellTreeContent,
 } from '../data/spellTree';
+import { runModsFromSave } from '../data/runMods';
+import { RunModsBar } from '../ui/runModsBar';
 import {
   layoutSpots,
   update,
@@ -144,6 +146,7 @@ export class TreeScene extends Phaser.Scene {
   /** In-memory only: exclusive-group spot armed for confirm click. */
   private armedSpotId: string | null = null;
   private feedback = '';
+  private runModsBar: RunModsBar | null = null;
 
   constructor() {
     super(SceneKeys.Tree);
@@ -196,6 +199,10 @@ export class TreeScene extends Phaser.Scene {
       .text(width / 2, 64, '', { fontFamily: FONT, fontSize: '15px', color: ACCENT_COLOR })
       .setOrigin(0.5)
       .setScrollFactor(0);
+
+    // Oath/relic strip stays pinned with the HUD (scrollFactor 0) so players can
+    // re-read their run mods while browsing the tree.
+    this.syncRunModsBar();
 
     this.statusText = this.add
       .text(width / 2, 470, '', {
@@ -478,9 +485,20 @@ export class TreeScene extends Phaser.Scene {
       applyTreeStateToSave(this.save, this.treeState);
       saveGame(this.save);
       this.feedback = '';
+      this.syncRunModsBar();
       return;
     }
     this.feedback = result.message;
+  }
+
+  /** Rebuild the HUD strip after an oath purchase so the diamond appears immediately. */
+  private syncRunModsBar(): void {
+    this.runModsBar?.destroy();
+    this.runModsBar = new RunModsBar(this, runModsFromSave(this.save), {
+      viewWidth: this.scale.width,
+      scrollFactor: 0,
+      depth: 250,
+    });
   }
 
   private buildBackButton(x: number, y: number): void {

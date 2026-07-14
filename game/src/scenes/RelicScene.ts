@@ -5,7 +5,8 @@
  * clear. Pick 1 of 3 static cards; clicking locks the choice into
  * `save.relicId`, clears the pending flag, persists, and returns to the Hub.
  * No skip button — the player must pick. Temp art only: rects + monospace
- * text, dark palette, matching Hub/Tree conventions.
+ * text, dark palette, matching Hub/Tree conventions. Card glyphs match the
+ * shared RunModsBar icon language (colored circles).
  */
 
 import Phaser from 'phaser';
@@ -13,6 +14,7 @@ import { SceneKeys } from './keys';
 import { loadSave, saveGame } from '../save/save';
 import { RELICS } from '../data/relics';
 import type { RelicDef } from '../combat/types';
+import { drawRunModGlyph } from '../ui/runModsBar';
 
 const BG_COLOR = 0x1a1210;
 const CARD_BG = 0x3a2a22;
@@ -29,6 +31,7 @@ const CARD_HEIGHT = 320;
 const CARD_GAP = 60;
 const CARD_LEFT = 60;
 const DESC_WRAP_WIDTH = CARD_WIDTH - 32;
+const GLYPH_RADIUS = 18;
 
 export class RelicScene extends Phaser.Scene {
   constructor() {
@@ -65,11 +68,17 @@ export class RelicScene extends Phaser.Scene {
       .setName(`relicCard:${relic.id}`);
 
     this.add
-      .text(x, y - CARD_HEIGHT / 2 + 36, relic.name, { fontFamily: FONT, fontSize: '18px', color: ACCENT_COLOR })
+      .text(x, y - CARD_HEIGHT / 2 + 28, relic.name, {
+        fontFamily: FONT,
+        fontSize: '18px',
+        color: ACCENT_COLOR,
+      })
       .setOrigin(0.5);
 
+    drawRunModGlyph(this, x, y - CARD_HEIGHT / 2 + 78, relic.id, 'relic', GLYPH_RADIUS);
+
     this.add
-      .text(x, y - CARD_HEIGHT / 2 + 90, relic.description, {
+      .text(x, y - CARD_HEIGHT / 2 + 118, relic.description, {
         fontFamily: FONT,
         fontSize: '14px',
         color: TEXT_COLOR,

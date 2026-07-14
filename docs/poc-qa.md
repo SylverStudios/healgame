@@ -597,8 +597,9 @@ coordinate table.
 
 ## Alpha 0.1 extensions named beyond the original handoff table
 
-`hubIronPass`, `hubRelicIcon`, `combatPaceToggle`, `relicCard:<relicId>` —
-everything journey still aims at after Iron Pass / relics / pace toggle.
+`hubIronPass`, `combatPaceToggle`, `relicCard:<relicId>` — everything journey
+still aims at after Iron Pass / relics / pace toggle. Relic/oath HUD icons use
+`runMod:<id>` (see Run mods top bar section).
 
 ## Acceptance
 
@@ -606,3 +607,19 @@ Full `npm run verify` passed (typecheck, lint, test, build, smoke, journey).
 Journey no longer embeds ally/spell/hub pixel tables — a `GROUND_Y` layout
 nudge cannot desync journey because `locate('combatAlly:tank')` reads live
 bounds.
+
+# Run mods top bar — oath + relic HUD (2026-07-13)
+
+Status: current · Authority: QA log for this slice · Last verified: 2026-07-13
+
+## What shipped
+
+Shared StS-style top-right icon strip (`game/src/ui/runModsBar.ts`) shows the
+sworn oath (diamond glyph) and chosen relic (circle glyph) on Hub, Combat, and
+Tree. Hover shows kind + name + description. Oath display text is pulled from
+the tree oath nodes via `runModsFromSave` (`game/src/data/runMods.ts`) — no
+duplicate effect copy. Hub no longer prints a mid-screen `Oath: …` line; Relic
+pick cards use the same glyph language.
+
+Semantic targets: `runMod:<id>` (e.g. `runMod:vigil-oath`,
+`runMod:triage-bell`). Former `hubRelicIcon` name retired.

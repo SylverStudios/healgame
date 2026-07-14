@@ -28,6 +28,8 @@ import { shakeBossImpact, showCastBeam, showHealRipple } from '../ui/combatFx';
 import { PaceToggle } from '../ui/paceToggle';
 import { loadSave, saveGame } from '../save/save';
 import { relicById } from '../data/relics';
+import { runModsFromSave } from '../data/runMods';
+import { RunModsBar } from '../ui/runModsBar';
 import type { CombatMods } from '../data/spellTree';
 
 /** Pinned contract: callers pass fully resolved CombatMods (from loadoutFromSave). */
@@ -209,6 +211,7 @@ export class CombatScene extends Phaser.Scene {
     this.rebuildEnemies(this.engine.state.enemies);
     this.buildHud();
     this.buildCastBars();
+    new RunModsBar(this, runModsFromSave(save), { viewWidth: VIEW_WIDTH });
 
     this.spellBar = new SpellBar(
       this,
