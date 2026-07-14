@@ -75,13 +75,12 @@ function floatFontPx(amount: number): string {
 }
 
 /**
- * Boss-focus "brand" (alpha-0.1-handoff §D3/§D9): crimson rectangle hovering
- * above the unit while a Tunnel Vision channel targets it. Distinct from the
- * player's heal-target indicator in both shape (rect vs chevron/halo) and
- * color (crimson vs gold) — the two can stack on the same unit.
+ * Boss-focus marker: a crimson crosshair hovering above the unit during
+ * Tunnel Vision. Its ring-and-reticle silhouette stays unmistakably distinct
+ * from the player's gold chevron/halo when both target the same ally.
  */
-const FOCUS_MARKER_WIDTH = 14;
-const FOCUS_MARKER_HEIGHT = 10;
+const FOCUS_MARKER_RADIUS = 7;
+const FOCUS_MARKER_ARM = 11;
 /** Gap between the heal-target chevron's slot and the focus brand. */
 const FOCUS_MARKER_GAP = 6;
 const FOCUS_MARKER_COLOR = 0xc23b22;
@@ -136,8 +135,8 @@ export class UnitSprite {
   private readonly targetMarker: Phaser.GameObjects.Triangle;
   /** Ember/iron ellipse under the unit's feet when targeted (handoff §M). */
   private readonly targetHalo: Phaser.GameObjects.Ellipse;
-  /** Crimson brand shown while a boss focus channel (Tunnel Vision) targets this unit. */
-  private readonly bossFocusMarker: Phaser.GameObjects.Rectangle;
+  /** Crimson crosshair shown while a boss focus channel targets this unit. */
+  private readonly bossFocusMarker: Phaser.GameObjects.Graphics;
 
   /** Standalone floating texts (hit markers / heal floats) not parented to the container. */
   private readonly activeFloats = new Set<Phaser.GameObjects.Text>();
@@ -232,11 +231,13 @@ export class UnitSprite {
     this.container.add(this.targetMarker);
 
     // Above the chevron's slot so a heal-targeted AND boss-focused unit shows both.
-    const focusY = markerTipY - TARGET_MARKER_HEIGHT - FOCUS_MARKER_GAP - FOCUS_MARKER_HEIGHT / 2;
-    this.bossFocusMarker = scene.add
-      .rectangle(0, focusY, FOCUS_MARKER_WIDTH, FOCUS_MARKER_HEIGHT, FOCUS_MARKER_COLOR)
-      .setStrokeStyle(1, 0x0a0605)
-      .setVisible(false);
+    const focusY = markerTipY - TARGET_MARKER_HEIGHT - FOCUS_MARKER_GAP - FOCUS_MARKER_ARM;
+    this.bossFocusMarker = scene.add.graphics().setPosition(0, focusY).setVisible(false);
+    this.bossFocusMarker.lineStyle(2, FOCUS_MARKER_COLOR, 1);
+    this.bossFocusMarker.strokeCircle(0, 0, FOCUS_MARKER_RADIUS);
+    this.bossFocusMarker.lineBetween(-FOCUS_MARKER_ARM, 0, FOCUS_MARKER_ARM, 0);
+    this.bossFocusMarker.lineBetween(0, -FOCUS_MARKER_ARM, 0, FOCUS_MARKER_ARM);
+    this.bossFocusMarker.fillStyle(FOCUS_MARKER_COLOR, 1).fillCircle(0, 0, 2);
     this.container.add(this.bossFocusMarker);
 
     const feetY = y + height / 2;
@@ -286,7 +287,7 @@ export class UnitSprite {
     this.targetHalo.setVisible(isTargeted && this.alive);
   }
 
-  /** Show/hide the crimson boss-focus brand (Tunnel Vision channel), with a slow alpha pulse. */
+  /** Show/hide the crimson boss-focus crosshair (Tunnel Vision channel), with a slow alpha pulse. */
   setBossFocused(isFocused: boolean): void {
     this.scene.tweens.killTweensOf(this.bossFocusMarker);
     this.bossFocusMarker.setAlpha(1);

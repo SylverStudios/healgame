@@ -111,6 +111,7 @@ export class CombatEngine {
 
   private rewardsGold = 0;
   private rewardsXp = 0;
+  private defeatedEnemies = 0;
 
   /** Events produced synchronously by commands (castSpell), flushed on the next advance(). */
   private pending: CombatEvent[] = [];
@@ -792,7 +793,11 @@ export class CombatEngine {
     this.swingTimers.delete(unit.id);
     this.enemyStats.delete(unit.id);
     events.push({ type: 'unitDied', unitId: unit.id });
-    this.rewardsGold += this.encounter.goldPerEnemy ?? REWARDS.goldPerEnemy;
+    this.defeatedEnemies += 1;
+    const goldEveryKills = this.encounter.goldEveryKills ?? REWARDS.goldEveryKills;
+    if (this.defeatedEnemies % goldEveryKills === 0) {
+      this.rewardsGold += this.encounter.goldPerEnemy ?? REWARDS.goldPerEnemy;
+    }
     this.rewardsXp += this.encounter.xpPerEnemy ?? REWARDS.xpPerEnemy;
     this.checkWaveOrVictory(events);
   }

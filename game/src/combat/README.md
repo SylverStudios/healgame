@@ -1,6 +1,6 @@
 # Combat engine (Chunk 1)
 
-Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-07-12
+Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-07-14
 
 Pure, deterministic TypeScript. No Phaser, no wall-clock, no randomness — driven
 entirely by `advance(dtMs)`. Chunk 2 builds the Phaser view against exactly
@@ -117,10 +117,14 @@ and compiles the ordered dungeon catalog into the engine's resolved
     the cast started. Window expiry is detected in `tick()` the moment
     `buffRemainingMs` crosses to `<=0` and emits `cooldownBuffEnded` exactly
     once (clamped at 0 so it never re-fires). Re-activating while a window is
-    already open would reset it to full duration rather than stack — not
-    reachable with the shipped data (`cooldownMs === durationMs`, so the CD
-    isn't ready again until after the window has already closed), but that's
-    the rule if a future CD ever has `cooldownMs < durationMs`.
+    already open would reset it to full duration rather than stack. With the
+    shipped data, Frenzied Liturgy's 30s window and 40s cooldown tick
+    independently: expiry leaves 10s of real recovery, during which activation
+    remains unavailable. The 40s cadence keeps a safety margin above the
+    playtest bot's 44s failure boundary while preserving the pinned
+    maxed-Zealot Iron Pass victory and adding readable downtime; a
+    future CD with `cooldownMs < durationMs` would still follow the
+    reset-not-stack rule.
   - **Interaction**: if a Still Waters charge is armed AND a Frenzied Liturgy
     window is open when a cast starts, **the free charge wins** — reserve 0,
     consume the charge, leave the cost-reduction window untouched (it keeps
@@ -253,9 +257,11 @@ and compiles the ordered dungeon catalog into the engine's resolved
 - **Waves/victory/wipe**: a wave clears (and the next spawns) the instant its
   last enemy dies; victory on boss hp 0; wipe the instant all 4 party members
   are dead. `advance()` is a no-op once `status !== 'running'`.
-- **Rewards**: compiled dungeon gold/XP values are credited instantly per kill
-  (trash and boss both count), regardless of a later wipe. Synthetic legacy
-  encounters may omit them and fall back to `REWARDS`.
+- **Rewards**: XP is credited instantly per kill. Gold uses the dungeon's
+  `goldEveryKills` cadence: each Nth defeated enemy credits one
+  `goldPerEnemy` bundle (trash and boss both count). Earned rewards survive a
+  later wipe. Synthetic legacy encounters may omit these values and fall back
+  to `REWARDS`.
 
 ## Determinism
 

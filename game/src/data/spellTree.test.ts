@@ -82,7 +82,7 @@ describe('SPELL_TREE config', () => {
   });
 
   it('offers forsaken-path tempo on the rival spot after swearing an oath', () => {
-    let state = create(SPELL_TREE, { gold: 10, ruby: 2 });
+    let state = create(SPELL_TREE, { gold: 14, ruby: 2 });
     const root = update(SPELL_TREE, state, { type: 'purchase', spotId: 'deep-reserves' });
     expect(root.ok).toBe(true);
     if (!root.ok) return;
@@ -109,6 +109,25 @@ describe('SPELL_TREE config', () => {
     expect(rivalTempo.ok).toBe(false);
     if (rivalTempo.ok) return;
     expect(rivalTempo.reason).toBe('requirements-unmet');
+  });
+
+  it('makes Patient Vow and Measured Devotion mutually exclusive', () => {
+    let state = treeStateFromLegacy(
+      { 'deep-reserves': 1, 'vigil-oath': 1 },
+      { gold: 100, ruby: 0 },
+    );
+    const power = update(SPELL_TREE, state, { type: 'purchase', spotId: 'vigil-patient-vow' });
+    expect(power.ok).toBe(true);
+    if (!power.ok) return;
+    state = power.state;
+
+    const efficiency = update(SPELL_TREE, state, {
+      type: 'purchase',
+      spotId: 'vigil-measured-devotion',
+    });
+    expect(efficiency.ok).toBe(false);
+    if (efficiency.ok) return;
+    expect(efficiency.reason).toBe('exclusive-locked');
   });
 
   it('adds 1.5× pace to CombatMods when warped tempo is owned', () => {
@@ -449,7 +468,6 @@ describe('parity with buildLoadout', () => {
         'deep-reserves': 5,
         'vigil-oath': 1,
         'vigil-patient-vow': 3,
-        'vigil-measured-devotion': 1,
       },
       ['solemn-mend', 'zealous-mending'],
     );
@@ -473,7 +491,6 @@ describe('parity with buildLoadout', () => {
         'deep-reserves': 5,
         'vigil-oath': 1,
         'vigil-patient-vow': 3,
-        'vigil-measured-devotion': 1,
         'vigil-graven-scale': 1,
       },
       ['solemn-mend', 'zealous-mending'],
@@ -496,11 +513,10 @@ describe('parity with buildLoadout', () => {
     ]);
   });
 
-  it('legacyRanksFromOwned round-trips with ownedIdsFromLegacyRanks', () => {
+  it('round-trips an efficiency-specialized Vigil build', () => {
     const ranks = {
       'deep-reserves': 5,
       'vigil-oath': 1,
-      'vigil-patient-vow': 2,
       'vigil-measured-devotion': 1,
     };
     expect(legacyRanksFromOwned(ownedIdsFromLegacyRanks(ranks))).toEqual(ranks);
@@ -554,7 +570,7 @@ describe('parity with buildLoadout', () => {
     );
     const mods = combatModsFromTree(state, ['zealous-mending']);
     expect(mods.fullHealthBonuses).toEqual([
-      { spellId: 'zealous-mending', hpPctAtLeast: 80, bonusHeal: 1 },
+      { spellId: 'zealous-mending', hpPctAtLeast: 80, bonusHeal: 2 },
     ]);
   });
 
@@ -577,7 +593,6 @@ describe('parity with buildLoadout', () => {
       'deep-reserves': 5,
       'vigil-oath': 1,
       'vigil-patient-vow': 3,
-      'vigil-measured-devotion': 1,
     };
     const unlocked = ['solemn-mend', 'zealous-mending'];
     const viaSave = loadoutFromSave({ treeRanks: ranks, unlockedSpells: unlocked });

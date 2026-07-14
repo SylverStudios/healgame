@@ -15,6 +15,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
     id: 'ash-gate',
     name: 'Ash Gate',
     goldPerEnemy: 1,
+    goldEveryKills: 2,
     xpPerEnemy: 1,
     rubyPerFirstClear: 1,
     waves: [
@@ -62,6 +63,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
     id: 'iron-pass',
     name: 'Iron Pass',
     goldPerEnemy: 1,
+    goldEveryKills: 2,
     xpPerEnemy: 1,
     rubyPerFirstClear: 0,
     waves: [
@@ -136,6 +138,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
     id: 'the-maw',
     name: 'The Maw',
     goldPerEnemy: 1,
+    goldEveryKills: 2,
     xpPerEnemy: 1,
     rubyPerFirstClear: 0,
     waves: [
@@ -211,7 +214,7 @@ describe('live dungeon content', () => {
       [
         'Dungeon 3: The Maw [the-maw]',
         'Unlock: clear iron-pass',
-        'Rewards: gold 1/enemy, XP 1/enemy, ruby 0/first clear',
+        'Rewards: gold 1/2 enemies, XP 1/enemy, ruby 0/first clear',
         'Visual: the-maw',
         'Wave 1:',
         '  2x Ash Husk [ash-husk] — HP 4, auto 1/3000ms, boss no, overrides hp=4',
@@ -235,7 +238,7 @@ describe('content diagnostics', () => {
       dungeons: [
         {
           ...CONTENT_CATALOGS.dungeons[0],
-          rewards: { goldPerEnemy: 0, xpPerEnemy: 0, rubyPerFirstClear: 0 },
+          rewards: { goldPerEnemy: 0, goldEveryKills: 2, xpPerEnemy: 0, rubyPerFirstClear: 0 },
           waves: [
             {
               enemies: [
@@ -351,7 +354,7 @@ describe('content diagnostics', () => {
         name: 'Broken',
         order: 1,
         unlock: { kind: 'dungeonClear', dungeonId: 'broken' },
-        rewards: { goldPerEnemy: 0, xpPerEnemy: 1, rubyPerFirstClear: 1 },
+        rewards: { goldPerEnemy: 0, goldEveryKills: 2, xpPerEnemy: 1, rubyPerFirstClear: 1 },
         visualKey: 'broken',
         waves: [
           { enemies: [{ mobId: 'boss', count: 1 }] },

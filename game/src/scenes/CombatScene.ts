@@ -82,6 +82,12 @@ const BOSS_UNIT_HEIGHT = 112;
 const WAVE_TEXT_Y = 20;
 const REWARDS_X = 14;
 const REWARDS_Y = 14;
+const FOCUS_CALLOUT_Y = 82;
+const WAVE_BANNER_Y = 128;
+const WAVE_BANNER_WIDTH = 280;
+const WAVE_BANNER_HEIGHT = 42;
+const WAVE_BANNER_HOLD_MS = 650;
+const WAVE_BANNER_FADE_MS = 350;
 
 const PLAYER_CAST_BAR_WIDTH = 320;
 const PLAYER_CAST_BAR_HEIGHT = 20;
@@ -110,6 +116,8 @@ const TOAST_FADE_MS = 1500;
 
 const OVERLAY_DEPTH = 1000;
 const OVERLAY_ALPHA = 0.85;
+const OVERLAY_FADE_MS = 250;
+const RESULT_REVEAL_MS = 220;
 
 const DIGIT_KEY_NAMES = ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE'] as const;
 
@@ -153,6 +161,9 @@ export class CombatScene extends Phaser.Scene {
 
   private waveText!: Phaser.GameObjects.Text;
   private rewardsText!: Phaser.GameObjects.Text;
+  private focusCalloutText!: Phaser.GameObjects.Text;
+  private waveBanner!: Phaser.GameObjects.Container;
+  private waveBannerText!: Phaser.GameObjects.Text;
 
   private combatLog!: CombatLog;
   /** id → display name for every unit ever seen this combat — log lines can reference units
@@ -224,7 +235,7 @@ export class CombatScene extends Phaser.Scene {
       this.sceneData.loadout.cooldowns,
       (cooldownId) => this.onCooldownActivate(cooldownId),
     );
-    this.registerHotkeys(spells);
+    this.registerHotkeys(spells, this.sceneData.loadout.cooldowns);
     this.registerEscapeKey();
 
     const available = this.sceneData.loadout.paceMultipliersTenths;
@@ -333,6 +344,27 @@ export class CombatScene extends Phaser.Scene {
     this.rewardsText = this.add
       .text(REWARDS_X, REWARDS_Y, '', { fontFamily: HUD_FONT, fontSize: '14px', color: '#f2c14e' })
       .setOrigin(0, 0);
+    this.focusCalloutText = this.add
+      .text(VIEW_WIDTH / 2, FOCUS_CALLOUT_Y, '', {
+        fontFamily: HUD_FONT,
+        fontSize: '15px',
+        color: '#e05a4e',
+      })
+      .setStroke('#0a0605', 3)
+      .setOrigin(0.5)
+      .setDepth(90)
+      .setVisible(false);
+
+    const bannerBg = this.add
+      .rectangle(0, 0, WAVE_BANNER_WIDTH, WAVE_BANNER_HEIGHT, 0x241a15, 0.92)
+      .setStrokeStyle(2, 0x8a7868);
+    this.waveBannerText = this.add
+      .text(0, 0, '', { fontFamily: HUD_FONT, fontSize: '22px', color: '#e8d8c8' })
+      .setOrigin(0.5);
+    this.waveBanner = this.add
+      .container(VIEW_WIDTH / 2, WAVE_BANNER_Y, [bannerBg, this.waveBannerText])
+      .setDepth(80)
+      .setAlpha(0);
   }
 
   private buildCastBars(): void {
@@ -387,13 +419,18 @@ export class CombatScene extends Phaser.Scene {
     this.tweens.add({ targets: this.toastText, alpha: 0, duration: TOAST_FADE_MS });
   }
 
-  private registerHotkeys(spells: SpellDef[]): void {
+  private registerHotkeys(spells: SpellDef[], cooldowns: CombatSceneData['loadout']['cooldowns']): void {
     const keyboard = this.input.keyboard;
     if (!keyboard) return;
     spells.forEach((spell, i) => {
       const keyName = DIGIT_KEY_NAMES[i];
       if (!keyName) return;
       keyboard.on(`keydown-${keyName}`, () => this.onSpellCast(spell.id));
+    });
+    cooldowns.forEach((cooldown, i) => {
+      const keyName = DIGIT_KEY_NAMES[spells.length + i];
+      if (!keyName) return;
+      keyboard.on(`keydown-${keyName}`, () => this.onCooldownActivate(cooldown.id));
     });
   }
 
@@ -426,6 +463,8 @@ export class CombatScene extends Phaser.Scene {
    *  silently ignores unknown ids and re-activation while still on cooldown. */
   private onCooldownActivate(cooldownId: string): void {
     if (this.engine.state.status !== 'running') return;
+    const cooldown = this.engine.state.cooldowns.find((state) => state.id === cooldownId);
+    if (!cooldown || cooldown.remainingCooldownMs > 0) return;
     this.engine.activateCooldown(cooldownId);
     this.syncView();
   }
@@ -482,6 +521,9 @@ export class CombatScene extends Phaser.Scene {
           // Tunnel Vision channel begins on one party member (alpha-0.1 §D3).
           // The telegraph's bossCastFinished already fired the small shake.
           this.findSprite(event.targetId)?.setBossFocused(true);
+          this.focusCalloutText
+            .setText(`TUNNEL VISION — FOCUSED: ${this.resolveUnitName(event.targetId)}`)
+            .setVisible(true);
           this.combatLog.push(
             `${this.formatTimestamp()} ${this.encounter.boss.name} fixates on ${this.resolveUnitName(event.targetId)} — ${event.name}!`,
           );
@@ -491,6 +533,7 @@ export class CombatScene extends Phaser.Scene {
         // event (float + log line), and 10 extra lines/shakes in 10s is noise.
         case 'bossFocusEnded': {
           this.findSprite(event.targetId)?.setBossFocused(false);
+          this.focusCalloutText.setVisible(false).setText('');
           this.combatLog.push(`${this.formatTimestamp()} ${event.name} ends.`);
           break;
         }
@@ -513,12 +556,14 @@ export class CombatScene extends Phaser.Scene {
         }
         case 'waveStarted':
           this.rebuildEnemies(this.engine.state.enemies);
+          this.showWaveBanner(event.waveIndex);
           break;
         case 'combatEnded':
           // A channel can be live when the fight ends (e.g. boss dies mid-
           // Tunnel-Vision) — the engine stops before emitting bossFocusEnded,
           // so clear any lingering brand before the overlay.
           this.partySprites.forEach((sprite) => sprite.setBossFocused(false));
+          this.focusCalloutText.setVisible(false).setText('');
           if (isFinalStatus(event.status)) this.showResultOverlay(event.status);
           break;
         default:
@@ -544,6 +589,21 @@ export class CombatScene extends Phaser.Scene {
   /** Combat-log timestamp from the scene-side elapsed-ms accumulator, e.g. `[12.3s]`. */
   private formatTimestamp(): string {
     return `[${(this.elapsedMs / 1000).toFixed(1)}s]`;
+  }
+
+  /** Presentation-only wave announcement; the engine continues advancing throughout. */
+  private showWaveBanner(waveIndex: number): void {
+    const label = waveIndex < this.encounter.waves.length ? `WAVE ${waveIndex + 1}` : 'BOSS WAVE';
+    this.tweens.killTweensOf(this.waveBanner);
+    this.waveBannerText.setText(label);
+    this.waveBanner.setAlpha(1);
+    this.tweens.add({
+      targets: this.waveBanner,
+      alpha: 0,
+      delay: WAVE_BANNER_HOLD_MS,
+      duration: WAVE_BANNER_FADE_MS,
+      ease: 'Quad.easeIn',
+    });
   }
 
   // ---- per-frame sync ---------------------------------------------------------
@@ -636,41 +696,68 @@ export class CombatScene extends Phaser.Scene {
     const centerX = VIEW_WIDTH / 2;
     const centerY = VIEW_HEIGHT / 2;
 
-    this.add
-      .rectangle(centerX, centerY, VIEW_WIDTH, VIEW_HEIGHT, 0x000000, OVERLAY_ALPHA)
+    const backdrop = this.add
+      .rectangle(centerX, centerY, VIEW_WIDTH, VIEW_HEIGHT, 0x000000)
       .setDepth(OVERLAY_DEPTH)
-      .setInteractive();
+      .setInteractive()
+      .setAlpha(0);
 
     const title = status === 'victory' ? 'VICTORY' : 'YOU WIPED';
     const titleColor = status === 'victory' ? '#f2c14e' : '#e05a4e';
-    this.add
+    const titleText = this.add
       .text(centerX, centerY - 60, title, { fontFamily: HUD_FONT, fontSize: '36px', color: titleColor })
       .setOrigin(0.5)
-      .setDepth(OVERLAY_DEPTH + 1);
+      .setDepth(OVERLAY_DEPTH + 1)
+      .setAlpha(0);
 
-    this.add
+    const rewardsText = this.add
       .text(centerX, centerY - 10, `Gold +${gold}   XP +${xp}`, {
         fontFamily: HUD_FONT,
         fontSize: '18px',
         color: '#e8d8c8',
       })
       .setOrigin(0.5)
-      .setDepth(OVERLAY_DEPTH + 1);
+      .setDepth(OVERLAY_DEPTH + 1)
+      .setAlpha(0);
 
-    this.add
+    const returnButton = this.add
       .rectangle(centerX, centerY + 60, 180, 44, 0x3a2a22)
       .setStrokeStyle(1, 0x0a0605)
       .setDepth(OVERLAY_DEPTH + 1)
       .setInteractive({ useHandCursor: true })
       .setName('combatReturn')
+      .setAlpha(0)
       .on('pointerdown', () => {
         const combatResult: CombatResult = { encounterId: this.sceneData.encounterId, status, gold, xp };
         this.scene.start(this.sceneData.returnTo, { combatResult });
       });
 
-    this.add
+    const returnText = this.add
       .text(centerX, centerY + 60, 'Return', { fontFamily: HUD_FONT, fontSize: '16px', color: '#e8d8c8' })
       .setOrigin(0.5)
-      .setDepth(OVERLAY_DEPTH + 2);
+      .setDepth(OVERLAY_DEPTH + 2)
+      .setAlpha(0);
+
+    // All result objects (especially combatReturn) exist immediately; only
+    // their presentation is staged, so semantic journey lookup remains stable.
+    this.tweens.add({ targets: backdrop, alpha: OVERLAY_ALPHA, duration: OVERLAY_FADE_MS });
+    this.tweens.add({
+      targets: titleText,
+      alpha: 1,
+      delay: 100,
+      duration: RESULT_REVEAL_MS,
+    });
+    this.tweens.add({
+      targets: rewardsText,
+      alpha: 1,
+      delay: 220,
+      duration: RESULT_REVEAL_MS,
+    });
+    this.tweens.add({
+      targets: [returnButton, returnText],
+      alpha: 1,
+      delay: 340,
+      duration: RESULT_REVEAL_MS,
+    });
   }
 }

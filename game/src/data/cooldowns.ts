@@ -15,12 +15,12 @@ export const STILL_WATERS: CooldownDef = {
   effect: { kind: 'freeNextHeal' },
 };
 
-/** Zealot CD: a 30s tempo window where heals cost 1 less mana (min 0). */
+/** Zealot CD: a 30s tempo window, followed by 10s of recovery before reuse. */
 export const FRENZIED_LITURGY: CooldownDef = {
   id: 'frenzied-liturgy',
   name: 'Frenzied Liturgy',
   description: 'For 30s, heals cost 1 less mana.',
-  cooldownMs: 30_000,
+  cooldownMs: 40_000,
   effect: { kind: 'manaCostReduction', durationMs: 30_000, costReduction: 1 },
 };
 

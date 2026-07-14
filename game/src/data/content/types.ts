@@ -77,6 +77,7 @@ export type DungeonUnlockRequirement =
 
 export interface DungeonRewardsDef {
   goldPerEnemy: number;
+  goldEveryKills: number;
   xpPerEnemy: number;
   rubyPerFirstClear: number;
 }

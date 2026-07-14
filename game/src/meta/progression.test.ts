@@ -143,21 +143,21 @@ describe('buildLoadout', () => {
   });
 
   it('scales bonusMaxMana with deep-reserves ranks', () => {
-    expect(buildLoadout(save({ treeRanks: { 'deep-reserves': 1 } })).bonusMaxMana).toBe(5);
-    expect(buildLoadout(save({ treeRanks: { 'deep-reserves': 5 } })).bonusMaxMana).toBe(25);
+    expect(buildLoadout(save({ treeRanks: { 'deep-reserves': 1 } })).bonusMaxMana).toBe(6);
+    expect(buildLoadout(save({ treeRanks: { 'deep-reserves': 5 } })).bonusMaxMana).toBe(30);
   });
 
   it('emits synergies scaled by ranks', () => {
     const s = save({ treeRanks: { 'zealot-oath': 1, 'zealot-fervent-chain': 2 }, subclass: 'zealot' });
     expect(buildLoadout(s).synergies).toEqual([
-      { triggerSpellId: 'zealous-mending', buffedSpellId: 'zealous-flare', bonusHeal: 2 },
+      { triggerSpellId: 'zealous-mending', buffedSpellId: 'zealous-flare', bonusHeal: 4 },
     ]);
   });
 
   it('emits full-health bonuses from Steady Hands (Alpha 0.1 §D4, replaces retired Desperate Zeal)', () => {
     const s = save({ treeRanks: { 'zealot-oath': 1, 'zealot-steady-hands': 1 }, subclass: 'zealot' });
     expect(buildLoadout(s).fullHealthBonuses).toEqual([
-      { spellId: 'zealous-mending', hpPctAtLeast: 80, bonusHeal: 1 },
+      { spellId: 'zealous-mending', hpPctAtLeast: 80, bonusHeal: 2 },
     ]);
   });
 
@@ -178,7 +178,7 @@ describe('buildLoadout', () => {
     });
     buildLoadout(s);
     expect(SPELLS.solemnVigil.castMs).toBe(3000);
-    expect(SPELLS.solemnVigil.mana).toBe(7);
+    expect(SPELLS.solemnVigil.mana).toBe(5);
   });
 
   it('ignores unknown tree node ids and unknown spell ids', () => {

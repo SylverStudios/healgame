@@ -7,6 +7,7 @@ export const ASH_GATE_DUNGEON = {
   unlock: { kind: 'always' },
   rewards: {
     goldPerEnemy: 1,
+    goldEveryKills: 2,
     xpPerEnemy: 1,
     rubyPerFirstClear: 1,
   },

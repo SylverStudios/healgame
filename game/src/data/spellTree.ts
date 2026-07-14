@@ -82,6 +82,7 @@ function rankSpot(args: {
   costs: { currency: string; amount: number }[];
   requiresFirst?: NodeDef['requires'];
   exclusiveGroup?: string;
+  exclusiveGroupFirst?: string;
   contentForRank: (rank: number) => SpellTreeContent;
 }): { nodes: NodeDef[]; spot: SpotDef } {
   const nodes: NodeDef[] = [];
@@ -97,6 +98,7 @@ function rankSpot(args: {
     };
     if (rank === 1 && args.requiresFirst !== undefined) node.requires = args.requiresFirst;
     if (args.exclusiveGroup !== undefined) node.exclusiveGroup = args.exclusiveGroup;
+    if (rank === 1 && args.exclusiveGroupFirst !== undefined) node.exclusiveGroup = args.exclusiveGroupFirst;
     nodes.push(node);
   }
   return { nodes, spot: { id: args.spotId, chain } };
@@ -109,8 +111,8 @@ const deepReserves = rankSpot({
   costs: Array.from({ length: 5 }, () => ({ currency: 'gold', amount: 5 })),
   contentForRank: () => ({
     name: 'Deep Reserves',
-    description: '+5 max mana per rank',
-    effect: { kind: 'bonusMaxMana', amount: 5 },
+    description: '+6 max mana per rank',
+    effect: { kind: 'bonusMaxMana', amount: 6 },
   }),
 });
 
@@ -172,32 +174,36 @@ const warpedTempoViaZealot: NodeDef = {
   }),
 };
 
+const VIGIL_SPECIALIZATION_GROUP = 'vigil-specialization';
+
 const patientVow = rankSpot({
   spotId: 'vigil-patient-vow',
   idPrefix: 'vigil-patient-vow',
   ranks: 3,
   costs: Array.from({ length: 3 }, () => ({ currency: 'gold', amount: 3 })),
   requiresFirst: { mode: 'all', nodes: ['vigil-oath'] },
+  exclusiveGroupFirst: VIGIL_SPECIALIZATION_GROUP,
   contentForRank: () => ({
     name: 'Patient Vow',
-    description: `Each ${SPELLS.solemnMend.name} arms +1 heal per rank on your next ${SPELLS.solemnVigil.name}.`,
+    description: `Power path: each ${SPELLS.solemnMend.name} arms +2 heal per rank on your next ${SPELLS.solemnVigil.name}. Locks Measured Devotion.`,
     subclass: 'vigil',
     effect: {
       kind: 'synergy',
       triggerSpellId: SPELLS.solemnMend.id,
       buffedSpellId: SPELLS.solemnVigil.id,
-      bonusHeal: 1,
+      bonusHeal: 2,
     },
   }),
 });
 
 const measuredDevotion: NodeDef = {
   id: 'vigil-measured-devotion',
+  exclusiveGroup: VIGIL_SPECIALIZATION_GROUP,
   requires: { mode: 'all', nodes: ['vigil-oath'] },
   cost: { currency: 'gold', amount: 4 },
   content: content({
     name: 'Measured Devotion',
-    description: `${SPELLS.solemnVigil.name} casts 1.0s slower and costs 3 less mana.`,
+    description: `Efficiency path: ${SPELLS.solemnVigil.name} casts 1.0s slower and costs 3 less mana. Locks Patient Vow.`,
     subclass: 'vigil',
     effect: {
       kind: 'castMod',
@@ -216,13 +222,13 @@ const ferventChain = rankSpot({
   requiresFirst: { mode: 'all', nodes: ['zealot-oath'] },
   contentForRank: () => ({
     name: 'Fervent Chain',
-    description: `Each ${SPELLS.zealousMending.name} arms +1 heal per rank on your next ${SPELLS.zealousFlare.name}.`,
+    description: `Each ${SPELLS.zealousMending.name} arms +2 heal per rank on your next ${SPELLS.zealousFlare.name}.`,
     subclass: 'zealot',
     effect: {
       kind: 'synergy',
       triggerSpellId: SPELLS.zealousMending.id,
       buffedSpellId: SPELLS.zealousFlare.id,
-      bonusHeal: 1,
+      bonusHeal: 2,
     },
   }),
 });
@@ -259,13 +265,13 @@ const steadyHands: NodeDef = {
   cost: { currency: 'gold', amount: 5 },
   content: content({
     name: 'Steady Hands',
-    description: `${SPELLS.zealousMending.name}: +1 heal when the target is at 80%+ health`,
+    description: `${SPELLS.zealousMending.name}: +2 heal when the target is at 80%+ health`,
     subclass: 'zealot',
     effect: {
       kind: 'fullHealthBonus',
       spellId: SPELLS.zealousMending.id,
       hpPctAtLeast: 80,
-      bonusHeal: 1,
+      bonusHeal: 2,
     },
   }),
 };
@@ -292,9 +298,9 @@ const vigilDeepWell: NodeDef = {
   cost: { currency: 'gold', amount: 5 },
   content: content({
     name: 'Deep Well',
-    description: '+4 max mana',
+    description: '+6 max mana',
     subclass: 'vigil',
-    effect: { kind: 'bonusMaxMana', amount: 4 },
+    effect: { kind: 'bonusMaxMana', amount: 6 },
   }),
 };
 
@@ -350,9 +356,9 @@ const zealotSpendthriftGrace: NodeDef = {
   cost: { currency: 'gold', amount: 6 },
   content: content({
     name: 'Spendthrift Grace',
-    description: '+3 max mana',
+    description: '+5 max mana',
     subclass: 'zealot',
-    effect: { kind: 'bonusMaxMana', amount: 3 },
+    effect: { kind: 'bonusMaxMana', amount: 5 },
   }),
 };
 

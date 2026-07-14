@@ -273,6 +273,8 @@ export interface EncounterDef {
   name: string;
   /** Resolved catalog rewards; legacy synthetic encounters fall back to reward constants. */
   goldPerEnemy?: number;
+  /** Award one gold bundle after each N defeated enemies. */
+  goldEveryKills?: number;
   xpPerEnemy?: number;
   rubyPerFirstClear?: number;
   waves: WaveDef[];

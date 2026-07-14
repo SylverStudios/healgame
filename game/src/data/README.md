@@ -1,6 +1,6 @@
 # Dungeon content authoring
 
-Status: current · Authority: enemy ability, mob, dungeon, validation, assembly, and preview contracts · Last verified: 2026-07-13
+Status: current · Authority: enemy ability, mob, dungeon, validation, assembly, and preview contracts · Last verified: 2026-07-14
 
 Dungeon content is typed TypeScript data. The game and authoring tools consume
 the same validated catalogs; there is no generated file or second JSON/YAML
@@ -32,6 +32,11 @@ source of truth.
 Use `statOverrides` only for encounter tuning that intentionally differs from
 a mob's base profile. Preview output always prints effective values and calls
 out overrides.
+
+Dungeon rewards keep XP per enemy, while `goldEveryKills` controls the integer
+gold-drop cadence. With `goldPerEnemy: 1` and `goldEveryKills: 2`, kills 2, 4,
+6, and so on each award 1 gold; an unmatched final kill does not award a
+partial bundle.
 
 ## Integration checklist
 

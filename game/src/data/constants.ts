@@ -35,16 +35,18 @@ export const MERCS = {
 } as const;
 
 export const SPELLS = {
-  solemnMend: { id: 'solemn-mend', name: 'Solemn Mend', heal: 5, mana: 5, castMs: 2000 },
-  zealousMending: { id: 'zealous-mending', name: 'Zealous Mending', heal: 6, mana: 6, castMs: 1000 },
+  solemnMend: { id: 'solemn-mend', name: 'Solemn Mend', heal: 4, mana: 3, castMs: 2000 },
+  zealousMending: { id: 'zealous-mending', name: 'Zealous Mending', heal: 4, mana: 4, castMs: 1000 },
   /** Vigil subclass spell (phase-2-handoff): slow, efficient. Granted by the vigil-oath tree node. */
-  solemnVigil: { id: 'solemn-vigil', name: 'Solemn Vigil', heal: 9, mana: 7, castMs: 3000 },
+  solemnVigil: { id: 'solemn-vigil', name: 'Solemn Vigil', heal: 6, mana: 5, castMs: 3000 },
   /** Zealot subclass spell (phase-2-handoff): fast, pricey per point. Granted by the zealot-oath tree node. */
-  zealousFlare: { id: 'zealous-flare', name: 'Zealous Flare', heal: 3, mana: 4, castMs: 500 },
+  zealousFlare: { id: 'zealous-flare', name: 'Zealous Flare', heal: 2, mana: 2, castMs: 500 },
 } as const;
 
 export const REWARDS = {
   goldPerEnemy: 1,
+  /** Gold drops in integer bundles after this many defeated enemies. */
+  goldEveryKills: 2,
   xpPerEnemy: 1,
   rubyPerFirstClear: 1,
   /**

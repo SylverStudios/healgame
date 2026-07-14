@@ -8,6 +8,7 @@
 import Phaser from 'phaser';
 import type { CooldownDef, CooldownState, SpellDef } from '../combat/types';
 import type { CombatMods } from '../data/spellTree';
+import { buildCooldownTooltipLines } from './cooldownTooltip';
 import { SpellTooltip, buildTooltipLines } from './spellTooltip';
 
 const BUTTON_WIDTH = 160;
@@ -144,44 +145,73 @@ class SpellButton {
  */
 class CooldownButton {
   readonly cooldownId: string;
+  readonly centerX: number;
+  readonly topY: number;
 
   private readonly bg: Phaser.GameObjects.Rectangle;
+  private readonly keycap: Phaser.GameObjects.Rectangle;
   private readonly nameText: Phaser.GameObjects.Text;
   private readonly timerText: Phaser.GameObjects.Text;
+  private readonly hotkeyText: Phaser.GameObjects.Text;
   private ready = true;
+  private combatRunning = true;
   private armed = false;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, def: CooldownDef, onClick: (cooldownId: string) => void) {
+  constructor(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    def: CooldownDef,
+    hotkeyLabel: string,
+    onClick: (cooldownId: string) => void,
+    onHoverStart: (cooldownId: string, centerX: number, topY: number) => void,
+    onHoverEnd: () => void,
+  ) {
     this.cooldownId = def.id;
+    this.centerX = x;
+    this.topY = y - CD_BUTTON_HEIGHT / 2;
 
     this.bg = scene.add
       .rectangle(x, y, CD_BUTTON_WIDTH, CD_BUTTON_HEIGHT, BUTTON_BG_COLOR)
       .setStrokeStyle(BUTTON_BORDER_WIDTH, BUTTON_BORDER_COLOR)
-      .setInteractive({ useHandCursor: true });
+      .setInteractive({ useHandCursor: true })
+      .setName(`combatCooldown:${def.id}`);
     this.bg.on('pointerdown', () => {
-      if (this.ready) onClick(this.cooldownId);
+      if (this.ready && this.combatRunning) onClick(this.cooldownId);
     });
+    this.bg.on('pointerover', () => onHoverStart(this.cooldownId, this.centerX, this.topY));
+    this.bg.on('pointerout', () => onHoverEnd());
+
+    const keycapX = x - CD_BUTTON_WIDTH / 2 + 6 + KEYCAP_SIZE / 2;
+    const keycapY = y - CD_BUTTON_HEIGHT / 2 + 6 + KEYCAP_SIZE / 2;
+    this.keycap = scene.add
+      .rectangle(keycapX, keycapY, KEYCAP_SIZE, KEYCAP_SIZE, KEYCAP_BG)
+      .setStrokeStyle(1, KEYCAP_BORDER);
 
     this.nameText = scene.add
-      .text(x, y - 10, def.name, {
+      .text(x + 8, y - 10, def.name, {
         fontFamily: CD_NAME_FONT,
         color: NAME_COLOR,
         align: 'center',
-        wordWrap: { width: CD_NAME_WRAP_WIDTH },
+        wordWrap: { width: CD_NAME_WRAP_WIDTH - 16 },
       })
       .setOrigin(0.5);
     this.timerText = scene.add
       .text(x, y + 14, '', { fontFamily: CD_TIMER_FONT, color: CD_TIMER_COLOR })
       .setOrigin(0.5)
       .setVisible(false);
+    this.hotkeyText = scene.add
+      .text(keycapX, keycapY, hotkeyLabel, {
+        fontFamily: HOTKEY_FONT,
+        color: HOTKEY_COLOR,
+      })
+      .setOrigin(0.5);
   }
 
   /** Reflects one CooldownState snapshot: dimmed + seconds while on cooldown, accent border while a buff is active. */
   update(state: CooldownState): void {
     this.ready = state.remainingCooldownMs <= 0;
-    const alpha = this.ready ? 1 : BUTTON_DISABLED_ALPHA;
-    this.bg.setAlpha(alpha);
-    this.nameText.setAlpha(alpha);
+    this.updateAvailability();
     this.timerText.setVisible(!this.ready);
     if (!this.ready) this.timerText.setText(`${Math.ceil(state.remainingCooldownMs / 1000)}s`);
 
@@ -192,10 +222,26 @@ class CooldownButton {
     }
   }
 
+  setCombatRunning(isRunning: boolean): void {
+    this.combatRunning = isRunning;
+    this.updateAvailability();
+  }
+
+  private updateAvailability(): void {
+    const alpha = this.ready && this.combatRunning ? 1 : BUTTON_DISABLED_ALPHA;
+    this.bg.setAlpha(alpha);
+    this.keycap.setAlpha(alpha);
+    this.nameText.setAlpha(alpha);
+    this.timerText.setAlpha(this.combatRunning ? 1 : BUTTON_DISABLED_ALPHA);
+    this.hotkeyText.setAlpha(alpha);
+  }
+
   destroy(): void {
     this.bg.destroy();
+    this.keycap.destroy();
     this.nameText.destroy();
     this.timerText.destroy();
+    this.hotkeyText.destroy();
   }
 }
 
@@ -226,6 +272,11 @@ export class SpellBar {
       this.tooltip.show(buttonCenterX, buttonTopY, buildTooltipLines(spell, loadout));
     };
     const hideTooltip = (): void => this.tooltip.hide();
+    const showCooldownTooltip = (cooldownId: string, buttonCenterX: number, buttonTopY: number): void => {
+      const cooldown = cooldowns.find((c) => c.id === cooldownId);
+      if (!cooldown) return;
+      this.tooltip.show(buttonCenterX, buttonTopY, buildCooldownTooltipLines(cooldown));
+    };
 
     const totalWidth = spells.length * BUTTON_WIDTH + Math.max(0, spells.length - 1) * BUTTON_GAP;
     const startX = centerX - totalWidth / 2 + BUTTON_WIDTH / 2;
@@ -239,7 +290,18 @@ export class SpellBar {
       const cdStartX = lastSpellRightEdge + CD_GROUP_GAP + CD_BUTTON_WIDTH / 2;
       cooldowns.forEach((def, i) => {
         const x = cdStartX + i * (CD_BUTTON_WIDTH + CD_BUTTON_GAP);
-        this.cooldownButtons.push(new CooldownButton(scene, x, y, def, onCooldownClick));
+        this.cooldownButtons.push(
+          new CooldownButton(
+            scene,
+            x,
+            y,
+            def,
+            `${spells.length + i + 1}`,
+            onCooldownClick,
+            showCooldownTooltip,
+            hideTooltip,
+          ),
+        );
       });
     }
   }
@@ -251,6 +313,7 @@ export class SpellBar {
       const enabled = isRunning && hasTarget && canAfford;
       button.setCastability(enabled, canAfford);
     }
+    for (const button of this.cooldownButtons) button.setCombatRunning(isRunning);
   }
 
   /** Accent border on buttons whose spell id has an armed synergy buffing it (handoff §E). */

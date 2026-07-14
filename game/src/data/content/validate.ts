@@ -227,6 +227,13 @@ export function validateContent(catalogs: ContentCatalogs): ContentValidationRes
         );
       }
     });
+    if (!isPositiveInteger(dungeon.rewards.goldEveryKills)) {
+      error(
+        'invalid-positive-integer',
+        `${path}.rewards.goldEveryKills`,
+        'goldEveryKills must be a positive integer',
+      );
+    }
     checkVisualKey(dungeon.visualKey, `${path}.visualKey`);
     if (dungeon.unlock.kind === 'dungeonClear') {
       const target = dungeonById.get(dungeon.unlock.dungeonId);

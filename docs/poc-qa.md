@@ -1,6 +1,6 @@
 # PoC QA — journey checklist & verification
 
-Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-13
+Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-14
 
 **Date:** 2026-07-08 · **Verdict: PoC complete.** Every poc-spec §1 criterion is
 implemented, and all of them are enforced by automated gates that run headless.
@@ -623,3 +623,57 @@ pick cards use the same glyph language.
 
 Semantic targets: `runMod:<id>` (e.g. `runMod:vigil-oath`,
 `runMod:triage-bell`). Former `hubRelicIcon` name retired.
+
+---
+
+# v0.1.1 playtest improvements (2026-07-13)
+
+The post-Alpha playtest pass keeps progression and combat rules intact except
+for the Frenzied Liturgy cadence below:
+
+- Cooldown buttons now match spells with hover details, sequential number
+  hotkeys, and `combatCooldown:<id>` semantic targets.
+- Tunnel Vision keeps a top-screen focused-ally callout throughout its channel
+  and marks that ally with a crimson crosshair distinct from heal targeting.
+- Wave changes announce themselves without pausing simulation; victory/wipe
+  results fade and reveal in stages while `combatReturn` exists immediately.
+- Hub currencies use one compact summary and unlocked dungeons share a bounded
+  row above Spell Tree and Restart, eliminating the two-dungeon collision.
+- Spell-tree nodes and spacing are more compact, with stronger title/header
+  contrast; graph behavior, tooltips, scrolling, and purchases are unchanged.
+- Relic hover required no duplicate work: the merged shared run-mods bar
+  already exposes oath and relic details on Hub, Combat, and Tree.
+
+Frenzied Liturgy keeps its 30s mana-cost-reduction window, but its cooldown is
+now **40s**, creating a 10s post-expiry recovery window. A temporary diagnostic
+ran the existing maxed-Zealot Iron Pass bot unchanged across every integer
+candidate from 31–45s: 31–43s preserved its pinned victory, while 44–45s wiped.
+The round 40s cadence makes activation timing matter while retaining a safety
+margin above that failure boundary. Deterministic cooldown tests pin expiry
+with 10s still remaining, rejection during recovery, and reactivation only at
+the exact 40s boundary.
+
+---
+
+# Healing, economy, and tree-impact retune (2026-07-14)
+
+Post-playtest tuning makes heals cheaper to press but smaller per cast:
+Solemn Mend **4 heal / 3 mana**, Zealous Mending **4/4**, Solemn Vigil
+**6/5**, and Zealous Flare **2/2**. Cast times are unchanged.
+
+Vigil now makes a permanent branch choice: Patient Vow is the power path
+(+2 armed heal per rank), while Measured Devotion is the efficiency path
+(Vigil +1s cast, -3 mana). Their shared `vigil-specialization` exclusive group
+prevents stacking both. Balance gates cover both maxed Vigil specializations
+independently.
+
+Tree prices are unchanged; lower gold income slows completion without making
+individual purchases feel farther away. Node effects are more visible:
+Deep Reserves grants **+6 mana/rank**, three-rank synergies grant
+**+2 heal/rank**, Deep Well grants +6 mana, Spendthrift Grace +5, and Steady
+Hands +2 heal.
+
+Gold now drops in one-gold bundles every **2 enemy kills** while XP still
+accrues every kill. Full-clear gold falls from 6→3 in Ash Gate and 13→6 in
+Iron Pass; wipe earnings remain banked. The content schema exposes this as
+`goldEveryKills`.

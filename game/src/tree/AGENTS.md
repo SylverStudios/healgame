@@ -1,6 +1,6 @@
 # Skill tree — agent notes
 
-Status: current · Authority: skill-tree service + live SPELL_TREE wiring · Last verified: 2026-07-13
+Status: current · Authority: skill-tree service + live SPELL_TREE wiring · Last verified: 2026-07-14
 
 Config-driven tree service (`game/src/tree/`) plus the live spell-tree data and
 combat resolve (`game/src/data/spellTree.ts`). Phaser stays out of this folder.
@@ -43,8 +43,9 @@ paths — do not extend them.
    `maxRanks` / `amountPerRank` on the service.
 3. Prerequisites: `requires: { mode: 'all' \| 'any', nodes }`. Spot chain order
    also gates later entries. Exactly one root (no requires, first in its spot).
-4. Subclass lockout = `exclusiveGroup` on the oath nodes; UI two-click arm is
-   scene-only (subclass group only), not tree-service state.
+4. Mutually exclusive choices use `exclusiveGroup`. This covers subclass
+   oaths and Vigil's Patient Vow (power) vs Measured Devotion (efficiency).
+   UI two-click arm remains scene-only for the subclass group.
 5. **Forsaken-path consolation:** nodes with `availableIfExclusiveLocked: true`
    in a spot chain are offered when the natural next entry is `exclusive-locked`
    (e.g. `warped-tempo-via-zealot` on the zealot spot after swearing Vigil).

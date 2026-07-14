@@ -35,6 +35,7 @@ and hovers by name — no hard-coded layout coordinates.
 | `treeBack` | back-button rect | `TreeScene.ts` |
 | `combatAlly:<unitId>` | sprite body when clickable | `unitSprite.ts` |
 | `combatSpell:<spellId>` | SpellButton bg rect | `spellBar.ts` |
+| `combatCooldown:<cooldownId>` | CooldownButton bg rect | `spellBar.ts` |
 | `combatReturn` | Return rect in result overlay | `CombatScene.ts` |
 | `combatPaceToggle` | pace control bg | `paceToggle.ts` |
 | `combatLogToggle` | log header text | `combatLog.ts` |
@@ -54,6 +55,6 @@ to canvas px accounting for camera scroll × scrollFactor (TreeScene HUD uses
 
 ## Out of scope (still)
 
-- Party/combat hotkeys as player UX
+- Party-target hotkeys as player UX (spell and cooldown number keys now ship)
 - ScaleManager-aware mapping for arbitrary viewports
 - DOM/a11y overlay, Playwright locators, screenshot diffing

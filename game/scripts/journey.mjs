@@ -459,7 +459,13 @@ try {
       xp: 12,
       unlockedSpells: ['solemn-mend', 'zealous-mending'],
       subclass: 'vigil',
-      treeRanks: { 'deep-reserves': 2, 'vigil-oath': 1, 'vigil-patient-vow': 1, 'warped-tempo-via-zealot': 1 },
+      treeRanks: {
+        'deep-reserves': 2,
+        'vigil-oath': 1,
+        'vigil-patient-vow': 1,
+        'vigil-still-waters': 1,
+        'warped-tempo-via-zealot': 1,
+      },
       clearedDungeons: ['ash-gate'],
     }),
   );
@@ -473,6 +479,13 @@ try {
   await hoverNamed(page, 'combatSpell:solemn-vigil');
   await page.waitForTimeout(400);
   await shot(page, 'combat-solemn-vigil-tooltip');
+  check((await locate(page, 'combatCooldown:still-waters')) !== null, 'Still Waters has a semantic combat target');
+  await hoverNamed(page, 'combatCooldown:still-waters');
+  await page.waitForTimeout(400);
+  await shot(page, 'combat-still-waters-tooltip');
+  await page.keyboard.press('4');
+  await page.waitForTimeout(300);
+  await shot(page, 'combat-still-waters-hotkey-armed');
   await page.mouse.move(480, 270); // off the button (viewport center; not a layout target)
   await page.waitForTimeout(4000); // let autos land for feedback frame
   await shot(page, 'combat-feedback-midfight');
