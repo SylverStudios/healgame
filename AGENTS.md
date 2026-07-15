@@ -64,8 +64,8 @@ agents should prefer `verify`.
 | Kind | Location |
 |------|----------|
 | Living rules | `CLAUDE.md`, `docs/poc-spec.md`, `docs/poc-qa.md` |
-| Active mission | [`docs/oathbound-depth-handoff.md`](docs/oathbound-depth-handoff.md) (`Status: planning` — Alpha 0.2 Oathbound Depth) |
-| Latest shipped phase | `docs/semantic-targets-handoff.md` (`Status: historical`; Alpha 0.1 remains `docs/alpha-0.1-handoff.md`) |
+| Active mission | None; check `docs/*-handoff.md` for a future `Status: planning` handoff |
+| Latest shipped phase | `docs/oathbound-depth-handoff.md` (`Status: historical` — Alpha 0.2 Oathbound Depth; Alpha 0.1 remains `docs/alpha-0.1-handoff.md`) |
 | PoC retrospective | `docs/poc-changelog.md` (`Status: historical`, frozen) |
 | Module contracts | Colocated `AGENTS.md` / `README.md` |
 | Historical | Bannered handoffs / outcomes (or `docs/archive/`) |

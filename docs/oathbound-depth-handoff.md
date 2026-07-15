@@ -1,6 +1,6 @@
 # Alpha 0.2 — Oathbound Depth (Vowstrike crown)
 
-Status: planning · Authority: wins this phase's scope · Last verified: 2026-07-15
+Status: historical · Authority: none — archive / Alpha 0.2 shipped · Last verified: 2026-07-15
 
 **Audience:** a **central agent in a fresh session** who reads this doc end-to-end,
 then **delegates chunks to Sonnet-class subagents** sequentially (parallel only

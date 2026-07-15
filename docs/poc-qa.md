@@ -2,6 +2,8 @@
 
 Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-15
 
+<!-- Alpha 0.2 section appended at end; living amendments win over earlier rows. -->
+
 **Date:** 2026-07-08 · **Verdict: PoC complete.** Every poc-spec §1 criterion is
 implemented, and all of them are enforced by automated gates that run headless.
 (Phase 2 amended subclass UX — see checklist row 7 and Phase 2 section below.)
@@ -748,3 +750,50 @@ Proof add that reused `tunnelVision` (Needle Gaze) with new trash/boss data
 only. Clearable with maxed kits (≥3 alive, Needle Gaze lands ≥1). Inserted
 between Cinder Vault and Black Choir; Black Choir unlocks after Verdant Rift;
 The Maw is Dungeon 6.
+
+---
+
+# Alpha 0.2 — Oathbound Depth (2026-07-15)
+
+Status: current · Last verified: 2026-07-15
+
+Planning bible (now historical): [`oathbound-depth-handoff.md`](./oathbound-depth-handoff.md).
+
+## How to run
+
+```bash
+cd game
+npm install
+npm run verify        # full gate (includes journey)
+npm run content -- balance --all
+npm run content -- validate
+```
+
+## Checklist (done means)
+
+| # | Criterion | Status | Enforced by |
+|---|-----------|--------|-------------|
+| 1 | Level → max mana + combat mana regen; relics stack; no player HoTs | ✅ | `manaBonusesForLevel`, `loadoutFromSave`, `CombatEngineOptions.manaRegen`, progression/engine tests |
+| 2 | Hourglass SPELL_TREE (shared → oath → mid → Vowstrike → crown); pure-mana pads slimmed | ✅ | `spellTree.ts` + tests; Deep Reserves 3 ranks; Deep Well / Spendthrift cut |
+| 3 | `vowstrike-virtue` / `vowstrike-vengeance` instant (`castMs: 0`); oath lightly colors aspect | ✅ | catalog + `engine.instant.test.ts`; `applyOathVowstrikeTwists` |
+| 4 | Placeholder glyphs on tree nodes + combat spell/CD buttons; hover full detail | ✅ | `ui/glyph.ts`, TreeScene, spellBar; tooltip tests |
+| 5 | Ash/mid shape preserved; Black Choir clearable with crown kits (≥3, Soul Toll ≥1); Maw unwinnable ± relic | ✅ | `balance.test.ts` + `npm run content -- balance --all` |
+| 6 | No respec; no status/cleanse this phase | ✅ | scope hold |
+| 7 | Full `npm run verify` green; handoff historical; AGENTS active mission cleared | ✅ | this section + `AGENTS.md` |
+
+## Decisions locked / shipped
+
+1. **Level mana (§D2):** `LEVEL_MANA` in `data/constants.ts`; helper in `data/levelMana.ts` (re-exported from `meta/progression`). +3 max mana per level above 1; regen +1/10s at L2, +1 rank every 3 levels. Engine merges loadout `manaRegen` with relic regen (sum amounts, min interval).
+2. **Instant cast:** `castMs === 0` completes inside `beginCast`; GCD still applies.
+3. **`healBonus` CD kind:** Wrath Ascendant 45s / 12s / +2 heal; stacks after synergy/missing/full/relic healing.
+4. **Save v6:** `healgame-save-v6`; purges v5/v1 keys; no migration.
+5. **Tree hourglass:** spots include `shared-mend-potency`, `shared-zealous-potency`, `vowstrike-*`, `wrath-ascendant`, `vowbound-crown`. Exclusive group `vowstrike-aspect`. Crown amp via `ampOwnedSpells`.
+6. **Oath×aspect twists:** Vigil+Virtue mana−1 Absolution; Vigil+Vengeance missing-health Reckoning; Zealot+Virtue Absolution→Zealous Mending synergy; Zealot+Vengeance Reckoning +1 heal.
+7. **Black Choir:** Dirge Sovereign `statOverrides.hp: 200` (was mob base 260) so crown kits clear under Soul Toll; gate flipped wipe→clear for all oath×aspect kits.
+8. **The Maw:** Hollow King `hp: 9999`; bots treat 10‑min sim cap as wipe (`capAsWipe`). Still unwinnable ± any relic.
+9. **Glyphs:** single-char placeholders (`M/Z/G/F/V/X/S/L/W`…). Tree WORLD_HEIGHT 1080; journey clicks by name.
+10. **QWER stretch parked:** digit hotkeys remain; note for a later pass (handoff §D7).
+
+## Journey notes
+
+Stage B3 scrolls the hourglass and buys Still Waters → shared mid → Virtue Vowstrike → Wrath Ascendant → Vowbound crown (named targets). Cut nodes `vigil-deep-well` / `zealot-spendthrift-grace` are gone.
