@@ -9,17 +9,18 @@ this surface (`engine.ts` + `types.ts`).
 ```ts
 new CombatEngine(encounter: EncounterDef, spells: SpellDef[], options?: {
   bonusMaxMana?: number;
+  manaRegen?: { amount: number; intervalMs: number }; // Alpha 0.2 — merge w/ relic regen
   synergies?: { triggerSpellId: string; buffedSpellId: string; bonusHeal: number }[];
   missingHealthBonuses?: { spellId: string; healPer10PctMissing: number }[];
   missingHealthPctBonuses?: { spellId: string; pctPer10PctMissing: number }[];
   fullHealthBonuses?: { spellId: string; hpPctAtLeast: number; bonusHeal: number }[];
-  cooldowns?: CooldownDef[]; // Alpha 0.1 §D6 — see "Cooldowns" below
+  cooldowns?: CooldownDef[]; // Alpha 0.1 §D6 / 0.2 healBonus — see "Cooldowns" below
 })
 // spells = player's unlocked list; options come from loadoutFromSave / CombatMods
-// (bonusMaxMana, synergies, missing-health/full-health heal rules). castMod is
-// already baked into spell defs by resolveCombatMods — the engine never sees it.
-// Omit options for the pre-tree default (no bonus of any kind) — fully backward
-// compatible.
+// (bonusMaxMana, manaRegen, synergies, missing-health/full-health heal rules).
+// castMod is already baked into spell defs by resolveCombatMods — the engine
+// never sees it. Omit options for the pre-tree default (no bonus of any kind)
+// — fully backward compatible.
 engine.advance(dtMs): CombatEvent[]   // steps the sim; safe for any dt (sub-steps internally)
 engine.setTarget(unitId): void        // click-to-target an ally; ignored if unknown/dead/enemy
 engine.castSpell(spellId): void       // starts, queues, or is silently dropped — see below
@@ -38,6 +39,11 @@ and compiles the ordered dungeon catalog into the engine's resolved
 
 - **Busy time** (locked §10.5): `max(castMs, GCD_MS)` from cast start. `gcdRemainingMs`
   and the cast's `remainingMs` tick in parallel from the same start.
+- **Instant cast** (Alpha 0.2 §D4): `SpellDef.castMs === 0` completes inside
+  `beginCast` on the same call stack (no cast-bar occupancy / no 0ms
+  `remainingMs` stuck in `nextTimerBoundary`). Mana is still reserved at start;
+  GCD still applies; synergy arm/consume and heal bonuses still run through
+  `completePlayerCast`. UI must hide the cast bar when `totalMs === 0`.
 - **Queue**: one slot; `castSpell` while busy queues `{spellId, targetId}` (target
   locked in at queue time), replacing any existing queue entry. Re-validated
   (target alive, mana available) the instant busy ends; dropped silently if it's
@@ -125,11 +131,20 @@ and compiles the ordered dungeon catalog into the engine's resolved
     maxed-Zealot Iron Pass victory and adding readable downtime; a
     future CD with `cooldownMs < durationMs` would still follow the
     reset-not-stack rule.
+  - **Wrath Ascendant shape (`healBonus`)** (Alpha 0.2 §D6): activating opens
+    a `durationMs` window (same timer path as `manaCostReduction` —
+    `buffRemainingMs`, `cooldownBuffEnded` on expiry, re-activate resets).
+    While open, every **completed** player heal adds `bonusHeal` to raw heal
+    **after** synergy / missing-health / missing-health-pct / full-health /
+    relic `bonusHealing`. Multiple open `healBonus` windows sum. A window that
+    expires mid-cast still applies if it was open at completion time (heal
+    bonus is evaluated at complete, not reserved at start).
   - **Interaction**: if a Still Waters charge is armed AND a Frenzied Liturgy
     window is open when a cast starts, **the free charge wins** — reserve 0,
     consume the charge, leave the cost-reduction window untouched (it keeps
     ticking, available for the *next* cast). Affordability while only the
     window is open checks the reduced cost, not the base `spell.mana`.
+    `healBonus` does not affect mana reservation.
   - **UI**: `spellBar.ts` renders one small button per granted cooldown to the
     right of the spell buttons (absent entirely — zero layout shift — when
     the loadout grants none). Dimmed while `remainingCooldownMs > 0`, with
@@ -262,7 +277,9 @@ and compiles the ordered dungeon catalog into the engine's resolved
     big pct-bonus payoffs are near-mutually exclusive — but both are computed
     independently and can land on the same heal (e.g. an 85% target: bands = 1
     pct bonus + the full-health bonus).
-  - All bonus kinds stack additively on the same cast. `castMod` never reaches
+  - All bonus kinds stack additively on the same cast. Raw heal order:
+    `spell.heal + synergy + missingHealth + missingHealthPct + fullHealth +
+    relic bonusHealing + active healBonus CD windows`. `castMod` never reaches
     the engine — `resolveCombatMods` / `loadoutFromSave` already bake it into
     `SpellDef.castMs`/`mana` before spells are handed to the constructor.
 - **Waves/victory/wipe**: a wave clears (and the next spawns) the instant its
@@ -278,6 +295,12 @@ and compiles the ordered dungeon catalog into the engine's resolved
   Effects stack additively; armor floors each hit at 1 and swing intervals at
   100ms. Timed mana regeneration advances on simulation time, preserving
   deterministic `advance(dtMs)` behavior.
+- **Level / loadout mana regen** (Alpha 0.2 §D2): `CombatEngineOptions.manaRegen`
+  merges with relic `manaRegen` — **sum amounts**, **minimum interval** across
+  every contributing source (same rule relic-to-relic already used). There is
+  a single regen ticker; `PARTY.manaRegenPer5s` is retired. Level bonuses are
+  computed by `manaBonusesForLevel` (`meta/progression.ts`) and wired through
+  loadout in a later chunk.
 
 ## Determinism
 

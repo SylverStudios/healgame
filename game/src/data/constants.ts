@@ -10,8 +10,21 @@ export const PARTY = {
   dpsMaxHp: 10,
   healerMaxHp: 15,
   startingMana: 20,
-  /** Harsh: no mana regen in combat for the first dungeon. */
-  manaRegenPer5s: 0,
+} as const;
+
+/**
+ * Alpha 0.2 §D2 — level-derived combat mana. Applied via
+ * `manaBonusesForLevel` → loadout → `CombatEngineOptions` (not player HoTs).
+ */
+export const LEVEL_MANA = {
+  /** Max mana added per level above 1. */
+  poolPerLevel: 3,
+  /** Mana restored each regen tick once any regen ranks are owned. */
+  regenAmountPerRank: 1,
+  regenIntervalMs: 10_000,
+  /** First regen rank at this level; +1 rank every `regenEveryLevels` after. */
+  regenFirstLevel: 2,
+  regenEveryLevels: 3,
 } as const;
 
 export const TRASH = {

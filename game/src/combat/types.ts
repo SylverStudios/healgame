@@ -25,6 +25,8 @@ export interface SpellDef {
   heal: number;
   mana: number;
   castMs: number;
+  /** Alpha 0.2 §D8 — placeholder glyph key/character for tree + spell bar. */
+  glyph?: string;
 }
 
 /**
@@ -78,16 +80,21 @@ export interface FullHealthBonusRule {
 }
 
 /**
- * A cooldown's gameplay effect (Alpha 0.1 §D6 — first major CDs, off-GCD).
+ * A cooldown's gameplay effect (Alpha 0.1 §D6 — first major CDs, off-GCD;
+ * Alpha 0.2 adds `healBonus` for Wrath Ascendant).
  * `freeNextHeal` (Still Waters): arms a charge; the first player cast that
  * STARTS while armed bypasses the affordability check, reserves 0 mana, and
  * consumes the charge at cast start. `manaCostReduction` (Frenzied Liturgy):
  * opens a `durationMs` window (sim time) during which heal casts reserve
- * `max(0, spell.mana - costReduction)` at cast start.
+ * `max(0, spell.mana - costReduction)` at cast start. `healBonus` (Wrath
+ * Ascendant): opens a `durationMs` window during which every completed player
+ * heal adds `bonusHeal` to raw heal **after** synergy / missing-health /
+ * full-health / relic `bonusHealing` (Alpha 0.2 §D6).
  */
 export type CooldownEffect =
   | { kind: 'freeNextHeal' }
-  | { kind: 'manaCostReduction'; durationMs: number; costReduction: number };
+  | { kind: 'manaCostReduction'; durationMs: number; costReduction: number }
+  | { kind: 'healBonus'; durationMs: number; bonusHeal: number };
 
 /** Data-driven cooldown definition (instances live in data/cooldowns.ts). */
 export interface CooldownDef {
@@ -108,9 +115,10 @@ export interface CooldownState {
   /** 0 = ready to activate. */
   remainingCooldownMs: number;
   /**
-   * manaCostReduction: ms left in the buff window. freeNextHeal: `1` while a
-   * charge is armed, `0` otherwise — an armed flag, not a duration (see
-   * combat/README.md). Either way, `> 0` means "show the active-buff accent".
+   * manaCostReduction / healBonus: ms left in the buff window. freeNextHeal:
+   * `1` while a charge is armed, `0` otherwise — an armed flag, not a duration
+   * (see combat/README.md). Either way, `> 0` means "show the active-buff
+   * accent".
    */
   activeRemainingMs: number;
 }
@@ -134,8 +142,14 @@ export interface RelicDef {
 }
 
 export interface CombatEngineOptions {
-  /** Adds to the healer's max AND starting mana (e.g. Deep Reserves). */
+  /** Adds to the healer's max AND starting mana (e.g. Deep Reserves + level). */
   bonusMaxMana?: number;
+  /**
+   * Alpha 0.2: combat mana regen from level (or loadout). Merged with relic
+   * `manaRegen`: amounts sum; interval is the minimum of every contributing
+   * source (see combat/README.md).
+   */
+  manaRegen?: { amount: number; intervalMs: number };
   synergies?: SynergyRule[];
   missingHealthBonuses?: MissingHealthBonusRule[];
   missingHealthPctBonuses?: MissingHealthPctBonusRule[];

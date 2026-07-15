@@ -30,7 +30,7 @@ export interface BotRun {
 /** Minimal synthetic SaveData for loadoutFromSave. */
 export function makeBalanceSave(overrides: Partial<SaveData>): SaveData {
   return {
-    version: 5,
+    version: 6,
     tutorialDone: true,
     xp: 0,
     unlockedSpells: [],
