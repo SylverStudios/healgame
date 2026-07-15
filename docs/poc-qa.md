@@ -2,8 +2,6 @@
 
 Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-15
 
-<!-- Alpha 0.2 section appended at end; living amendments win over earlier rows. -->
-
 **Date:** 2026-07-08 · **Verdict: PoC complete.** Every poc-spec §1 criterion is
 implemented, and all of them are enforced by automated gates that run headless.
 (Phase 2 amended subclass UX — see checklist row 7 and Phase 2 section below.)
