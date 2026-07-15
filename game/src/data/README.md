@@ -1,6 +1,6 @@
 # Dungeon content authoring
 
-Status: current · Authority: enemy ability, mob, dungeon, validation, assembly, and preview contracts · Last verified: 2026-07-13
+Status: current · Authority: enemy ability, mob, dungeon, validation, assembly, and preview contracts · Last verified: 2026-07-14
 
 Dungeon content is typed TypeScript data. The game and authoring tools consume
 the same validated catalogs; there is no generated file or second JSON/YAML
@@ -33,6 +33,10 @@ Use `statOverrides` only for encounter tuning that intentionally differs from
 a mob's base profile. Preview output always prints effective values and calls
 out overrides.
 
+Dungeon reward data contains only `xpPerEnemy`. Every kill pays that XP even
+when the party later wipes. First-clear relic offers are meta-progression, not
+encounter currency, and are assembled from `data/relics.ts`.
+
 ## Integration checklist
 
 - Register every ability, mob, and dungeon `visualKey` in
@@ -51,8 +55,8 @@ out overrides.
   catalog size/order changes. `ui/sprites.test.ts` enforces mob art coverage.
 - Add deterministic cases to `combat/balance.test.ts` for content that defines
   a new difficulty gate, then record the result in `docs/poc-qa.md`.
-- If a journey stage must click a new or reflowed button, update the `UI`
-  coordinates in `scripts/journey.mjs` per the repository layout rule.
+- Give every journey-targeted control a stable `setName(...)` and drive it
+  through `window.__healgame.locate`; never add coordinate tables.
 
 ## Runtime boundary
 

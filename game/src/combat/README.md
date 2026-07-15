@@ -1,6 +1,6 @@
 # Combat engine (Chunk 1)
 
-Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-07-12
+Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-07-14
 
 Pure, deterministic TypeScript. No Phaser, no wall-clock, no randomness — driven
 entirely by `advance(dtMs)`. Chunk 2 builds the Phaser view against exactly
@@ -26,7 +26,7 @@ engine.castSpell(spellId): void       // starts, queues, or is silently dropped 
 engine.cancelCast(): void             // cancel active cast (+ any queue) and refund reserved mana — see below
 engine.activateCooldown(cooldownId): void // off-GCD; see "Cooldowns" below
 engine.state: Readonly<CombatState>
-engine.rewards: { gold, xp }          // accrued per kill, immediately, even on a later wipe
+engine.rewards: { xp }                // accrued per kill, immediately, even on a later wipe
 ```
 
 Data: `data/spells.ts` (`ALL_SPELLS`, sourced from `constants.ts`) and the
@@ -117,10 +117,14 @@ and compiles the ordered dungeon catalog into the engine's resolved
     the cast started. Window expiry is detected in `tick()` the moment
     `buffRemainingMs` crosses to `<=0` and emits `cooldownBuffEnded` exactly
     once (clamped at 0 so it never re-fires). Re-activating while a window is
-    already open would reset it to full duration rather than stack — not
-    reachable with the shipped data (`cooldownMs === durationMs`, so the CD
-    isn't ready again until after the window has already closed), but that's
-    the rule if a future CD ever has `cooldownMs < durationMs`.
+    already open would reset it to full duration rather than stack. With the
+    shipped data, Frenzied Liturgy's 30s window and 40s cooldown tick
+    independently: expiry leaves 10s of real recovery, during which activation
+    remains unavailable. The 40s cadence keeps a safety margin above the
+    playtest bot's 44s failure boundary while preserving the pinned
+    maxed-Zealot Iron Pass victory and adding readable downtime; a
+    future CD with `cooldownMs < durationMs` would still follow the
+    reset-not-stack rule.
   - **Interaction**: if a Still Waters charge is armed AND a Frenzied Liturgy
     window is open when a cast starts, **the free charge wins** — reserve 0,
     consume the charge, leave the cost-reduction window untouched (it keeps
@@ -253,9 +257,16 @@ and compiles the ordered dungeon catalog into the engine's resolved
 - **Waves/victory/wipe**: a wave clears (and the next spawns) the instant its
   last enemy dies; victory on boss hp 0; wipe the instant all 4 party members
   are dead. `advance()` is a no-op once `status !== 'running'`.
-- **Rewards**: compiled dungeon gold/XP values are credited instantly per kill
-  (trash and boss both count), regardless of a later wipe. Synthetic legacy
-  encounters may omit them and fall back to `REWARDS`.
+- **Rewards**: XP is credited instantly per enemy kill (trash and bosses both
+  count) and survives a later wipe. Encounters may override `xpPerEnemy`;
+  synthetic encounters fall back to `REWARDS`.
+- **Permanent relic stats**: the scene resolves every saved relic and passes
+  the definitions through `CombatEngineOptions.relics`. The engine folds
+  their data-only effects at construction: max mana, timed mana regeneration,
+  flat healing, role max HP/armor/auto damage, and merc swing interval.
+  Effects stack additively; armor floors each hit at 1 and swing intervals at
+  100ms. Timed mana regeneration advances on simulation time, preserving
+  deterministic `advance(dtMs)` behavior.
 
 ## Determinism
 

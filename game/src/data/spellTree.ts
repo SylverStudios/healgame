@@ -82,6 +82,7 @@ function rankSpot(args: {
   costs: { currency: string; amount: number }[];
   requiresFirst?: NodeDef['requires'];
   exclusiveGroup?: string;
+  exclusiveGroupFirst?: string;
   contentForRank: (rank: number) => SpellTreeContent;
 }): { nodes: NodeDef[]; spot: SpotDef } {
   const nodes: NodeDef[] = [];
@@ -97,6 +98,7 @@ function rankSpot(args: {
     };
     if (rank === 1 && args.requiresFirst !== undefined) node.requires = args.requiresFirst;
     if (args.exclusiveGroup !== undefined) node.exclusiveGroup = args.exclusiveGroup;
+    if (rank === 1 && args.exclusiveGroupFirst !== undefined) node.exclusiveGroup = args.exclusiveGroupFirst;
     nodes.push(node);
   }
   return { nodes, spot: { id: args.spotId, chain } };
@@ -106,11 +108,11 @@ const deepReserves = rankSpot({
   spotId: 'deep-reserves',
   idPrefix: 'deep-reserves',
   ranks: 5,
-  costs: Array.from({ length: 5 }, () => ({ currency: 'gold', amount: 5 })),
+  costs: Array.from({ length: 5 }, () => ({ currency: 'talent', amount: 1 })),
   contentForRank: () => ({
     name: 'Deep Reserves',
-    description: '+5 max mana per rank',
-    effect: { kind: 'bonusMaxMana', amount: 5 },
+    description: '+6 max mana per rank',
+    effect: { kind: 'bonusMaxMana', amount: 6 },
   }),
 });
 
@@ -118,7 +120,7 @@ const vigilOath: NodeDef = {
   id: 'vigil-oath',
   exclusiveGroup: 'subclass',
   requires: { mode: 'all', nodes: ['deep-reserves-1'] },
-  cost: { currency: 'ruby', amount: 1 },
+  cost: { currency: 'talent', amount: 1 },
   content: content({
     name: 'Path of the Vigil',
     description:
@@ -134,7 +136,7 @@ const zealotOath: NodeDef = {
   id: 'zealot-oath',
   exclusiveGroup: 'subclass',
   requires: { mode: 'all', nodes: ['deep-reserves-1'] },
-  cost: { currency: 'ruby', amount: 1 },
+  cost: { currency: 'talent', amount: 1 },
   content: content({
     name: 'Path of the Zealot',
     description:
@@ -151,7 +153,7 @@ const warpedTempoViaVigil: NodeDef = {
   exclusiveGroup: 'combat-tempo',
   availableIfExclusiveLocked: true,
   requires: { mode: 'all', nodes: ['zealot-oath'] },
-  cost: { currency: 'gold', amount: 4 },
+  cost: { currency: 'talent', amount: 1 },
   content: content({
     name: 'Warped Tempo',
     description: 'Forsaken gift: unlock 1.5× combat pace (locks the rival consolation).',
@@ -164,7 +166,7 @@ const warpedTempoViaZealot: NodeDef = {
   exclusiveGroup: 'combat-tempo',
   availableIfExclusiveLocked: true,
   requires: { mode: 'all', nodes: ['vigil-oath'] },
-  cost: { currency: 'gold', amount: 4 },
+  cost: { currency: 'talent', amount: 1 },
   content: content({
     name: 'Warped Tempo',
     description: 'Forsaken gift: unlock 1.5× combat pace (locks the rival consolation).',
@@ -172,32 +174,36 @@ const warpedTempoViaZealot: NodeDef = {
   }),
 };
 
+const VIGIL_SPECIALIZATION_GROUP = 'vigil-specialization';
+
 const patientVow = rankSpot({
   spotId: 'vigil-patient-vow',
   idPrefix: 'vigil-patient-vow',
   ranks: 3,
-  costs: Array.from({ length: 3 }, () => ({ currency: 'gold', amount: 3 })),
+  costs: Array.from({ length: 3 }, () => ({ currency: 'talent', amount: 1 })),
   requiresFirst: { mode: 'all', nodes: ['vigil-oath'] },
+  exclusiveGroupFirst: VIGIL_SPECIALIZATION_GROUP,
   contentForRank: () => ({
     name: 'Patient Vow',
-    description: `Each ${SPELLS.solemnMend.name} arms +1 heal per rank on your next ${SPELLS.solemnVigil.name}.`,
+    description: `Power path: each ${SPELLS.solemnMend.name} arms +2 heal per rank on your next ${SPELLS.solemnVigil.name}. Locks Measured Devotion.`,
     subclass: 'vigil',
     effect: {
       kind: 'synergy',
       triggerSpellId: SPELLS.solemnMend.id,
       buffedSpellId: SPELLS.solemnVigil.id,
-      bonusHeal: 1,
+      bonusHeal: 2,
     },
   }),
 });
 
 const measuredDevotion: NodeDef = {
   id: 'vigil-measured-devotion',
+  exclusiveGroup: VIGIL_SPECIALIZATION_GROUP,
   requires: { mode: 'all', nodes: ['vigil-oath'] },
-  cost: { currency: 'gold', amount: 4 },
+  cost: { currency: 'talent', amount: 1 },
   content: content({
     name: 'Measured Devotion',
-    description: `${SPELLS.solemnVigil.name} casts 1.0s slower and costs 3 less mana.`,
+    description: `Efficiency path: ${SPELLS.solemnVigil.name} casts 1.0s slower and costs 3 less mana. Locks Patient Vow.`,
     subclass: 'vigil',
     effect: {
       kind: 'castMod',
@@ -212,17 +218,17 @@ const ferventChain = rankSpot({
   spotId: 'zealot-fervent-chain',
   idPrefix: 'zealot-fervent-chain',
   ranks: 3,
-  costs: Array.from({ length: 3 }, () => ({ currency: 'gold', amount: 3 })),
+  costs: Array.from({ length: 3 }, () => ({ currency: 'talent', amount: 1 })),
   requiresFirst: { mode: 'all', nodes: ['zealot-oath'] },
   contentForRank: () => ({
     name: 'Fervent Chain',
-    description: `Each ${SPELLS.zealousMending.name} arms +1 heal per rank on your next ${SPELLS.zealousFlare.name}.`,
+    description: `Each ${SPELLS.zealousMending.name} arms +2 heal per rank on your next ${SPELLS.zealousFlare.name}.`,
     subclass: 'zealot',
     effect: {
       kind: 'synergy',
       triggerSpellId: SPELLS.zealousMending.id,
       buffedSpellId: SPELLS.zealousFlare.id,
-      bonusHeal: 1,
+      bonusHeal: 2,
     },
   }),
 });
@@ -232,15 +238,12 @@ const ferventChain = rankSpot({
  * bonus) is retired — the missing-health identity moves to Vigil's
  * `vigil-graven-scale` (percent-of-base-heal). `zealot-steady-hands` takes
  * this node's slot in the branch structure (same prereq: zealot-oath).
- * Legacy saves that still own the retired node are refunded its gold cost on
- * load — see `RETIRED_NODE_REFUNDS` / `ownedIdsFromLegacyRanks` below.
+ * Legacy saves that still own the retired node simply omit it during migration.
  */
-const RETIRED_ZEALOT_DESPERATE_ZEAL_ID = 'zealot-desperate-zeal';
-
 const gravenScale: NodeDef = {
   id: 'vigil-graven-scale',
   requires: { mode: 'all', nodes: ['vigil-patient-vow-1'] },
-  cost: { currency: 'gold', amount: 5 },
+  cost: { currency: 'talent', amount: 1 },
   content: content({
     name: 'Graven Scale',
     description: `${SPELLS.solemnVigil.name}: +5% of base heal per 10% target health missing (rounds up)`,
@@ -256,16 +259,16 @@ const gravenScale: NodeDef = {
 const steadyHands: NodeDef = {
   id: 'zealot-steady-hands',
   requires: { mode: 'all', nodes: ['zealot-oath'] },
-  cost: { currency: 'gold', amount: 5 },
+  cost: { currency: 'talent', amount: 1 },
   content: content({
     name: 'Steady Hands',
-    description: `${SPELLS.zealousMending.name}: +1 heal when the target is at 80%+ health`,
+    description: `${SPELLS.zealousMending.name}: +2 heal when the target is at 80%+ health`,
     subclass: 'zealot',
     effect: {
       kind: 'fullHealthBonus',
       spellId: SPELLS.zealousMending.id,
       hpPctAtLeast: 80,
-      bonusHeal: 1,
+      bonusHeal: 2,
     },
   }),
 };
@@ -289,19 +292,19 @@ const ZEALOT_LAYER2_REQUIRES: NodeDef['requires'] = {
 const vigilDeepWell: NodeDef = {
   id: 'vigil-deep-well',
   requires: VIGIL_LAYER2_REQUIRES,
-  cost: { currency: 'gold', amount: 5 },
+  cost: { currency: 'talent', amount: 1 },
   content: content({
     name: 'Deep Well',
-    description: '+4 max mana',
+    description: '+6 max mana',
     subclass: 'vigil',
-    effect: { kind: 'bonusMaxMana', amount: 4 },
+    effect: { kind: 'bonusMaxMana', amount: 6 },
   }),
 };
 
 const vigilThrift: NodeDef = {
   id: 'vigil-thrift',
   requires: VIGIL_LAYER2_REQUIRES,
-  cost: { currency: 'gold', amount: 6 },
+  cost: { currency: 'talent', amount: 1 },
   content: content({
     name: 'Thrift',
     description: `${SPELLS.solemnMend.name} costs 1 less mana (${SPELLS.solemnMend.mana} → ${SPELLS.solemnMend.mana - 1})`,
@@ -318,7 +321,7 @@ const vigilThrift: NodeDef = {
 const vigilStillWaters: NodeDef = {
   id: 'vigil-still-waters',
   requires: VIGIL_LAYER2_REQUIRES,
-  cost: { currency: 'gold', amount: 8 },
+  cost: { currency: 'talent', amount: 1 },
   content: content({
     name: 'Still Waters',
     description: `Grants ${STILL_WATERS.name} (${s(STILL_WATERS.cooldownMs)}): ${STILL_WATERS.description}`,
@@ -330,7 +333,7 @@ const vigilStillWaters: NodeDef = {
 const zealotQuickBreath: NodeDef = {
   id: 'zealot-quick-breath',
   requires: ZEALOT_LAYER2_REQUIRES,
-  cost: { currency: 'gold', amount: 5 },
+  cost: { currency: 'talent', amount: 1 },
   content: content({
     name: 'Quick Breath',
     description: `${SPELLS.zealousFlare.name} casts 200ms faster (${s(SPELLS.zealousFlare.castMs)} → ${s(SPELLS.zealousFlare.castMs - 200)})`,
@@ -347,19 +350,19 @@ const zealotQuickBreath: NodeDef = {
 const zealotSpendthriftGrace: NodeDef = {
   id: 'zealot-spendthrift-grace',
   requires: ZEALOT_LAYER2_REQUIRES,
-  cost: { currency: 'gold', amount: 6 },
+  cost: { currency: 'talent', amount: 1 },
   content: content({
     name: 'Spendthrift Grace',
-    description: '+3 max mana',
+    description: '+5 max mana',
     subclass: 'zealot',
-    effect: { kind: 'bonusMaxMana', amount: 3 },
+    effect: { kind: 'bonusMaxMana', amount: 5 },
   }),
 };
 
 const zealotFrenziedLiturgy: NodeDef = {
   id: 'zealot-frenzied-liturgy',
   requires: ZEALOT_LAYER2_REQUIRES,
-  cost: { currency: 'gold', amount: 8 },
+  cost: { currency: 'talent', amount: 1 },
   content: content({
     name: 'Frenzied Liturgy',
     description: `Grants ${FRENZIED_LITURGY.name} (${s(FRENZIED_LITURGY.cooldownMs)}): ${FRENZIED_LITURGY.description}`,
@@ -545,42 +548,16 @@ export function combatModsFromTree(
 export function loadoutFromSave(save: {
   treeRanks: Record<string, number>;
   unlockedSpells: readonly string[];
-  gold?: number;
-  rubies?: number;
 }): CombatMods {
-  const state = treeStateFromLegacy(save.treeRanks, {
-    gold: save.gold ?? 0,
-    ruby: save.rubies ?? 0,
-  });
+  const state = treeStateFromLegacy(save.treeRanks, 0);
   return combatModsFromTree(state, save.unlockedSpells);
-}
-
-/**
- * Gold refunded per retired-from-the-live-tree node still present in a save's
- * `treeRanks` (Alpha 0.1 §D4: `zealot-desperate-zeal` removed — mirrors the
- * v1→v2 `RETIRED_V1_NODES` refund pattern in `save/save.ts`, but recomputed
- * from `treeRanks` on every load rather than a one-time migration, since the
- * save version itself hasn't changed). Amount matches the node's old cost.
- */
-const RETIRED_NODE_REFUNDS: Readonly<Record<string, number>> = {
-  [RETIRED_ZEALOT_DESPERATE_ZEAL_ID]: 4,
-};
-
-/** Total gold owed back for retired node ids still present in legacy `treeRanks`. */
-function retiredNodeGoldRefund(treeRanks: Record<string, number>): number {
-  let refund = 0;
-  for (const [id, amount] of Object.entries(RETIRED_NODE_REFUNDS)) {
-    if ((treeRanks[id] ?? 0) > 0) refund += amount;
-  }
-  return refund;
 }
 
 /**
  * Map legacy `treeRanks` (nodeId → ranks) onto owned chain node ids for the
  * new config. Used by parity tests and (later) save migration. Retired node
  * ids (e.g. `zealot-desperate-zeal`) are never emitted — they no longer exist
- * in `SPELL_TREE` and `create()` throws on unknown owned ids; their gold is
- * refunded separately via `retiredNodeGoldRefund` in `treeStateFromLegacy`.
+ * in `SPELL_TREE` and `create()` throws on unknown owned ids.
  */
 export function ownedIdsFromLegacyRanks(treeRanks: Record<string, number>): string[] {
   const owned: string[] = [];
@@ -609,17 +586,14 @@ export function ownedIdsFromLegacyRanks(treeRanks: Record<string, number>): stri
 }
 
 /**
- * Build opaque tree state from a legacy save-shaped ranks map + wallet.
- * Adds any retired-node gold refund to the wallet on the way in (Alpha 0.1
- * §D4) — once a save persists a purchase, `legacyRanksFromOwned` no longer
- * emits the retired id, so the refund is not re-applied on the next load.
+ * Build opaque tree state from persisted ranks and currently unallocated
+ * talent points.
  */
 export function treeStateFromLegacy(
   treeRanks: Record<string, number>,
-  wallet: { gold: number; ruby: number },
+  availableTalentPoints: number,
 ): TreeState {
-  const refundedWallet = { ...wallet, gold: wallet.gold + retiredNodeGoldRefund(treeRanks) };
-  return create(SPELL_TREE, refundedWallet, ownedIdsFromLegacyRanks(treeRanks));
+  return create(SPELL_TREE, { talent: availableTalentPoints }, ownedIdsFromLegacyRanks(treeRanks));
 }
 
 const MULTI_RANK_PREFIXES: { prefix: string; max: number }[] = [
@@ -665,14 +639,12 @@ export function legacyRanksFromOwned(owned: readonly string[]): Record<string, n
   return ranks;
 }
 
-/** Push opaque tree state into SaveData currencies + treeRanks + subclass. */
+/** Push opaque tree ownership into SaveData; XP remains the source of point capacity. */
 export function applyTreeStateToSave(
-  save: { gold: number; rubies: number; treeRanks: Record<string, number>; subclass: SubclassId | null },
+  save: { treeRanks: Record<string, number>; subclass: SubclassId | null },
   state: TreeState,
 ): void {
   const snap = snapshot(state);
-  save.gold = snap.wallet['gold'] ?? 0;
-  save.rubies = snap.wallet['ruby'] ?? 0;
   save.treeRanks = legacyRanksFromOwned(snap.owned);
 
   if (snap.owned.includes('vigil-oath')) save.subclass = 'vigil';

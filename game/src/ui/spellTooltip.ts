@@ -22,7 +22,7 @@ const DEFAULT_LINE_COLOR = '#d8c8b8';
 const NAME_LINE_COLOR = '#e8d8c8';
 const SYNERGY_LINE_COLOR = '#f2c14e';
 
-interface TooltipLine {
+export interface TooltipLine {
   text: string;
   color: string;
 }

@@ -1,10 +1,10 @@
 # Semantic click targets — handoff
 
 Status: historical — shipped 2026-07-13 (see poc-qa.md Semantic click targets
-section) · Authority: none — archive · Last verified: 2026-07-13
+section) · Authority: none — archive · Last verified: 2026-07-14
 
 Note: `hubRelicIcon` was superseded by `runMod:<id>` when the shared run-mods
-top bar shipped (oath + relic, Hub/Combat/Tree).
+top bar shipped (oath + cumulative relics, Hub/Combat/Tree).
 
 **Audience:** historical — the setName / `__healgame.locate` / journey-by-name
 change is live. Kept here as the design record and name inventory.
@@ -35,6 +35,7 @@ and hovers by name — no hard-coded layout coordinates.
 | `treeBack` | back-button rect | `TreeScene.ts` |
 | `combatAlly:<unitId>` | sprite body when clickable | `unitSprite.ts` |
 | `combatSpell:<spellId>` | SpellButton bg rect | `spellBar.ts` |
+| `combatCooldown:<cooldownId>` | CooldownButton bg rect | `spellBar.ts` |
 | `combatReturn` | Return rect in result overlay | `CombatScene.ts` |
 | `combatPaceToggle` | pace control bg | `paceToggle.ts` |
 | `combatLogToggle` | log header text | `combatLog.ts` |
@@ -54,6 +55,6 @@ to canvas px accounting for camera scroll × scrollFactor (TreeScene HUD uses
 
 ## Out of scope (still)
 
-- Party/combat hotkeys as player UX
+- Party-target hotkeys as player UX (spell and cooldown number keys now ship)
 - ScaleManager-aware mapping for arbitrary viewports
 - DOM/a11y overlay, Playwright locators, screenshot diffing

@@ -1,17 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
+  allocatedTalentPoints,
   applyCombatResult,
+  availableTalentPoints,
   buildLoadout,
   isDungeonUnlocked,
   isIronPassUnlocked,
   isMawUnlocked,
-  nodeStatus,
-  purchaseNode,
 } from './progression';
 import { newSaveData, type SaveData } from '../save/save';
-import { SPELLS, XP_LEVEL_2_THRESHOLD } from '../data/constants';
+import { levelForXp, SPELLS, XP_LEVEL_2_THRESHOLD, xpForLevel } from '../data/constants';
 import { IRON_PASS, THE_MAW } from '../data/encounters';
-import { getDungeonById } from '../data/dungeons';
 import type { CombatResult } from '../scenes/CombatScene';
 
 function save(overrides: Partial<SaveData> = {}): SaveData {
@@ -19,102 +18,114 @@ function save(overrides: Partial<SaveData> = {}): SaveData {
 }
 
 function result(overrides: Partial<CombatResult> = {}): CombatResult {
-  return { encounterId: 'ash-gate', status: 'wipe', gold: 0, xp: 0, ...overrides };
+  return { encounterId: 'ash-gate', status: 'wipe', xp: 0, ...overrides };
 }
 
 describe('applyCombatResult', () => {
-  it('accrues gold and xp on a wipe', () => {
+  it('accrues xp on a wipe', () => {
     const s = save();
-    const notices = applyCombatResult(s, result({ status: 'wipe', gold: 3, xp: 2 }));
-    expect(s.gold).toBe(3);
+    const notices = applyCombatResult(s, result({ status: 'wipe', xp: 2 }));
     expect(s.xp).toBe(2);
     expect(notices).toEqual([]);
   });
 
-  it('accrues gold and xp on a victory', () => {
+  it('accrues xp on a victory', () => {
     const s = save();
-    applyCombatResult(s, result({ status: 'victory', gold: 4, xp: 3 }));
-    expect(s.gold).toBe(4);
+    applyCombatResult(s, result({ status: 'victory', xp: 3 }), () => 0);
     expect(s.xp).toBe(3);
   });
 
-  it('auto-grants zealous-mending exactly once when xp crosses the level-2 threshold', () => {
+  it('grants one talent point and Zealous Mending when reaching level 2', () => {
     const s = save({ xp: XP_LEVEL_2_THRESHOLD - 1, unlockedSpells: ['solemn-mend'] });
     const notices = applyCombatResult(s, result({ xp: 1 }));
+    expect(availableTalentPoints(s)).toBe(2);
     expect(s.unlockedSpells).toContain(SPELLS.zealousMending.id);
     expect(s.unlockedSpells.filter((id) => id === SPELLS.zealousMending.id)).toHaveLength(1);
-    expect(notices).toEqual([{ kind: 'levelUp', text: `LEVEL 2 — ${SPELLS.zealousMending.name} learned!` }]);
+    expect(notices).toEqual([
+      { kind: 'levelUp', text: 'LEVEL 2 — +1 Talent Point' },
+      { kind: 'spellLearned', text: `${SPELLS.zealousMending.name} learned!` },
+    ]);
   });
 
-  it('does not grant the spell when xp does not cross the threshold', () => {
+  it('does not grant the spell or another talent point below the threshold', () => {
     const s = save({ xp: 0, unlockedSpells: ['solemn-mend'] });
     const notices = applyCombatResult(s, result({ xp: 1 }));
+    expect(availableTalentPoints(s)).toBe(1);
     expect(s.unlockedSpells).not.toContain(SPELLS.zealousMending.id);
     expect(notices).toEqual([]);
   });
 
-  it('grants a ruby and records the clear on the first victory in a dungeon', () => {
-    const s = save();
-    const notices = applyCombatResult(s, result({ status: 'victory', encounterId: 'ash-gate' }));
-    const reward = getDungeonById('ash-gate')?.rewards.rubyPerFirstClear;
-    expect(s.rubies).toBe(reward);
-    expect(s.clearedDungeons).toEqual(['ash-gate']);
-    expect(notices).toEqual([{ kind: 'firstClear', text: `FIRST CLEAR — +${reward} Ruby` }]);
+  it.each(['ash-gate', 'iron-pass', 'the-maw'])(
+    'queues three deterministic relic offers on the first %s clear',
+    (encounterId) => {
+      const priorClears =
+        encounterId === 'ash-gate'
+          ? []
+          : encounterId === 'iron-pass'
+            ? ['ash-gate']
+            : ['ash-gate', 'iron-pass'];
+      const expectedClears = [...priorClears, encounterId];
+      const s = save({ clearedDungeons: priorClears });
+      const notices = applyCombatResult(
+        s,
+        result({ status: 'victory', encounterId }),
+        () => 0,
+      );
+      expect(s.clearedDungeons).toEqual(expectedClears);
+      expect(s.pendingRelicOffers).toEqual([
+        'ember-ledger',
+        'triage-bell',
+        'still-reservoir',
+      ]);
+      expect(notices).toEqual([{ kind: 'firstClear', text: 'FIRST CLEAR — CHOOSE A RELIC' }]);
+    },
+  );
+
+  it('excludes owned relics from first-clear offers', () => {
+    const s = save({ relicIds: ['ember-ledger'] });
+    applyCombatResult(s, result({ status: 'victory' }), () => 0);
+    expect(s.pendingRelicOffers).toEqual([
+      'triage-bell',
+      'still-reservoir',
+      'vital-ember',
+    ]);
   });
 
-  it('does not grant a second ruby on a replay victory', () => {
-    const s = save({ rubies: 1, clearedDungeons: ['ash-gate'] });
-    const notices = applyCombatResult(s, result({ status: 'victory', encounterId: 'ash-gate' }));
-    expect(s.rubies).toBe(1);
+  it('does not replace pending offers on a replay victory', () => {
+    const pendingRelicOffers = ['vital-ember', 'bastion-plate', 'iron-ward'];
+    const s = save({ clearedDungeons: ['ash-gate'], pendingRelicOffers });
+    const notices = applyCombatResult(s, result({ status: 'victory' }), () => 0);
+    expect(s.pendingRelicOffers).toEqual(pendingRelicOffers);
     expect(notices).toEqual([]);
   });
 
-  it('records an iron-pass first clear (unlocking The Maw) but grants no ruby — §D1', () => {
-    const s = save({ clearedDungeons: ['ash-gate'], rubies: 1 });
-    const notices = applyCombatResult(s, result({ status: 'victory', encounterId: 'iron-pass' }));
-    expect(s.rubies).toBe(1);
-    expect(s.clearedDungeons).toEqual(['ash-gate', 'iron-pass']);
-    expect(notices).toEqual([{ kind: 'firstClear', text: 'FIRST CLEAR!' }]);
-  });
-
-  it('does not grant a ruby on a wipe', () => {
+  it('does not queue relic offers on a wipe', () => {
     const s = save();
-    applyCombatResult(s, result({ status: 'wipe', encounterId: 'ash-gate' }));
-    expect(s.rubies).toBe(0);
+    applyCombatResult(s, result({ status: 'wipe' }), () => 0);
+    expect(s.pendingRelicOffers).toEqual([]);
     expect(s.clearedDungeons).toEqual([]);
-  });
-
-  it('queues the relic pick on the first-ever Ash Gate clear (Alpha 0.1 §D7)', () => {
-    const s = save();
-    expect(s.relicPickPending).toBe(false);
-    applyCombatResult(s, result({ status: 'victory', encounterId: 'ash-gate' }));
-    expect(s.relicPickPending).toBe(true);
-  });
-
-  it('does not re-queue the relic pick on a replay Ash Gate victory', () => {
-    const s = save({ clearedDungeons: ['ash-gate'], relicPickPending: false });
-    applyCombatResult(s, result({ status: 'victory', encounterId: 'ash-gate' }));
-    expect(s.relicPickPending).toBe(false);
-  });
-
-  it('never queues the relic pick on an Iron Pass (or other) first clear', () => {
-    const s = save({ clearedDungeons: ['ash-gate'] });
-    applyCombatResult(s, result({ status: 'victory', encounterId: 'iron-pass' }));
-    expect(s.relicPickPending).toBe(false);
-  });
-
-  it('does not queue the relic pick on an Ash Gate wipe', () => {
-    const s = save();
-    applyCombatResult(s, result({ status: 'wipe', encounterId: 'ash-gate' }));
-    expect(s.relicPickPending).toBe(false);
   });
 
   it('does not reward or record an unknown dungeon id', () => {
     const s = save();
-    const notices = applyCombatResult(s, result({ status: 'victory', encounterId: 'unknown-dungeon' }));
-    expect(s.rubies).toBe(0);
+    const notices = applyCombatResult(
+      s,
+      result({ status: 'victory', encounterId: 'unknown-dungeon' }),
+      () => 0,
+    );
     expect(s.clearedDungeons).toEqual([]);
+    expect(s.pendingRelicOffers).toEqual([]);
     expect(notices).toEqual([]);
+  });
+});
+
+describe('XP levels and talent capacity', () => {
+  it('uses an increasing 10/20/30 XP curve and gives level 6 six total points', () => {
+    expect([2, 3, 4, 5, 6].map(xpForLevel)).toEqual([10, 30, 60, 100, 150]);
+    expect(levelForXp(149)).toBe(5);
+    const s = save({ xp: 150, treeRanks: { 'deep-reserves': 4 } });
+    expect(allocatedTalentPoints(s)).toBe(4);
+    expect(availableTalentPoints(s)).toBe(2);
   });
 });
 
@@ -143,21 +154,21 @@ describe('buildLoadout', () => {
   });
 
   it('scales bonusMaxMana with deep-reserves ranks', () => {
-    expect(buildLoadout(save({ treeRanks: { 'deep-reserves': 1 } })).bonusMaxMana).toBe(5);
-    expect(buildLoadout(save({ treeRanks: { 'deep-reserves': 5 } })).bonusMaxMana).toBe(25);
+    expect(buildLoadout(save({ treeRanks: { 'deep-reserves': 1 } })).bonusMaxMana).toBe(6);
+    expect(buildLoadout(save({ treeRanks: { 'deep-reserves': 5 } })).bonusMaxMana).toBe(30);
   });
 
   it('emits synergies scaled by ranks', () => {
     const s = save({ treeRanks: { 'zealot-oath': 1, 'zealot-fervent-chain': 2 }, subclass: 'zealot' });
     expect(buildLoadout(s).synergies).toEqual([
-      { triggerSpellId: 'zealous-mending', buffedSpellId: 'zealous-flare', bonusHeal: 2 },
+      { triggerSpellId: 'zealous-mending', buffedSpellId: 'zealous-flare', bonusHeal: 4 },
     ]);
   });
 
   it('emits full-health bonuses from Steady Hands (Alpha 0.1 §D4, replaces retired Desperate Zeal)', () => {
     const s = save({ treeRanks: { 'zealot-oath': 1, 'zealot-steady-hands': 1 }, subclass: 'zealot' });
     expect(buildLoadout(s).fullHealthBonuses).toEqual([
-      { spellId: 'zealous-mending', hpPctAtLeast: 80, bonusHeal: 1 },
+      { spellId: 'zealous-mending', hpPctAtLeast: 80, bonusHeal: 2 },
     ]);
   });
 
@@ -178,7 +189,7 @@ describe('buildLoadout', () => {
     });
     buildLoadout(s);
     expect(SPELLS.solemnVigil.castMs).toBe(3000);
-    expect(SPELLS.solemnVigil.mana).toBe(7);
+    expect(SPELLS.solemnVigil.mana).toBe(5);
   });
 
   it('ignores unknown tree node ids and unknown spell ids', () => {
@@ -189,110 +200,32 @@ describe('buildLoadout', () => {
   });
 });
 
-describe('purchaseNode', () => {
-  it('buys the root node with gold and records rank 1', () => {
-    const s = save({ gold: 5 });
-    expect(purchaseNode(s, 'deep-reserves')).toBe(true);
-    expect(s.gold).toBe(0);
-    expect(s.treeRanks).toEqual({ 'deep-reserves': 1 });
+describe('talent points', () => {
+  it('counts allocated ranks across all tree nodes', () => {
+    expect(
+      allocatedTalentPoints(
+        save({ treeRanks: { 'deep-reserves': 3, 'vigil-oath': 1, 'vigil-patient-vow': 2 } }),
+      ),
+    ).toBe(6);
   });
 
-  it('buys additional ranks up to maxRanks, then refuses', () => {
-    const s = save({ gold: 100, treeRanks: { 'deep-reserves': 4 } });
-    expect(purchaseNode(s, 'deep-reserves')).toBe(true);
-    expect(s.treeRanks['deep-reserves']).toBe(5);
-    expect(purchaseNode(s, 'deep-reserves')).toBe(false);
-    expect(s.gold).toBe(95);
+  it('ignores negative ranks and floors fractional ranks defensively', () => {
+    expect(allocatedTalentPoints(save({ treeRanks: { negative: -2, fractional: 2.9 } }))).toBe(2);
   });
 
-  it('fails on insufficient gold, without mutating the save', () => {
-    const s = save({ gold: 4 });
-    expect(purchaseNode(s, 'deep-reserves')).toBe(false);
-    expect(s.gold).toBe(4);
-    expect(s.treeRanks).toEqual({});
+  it('grants one available point per level', () => {
+    expect(availableTalentPoints(save({ xp: 0 }))).toBe(1);
+    expect(availableTalentPoints(save({ xp: XP_LEVEL_2_THRESHOLD }))).toBe(2);
+    expect(availableTalentPoints(save({ xp: 30 }))).toBe(3);
   });
 
-  it('fails on an unknown node id', () => {
-    const s = save({ gold: 100 });
-    expect(purchaseNode(s, 'not-a-real-node')).toBe(false);
-    expect(s.gold).toBe(100);
-  });
-
-  it('gates on prerequisites: no oath without deep-reserves', () => {
-    const s = save({ rubies: 1 });
-    expect(purchaseNode(s, 'vigil-oath')).toBe(false);
-    expect(s.rubies).toBe(1);
-    expect(s.subclass).toBeNull();
-  });
-
-  it('buys a subclass oath with a ruby and sets save.subclass', () => {
-    const s = save({ rubies: 1, treeRanks: { 'deep-reserves': 1 } });
-    expect(purchaseNode(s, 'vigil-oath')).toBe(true);
-    expect(s.rubies).toBe(0);
-    expect(s.subclass).toBe('vigil');
-    expect(s.treeRanks['vigil-oath']).toBe(1);
-  });
-
-  it('buying one oath permanently locks the other (exclusiveGroup)', () => {
-    const s = save({ rubies: 2, treeRanks: { 'deep-reserves': 1 } });
-    expect(purchaseNode(s, 'zealot-oath')).toBe(true);
-    expect(purchaseNode(s, 'vigil-oath')).toBe(false);
-    expect(s.rubies).toBe(1);
-    expect(s.subclass).toBe('zealot');
-  });
-
-  it('follow-up nodes require their oath', () => {
-    const s = save({ gold: 10, treeRanks: { 'deep-reserves': 1 } });
-    expect(purchaseNode(s, 'vigil-patient-vow')).toBe(false);
-    s.treeRanks['vigil-oath'] = 1;
-    expect(purchaseNode(s, 'vigil-patient-vow')).toBe(true);
-    expect(s.gold).toBe(7);
-  });
-
-  it('buying a follow-up node never touches save.subclass', () => {
-    const s = save({ gold: 10, subclass: 'vigil', treeRanks: { 'deep-reserves': 1, 'vigil-oath': 1 } });
-    expect(purchaseNode(s, 'vigil-measured-devotion')).toBe(true);
-    expect(s.subclass).toBe('vigil');
-  });
-});
-
-describe('nodeStatus', () => {
-  it('is undefined for unknown nodes', () => {
-    expect(nodeStatus(save(), 'nope')).toBeUndefined();
-  });
-
-  it('reports a fresh root node as purchasable when affordable', () => {
-    expect(nodeStatus(save({ gold: 5 }), 'deep-reserves')).toEqual({
-      ranks: 0,
-      maxed: false,
-      requirementsMet: true,
-      lockedByExclusive: false,
-      affordable: true,
-      purchasable: true,
-    });
-  });
-
-  it('reports prereq-gated nodes as not purchasable', () => {
-    const status = nodeStatus(save({ rubies: 1 }), 'vigil-oath');
-    expect(status?.requirementsMet).toBe(false);
-    expect(status?.purchasable).toBe(false);
-  });
-
-  it('reports the rival oath as lockedByExclusive after a subclass purchase', () => {
-    const s = save({ rubies: 5, treeRanks: { 'deep-reserves': 1, 'vigil-oath': 1 }, subclass: 'vigil' });
-    const rival = nodeStatus(s, 'zealot-oath');
-    expect(rival?.lockedByExclusive).toBe(true);
-    expect(rival?.purchasable).toBe(false);
-    const owned = nodeStatus(s, 'vigil-oath');
-    expect(owned?.lockedByExclusive).toBe(false);
-    expect(owned?.maxed).toBe(true);
-  });
-
-  it('reports maxed multi-rank nodes', () => {
-    const s = save({ gold: 100, treeRanks: { 'deep-reserves': 5 } });
-    const status = nodeStatus(s, 'deep-reserves');
-    expect(status?.maxed).toBe(true);
-    expect(status?.purchasable).toBe(false);
+  it('subtracts allocated ranks and never returns a negative balance', () => {
+    expect(
+      availableTalentPoints(
+        save({ xp: 30, treeRanks: { 'deep-reserves': 2, 'vigil-oath': 1 } }),
+      ),
+    ).toBe(0);
+    expect(availableTalentPoints(save({ xp: 0, treeRanks: { 'deep-reserves': 3 } }))).toBe(0);
   });
 });
 
@@ -383,7 +316,7 @@ describe('THE_MAW data sanity', () => {
     expect(cast.castMs).toBe(10_000);
   });
 
-  it('includes a light trash wave so grinding still pays gold/xp', () => {
+  it('includes a light trash wave so grinding still pays xp', () => {
     expect(THE_MAW.waves).toHaveLength(1);
     expect(THE_MAW.waves[0]?.enemies[0]?.count).toBe(2);
   });

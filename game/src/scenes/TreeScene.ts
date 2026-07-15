@@ -15,6 +15,8 @@ import {
 } from '../data/spellTree';
 import { runModsFromSave } from '../data/runMods';
 import { RunModsBar } from '../ui/runModsBar';
+import { allocatedTalentPoints, availableTalentPoints } from '../meta/progression';
+import { levelForXp } from '../data/constants';
 import {
   layoutSpots,
   update,
@@ -44,20 +46,21 @@ const OWNED_COLOR = '#7ad67a';
 const DANGER_COLOR = '#e05a4e';
 const FONT = 'monospace';
 
-const NODE_WIDTH = 200;
-const NODE_HEIGHT = 70;
+const NODE_WIDTH = 192;
+const NODE_HEIGHT = 62;
 
 /**
- * Alpha 0.1 §D5 tree layer 2 sits below the branch rows (world y 650/800),
+ * Alpha 0.1 §D5 tree layer 2 sits below the branch rows (world y 600/735),
  * past the 960×540 base canvas (see main.ts) which has no room left after
  * the existing rows (deep-reserves 130 → oaths 260 → branch follow-ups 400 →
  * graven-scale 550). TreeScene now scrolls: world content (nodes/edges) pans
  * under a screen-fixed HUD (title/wallet/status/back button via
  * `setScrollFactor(0)`), driven by mouse wheel. `journey.mjs` reaches layer 2
  * via `page.mouse.wheel(0, dy)` while hovering the canvas, then clicks the
- * resulting on-screen position (world y − scrollY).
+ * resulting on-screen position (world y − scrollY). The compact 820px world
+ * still leaves the final row fully reachable at maximum scroll.
  */
-const WORLD_HEIGHT = 900;
+const WORLD_HEIGHT = 820;
 const WHEEL_SCROLL_SCALE = 0.5;
 
 const TOOLTIP_BG = 0x241a15;
@@ -66,6 +69,7 @@ const TOOLTIP_PADDING = 8;
 const TOOLTIP_GAP = 8;
 const TOOLTIP_MAX_WIDTH = 280;
 const TOOLTIP_DEPTH = 300;
+const HUD_DEPTH = 200;
 
 /**
  * Presentation overrides for the live SPELL_TREE (node placement).
@@ -73,21 +77,21 @@ const TOOLTIP_DEPTH = 300;
  * Journey clicks nodes by `treeNode:<spotId>` name, not by these coords.
  */
 const SPELL_TREE_POSITIONS: Readonly<Record<string, SpotPosition>> = {
-  'deep-reserves': { x: 480, y: 130 },
-  'vigil-oath': { x: 260, y: 260 },
-  'zealot-oath': { x: 700, y: 260 },
-  'vigil-patient-vow': { x: 150, y: 400 },
-  'vigil-measured-devotion': { x: 380, y: 400 },
-  'vigil-graven-scale': { x: 150, y: 550 },
-  'zealot-fervent-chain': { x: 590, y: 400 },
-  'zealot-steady-hands': { x: 820, y: 400 },
+  'deep-reserves': { x: 480, y: 125 },
+  'vigil-oath': { x: 260, y: 235 },
+  'zealot-oath': { x: 700, y: 235 },
+  'vigil-patient-vow': { x: 150, y: 355 },
+  'vigil-measured-devotion': { x: 380, y: 355 },
+  'vigil-graven-scale': { x: 150, y: 480 },
+  'zealot-fervent-chain': { x: 590, y: 355 },
+  'zealot-steady-hands': { x: 820, y: 355 },
   // Layer 2 (Alpha 0.1 §D5) — below the branch row, reached via scroll.
-  'vigil-deep-well': { x: 150, y: 650 },
-  'vigil-thrift': { x: 380, y: 650 },
-  'zealot-quick-breath': { x: 590, y: 650 },
-  'zealot-spendthrift-grace': { x: 820, y: 650 },
-  'vigil-still-waters': { x: 265, y: 800 },
-  'zealot-frenzied-liturgy': { x: 705, y: 800 },
+  'vigil-deep-well': { x: 150, y: 600 },
+  'vigil-thrift': { x: 380, y: 600 },
+  'zealot-quick-breath': { x: 590, y: 600 },
+  'zealot-spendthrift-grace': { x: 820, y: 600 },
+  'vigil-still-waters': { x: 265, y: 735 },
+  'zealot-frenzied-liturgy': { x: 705, y: 735 },
 };
 
 function asContent(raw: unknown): SpellTreeContent | null {
@@ -98,8 +102,7 @@ function asContent(raw: unknown): SpellTreeContent | null {
 }
 
 function costLabel(currency: string, amount: number): string {
-  if (currency === 'gold') return `${amount}g`;
-  if (currency === 'ruby') return `${amount} ruby`;
+  if (currency === 'talent') return `${amount} point`;
   return `${amount} ${currency}`;
 }
 
@@ -155,10 +158,7 @@ export class TreeScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.setBackgroundColor(BG_COLOR);
     this.save = loadSave();
-    this.treeState = treeStateFromLegacy(this.save.treeRanks, {
-      gold: this.save.gold,
-      ruby: this.save.rubies,
-    });
+    this.treeState = treeStateFromLegacy(this.save.treeRanks, availableTalentPoints(this.save));
     this.armedSpotId = null;
     this.feedback = '';
 
@@ -192,12 +192,26 @@ export class TreeScene extends Phaser.Scene {
       .on('pointerdown', () => this.disarmAndRerenderIfNeeded());
 
     this.add
-      .text(width / 2, 34, 'Spell Tree', { fontFamily: FONT, fontSize: '26px', color: TEXT_COLOR })
+      .rectangle(width / 2, 39, 290, 58, 0x241a15, 0.96)
+      .setStrokeStyle(1, BORDER_COLOR)
+      .setDepth(HUD_DEPTH)
+      .setScrollFactor(0);
+    this.add
+      .text(width / 2, 28, 'SPELL TREE', {
+        fontFamily: FONT,
+        fontSize: '27px',
+        fontStyle: 'bold',
+        color: '#fff2df',
+        stroke: '#0a0605',
+        strokeThickness: 3,
+      })
       .setOrigin(0.5)
+      .setDepth(HUD_DEPTH)
       .setScrollFactor(0);
     this.headerText = this.add
-      .text(width / 2, 64, '', { fontFamily: FONT, fontSize: '15px', color: ACCENT_COLOR })
+      .text(width / 2, 58, '', { fontFamily: FONT, fontSize: '13px', color: ACCENT_COLOR })
       .setOrigin(0.5)
+      .setDepth(HUD_DEPTH)
       .setScrollFactor(0);
 
     // Oath/relic strip stays pinned with the HUD (scrollFactor 0) so players can
@@ -213,6 +227,7 @@ export class TreeScene extends Phaser.Scene {
         wordWrap: { width: 860 },
       })
       .setOrigin(0.5, 1)
+      .setDepth(HUD_DEPTH)
       .setScrollFactor(0);
 
     this.feedbackText = this.add
@@ -223,6 +238,7 @@ export class TreeScene extends Phaser.Scene {
         align: 'center',
       })
       .setOrigin(0.5, 0)
+      .setDepth(HUD_DEPTH)
       .setScrollFactor(0);
 
     this.nodesContainer = this.add.container(0, 0);
@@ -251,7 +267,7 @@ export class TreeScene extends Phaser.Scene {
   /** Simple lock glyph between the Vigil and Zealot oath nodes (handoff §Q). */
   private buildOathLockIcon(): void {
     const x = 480;
-    const y = 260;
+    const y = 235;
     const shackle = this.add
       .rectangle(x, y - 7, 12, 9, BG_COLOR)
       .setStrokeStyle(2, 0x8a7868)
@@ -284,9 +300,10 @@ export class TreeScene extends Phaser.Scene {
     this.hideTooltip();
     this.nodesContainer.removeAll(true);
     const treeView = view(SPELL_TREE, this.treeState);
-    const gold = treeView.wallet['gold'] ?? 0;
-    const ruby = treeView.wallet['ruby'] ?? 0;
-    this.headerText.setText(`Gold ${gold} (tree)    Rubies ${ruby} (oaths)`);
+    const available = treeView.wallet['talent'] ?? 0;
+    this.headerText.setText(
+      `Level ${levelForXp(this.save.xp)}   •   ${available} unplaced   •   ${allocatedTalentPoints(this.save)} placed`,
+    );
     this.statusText.setText(this.armMessage());
     this.feedbackText.setText(this.feedback);
 
@@ -364,15 +381,18 @@ export class TreeScene extends Phaser.Scene {
     bg.on('pointerdown', () => this.onSpotClicked(spot));
 
     const nameText = this.add
-      .text(pos.x, pos.y - 20, spotTitle(spot), {
+      .text(pos.x, pos.y - 15, spotTitle(spot), {
         fontFamily: FONT,
         fontSize: '13px',
+        fontStyle: 'bold',
         color: nameColor,
         align: 'center',
+        stroke: '#0a0605',
+        strokeThickness: 2,
       })
       .setOrigin(0.5)
       .setAlpha(alpha);
-    this.clampTitleWidth(nameText, NODE_WIDTH - 16);
+    this.clampTitleWidth(nameText, NODE_WIDTH - 10);
 
     const costStr = spot.next
       ? costLabel(spot.next.cost.currency, spot.next.cost.amount)
@@ -380,7 +400,7 @@ export class TreeScene extends Phaser.Scene {
         ? 'owned'
         : '';
     const costText = this.add
-      .text(pos.x, pos.y + 10, costStr, { fontFamily: FONT, fontSize: '13px', color: costColor })
+      .text(pos.x, pos.y + 9, costStr, { fontFamily: FONT, fontSize: '12px', color: costColor })
       .setOrigin(0.5)
       .setAlpha(alpha);
 
@@ -388,7 +408,7 @@ export class TreeScene extends Phaser.Scene {
 
     if (spot.status === 'exclusive-locked') {
       const lockedText = this.add
-        .text(pos.x, pos.y + 27, 'LOCKED', { fontFamily: FONT, fontSize: '12px', color: DANGER_COLOR })
+        .text(pos.x, pos.y + 23, 'LOCKED', { fontFamily: FONT, fontSize: '10px', color: DANGER_COLOR })
         .setOrigin(0.5)
         .setAlpha(alpha);
       this.nodesContainer.add(lockedText);
@@ -506,11 +526,13 @@ export class TreeScene extends Phaser.Scene {
       .rectangle(x, y, 160, 44, BUTTON_COLOR)
       .setStrokeStyle(2, BORDER_COLOR)
       .setInteractive({ useHandCursor: true })
+      .setDepth(HUD_DEPTH)
       .setScrollFactor(0)
       .setName('treeBack');
     this.add
       .text(x, y, 'Back', { fontFamily: FONT, fontSize: '16px', color: TEXT_COLOR })
       .setOrigin(0.5)
+      .setDepth(HUD_DEPTH)
       .setScrollFactor(0);
     rect.on('pointerdown', () => this.scene.start(SceneKeys.Hub));
   }

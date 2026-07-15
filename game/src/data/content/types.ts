@@ -76,9 +76,7 @@ export type DungeonUnlockRequirement =
   | { kind: 'dungeonClear'; dungeonId: string };
 
 export interface DungeonRewardsDef {
-  goldPerEnemy: number;
   xpPerEnemy: number;
-  rubyPerFirstClear: number;
 }
 
 /** Authoring form: unlike EncounterDef, the final boss is an ordinary ordered wave. */

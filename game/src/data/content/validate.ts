@@ -212,21 +212,13 @@ export function validateContent(catalogs: ContentCatalogs): ContentValidationRes
     if (!isPositiveInteger(dungeon.order)) {
       error('invalid-positive-integer', `${path}.order`, 'order must be a positive integer');
     }
-    (
-      [
-        ['goldPerEnemy', dungeon.rewards.goldPerEnemy],
-        ['xpPerEnemy', dungeon.rewards.xpPerEnemy],
-        ['rubyPerFirstClear', dungeon.rewards.rubyPerFirstClear],
-      ] as const
-    ).forEach(([field, value]) => {
-      if (!isNonNegativeInteger(value)) {
-        error(
-          'invalid-non-negative-integer',
-          `${path}.rewards.${field}`,
-          `${field} must be a non-negative integer`,
-        );
-      }
-    });
+    if (!isNonNegativeInteger(dungeon.rewards.xpPerEnemy)) {
+      error(
+        'invalid-non-negative-integer',
+        `${path}.rewards.xpPerEnemy`,
+        'xpPerEnemy must be a non-negative integer',
+      );
+    }
     checkVisualKey(dungeon.visualKey, `${path}.visualKey`);
     if (dungeon.unlock.kind === 'dungeonClear') {
       const target = dungeonById.get(dungeon.unlock.dungeonId);

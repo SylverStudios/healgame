@@ -6,9 +6,7 @@ export const THE_MAW_DUNGEON = {
   order: 3,
   unlock: { kind: 'dungeonClear', dungeonId: 'iron-pass' },
   rewards: {
-    goldPerEnemy: 1,
     xpPerEnemy: 1,
-    rubyPerFirstClear: 0,
   },
   visualKey: 'the-maw',
   waves: [

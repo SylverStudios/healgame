@@ -42,28 +42,26 @@ const BASE_KIT: SpellDef[] = [SPELLS.solemnMend];
 /** Minimal synthetic SaveData for loadoutFromSave — only the fields the two maxed builds below need. */
 function makeSave(overrides: Partial<SaveData>): SaveData {
   return {
-    version: 4,
+    version: 5,
     tutorialDone: true,
-    gold: 0,
     xp: 0,
-    rubies: 0,
     unlockedSpells: [],
     treeRanks: {},
     subclass: null,
     clearedDungeons: [],
     combatPaceTenths: 10,
-    relicId: null,
-    relicPickPending: false,
+    relicIds: [],
+    pendingRelicOffers: [],
     ...overrides,
   };
 }
 
 /**
  * Maxed Vigil build (phase-2-handoff Chunk 1 brief, extended alpha-0.1-handoff
- * §D5 chunk 9a): Deep Reserves x5, Vigil oath + Patient Vow x3 (Mend->Vigil
- * synergy) + Measured Devotion (Solemn Vigil slower/cheaper), plus ALL Vigil
- * tree layer-2 nodes — Deep Well (+4 max mana), Thrift (Solemn Mend -1 mana),
- * Still Waters (grants the CD).
+ * §D5 chunk 9a): Deep Reserves x5, Vigil oath + the Patient Vow power
+ * specialization x3 (Mend->Vigil synergy), plus ALL Vigil tree layer-2 nodes
+ * — Deep Well, Thrift, and Still Waters. Measured Devotion is the mutually
+ * exclusive efficiency specialization and cannot stack with Patient Vow.
  */
 const VIGIL_SAVE: SaveData = makeSave({
   unlockedSpells: ['solemn-mend', 'zealous-mending'],
@@ -71,6 +69,19 @@ const VIGIL_SAVE: SaveData = makeSave({
     'deep-reserves': 5,
     'vigil-oath': 1,
     'vigil-patient-vow': 3,
+    'vigil-deep-well': 1,
+    'vigil-thrift': 1,
+    'vigil-still-waters': 1,
+  },
+  subclass: 'vigil',
+});
+
+/** Maxed Vigil efficiency specialization: Measured Devotion instead of Patient Vow. */
+const VIGIL_EFFICIENCY_SAVE: SaveData = makeSave({
+  unlockedSpells: ['solemn-mend', 'zealous-mending'],
+  treeRanks: {
+    'deep-reserves': 5,
+    'vigil-oath': 1,
     'vigil-measured-devotion': 1,
     'vigil-deep-well': 1,
     'vigil-thrift': 1,
@@ -101,6 +112,7 @@ const ZEALOT_SAVE: SaveData = makeSave({
 });
 
 const VIGIL_LOADOUT: CombatMods = loadoutFromSave(VIGIL_SAVE);
+const VIGIL_EFFICIENCY_LOADOUT: CombatMods = loadoutFromSave(VIGIL_EFFICIENCY_SAVE);
 const ZEALOT_LOADOUT: CombatMods = loadoutFromSave(ZEALOT_SAVE);
 
 interface BotRun {
@@ -146,11 +158,9 @@ type BotStyle = 'none' | 'naive' | 'disciplined';
  * generalizes to whichever cooldown a loadout owns:
  * - `manaCostReduction` (Frenzied Liturgy): activate whenever ready — a pure
  *   tempo window with no downside to popping early.
- * - `freeNextHeal` (Still Waters): activate only when ready AND the healer's
- *   mana is already short of the heal they'd otherwise cast next (the OOM
- *   panic button) — computed from the same target/emergency logic as the
- *   cast decision, just ignoring affordability so the "intended" spell is
- *   known before mana is checked.
+ * - `freeNextHeal` (Still Waters): activate whenever ready and a useful heal
+ *   is intended. The charge has no downside and immediately makes that next
+ *   action free.
  */
 function runBot(
   encounter: EncounterDef,
@@ -225,7 +235,7 @@ function runBot(
           if (def.effect.kind === 'manaCostReduction') {
             engine.activateCooldown(def.id);
             cdActivations += 1;
-          } else if (def.effect.kind === 'freeNextHeal' && intended && healer.mana < intended.mana) {
+          } else if (def.effect.kind === 'freeNextHeal' && intended) {
             engine.activateCooldown(def.id);
             cdActivations += 1;
           }
@@ -302,7 +312,7 @@ function runBuildBot(
   encounter: EncounterDef,
   loadout: CombatMods,
   style: BotStyle,
-  relic?: RelicDef,
+  relics: RelicDef[] = [],
 ): BotRun {
   return runBot(
     encounter,
@@ -314,7 +324,7 @@ function runBuildBot(
       missingHealthPctBonuses: loadout.missingHealthPctBonuses,
       fullHealthBonuses: loadout.fullHealthBonuses,
       cooldowns: loadout.cooldowns,
-      relic,
+      relics,
     },
     style,
   );
@@ -345,6 +355,11 @@ describe('Ash Gate difficulty shape (poc-spec §4.1)', () => {
     expect(vigilRun.healsCast).toBeGreaterThan(0);
     expect(vigilRun.survivors).toBeGreaterThanOrEqual(3);
 
+    const vigilEfficiencyRun = runBuildBot(ASH_GATE, VIGIL_EFFICIENCY_LOADOUT, 'disciplined');
+    expect(vigilEfficiencyRun.status).toBe('victory');
+    expect(vigilEfficiencyRun.healsCast).toBeGreaterThan(0);
+    expect(vigilEfficiencyRun.survivors).toBeGreaterThanOrEqual(3);
+
     const zealotRun = runBuildBot(ASH_GATE, ZEALOT_LOADOUT, 'disciplined');
     expect(zealotRun.status).toBe('victory');
     expect(zealotRun.healsCast).toBeGreaterThan(0);
@@ -367,6 +382,14 @@ describe('Iron Pass difficulty shape (alpha-0.1-handoff §D2/§D3, chunk 9a)', (
     expect(run.cdActivations).toBeGreaterThanOrEqual(1);
   });
 
+  it('the mutually exclusive Vigil efficiency build also clears Iron Pass', () => {
+    const run = runBuildBot(IRON_PASS, VIGIL_EFFICIENCY_LOADOUT, 'disciplined');
+    expect(run.status).toBe('victory');
+    expect(run.survivors).toBeGreaterThanOrEqual(3);
+    expect(run.bossFocusStarted).toBeGreaterThanOrEqual(1);
+    expect(run.cdActivations).toBeGreaterThanOrEqual(1);
+  });
+
   it('a maxed Zealot build clears Iron Pass with disciplined play', () => {
     const run = runBuildBot(IRON_PASS, ZEALOT_LOADOUT, 'disciplined');
     expect(run.status).toBe('victory');
@@ -378,11 +401,13 @@ describe('Iron Pass difficulty shape (alpha-0.1-handoff §D2/§D3, chunk 9a)', (
 describe('The Maw is an unwinnable sandbox (poc-spec §7, alpha-0.1-handoff §D7 chunk 9a)', () => {
   it('wipes even with either maxed subclass build and disciplined healing (no relic)', () => {
     expect(runBuildBot(THE_MAW, VIGIL_LOADOUT, 'disciplined').status).toBe('wipe');
+    expect(runBuildBot(THE_MAW, VIGIL_EFFICIENCY_LOADOUT, 'disciplined').status).toBe('wipe');
     expect(runBuildBot(THE_MAW, ZEALOT_LOADOUT, 'disciplined').status).toBe('wipe');
   });
 
   it.each(RELICS)('wipes with either maxed build even holding the $name relic', (relic) => {
-    expect(runBuildBot(THE_MAW, VIGIL_LOADOUT, 'disciplined', relic).status).toBe('wipe');
-    expect(runBuildBot(THE_MAW, ZEALOT_LOADOUT, 'disciplined', relic).status).toBe('wipe');
+    expect(runBuildBot(THE_MAW, VIGIL_LOADOUT, 'disciplined', [relic]).status).toBe('wipe');
+    expect(runBuildBot(THE_MAW, VIGIL_EFFICIENCY_LOADOUT, 'disciplined', [relic]).status).toBe('wipe');
+    expect(runBuildBot(THE_MAW, ZEALOT_LOADOUT, 'disciplined', [relic]).status).toBe('wipe');
   });
 });

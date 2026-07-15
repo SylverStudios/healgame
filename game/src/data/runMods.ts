@@ -1,12 +1,12 @@
 /**
- * Display-only run modifiers for the StS-style top bar: sworn oath + picked
- * relic. Combat effects still come from the tree loadout / engine `relic`
+ * Display-only run modifiers for the StS-style top bar: sworn oath + permanent
+ * relics. Combat effects still come from the tree loadout / engine `relics`
  * option — this module only assembles name/description for HUD tooltips.
  */
 
 import type { SubclassId } from '../save/save';
 import { SPELL_TREE, type SpellTreeContent } from './spellTree';
-import { relicById } from './relics';
+import { relicsById } from './relics';
 
 export type RunModKind = 'oath' | 'relic';
 
@@ -42,19 +42,17 @@ export function oathRunMod(subclass: SubclassId): RunModDisplay {
 }
 
 /**
- * Ordered run mods for the HUD: oath first (identity), then relic (pick).
- * Empty when neither is present yet.
+ * Ordered run mods for the HUD: oath first, then permanent relics.
  */
 export function runModsFromSave(save: {
   subclass: SubclassId | null;
-  relicId: string | null;
+  relicIds: readonly string[];
 }): RunModDisplay[] {
   const mods: RunModDisplay[] = [];
   if (save.subclass !== null) {
     mods.push(oathRunMod(save.subclass));
   }
-  const relic = relicById(save.relicId);
-  if (relic) {
+  for (const relic of relicsById(save.relicIds)) {
     mods.push({
       id: relic.id,
       kind: 'relic',

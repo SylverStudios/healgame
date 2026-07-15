@@ -6,7 +6,7 @@ import type { CombatEvent, CooldownDef, EncounterDef, SpellDef } from './types';
 
 /**
  * Alpha 0.1 §D6 (first major CDs): Still Waters (freeNextHeal, 60s) and
- * Frenzied Liturgy (manaCostReduction, 30s/30s). See combat/README.md
+ * Frenzied Liturgy (manaCostReduction, 30s buff / 40s cooldown). See combat/README.md
  * "Cooldowns" for the full rule writeup this file encodes.
  *
  * A single never-dying dummy (mirrors engine.effects.test.ts's
@@ -275,21 +275,38 @@ describe('Frenzied Liturgy (manaCostReduction)', () => {
     expect(healerMana(engine)).toBe(16); // still only the reduced amount was ever spent
   });
 
-  it('the window expires after 30s sim: cooldownBuffEnded fires exactly once, then casts cost normal mana', () => {
+  it('expires after 30s with 10s cooldown remaining; cannot reactivate until the 40s cooldown is ready', () => {
     const engine = new CombatEngine(NEVER_DYING_TRASH_ENCOUNTER, TEST_SPELLS, { cooldowns: [FRENZIED_LITURGY] });
     engine.setTarget('healer');
     engine.activateCooldown(FRENZIED_LITURGY.id);
     const events = engine.advance(manaCostReductionDurationMs(FRENZIED_LITURGY)); // exactly 30_000ms
     expect(buffEndeds(events)).toHaveLength(1);
     expect(cooldownState(engine, FRENZIED_LITURGY.id).activeRemainingMs).toBe(0);
+    expect(cooldownState(engine, FRENZIED_LITURGY.id).remainingCooldownMs).toBe(
+      FRENZIED_LITURGY.cooldownMs - manaCostReductionDurationMs(FRENZIED_LITURGY),
+    );
 
     engine.castSpell(TEST_SOLEMN_MEND.id); // window closed -> full 5-mana cost
     engine.advance(0);
     expect(healerMana(engine)).toBe(15); // 20 - 5, not 20 - 4
 
-    // No further cooldownBuffEnded fires from continuing to advance (guarded by the > 0 check).
-    const laterEvents = engine.advance(5000);
-    expect(buffEndeds(laterEvents)).toHaveLength(0);
+    engine.activateCooldown(FRENZIED_LITURGY.id); // buff is over, but recovery is not -> ignored
+    expect(activations(engine.advance(0))).toHaveLength(0);
+
+    const recoveryMs = FRENZIED_LITURGY.cooldownMs - manaCostReductionDurationMs(FRENZIED_LITURGY);
+    const beforeReadyEvents = engine.advance(recoveryMs - 1);
+    expect(buffEndeds(beforeReadyEvents)).toHaveLength(0); // expiry event never repeats during recovery
+    expect(cooldownState(engine, FRENZIED_LITURGY.id).remainingCooldownMs).toBe(1);
+    engine.activateCooldown(FRENZIED_LITURGY.id);
+    expect(activations(engine.advance(0))).toHaveLength(0);
+
+    engine.advance(1);
+    expect(cooldownState(engine, FRENZIED_LITURGY.id).remainingCooldownMs).toBe(0);
+    engine.activateCooldown(FRENZIED_LITURGY.id);
+    expect(activations(engine.advance(0))).toHaveLength(1);
+    expect(cooldownState(engine, FRENZIED_LITURGY.id).activeRemainingMs).toBe(
+      manaCostReductionDurationMs(FRENZIED_LITURGY),
+    );
   });
 });
 

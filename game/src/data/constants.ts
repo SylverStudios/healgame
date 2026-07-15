@@ -35,28 +35,31 @@ export const MERCS = {
 } as const;
 
 export const SPELLS = {
-  solemnMend: { id: 'solemn-mend', name: 'Solemn Mend', heal: 5, mana: 5, castMs: 2000 },
-  zealousMending: { id: 'zealous-mending', name: 'Zealous Mending', heal: 6, mana: 6, castMs: 1000 },
+  solemnMend: { id: 'solemn-mend', name: 'Solemn Mend', heal: 4, mana: 3, castMs: 2000 },
+  zealousMending: { id: 'zealous-mending', name: 'Zealous Mending', heal: 4, mana: 4, castMs: 1000 },
   /** Vigil subclass spell (phase-2-handoff): slow, efficient. Granted by the vigil-oath tree node. */
-  solemnVigil: { id: 'solemn-vigil', name: 'Solemn Vigil', heal: 9, mana: 7, castMs: 3000 },
+  solemnVigil: { id: 'solemn-vigil', name: 'Solemn Vigil', heal: 6, mana: 5, castMs: 3000 },
   /** Zealot subclass spell (phase-2-handoff): fast, pricey per point. Granted by the zealot-oath tree node. */
-  zealousFlare: { id: 'zealous-flare', name: 'Zealous Flare', heal: 3, mana: 4, castMs: 500 },
+  zealousFlare: { id: 'zealous-flare', name: 'Zealous Flare', heal: 2, mana: 2, castMs: 500 },
 } as const;
 
 export const REWARDS = {
-  goldPerEnemy: 1,
+  /** Every defeated enemy advances the account, including kills in a wipe. */
   xpPerEnemy: 1,
-  rubyPerFirstClear: 1,
-  /**
-   * Alpha 0.1 §D1: rubies stay Ash-Gate-only — an Iron Pass first clear
-   * records the clear (unlocking The Maw) but grants no ruby.
-   */
-  rubyFirstClearDungeonIds: ['ash-gate'],
 } as const;
 
-/** Micro-choice (poc-spec §10.1): level 2 at 10 XP; only level 2 matters for PoC. */
+/** Level 2 remains at 10 XP; later levels require 10, 20, 30… additional XP. */
 export const XP_LEVEL_2_THRESHOLD = 10;
 
+/** Total XP required to reach a level (level 1 starts at 0 XP). */
+export function xpForLevel(level: number): number {
+  const safeLevel = Math.max(1, Math.floor(level));
+  return (XP_LEVEL_2_THRESHOLD * safeLevel * (safeLevel - 1)) / 2;
+}
+
 export function levelForXp(xp: number): number {
-  return xp >= XP_LEVEL_2_THRESHOLD ? 2 : 1;
+  const safeXp = Math.max(0, Math.floor(xp));
+  let level = 1;
+  while (xpForLevel(level + 1) <= safeXp) level += 1;
+  return level;
 }

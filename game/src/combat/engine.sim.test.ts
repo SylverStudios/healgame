@@ -40,12 +40,10 @@ describe('end-to-end: scripted healer bot', () => {
     expect(ended).toHaveLength(1);
   });
 
-  it('rewards are at least the number of enemy kills, and gold/xp move together', () => {
+  it('XP tracks every kill', () => {
     const { events, engine } = runHealerBotSim();
     const kills = events.filter((e) => e.type === 'unitDied' && !['tank', 'dps1', 'dps2', 'healer'].includes(e.unitId));
-    expect(engine.rewards.gold).toBeGreaterThanOrEqual(kills.length);
-    expect(engine.rewards.xp).toBeGreaterThanOrEqual(kills.length);
-    expect(engine.rewards.gold).toBe(engine.rewards.xp); // 1 gold + 1 xp per kill in poc-spec draft numbers
+    expect(engine.rewards.xp).toBe(kills.length);
     expect(kills.length).toBeGreaterThan(0); // the bot should land at least one kill before any outcome
   });
 
