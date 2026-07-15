@@ -19,6 +19,6 @@ export const THE_MAW_DUNGEON = {
         },
       ],
     },
-    { enemies: [{ mobId: 'hollow-king', count: 1 }] },
+    { enemies: [{ mobId: 'hollow-king', count: 1, statOverrides: { hp: 9999 } }] },
   ],
 } as const satisfies DungeonDef;

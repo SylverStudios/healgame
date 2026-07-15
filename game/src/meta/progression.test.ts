@@ -360,7 +360,7 @@ describe('manaBonusesForLevel (Alpha 0.2 §D2)', () => {
 
 describe('THE_MAW data sanity', () => {
   it('has a boss with overwhelming hp', () => {
-    expect(THE_MAW.boss.hp).toBe(999);
+    expect(THE_MAW.boss.hp).toBe(9999);
   });
 
   it('has a named party-wide cast (Extinction) defined', () => {

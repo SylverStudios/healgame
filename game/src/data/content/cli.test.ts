@@ -54,8 +54,8 @@ describe('content CLI', () => {
     const one = runContent('balance', sample.id);
     expect(one.status).toBe(0);
     expect(one.stdout).toContain(`${sample.name} [${sample.id}]`);
-    expect(one.stdout).toContain('Vigil (Patient Vow):');
-    expect(one.stdout).toContain('Zealot:');
+    expect(one.stdout).toContain('Vigil × Virtue (Patient Crown):');
+    expect(one.stdout).toContain('Zealot × Virtue (Crown):');
 
     const all = runContent('balance', '--all');
     expect(all.status).toBe(0);
