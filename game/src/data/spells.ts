@@ -12,6 +12,8 @@ export const ALL_SPELLS: SpellDef[] = [
   SPELLS.zealousMending,
   SPELLS.solemnVigil,
   SPELLS.zealousFlare,
+  SPELLS.vowstrikeVirtue,
+  SPELLS.vowstrikeVengeance,
 ];
 
 export function spellById(id: string): SpellDef | undefined {

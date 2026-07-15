@@ -48,12 +48,16 @@ export const MERCS = {
 } as const;
 
 export const SPELLS = {
-  solemnMend: { id: 'solemn-mend', name: 'Solemn Mend', heal: 4, mana: 3, castMs: 2000 },
-  zealousMending: { id: 'zealous-mending', name: 'Zealous Mending', heal: 4, mana: 4, castMs: 1000 },
+  solemnMend: { id: 'solemn-mend', name: 'Solemn Mend', heal: 4, mana: 3, castMs: 2000, glyph: 'M' },
+  zealousMending: { id: 'zealous-mending', name: 'Zealous Mending', heal: 4, mana: 4, castMs: 1000, glyph: 'Z' },
   /** Vigil subclass spell (phase-2-handoff): slow, efficient. Granted by the vigil-oath tree node. */
-  solemnVigil: { id: 'solemn-vigil', name: 'Solemn Vigil', heal: 6, mana: 5, castMs: 3000 },
+  solemnVigil: { id: 'solemn-vigil', name: 'Solemn Vigil', heal: 6, mana: 5, castMs: 3000, glyph: 'G' },
   /** Zealot subclass spell (phase-2-handoff): fast, pricey per point. Granted by the zealot-oath tree node. */
-  zealousFlare: { id: 'zealous-flare', name: 'Zealous Flare', heal: 2, mana: 2, castMs: 500 },
+  zealousFlare: { id: 'zealous-flare', name: 'Zealous Flare', heal: 2, mana: 2, castMs: 500, glyph: 'F' },
+  /** Alpha 0.2 §D4 — Virtue/light Vowstrike. True instant; granted by vowstrike-virtue tree node. */
+  vowstrikeVirtue: { id: 'vowstrike-virtue', name: 'Vowstrike: Absolution', heal: 3, mana: 2, castMs: 0, glyph: 'V' },
+  /** Alpha 0.2 §D4 — Vengeance/dark Vowstrike. True instant; granted by vowstrike-vengeance tree node. */
+  vowstrikeVengeance: { id: 'vowstrike-vengeance', name: 'Vowstrike: Reckoning', heal: 2, mana: 2, castMs: 0, glyph: 'X' },
 } as const;
 
 export const REWARDS = {

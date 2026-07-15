@@ -13,6 +13,7 @@ export const STILL_WATERS: CooldownDef = {
   description: 'Next completed heal costs no mana.',
   cooldownMs: 60_000,
   effect: { kind: 'freeNextHeal' },
+  glyph: 'S',
 };
 
 /** Zealot CD: a 30s tempo window, followed by 10s of recovery before reuse. */
@@ -22,9 +23,20 @@ export const FRENZIED_LITURGY: CooldownDef = {
   description: 'For 30s, heals cost 1 less mana.',
   cooldownMs: 40_000,
   effect: { kind: 'manaCostReduction', durationMs: 30_000, costReduction: 1 },
+  glyph: 'L',
 };
 
-export const COOLDOWNS: CooldownDef[] = [STILL_WATERS, FRENZIED_LITURGY];
+/** Crown CD (Alpha 0.2 §D6): shared Wings-feel cooldown, granted by the wrath-ascendant tree node. */
+export const WRATH_ASCENDANT: CooldownDef = {
+  id: 'wrath-ascendant',
+  name: 'Wrath Ascendant',
+  description: 'For 12s, your heals gain +2. Off-GCD.',
+  cooldownMs: 45_000,
+  effect: { kind: 'healBonus', durationMs: 12_000, bonusHeal: 2 },
+  glyph: 'W',
+};
+
+export const COOLDOWNS: CooldownDef[] = [STILL_WATERS, FRENZIED_LITURGY, WRATH_ASCENDANT];
 
 export function cooldownById(id: string): CooldownDef | undefined {
   return COOLDOWNS.find((c) => c.id === id);
