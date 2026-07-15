@@ -72,6 +72,23 @@ describe('permanent relic stats', () => {
     engine.advance(1);
     expect(engine.state.party.find((unit) => unit.id === 'healer')?.mana).toBe(16);
   });
+
+  it('merges options.manaRegen with relic manaRegen (sum amounts, min interval)', () => {
+    // Ember Ledger: +1 / 30s. Options: +1 / 10s → combined +2 every 10s.
+    const engine = new CombatEngine(ENCOUNTER, TEST_SPELLS, {
+      relics: [EMBER_LEDGER],
+      manaRegen: { amount: 1, intervalMs: 10_000 },
+    });
+    engine.setTarget('healer');
+    engine.castSpell(TEST_SOLEMN_MEND.id);
+    engine.advance(TEST_SOLEMN_MEND.castMs); // 2000ms elapsed → 8000ms until first tick
+    const manaAfterCast = engine.state.party.find((unit) => unit.id === 'healer')!.mana;
+
+    engine.advance(7999);
+    expect(engine.state.party.find((unit) => unit.id === 'healer')!.mana).toBe(manaAfterCast);
+    engine.advance(1);
+    expect(engine.state.party.find((unit) => unit.id === 'healer')!.mana).toBe(manaAfterCast + 2);
+  });
 });
 
 describe('no relic regression', () => {

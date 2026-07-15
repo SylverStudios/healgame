@@ -1,6 +1,6 @@
 # AGENTS.md — healgame documentation system
 
-Status: current · Authority: doc conventions for all agents · Last verified: 2026-07-13
+Status: current · Authority: doc conventions for all agents · Last verified: 2026-07-15
 
 How we keep docs trustworthy. Operating rules for the game itself live in
 [`CLAUDE.md`](CLAUDE.md). Module contracts live next to code (e.g.
@@ -65,7 +65,7 @@ agents should prefer `verify`.
 |------|----------|
 | Living rules | `CLAUDE.md`, `docs/poc-spec.md`, `docs/poc-qa.md` |
 | Active mission | None; check `docs/*-handoff.md` for a future `Status: planning` handoff |
-| Latest shipped phase | `docs/semantic-targets-handoff.md` (`Status: historical`; Alpha 0.1 remains `docs/alpha-0.1-handoff.md`) |
+| Latest shipped phase | `docs/oathbound-depth-handoff.md` (`Status: historical` — Alpha 0.2 Oathbound Depth; Alpha 0.1 remains `docs/alpha-0.1-handoff.md`) |
 | PoC retrospective | `docs/poc-changelog.md` (`Status: historical`, frozen) |
 | Module contracts | Colocated `AGENTS.md` / `README.md` |
 | Historical | Bannered handoffs / outcomes (or `docs/archive/`) |

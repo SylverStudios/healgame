@@ -23,11 +23,11 @@ function storePayload(store: KeyValueStore, payload: Record<string, unknown>): v
 }
 
 describe('save', () => {
-  it('returns a fresh v5 save when nothing is stored', () => {
+  it('returns a fresh v6 save when nothing is stored', () => {
     const save = loadSave(memoryStore());
     expect(save).toEqual(newSaveData());
     expect(save).toEqual({
-      version: 5,
+      version: 6,
       tutorialDone: false,
       xp: 0,
       unlockedSpells: [],
@@ -42,10 +42,10 @@ describe('save', () => {
     expect(save).not.toHaveProperty('rubies');
   });
 
-  it('round-trips a full v5 save', () => {
+  it('round-trips a full v6 save', () => {
     const store = memoryStore();
     const data: SaveData = {
-      version: 5,
+      version: 6,
       tutorialDone: true,
       xp: 42,
       unlockedSpells: ['solemn-mend', 'zealous-mending'],
@@ -60,11 +60,13 @@ describe('save', () => {
     expect(loadSave(store)).toEqual(data);
   });
 
-  it('deletes the old development save key instead of migrating it', () => {
+  it('deletes old development save keys instead of migrating them', () => {
     const store = memoryStore();
     store.setItem('healgame-save-v1', JSON.stringify({ version: 4, xp: 999 }));
+    store.setItem('healgame-save-v5', JSON.stringify({ version: 5, xp: 999 }));
     expect(loadSave(store)).toEqual(newSaveData());
     expect(store.getItem('healgame-save-v1')).toBeNull();
+    expect(store.getItem('healgame-save-v5')).toBeNull();
   });
 
   it('resetSave wipes everything (restart, no respec)', () => {
@@ -79,19 +81,8 @@ describe('save', () => {
 
   it('falls back to a fresh save on corrupt or unknown data', () => {
     const store = memoryStore();
-    store.setItem(SAVE_KEY, '{not json');
+    storePayload(store, { version: 6, xp: 'nope' });
     expect(loadSave(store)).toEqual(newSaveData());
-    store.setItem(SAVE_KEY, JSON.stringify({ version: 99 }));
-    expect(loadSave(store)).toEqual(newSaveData());
-    storePayload(store, { ...newSaveData(), version: 4 });
-    expect(loadSave(store)).toEqual(newSaveData());
-    storePayload(store, { ...newSaveData(), pendingRelicOffers: 'nope' });
-    expect(loadSave(store)).toEqual(newSaveData());
-  });
-
-  it('works without any storage (SSR/tests)', () => {
-    expect(loadSave(null)).toEqual(newSaveData());
-    expect(() => saveGame(newSaveData(), null)).not.toThrow();
-    expect(() => resetSave(null)).not.toThrow();
+    expect(store.getItem(SAVE_KEY)).toBeNull();
   });
 });

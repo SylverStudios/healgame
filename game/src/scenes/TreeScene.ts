@@ -15,6 +15,7 @@ import {
 } from '../data/spellTree';
 import { runModsFromSave } from '../data/runMods';
 import { RunModsBar } from '../ui/runModsBar';
+import { glyphChar } from '../ui/glyph';
 import { allocatedTalentPoints, availableTalentPoints } from '../meta/progression';
 import { levelForXp } from '../data/constants';
 import {
@@ -50,17 +51,24 @@ const NODE_WIDTH = 192;
 const NODE_HEIGHT = 62;
 
 /**
- * Alpha 0.1 §D5 tree layer 2 sits below the branch rows (world y 600/735),
- * past the 960×540 base canvas (see main.ts) which has no room left after
- * the existing rows (deep-reserves 130 → oaths 260 → branch follow-ups 400 →
- * graven-scale 550). TreeScene now scrolls: world content (nodes/edges) pans
- * under a screen-fixed HUD (title/wallet/status/back button via
- * `setScrollFactor(0)`), driven by mouse wheel. `journey.mjs` reaches layer 2
- * via `page.mouse.wheel(0, dy)` while hovering the canvas, then clicks the
- * resulting on-screen position (world y − scrollY). The compact 820px world
- * still leaves the final row fully reachable at maximum scroll.
+ * Alpha 0.2 §D8 hourglass tree: rows extend to y≈960 (crown), past the
+ * 960×540 base canvas. World height is 1080; max scroll = 1080 − 540 = 540.
+ * World content (nodes/edges) pans under a screen-fixed HUD (title/wallet/
+ * status/back button via `setScrollFactor(0)`), driven by mouse wheel.
+ * Journey reaches deep nodes by wheeling the canvas then clicking by name
+ * (`treeNode:<spotId>`) — no coordinate tables needed.
+ *
+ * Row layout (y centers):
+ *   125  deep-reserves
+ *   235  vigil-oath / zealot-oath
+ *   355  patient-vow/measured / fervent-chain/steady-hands
+ *   480  graven-scale (vigil path only)
+ *   600  thrift, still-waters / quick-breath, frenzied-liturgy  (layer 2)
+ *   720  shared-mend-potency / shared-zealous-potency            (shared mid)
+ *   840  vowstrike-virtue / vowstrike-vengeance                  (Vowstrike fork)
+ *   960  wrath-ascendant / vowbound-crown                        (crown)
  */
-const WORLD_HEIGHT = 820;
+const WORLD_HEIGHT = 1080;
 const WHEEL_SCROLL_SCALE = 0.5;
 
 const TOOLTIP_BG = 0x241a15;
@@ -75,9 +83,14 @@ const HUD_DEPTH = 200;
  * Presentation overrides for the live SPELL_TREE (node placement).
  * Any other config falls through to layoutSpots auto-placement.
  * Journey clicks nodes by `treeNode:<spotId>` name, not by these coords.
+ *
+ * Pure-mana nodes vigil-deep-well and zealot-spendthrift-grace were removed
+ * in Alpha 0.2; their entries are omitted here.
  */
 const SPELL_TREE_POSITIONS: Readonly<Record<string, SpotPosition>> = {
+  // Shared early
   'deep-reserves': { x: 480, y: 125 },
+  // Oath wedge
   'vigil-oath': { x: 260, y: 235 },
   'zealot-oath': { x: 700, y: 235 },
   'vigil-patient-vow': { x: 150, y: 355 },
@@ -85,13 +98,21 @@ const SPELL_TREE_POSITIONS: Readonly<Record<string, SpotPosition>> = {
   'vigil-graven-scale': { x: 150, y: 480 },
   'zealot-fervent-chain': { x: 590, y: 355 },
   'zealot-steady-hands': { x: 820, y: 355 },
-  // Layer 2 (Alpha 0.1 §D5) — below the branch row, reached via scroll.
-  'vigil-deep-well': { x: 150, y: 600 },
-  'vigil-thrift': { x: 380, y: 600 },
-  'zealot-quick-breath': { x: 590, y: 600 },
-  'zealot-spendthrift-grace': { x: 820, y: 600 },
-  'vigil-still-waters': { x: 265, y: 735 },
-  'zealot-frenzied-liturgy': { x: 705, y: 735 },
+  // Layer 2 — output nodes compacted to y 600 (deep-well/spendthrift-grace cut in Alpha 0.2).
+  // Four nodes spread across the 960px canvas with ~20px gaps between node edges.
+  'vigil-thrift': { x: 160, y: 600 },
+  'vigil-still-waters': { x: 375, y: 600 },
+  'zealot-quick-breath': { x: 585, y: 600 },
+  'zealot-frenzied-liturgy': { x: 800, y: 600 },
+  // Shared mid (Alpha 0.2 §D1)
+  'shared-mend-potency': { x: 320, y: 720 },
+  'shared-zealous-potency': { x: 640, y: 720 },
+  // Vowstrike fork (Alpha 0.2 §D4) — exclusiveGroup: vowstrike-aspect
+  'vowstrike-virtue': { x: 260, y: 840 },
+  'vowstrike-vengeance': { x: 700, y: 840 },
+  // Shared crown (Alpha 0.2 §D6)
+  'wrath-ascendant': { x: 360, y: 960 },
+  'vowbound-crown': { x: 600, y: 960 },
 };
 
 function asContent(raw: unknown): SpellTreeContent | null {
@@ -108,14 +129,6 @@ function costLabel(currency: string, amount: number): string {
 
 function showingNode(spot: SpotView) {
   return spot.next ?? spot.owned[spot.owned.length - 1] ?? null;
-}
-
-function spotTitle(spot: SpotView): string {
-  const node = showingNode(spot);
-  const content = node ? asContent(node.content) : null;
-  const name = content?.name ?? node?.id ?? spot.id;
-  if (spot.chainLength > 1) return `${name} ${spot.owned.length}/${spot.chainLength}`;
-  return name;
 }
 
 function spotDescription(spot: SpotView): string {
@@ -380,39 +393,50 @@ export class TreeScene extends Phaser.Scene {
     bg.on('pointerout', () => this.hideTooltip());
     bg.on('pointerdown', () => this.onSpotClicked(spot));
 
-    const nameText = this.add
-      .text(pos.x, pos.y - 15, spotTitle(spot), {
+    // Large glyph is the primary visual; full name + stats stay in the tooltip.
+    const node = showingNode(spot);
+    const content = node ? asContent(node.content) : null;
+    // Pass content directly when available (name: string satisfies exactOptionalPropertyTypes);
+    // fall back to spot/node id when content could not be cast.
+    const glyph = content ? glyphChar(content) : glyphChar({ id: node?.id ?? spot.id });
+    const glyphText = this.add
+      .text(pos.x, pos.y - 6, glyph, {
         fontFamily: FONT,
-        fontSize: '13px',
+        fontSize: '26px',
         fontStyle: 'bold',
         color: nameColor,
-        align: 'center',
         stroke: '#0a0605',
         strokeThickness: 2,
       })
       .setOrigin(0.5)
       .setAlpha(alpha);
-    this.clampTitleWidth(nameText, NODE_WIDTH - 10);
 
+    // Small status indicator below the glyph: ranks or cost or LOCKED.
     const costStr = spot.next
       ? costLabel(spot.next.cost.currency, spot.next.cost.amount)
       : spot.status === 'complete'
         ? 'owned'
         : '';
+    const rankSuffix = spot.chainLength > 1 ? ` ${spot.owned.length}/${spot.chainLength}` : '';
+    const statusLabel =
+      spot.status === 'exclusive-locked'
+        ? 'LOCKED'
+        : rankSuffix
+          ? costStr
+            ? `${costStr}${rankSuffix}`
+            : rankSuffix.trim()
+          : costStr;
+    const statusColor = spot.status === 'exclusive-locked' ? DANGER_COLOR : costColor;
     const costText = this.add
-      .text(pos.x, pos.y + 9, costStr, { fontFamily: FONT, fontSize: '12px', color: costColor })
+      .text(pos.x, pos.y + 16, statusLabel, {
+        fontFamily: FONT,
+        fontSize: '10px',
+        color: statusColor,
+      })
       .setOrigin(0.5)
       .setAlpha(alpha);
 
-    this.nodesContainer.add([bg, nameText, costText]);
-
-    if (spot.status === 'exclusive-locked') {
-      const lockedText = this.add
-        .text(pos.x, pos.y + 23, 'LOCKED', { fontFamily: FONT, fontSize: '10px', color: DANGER_COLOR })
-        .setOrigin(0.5)
-        .setAlpha(alpha);
-      this.nodesContainer.add(lockedText);
-    }
+    this.nodesContainer.add([bg, glyphText, costText]);
   }
 
   /**
@@ -447,17 +471,6 @@ export class TreeScene extends Phaser.Scene {
 
   private hideTooltip(): void {
     this.tooltipContainer.setVisible(false);
-  }
-
-  /** Truncates an already-rendered text object with an ellipsis until it fits maxWidth. */
-  private clampTitleWidth(text: Phaser.GameObjects.Text, maxWidth: number): void {
-    if (text.width <= maxWidth) return;
-    const full = text.text;
-    let end = full.length - 1;
-    while (end > 1 && text.width > maxWidth) {
-      text.setText(`${full.slice(0, end)}…`);
-      end -= 1;
-    }
   }
 
   private onSpotClicked(spot: SpotView): void {

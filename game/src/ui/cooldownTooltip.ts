@@ -6,8 +6,10 @@ const DEFAULT_LINE_COLOR = '#e8d8c8';
 
 /** Pure cooldown tooltip content: effect copy plus explicit active duration and reuse timing. */
 export function buildCooldownTooltipLines(cooldown: CooldownDef): TooltipLine[] {
+  // Both manaCostReduction and healBonus carry a timed window (durationMs).
+  // freeNextHeal is charge-based (no duration) — display as "Until next heal".
   const duration =
-    cooldown.effect.kind === 'manaCostReduction'
+    cooldown.effect.kind === 'manaCostReduction' || cooldown.effect.kind === 'healBonus'
       ? `${cooldown.effect.durationMs / 1000}s`
       : 'Until next heal';
 

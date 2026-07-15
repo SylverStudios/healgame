@@ -19,6 +19,10 @@ export interface HubNotice {
   text: string;
 }
 
+// Re-exported from data/levelMana.ts so callers don't need to update imports.
+export type { LevelManaBonuses } from '../data/levelMana';
+export { manaBonusesForLevel } from '../data/levelMana';
+
 /**
  * XP always accrues, including on a wipe. Levels grant one tree point each;
  * level 2 also auto-unlocks Zealous Mending. Every distinct dungeon first

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FRENZIED_LITURGY, STILL_WATERS } from '../data/cooldowns';
+import { FRENZIED_LITURGY, STILL_WATERS, WRATH_ASCENDANT } from '../data/cooldowns';
 import { buildCooldownTooltipLines } from './cooldownTooltip';
 
 describe('buildCooldownTooltipLines', () => {
@@ -18,6 +18,15 @@ describe('buildCooldownTooltipLines', () => {
       'Next completed heal costs no mana.',
       'Duration: Until next heal',
       'Cooldown: 60s',
+    ]);
+  });
+
+  it('shows the heal-bonus window duration for Wrath Ascendant (healBonus kind)', () => {
+    expect(buildCooldownTooltipLines(WRATH_ASCENDANT).map((line) => line.text)).toEqual([
+      'Wrath Ascendant',
+      'For 12s, your heals gain +2. Off-GCD.',
+      'Duration: 12s',
+      'Cooldown: 45s',
     ]);
   });
 });

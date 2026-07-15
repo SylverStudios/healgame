@@ -28,4 +28,18 @@ describe('CombatEngine constructor options', () => {
     const healer = engine.state.party.find((u) => u.id === 'healer')!;
     expect(healer.maxMana).toBe(PARTY.startingMana);
   });
+
+  it('applies options.manaRegen on the simulation interval (Alpha 0.2)', () => {
+    const engine = new CombatEngine(makeTestEncounter(), TEST_SPELLS, {
+      manaRegen: { amount: 2, intervalMs: 10_000 },
+    });
+    engine.setTarget('healer');
+    engine.castSpell('solemn-mend');
+    engine.advance(2000);
+    const manaAfterCast = engine.state.party.find((u) => u.id === 'healer')!.mana;
+    engine.advance(7999);
+    expect(engine.state.party.find((u) => u.id === 'healer')!.mana).toBe(manaAfterCast);
+    engine.advance(1);
+    expect(engine.state.party.find((u) => u.id === 'healer')!.mana).toBe(manaAfterCast + 2);
+  });
 });

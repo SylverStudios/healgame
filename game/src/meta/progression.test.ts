@@ -7,9 +7,10 @@ import {
   isDungeonUnlocked,
   isIronPassUnlocked,
   isMawUnlocked,
+  manaBonusesForLevel,
 } from './progression';
 import { newSaveData, type SaveData } from '../save/save';
-import { levelForXp, SPELLS, XP_LEVEL_2_THRESHOLD, xpForLevel } from '../data/constants';
+import { LEVEL_MANA, levelForXp, SPELLS, XP_LEVEL_2_THRESHOLD, xpForLevel } from '../data/constants';
 import { IRON_PASS, THE_MAW } from '../data/encounters';
 import type { CombatResult } from '../scenes/CombatScene';
 
@@ -156,9 +157,9 @@ describe('buildLoadout', () => {
     ]);
   });
 
-  it('scales bonusMaxMana with deep-reserves ranks', () => {
+  it('scales bonusMaxMana with deep-reserves ranks (max 3 in Alpha 0.2)', () => {
     expect(buildLoadout(save({ treeRanks: { 'deep-reserves': 1 } })).bonusMaxMana).toBe(6);
-    expect(buildLoadout(save({ treeRanks: { 'deep-reserves': 5 } })).bonusMaxMana).toBe(30);
+    expect(buildLoadout(save({ treeRanks: { 'deep-reserves': 3 } })).bonusMaxMana).toBe(18);
   });
 
   it('emits synergies scaled by ranks', () => {
@@ -328,9 +329,38 @@ describe('isDungeonUnlocked', () => {
   });
 });
 
+describe('manaBonusesForLevel (Alpha 0.2 §D2)', () => {
+  it.each([
+    [1, 0, null],
+    [2, 3, 1],
+    [3, 6, 1],
+    [4, 9, 1],
+    [5, 12, 2],
+    [8, 21, 3],
+    [11, 30, 4],
+  ] as const)('level %i → bonusMaxMana %i, regen amount %s', (level, bonusMaxMana, regenAmount) => {
+    const bonuses = manaBonusesForLevel(level);
+    expect(bonuses.bonusMaxMana).toBe(bonusMaxMana);
+    if (regenAmount === null) {
+      expect(bonuses.manaRegen).toBeNull();
+    } else {
+      expect(bonuses.manaRegen).toEqual({
+        amount: regenAmount,
+        intervalMs: LEVEL_MANA.regenIntervalMs,
+      });
+    }
+  });
+
+  it('floors non-integer levels and clamps below 1', () => {
+    expect(manaBonusesForLevel(2.9)).toEqual(manaBonusesForLevel(2));
+    expect(manaBonusesForLevel(0)).toEqual(manaBonusesForLevel(1));
+    expect(manaBonusesForLevel(-5)).toEqual(manaBonusesForLevel(1));
+  });
+});
+
 describe('THE_MAW data sanity', () => {
   it('has a boss with overwhelming hp', () => {
-    expect(THE_MAW.boss.hp).toBe(999);
+    expect(THE_MAW.boss.hp).toBe(9999);
   });
 
   it('has a named party-wide cast (Extinction) defined', () => {

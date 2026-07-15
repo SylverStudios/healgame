@@ -1,15 +1,18 @@
 /**
  * Live spell-tree config + combat resolve (new tree service).
  *
- * Layout mirrors the phase-2 tree in data/tree.ts:
- *   Deep Reserves (×5 chain) → Vigil | Zealot oaths (exclusive) → follow-ups.
+ * Alpha 0.2: hourglass topology
+ *   Deep Reserves (×3 chain) → Vigil | Zealot oaths (exclusive) → branch
+ *   follow-ups → [shared mid: mend/zealous potency] → Vowstrike fork
+ *   (light/dark, exclusive) → shared crown (Wrath Ascendant + Vowbound Crown).
  *
  * Multi-rank nodes are spot chains (one purchase = one content entry).
  * Combat never sees the graph — call `combatModsFromTree` (or
  * `resolveCombatMods` on `ownedContents`) at fight start.
  */
 
-import { SPELLS } from './constants';
+import { SPELLS, levelForXp } from './constants';
+import { manaBonusesForLevel } from './levelMana';
 import { spellById } from './spells';
 import { STILL_WATERS, FRENZIED_LITURGY, cooldownById } from './cooldowns';
 import type {
@@ -42,9 +45,15 @@ export type SpellTreeEffect =
   | { kind: 'missingHealthBonus'; spellId: string; healPer10PctMissing: number }
   | { kind: 'missingHealthPctBonus'; spellId: string; pctPer10PctMissing: number }
   | { kind: 'fullHealthBonus'; spellId: string; hpPctAtLeast: number; bonusHeal: number }
-  | { kind: 'castMod'; spellId: string; castMsDelta: number; manaDelta: number }
+  | { kind: 'castMod'; spellId: string; castMsDelta: number; manaDelta: number; healDelta?: number }
   | { kind: 'combatPace'; multiplierTenths: number }
-  | { kind: 'grantCooldown'; cooldownId: string };
+  | { kind: 'grantCooldown'; cooldownId: string }
+  /**
+   * Alpha 0.2 §D6 crown amp: after spells are baked, add `healDelta` to every
+   * outgoing spell whose id appears in `spellIds` (only spells already owned
+   * are affected; unknown ids are skipped). Clamp heal ≥ 0.
+   */
+  | { kind: 'ampOwnedSpells'; spellIds: string[]; healDelta: number };
 
 /** Opaque-to-tree payload: display + effect (+ optional subclass tag for oaths). */
 export interface SpellTreeContent {
@@ -52,6 +61,8 @@ export interface SpellTreeContent {
   description: string;
   effect: SpellTreeEffect;
   subclass?: SubclassId;
+  /** Alpha 0.2 §D8 — single-char placeholder glyph for tree node display. */
+  glyph?: string;
 }
 
 /** Flat combat-facing mods — same shape as meta/progression `Loadout` minus coupling. */
@@ -66,8 +77,10 @@ export interface CombatMods {
   fullHealthBonuses: FullHealthBonusRule[];
   /** Sorted unique pace multipliers (tenths); always includes 10; adds 15 when tempo owned. */
   paceMultipliersTenths: number[];
-  /** Alpha 0.1 §D6: cooldowns granted by the tree (e.g. Still Waters, Frenzied Liturgy). Chunk 7 adds the grantCooldown effect kind that populates this. */
+  /** Alpha 0.1 §D6: cooldowns granted by the tree (e.g. Still Waters, Frenzied Liturgy). */
   cooldowns: CooldownDef[];
+  /** Alpha 0.2 §D2: combat mana regen from level (or future sources). Absent at level 1. */
+  manaRegen?: { amount: number; intervalMs: number };
 }
 
 function content(c: SpellTreeContent): SpellTreeContent {
@@ -104,17 +117,27 @@ function rankSpot(args: {
   return { nodes, spot: { id: args.spotId, chain } };
 }
 
+// ---------------------------------------------------------------------------
+// Shared early
+// ---------------------------------------------------------------------------
+
+/** Deep Reserves: 3 ranks (was 5), +6 max mana each. Rank ids: deep-reserves-1..3. */
 const deepReserves = rankSpot({
   spotId: 'deep-reserves',
   idPrefix: 'deep-reserves',
-  ranks: 5,
-  costs: Array.from({ length: 5 }, () => ({ currency: 'talent', amount: 1 })),
+  ranks: 3,
+  costs: Array.from({ length: 3 }, () => ({ currency: 'talent', amount: 1 })),
   contentForRank: () => ({
     name: 'Deep Reserves',
     description: '+6 max mana per rank',
+    glyph: 'R',
     effect: { kind: 'bonusMaxMana', amount: 6 },
   }),
 });
+
+// ---------------------------------------------------------------------------
+// Oath wedge (existing, trimmed)
+// ---------------------------------------------------------------------------
 
 const vigilOath: NodeDef = {
   id: 'vigil-oath',
@@ -127,6 +150,7 @@ const vigilOath: NodeDef = {
       `Swear the Vigil oath (locks out the Zealot). Grants ${SPELLS.solemnVigil.name}: ` +
       `heals ${SPELLS.solemnVigil.heal}, costs ${SPELLS.solemnVigil.mana} mana, ` +
       `${s(SPELLS.solemnVigil.castMs)} cast — slow, efficient.`,
+    glyph: 'G',
     subclass: 'vigil',
     effect: { kind: 'grantSpell', spellId: SPELLS.solemnVigil.id },
   }),
@@ -143,6 +167,7 @@ const zealotOath: NodeDef = {
       `Swear the Zealot oath (locks out the Vigil). Grants ${SPELLS.zealousFlare.name}: ` +
       `heals ${SPELLS.zealousFlare.heal}, costs ${SPELLS.zealousFlare.mana} mana, ` +
       `${s(SPELLS.zealousFlare.castMs)} cast — fast, pricey per point.`,
+    glyph: 'F',
     subclass: 'zealot',
     effect: { kind: 'grantSpell', spellId: SPELLS.zealousFlare.id },
   }),
@@ -157,6 +182,7 @@ const warpedTempoViaVigil: NodeDef = {
   content: content({
     name: 'Warped Tempo',
     description: 'Forsaken gift: unlock 1.5× combat pace (locks the rival consolation).',
+    glyph: 'A',
     effect: { kind: 'combatPace', multiplierTenths: 15 },
   }),
 };
@@ -170,6 +196,7 @@ const warpedTempoViaZealot: NodeDef = {
   content: content({
     name: 'Warped Tempo',
     description: 'Forsaken gift: unlock 1.5× combat pace (locks the rival consolation).',
+    glyph: 'A',
     effect: { kind: 'combatPace', multiplierTenths: 15 },
   }),
 };
@@ -186,6 +213,7 @@ const patientVow = rankSpot({
   contentForRank: () => ({
     name: 'Patient Vow',
     description: `Power path: each ${SPELLS.solemnMend.name} arms +2 heal per rank on your next ${SPELLS.solemnVigil.name}. Locks Measured Devotion.`,
+    glyph: 'P',
     subclass: 'vigil',
     effect: {
       kind: 'synergy',
@@ -204,6 +232,7 @@ const measuredDevotion: NodeDef = {
   content: content({
     name: 'Measured Devotion',
     description: `Efficiency path: ${SPELLS.solemnVigil.name} casts 1.0s slower and costs 3 less mana. Locks Patient Vow.`,
+    glyph: 'D',
     subclass: 'vigil',
     effect: {
       kind: 'castMod',
@@ -223,6 +252,7 @@ const ferventChain = rankSpot({
   contentForRank: () => ({
     name: 'Fervent Chain',
     description: `Each ${SPELLS.zealousMending.name} arms +2 heal per rank on your next ${SPELLS.zealousFlare.name}.`,
+    glyph: 'E',
     subclass: 'zealot',
     effect: {
       kind: 'synergy',
@@ -247,6 +277,7 @@ const gravenScale: NodeDef = {
   content: content({
     name: 'Graven Scale',
     description: `${SPELLS.solemnVigil.name}: +5% of base heal per 10% target health missing (rounds up)`,
+    glyph: 'K',
     subclass: 'vigil',
     effect: {
       kind: 'missingHealthPctBonus',
@@ -263,6 +294,7 @@ const steadyHands: NodeDef = {
   content: content({
     name: 'Steady Hands',
     description: `${SPELLS.zealousMending.name}: +2 heal when the target is at 80%+ health`,
+    glyph: 'H',
     subclass: 'zealot',
     effect: {
       kind: 'fullHealthBonus',
@@ -274,10 +306,12 @@ const steadyHands: NodeDef = {
 };
 
 /**
- * Alpha 0.1 §D5: tree layer 2 (mana focus). Each node requires owning at
- * least one existing branch node on its side — `mode: 'any'` (patient-vow
- * rank 1 OR measured-devotion for Vigil; fervent-chain rank 1 OR steady-hands
- * for Zealot) — so either follow-up path into the branch unlocks layer 2.
+ * Alpha 0.1 §D5 / Alpha 0.2: layer-2 output nodes. Each requires owning at
+ * least one existing branch node — `mode: 'any'` — so either follow-up path
+ * into that branch unlocks it.
+ *
+ * Pure-mana nodes (vigil-deep-well, zealot-spendthrift-grace) are cut in
+ * Alpha 0.2; only output/tempo nodes remain.
  */
 const VIGIL_LAYER2_REQUIRES: NodeDef['requires'] = {
   mode: 'any',
@@ -289,18 +323,6 @@ const ZEALOT_LAYER2_REQUIRES: NodeDef['requires'] = {
   nodes: ['zealot-fervent-chain-1', 'zealot-steady-hands'],
 };
 
-const vigilDeepWell: NodeDef = {
-  id: 'vigil-deep-well',
-  requires: VIGIL_LAYER2_REQUIRES,
-  cost: { currency: 'talent', amount: 1 },
-  content: content({
-    name: 'Deep Well',
-    description: '+6 max mana',
-    subclass: 'vigil',
-    effect: { kind: 'bonusMaxMana', amount: 6 },
-  }),
-};
-
 const vigilThrift: NodeDef = {
   id: 'vigil-thrift',
   requires: VIGIL_LAYER2_REQUIRES,
@@ -308,6 +330,7 @@ const vigilThrift: NodeDef = {
   content: content({
     name: 'Thrift',
     description: `${SPELLS.solemnMend.name} costs 1 less mana (${SPELLS.solemnMend.mana} → ${SPELLS.solemnMend.mana - 1})`,
+    glyph: 'T',
     subclass: 'vigil',
     effect: {
       kind: 'castMod',
@@ -325,6 +348,7 @@ const vigilStillWaters: NodeDef = {
   content: content({
     name: 'Still Waters',
     description: `Grants ${STILL_WATERS.name} (${s(STILL_WATERS.cooldownMs)}): ${STILL_WATERS.description}`,
+    glyph: 'S',
     subclass: 'vigil',
     effect: { kind: 'grantCooldown', cooldownId: STILL_WATERS.id },
   }),
@@ -337,6 +361,7 @@ const zealotQuickBreath: NodeDef = {
   content: content({
     name: 'Quick Breath',
     description: `${SPELLS.zealousFlare.name} casts 200ms faster (${s(SPELLS.zealousFlare.castMs)} → ${s(SPELLS.zealousFlare.castMs - 200)})`,
+    glyph: 'Q',
     subclass: 'zealot',
     effect: {
       kind: 'castMod',
@@ -347,18 +372,6 @@ const zealotQuickBreath: NodeDef = {
   }),
 };
 
-const zealotSpendthriftGrace: NodeDef = {
-  id: 'zealot-spendthrift-grace',
-  requires: ZEALOT_LAYER2_REQUIRES,
-  cost: { currency: 'talent', amount: 1 },
-  content: content({
-    name: 'Spendthrift Grace',
-    description: '+5 max mana',
-    subclass: 'zealot',
-    effect: { kind: 'bonusMaxMana', amount: 5 },
-  }),
-};
-
 const zealotFrenziedLiturgy: NodeDef = {
   id: 'zealot-frenzied-liturgy',
   requires: ZEALOT_LAYER2_REQUIRES,
@@ -366,10 +379,138 @@ const zealotFrenziedLiturgy: NodeDef = {
   content: content({
     name: 'Frenzied Liturgy',
     description: `Grants ${FRENZIED_LITURGY.name} (${s(FRENZIED_LITURGY.cooldownMs)}): ${FRENZIED_LITURGY.description}`,
+    glyph: 'L',
     subclass: 'zealot',
     effect: { kind: 'grantCooldown', cooldownId: FRENZIED_LITURGY.id },
   }),
 };
+
+// ---------------------------------------------------------------------------
+// Shared mid (Alpha 0.2 NEW) — gate: any of oath follow-ups
+// ---------------------------------------------------------------------------
+
+const SHARED_MID_REQUIRES: NodeDef['requires'] = {
+  mode: 'any',
+  nodes: ['vigil-patient-vow-1', 'vigil-measured-devotion', 'zealot-fervent-chain-1', 'zealot-steady-hands'],
+};
+
+const sharedMendPotency: NodeDef = {
+  id: 'shared-mend-potency',
+  requires: SHARED_MID_REQUIRES,
+  cost: { currency: 'talent', amount: 1 },
+  content: content({
+    name: 'Mend Potency',
+    description: `${SPELLS.solemnMend.name} heals for 1 more.`,
+    glyph: 'm',
+    effect: {
+      kind: 'castMod',
+      spellId: SPELLS.solemnMend.id,
+      castMsDelta: 0,
+      manaDelta: 0,
+      healDelta: 1,
+    },
+  }),
+};
+
+const sharedZealousPotency: NodeDef = {
+  id: 'shared-zealous-potency',
+  requires: SHARED_MID_REQUIRES,
+  cost: { currency: 'talent', amount: 1 },
+  content: content({
+    name: 'Zealous Potency',
+    description: `${SPELLS.zealousMending.name} heals for 1 more.`,
+    glyph: 'z',
+    effect: {
+      kind: 'castMod',
+      spellId: SPELLS.zealousMending.id,
+      castMsDelta: 0,
+      manaDelta: 0,
+      healDelta: 1,
+    },
+  }),
+};
+
+// ---------------------------------------------------------------------------
+// Vowstrike fork (Alpha 0.2 NEW) — exclusiveGroup: vowstrike-aspect
+// ---------------------------------------------------------------------------
+
+const VOWSTRIKE_REQUIRES: NodeDef['requires'] = {
+  mode: 'any',
+  nodes: ['shared-mend-potency', 'shared-zealous-potency'],
+};
+
+const vowstrikeVirtueNode: NodeDef = {
+  id: 'vowstrike-virtue',
+  exclusiveGroup: 'vowstrike-aspect',
+  requires: VOWSTRIKE_REQUIRES,
+  cost: { currency: 'talent', amount: 1 },
+  content: content({
+    name: SPELLS.vowstrikeVirtue.name,
+    description:
+      `Gain ${SPELLS.vowstrikeVirtue.name}: instant direct heal ` +
+      `(${SPELLS.vowstrikeVirtue.heal} heal, ${SPELLS.vowstrikeVirtue.mana} mana, 0s cast). ` +
+      `Locks Vowstrike: Reckoning.`,
+    glyph: 'V',
+    effect: { kind: 'grantSpell', spellId: SPELLS.vowstrikeVirtue.id },
+  }),
+};
+
+const vowstrikeVengeanceNode: NodeDef = {
+  id: 'vowstrike-vengeance',
+  exclusiveGroup: 'vowstrike-aspect',
+  requires: VOWSTRIKE_REQUIRES,
+  cost: { currency: 'talent', amount: 1 },
+  content: content({
+    name: SPELLS.vowstrikeVengeance.name,
+    description:
+      `Gain ${SPELLS.vowstrikeVengeance.name}: instant direct heal, stronger when target is hurt ` +
+      `(${SPELLS.vowstrikeVengeance.heal} heal, ${SPELLS.vowstrikeVengeance.mana} mana, 0s cast). ` +
+      `Locks Vowstrike: Absolution.`,
+    glyph: 'X',
+    effect: { kind: 'grantSpell', spellId: SPELLS.vowstrikeVengeance.id },
+  }),
+};
+
+// ---------------------------------------------------------------------------
+// Shared crown (Alpha 0.2 NEW) — requires either Vowstrike aspect
+// ---------------------------------------------------------------------------
+
+const CROWN_REQUIRES: NodeDef['requires'] = {
+  mode: 'any',
+  nodes: ['vowstrike-virtue', 'vowstrike-vengeance'],
+};
+
+const wrathAscendantNode: NodeDef = {
+  id: 'wrath-ascendant',
+  requires: CROWN_REQUIRES,
+  cost: { currency: 'talent', amount: 1 },
+  content: content({
+    name: 'Wrath Ascendant',
+    description: 'Grants Wrath Ascendant (45s CD): for 12s, all your heals gain +2. Off-GCD.',
+    glyph: 'W',
+    effect: { kind: 'grantCooldown', cooldownId: 'wrath-ascendant' },
+  }),
+};
+
+const vowboundCrownNode: NodeDef = {
+  id: 'vowbound-crown',
+  requires: CROWN_REQUIRES,
+  cost: { currency: 'talent', amount: 1 },
+  content: content({
+    name: 'Vowbound Crown',
+    description: 'Your Vowstrike heals for 1 more.',
+    glyph: 'C',
+    effect: {
+      kind: 'ampOwnedSpells',
+      spellIds: [SPELLS.vowstrikeVirtue.id, SPELLS.vowstrikeVengeance.id],
+      healDelta: 1,
+    },
+  }),
+};
+
+// ---------------------------------------------------------------------------
+// Authoritative config
+// ---------------------------------------------------------------------------
 
 /** Authoritative spell-tree config for the new service. */
 export const SPELL_TREE: TreeConfig = {
@@ -384,12 +525,16 @@ export const SPELL_TREE: TreeConfig = {
     gravenScale,
     ...ferventChain.nodes,
     steadyHands,
-    vigilDeepWell,
     vigilThrift,
     vigilStillWaters,
     zealotQuickBreath,
-    zealotSpendthriftGrace,
     zealotFrenziedLiturgy,
+    sharedMendPotency,
+    sharedZealousPotency,
+    vowstrikeVirtueNode,
+    vowstrikeVengeanceNode,
+    wrathAscendantNode,
+    vowboundCrownNode,
   ],
   spots: [
     deepReserves.spot,
@@ -400,12 +545,16 @@ export const SPELL_TREE: TreeConfig = {
     { id: 'vigil-graven-scale', chain: ['vigil-graven-scale'] },
     ferventChain.spot,
     { id: 'zealot-steady-hands', chain: ['zealot-steady-hands'] },
-    { id: 'vigil-deep-well', chain: ['vigil-deep-well'] },
     { id: 'vigil-thrift', chain: ['vigil-thrift'] },
     { id: 'vigil-still-waters', chain: ['vigil-still-waters'] },
     { id: 'zealot-quick-breath', chain: ['zealot-quick-breath'] },
-    { id: 'zealot-spendthrift-grace', chain: ['zealot-spendthrift-grace'] },
     { id: 'zealot-frenzied-liturgy', chain: ['zealot-frenzied-liturgy'] },
+    { id: 'shared-mend-potency', chain: ['shared-mend-potency'] },
+    { id: 'shared-zealous-potency', chain: ['shared-zealous-potency'] },
+    { id: 'vowstrike-virtue', chain: ['vowstrike-virtue'] },
+    { id: 'vowstrike-vengeance', chain: ['vowstrike-vengeance'] },
+    { id: 'wrath-ascendant', chain: ['wrath-ascendant'] },
+    { id: 'vowbound-crown', chain: ['vowbound-crown'] },
   ],
 };
 
@@ -414,10 +563,90 @@ if (configError) {
   throw new Error(`SPELL_TREE invalid: ${configError.message}`);
 }
 
+// ---------------------------------------------------------------------------
+// Oath × Vowstrike resolve twists (Alpha 0.2 §D5)
+// ---------------------------------------------------------------------------
+
+/**
+ * After combat mods are assembled and spells are baked, apply one small twist
+ * when both an oath and a Vowstrike aspect are owned. The twist is data-driven
+ * (modifies the already-constructed mods object in place) so the engine needs
+ * no new kinds.
+ *
+ * | Oath × Aspect      | Twist                                                     |
+ * |--------------------|-----------------------------------------------------------|
+ * | Vigil × Virtue     | vowstrike-virtue manaDelta −1                             |
+ * | Vigil × Vengeance  | missingHealthBonus vowstrike-vengeance healPer10PctMissing +1 |
+ * | Zealot × Virtue    | synergy: trigger vowstrike-virtue → buff zealous-mending +1 |
+ * | Zealot × Vengeance | vowstrike-vengeance healDelta +1                          |
+ */
+export function applyOathVowstrikeTwists(
+  mods: CombatMods,
+  contents: readonly SpellTreeContent[],
+): void {
+  const hasVigil = contents.some(
+    (c) =>
+      c.subclass === 'vigil' ||
+      (c.effect.kind === 'grantSpell' && c.effect.spellId === SPELLS.solemnVigil.id),
+  );
+  const hasZealot = contents.some(
+    (c) =>
+      c.subclass === 'zealot' ||
+      (c.effect.kind === 'grantSpell' && c.effect.spellId === SPELLS.zealousFlare.id),
+  );
+  const hasVirtue = mods.spells.some((sp) => sp.id === SPELLS.vowstrikeVirtue.id);
+  const hasVengeance = mods.spells.some((sp) => sp.id === SPELLS.vowstrikeVengeance.id);
+
+  if ((!hasVirtue && !hasVengeance) || (!hasVigil && !hasZealot)) return;
+
+  const oath = hasVigil ? 'vigil' : 'zealot';
+  const aspect = hasVirtue ? 'virtue' : 'vengeance';
+
+  if (oath === 'vigil' && aspect === 'virtue') {
+    const spell = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVirtue.id);
+    if (spell) spell.mana = Math.max(0, spell.mana - 1);
+  } else if (oath === 'vigil' && aspect === 'vengeance') {
+    const existing = mods.missingHealthBonuses.find(
+      (m) => m.spellId === SPELLS.vowstrikeVengeance.id,
+    );
+    if (existing) {
+      existing.healPer10PctMissing += 1;
+    } else {
+      mods.missingHealthBonuses.push({
+        spellId: SPELLS.vowstrikeVengeance.id,
+        healPer10PctMissing: 1,
+      });
+    }
+  } else if (oath === 'zealot' && aspect === 'virtue') {
+    const existing = mods.synergies.find(
+      (syn) =>
+        syn.triggerSpellId === SPELLS.vowstrikeVirtue.id &&
+        syn.buffedSpellId === SPELLS.zealousMending.id,
+    );
+    if (existing) {
+      existing.bonusHeal += 1;
+    } else {
+      mods.synergies.push({
+        triggerSpellId: SPELLS.vowstrikeVirtue.id,
+        buffedSpellId: SPELLS.zealousMending.id,
+        bonusHeal: 1,
+      });
+    }
+  } else if (oath === 'zealot' && aspect === 'vengeance') {
+    const spell = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVengeance.id);
+    if (spell) spell.heal = Math.max(0, spell.heal + 1);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Combat resolve
+// ---------------------------------------------------------------------------
+
 /**
  * Reduce owned tree contents into combat mods. Order/position in the tree do
- * not matter — only which contents are active. `castMod` is baked into spell
- * defs here so the engine never sees it.
+ * not matter — only which contents are active. `castMod` (including optional
+ * `healDelta`) is baked into spell defs; `ampOwnedSpells` is applied after
+ * baking; oath×vowstrike twists are applied last.
  */
 export function resolveCombatMods(
   contents: readonly SpellTreeContent[],
@@ -430,6 +659,7 @@ export function resolveCombatMods(
   const missingPctMap = new Map<string, MissingHealthPctBonusRule>();
   const fullHealthMap = new Map<string, FullHealthBonusRule>();
   const castMods: Extract<SpellTreeEffect, { kind: 'castMod' }>[] = [];
+  const ampSpells: Extract<SpellTreeEffect, { kind: 'ampOwnedSpells' }>[] = [];
   const paceTenths = new Set<number>([10]);
   const cooldownMap = new Map<string, CooldownDef>();
 
@@ -492,6 +722,9 @@ export function resolveCombatMods(
       case 'castMod':
         castMods.push(effect);
         break;
+      case 'ampOwnedSpells':
+        ampSpells.push(effect);
+        break;
       case 'combatPace':
         paceTenths.add(effect.multiplierTenths);
         break;
@@ -509,15 +742,25 @@ export function resolveCombatMods(
     .filter((spell): spell is SpellDef => spell !== undefined)
     .map((spell) => ({ ...spell }));
 
+  // Bake castMods (castMsDelta, manaDelta, optional healDelta).
   for (const mod of castMods) {
     const spell = spells.find((sp) => sp.id === mod.spellId);
     if (spell) {
       spell.castMs = Math.max(0, spell.castMs + mod.castMsDelta);
       spell.mana = Math.max(0, spell.mana + mod.manaDelta);
+      spell.heal = Math.max(0, spell.heal + (mod.healDelta ?? 0));
     }
   }
 
-  return {
+  // Bake ampOwnedSpells (only spells already in the loadout are affected).
+  for (const amp of ampSpells) {
+    for (const id of amp.spellIds) {
+      const spell = spells.find((sp) => sp.id === id);
+      if (spell) spell.heal = Math.max(0, spell.heal + amp.healDelta);
+    }
+  }
+
+  const mods: CombatMods = {
     spells,
     bonusMaxMana,
     synergies: [...synergyMap.values()],
@@ -527,6 +770,9 @@ export function resolveCombatMods(
     paceMultipliersTenths: [...paceTenths].sort((a, b) => a - b),
     cooldowns: [...cooldownMap.values()],
   };
+
+  applyOathVowstrikeTwists(mods, contents);
+  return mods;
 }
 
 /**
@@ -542,22 +788,36 @@ export function combatModsFromTree(
 
 /**
  * Canonical combat entry point: save → tree state → flat CombatMods.
+ * Applies level-derived mana bonuses (§D2) on top of tree bonuses.
  * Hub / tutorial / balance bots call this at fight start; the engine never
  * sees the skill-tree graph.
  */
 export function loadoutFromSave(save: {
   treeRanks: Record<string, number>;
   unlockedSpells: readonly string[];
+  xp?: number;
 }): CombatMods {
   const state = treeStateFromLegacy(save.treeRanks, 0);
-  return combatModsFromTree(state, save.unlockedSpells);
+  const mods = combatModsFromTree(state, save.unlockedSpells);
+  const level = levelForXp(save.xp ?? 0);
+  const levelMana = manaBonusesForLevel(level);
+  mods.bonusMaxMana += levelMana.bonusMaxMana;
+  if (levelMana.manaRegen !== null) {
+    mods.manaRegen = levelMana.manaRegen;
+  }
+  return mods;
 }
+
+// ---------------------------------------------------------------------------
+// Legacy bridge (save ↔ tree service)
+// ---------------------------------------------------------------------------
 
 /**
  * Map legacy `treeRanks` (nodeId → ranks) onto owned chain node ids for the
- * new config. Used by parity tests and (later) save migration. Retired node
- * ids (e.g. `zealot-desperate-zeal`) are never emitted — they no longer exist
- * in `SPELL_TREE` and `create()` throws on unknown owned ids.
+ * new config. Used by parity tests and save migration. Retired node ids
+ * (e.g. `zealot-desperate-zeal`, `vigil-deep-well`, `zealot-spendthrift-grace`)
+ * are never emitted — they no longer exist in `SPELL_TREE` and `create()`
+ * throws on unknown owned ids.
  */
 export function ownedIdsFromLegacyRanks(treeRanks: Record<string, number>): string[] {
   const owned: string[] = [];
@@ -566,7 +826,7 @@ export function ownedIdsFromLegacyRanks(treeRanks: Record<string, number>): stri
     for (let i = 1; i <= n; i++) owned.push(max === 1 ? prefix : `${prefix}-${i}`);
   };
 
-  pushRanks('deep-reserves', treeRanks['deep-reserves'] ?? 0, 5);
+  pushRanks('deep-reserves', treeRanks['deep-reserves'] ?? 0, 3);
   if ((treeRanks['vigil-oath'] ?? 0) > 0) owned.push('vigil-oath');
   if ((treeRanks['zealot-oath'] ?? 0) > 0) owned.push('zealot-oath');
   pushRanks('vigil-patient-vow', treeRanks['vigil-patient-vow'] ?? 0, 3);
@@ -576,12 +836,16 @@ export function ownedIdsFromLegacyRanks(treeRanks: Record<string, number>): stri
   if ((treeRanks['zealot-steady-hands'] ?? 0) > 0) owned.push('zealot-steady-hands');
   if ((treeRanks['warped-tempo-via-vigil'] ?? 0) > 0) owned.push('warped-tempo-via-vigil');
   if ((treeRanks['warped-tempo-via-zealot'] ?? 0) > 0) owned.push('warped-tempo-via-zealot');
-  if ((treeRanks['vigil-deep-well'] ?? 0) > 0) owned.push('vigil-deep-well');
   if ((treeRanks['vigil-thrift'] ?? 0) > 0) owned.push('vigil-thrift');
   if ((treeRanks['vigil-still-waters'] ?? 0) > 0) owned.push('vigil-still-waters');
   if ((treeRanks['zealot-quick-breath'] ?? 0) > 0) owned.push('zealot-quick-breath');
-  if ((treeRanks['zealot-spendthrift-grace'] ?? 0) > 0) owned.push('zealot-spendthrift-grace');
   if ((treeRanks['zealot-frenzied-liturgy'] ?? 0) > 0) owned.push('zealot-frenzied-liturgy');
+  if ((treeRanks['shared-mend-potency'] ?? 0) > 0) owned.push('shared-mend-potency');
+  if ((treeRanks['shared-zealous-potency'] ?? 0) > 0) owned.push('shared-zealous-potency');
+  if ((treeRanks['vowstrike-virtue'] ?? 0) > 0) owned.push('vowstrike-virtue');
+  if ((treeRanks['vowstrike-vengeance'] ?? 0) > 0) owned.push('vowstrike-vengeance');
+  if ((treeRanks['wrath-ascendant'] ?? 0) > 0) owned.push('wrath-ascendant');
+  if ((treeRanks['vowbound-crown'] ?? 0) > 0) owned.push('vowbound-crown');
   return owned;
 }
 
@@ -597,7 +861,7 @@ export function treeStateFromLegacy(
 }
 
 const MULTI_RANK_PREFIXES: { prefix: string; max: number }[] = [
-  { prefix: 'deep-reserves', max: 5 },
+  { prefix: 'deep-reserves', max: 3 },
   { prefix: 'vigil-patient-vow', max: 3 },
   { prefix: 'zealot-fervent-chain', max: 3 },
 ];
@@ -610,12 +874,16 @@ const SINGLE_NODES = [
   'zealot-steady-hands',
   'warped-tempo-via-vigil',
   'warped-tempo-via-zealot',
-  'vigil-deep-well',
   'vigil-thrift',
   'vigil-still-waters',
   'zealot-quick-breath',
-  'zealot-spendthrift-grace',
   'zealot-frenzied-liturgy',
+  'shared-mend-potency',
+  'shared-zealous-potency',
+  'vowstrike-virtue',
+  'vowstrike-vengeance',
+  'wrath-ascendant',
+  'vowbound-crown',
 ] as const;
 
 /**

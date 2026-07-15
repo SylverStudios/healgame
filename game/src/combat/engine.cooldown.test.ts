@@ -310,6 +310,74 @@ describe('Frenzied Liturgy (manaCostReduction)', () => {
   });
 });
 
+/** Alpha 0.2 §D6 — Wrath Ascendant stub shape (inline; data lands in chunk 1). */
+const TEST_HEAL_BONUS: CooldownDef = {
+  id: 'test-heal-bonus',
+  name: 'Test Heal Bonus',
+  description: 'For 12s, heals gain +2.',
+  cooldownMs: 45_000,
+  effect: { kind: 'healBonus', durationMs: 12_000, bonusHeal: 2 },
+};
+
+function healBonusDurationMs(def: CooldownDef): number {
+  return def.effect.kind === 'healBonus' ? def.effect.durationMs : 0;
+}
+
+describe('healBonus window (Alpha 0.2)', () => {
+  it('adds bonusHeal to completed heals while the window is open', () => {
+    const engine = new CombatEngine(NEVER_DYING_TRASH_ENCOUNTER, TEST_SPELLS, {
+      cooldowns: [TEST_HEAL_BONUS],
+    });
+    engine.setTarget('healer');
+    engine.activateCooldown(TEST_HEAL_BONUS.id);
+    engine.advance(0);
+    expect(cooldownState(engine, TEST_HEAL_BONUS.id).activeRemainingMs).toBe(
+      healBonusDurationMs(TEST_HEAL_BONUS),
+    );
+
+    engine.castSpell(TEST_SOLEMN_MEND.id);
+    const events = engine.advance(TEST_SOLEMN_MEND.castMs);
+    const heal = heals(events)[0]!;
+    // Base 5 + healBonus 2; full-HP target → all overheal.
+    expect(heal.amount + heal.overheal).toBe(TEST_SOLEMN_MEND.heal + 2);
+  });
+
+  it('expires after durationMs and stops adding bonusHeal', () => {
+    const engine = new CombatEngine(NEVER_DYING_TRASH_ENCOUNTER, TEST_SPELLS, {
+      cooldowns: [TEST_HEAL_BONUS],
+    });
+    engine.setTarget('healer');
+    engine.activateCooldown(TEST_HEAL_BONUS.id);
+    const expireEvents = engine.advance(healBonusDurationMs(TEST_HEAL_BONUS));
+    expect(buffEndeds(expireEvents)).toEqual([{ type: 'cooldownBuffEnded', id: TEST_HEAL_BONUS.id }]);
+    expect(cooldownState(engine, TEST_HEAL_BONUS.id).activeRemainingMs).toBe(0);
+
+    engine.castSpell(TEST_SOLEMN_MEND.id);
+    const events = engine.advance(TEST_SOLEMN_MEND.castMs);
+    const heal = heals(events)[0]!;
+    expect(heal.amount + heal.overheal).toBe(TEST_SOLEMN_MEND.heal);
+  });
+
+  it('stacks after relic bonusHealing on the same completed cast', () => {
+    const relic = {
+      id: 'test-relic-heal',
+      name: 'Test Relic',
+      description: '+1 healing',
+      effects: [{ kind: 'bonusHealing' as const, amount: 1 }],
+    };
+    const engine = new CombatEngine(NEVER_DYING_TRASH_ENCOUNTER, TEST_SPELLS, {
+      cooldowns: [TEST_HEAL_BONUS],
+      relics: [relic],
+    });
+    engine.setTarget('healer');
+    engine.activateCooldown(TEST_HEAL_BONUS.id);
+    engine.advance(0);
+    engine.castSpell(TEST_SOLEMN_MEND.id);
+    const heal = heals(engine.advance(TEST_SOLEMN_MEND.castMs))[0]!;
+    expect(heal.amount + heal.overheal).toBe(TEST_SOLEMN_MEND.heal + 1 + 2);
+  });
+});
+
 describe('interaction: Still Waters + Frenzied Liturgy both active', () => {
   it('the free charge wins: reserves 0, consumes only the freeNextHeal charge, leaves the cost-reduction window untouched', () => {
     const engine = new CombatEngine(NEVER_DYING_TRASH_ENCOUNTER, TEST_SPELLS, {

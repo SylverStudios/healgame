@@ -149,7 +149,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
     boss: {
       id: 'hollow-king',
       name: 'Hollow King',
-      hp: 999,
+      hp: 9999,
       autoDamage: 3,
       swingIntervalMs: 3500,
       cast: {
@@ -229,7 +229,7 @@ describe('live dungeon content', () => {
         '  2x Ash Husk [ash-husk] — HP 4, auto 1/3000ms, boss no, overrides hp=4',
         '    Abilities: none',
         'Wave 2 (boss):',
-        '  1x Hollow King [hollow-king] — HP 999, auto 3/3500ms, boss yes, overrides none',
+        '  1x Hollow King [hollow-king] — HP 9999, auto 3/3500ms, boss yes, overrides hp=9999',
         '    Ability: Extinction [extinction] partyAoE — cast 10000ms, first 15000ms, interval 25000ms, party damage 10',
       ].join('\n'),
     );

@@ -1,12 +1,15 @@
 /**
  * Single local save slot. This is a development build: old save keys and
  * unrecognized payloads are discarded instead of migrated.
+ *
+ * Alpha 0.2 rotates to v6 (tree topology / level-mana era). Prior v5 keys are
+ * purged on load — no migration.
  */
 
 export type SubclassId = 'vigil' | 'zealot';
 
 export interface SaveData {
-  version: 5;
+  version: 6;
   tutorialDone: boolean;
   xp: number;
   /** Spell ids granted outside the tree (tutorial and level milestones). */
@@ -24,7 +27,7 @@ export interface SaveData {
 
 export function newSaveData(): SaveData {
   return {
-    version: 5,
+    version: 6,
     tutorialDone: false,
     xp: 0,
     unlockedSpells: [],
@@ -37,8 +40,8 @@ export function newSaveData(): SaveData {
   };
 }
 
-export const SAVE_KEY = 'healgame-save-v5';
-const LEGACY_SAVE_KEY = 'healgame-save-v1';
+export const SAVE_KEY = 'healgame-save-v6';
+const LEGACY_SAVE_KEYS = ['healgame-save-v1', 'healgame-save-v5'] as const;
 
 /** Minimal storage interface so tests can inject an in-memory store. */
 export interface KeyValueStore {
@@ -54,7 +57,7 @@ function defaultStore(): KeyValueStore | null {
 
 export function loadSave(store: KeyValueStore | null = defaultStore()): SaveData {
   if (!store) return newSaveData();
-  store.removeItem(LEGACY_SAVE_KEY);
+  for (const key of LEGACY_SAVE_KEYS) store.removeItem(key);
   const raw = store.getItem(SAVE_KEY);
   if (!raw) return newSaveData();
   try {
@@ -75,7 +78,7 @@ export function saveGame(data: SaveData, store: KeyValueStore | null = defaultSt
 /** Restart: wipe the save. Caller starts a new game from newSaveData(). */
 export function resetSave(store: KeyValueStore | null = defaultStore()): void {
   store?.removeItem(SAVE_KEY);
-  store?.removeItem(LEGACY_SAVE_KEY);
+  for (const key of LEGACY_SAVE_KEYS) store?.removeItem(key);
 }
 
 function hasBaseShape(v: Record<string, unknown>): boolean {
@@ -91,7 +94,7 @@ function hasBaseShape(v: Record<string, unknown>): boolean {
 function isSaveData(value: unknown): value is SaveData {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
-  if (v.version !== 5 || !hasBaseShape(v)) return false;
+  if (v.version !== 6 || !hasBaseShape(v)) return false;
   const ranks = v.treeRanks;
   if (typeof ranks !== 'object' || ranks === null || Array.isArray(ranks)) return false;
   if (!Object.values(ranks).every((r) => typeof r === 'number')) return false;

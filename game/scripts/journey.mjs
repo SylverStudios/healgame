@@ -7,7 +7,7 @@
  *
  * Stages:
  *   A  fresh save → tutorial → learn Solemn Mend → Ash Gate → naive-heal to a
- *      wipe → hub applies kill XP (save is v5 from birth)
+ *      wipe → hub applies kill XP (save is v6 from birth)
  *   A2 seeded 8 XP → one more run crosses level 2 (Zealous auto-grant ribbon)
  *   M  seeded stale v4 payload → boot discards it and starts fresh
  *   Relic  seeded post-first-clear save with a pending three-card offer
@@ -15,13 +15,12 @@
  *      never re-offered on a later hub visit
  *   D2 seeded Ash-Gate-cleared save → hub shows Iron Pass (Dungeon 2), NOT
  *      The Maw (alpha-0.1-handoff §D1) → enter Iron Pass → return unwon
- *   B  seeded post-first-clear v4 save → tree graph: buy Deep Reserves ranks,
+ *   B  seeded post-first-clear save → tree graph: buy Deep Reserves ranks,
  *      arm + swear the Vigil oath in-tree (talent placed, Zealot locked), buy a
  *      follow-up node → hub shows the oath
- *   B3 seeded sworn-oath + prereq-node saves → tree layer 2 (§D5): scroll to
- *      the new row, buy a Vigil mana passive + the Still Waters CD node; a
- *      second seed proves the §D4 rebalance (Steady Hands purchasable at the
- *      old Desperate Zeal slot on a Zealot save)
+ *   B3 Alpha 0.2 hourglass: sworn Vigil + Patient Vow → scroll → Still Waters,
+ *      shared mid (mend potency), Virtue Vowstrike, Wrath Ascendant + crown;
+ *      second seed proves Steady Hands still purchasable on Zealot path
  *   B2 combat with the Vigil kit → hover the Solemn Vigil button → tooltip
  *      screenshot (modifier lines from the tree) + mid-fight feedback shot
  *   C  Maw gating (§D1): Ash-Gate-only save → Maw absent; Ash Gate + Iron
@@ -51,7 +50,7 @@ const shotsDir = (() => {
 mkdirSync(shotsDir, { recursive: true });
 
 const PORT = 4174;
-const SAVE_KEY = 'healgame-save-v5';
+const SAVE_KEY = 'healgame-save-v6';
 
 /** Resolve a semantic GameObject name via window.__healgame (src/debug/testHooks.ts). */
 const locate = (page, name) =>
@@ -136,7 +135,7 @@ async function seedSave(page, save) {
 
 function baseSave(overrides) {
   return {
-    version: 5,
+    version: 6,
     tutorialDone: true,
     xp: 0,
     unlockedSpells: ['solemn-mend'],
@@ -192,7 +191,7 @@ try {
   await clickNamed(page, 'tutorialLearn');
   await page.waitForTimeout(800);
   let save = await readSave(page);
-  check(save?.version === 5, 'new saves are written as v5');
+  check(save?.version === 6, 'new saves are written as v6');
   check(save?.tutorialDone === true, 'tutorial click sets tutorialDone');
   check(save?.unlockedSpells.includes('solemn-mend') === true, 'Solemn Mend unlocked via tutorial');
   check(save?.relicIds.length === 0 && save?.pendingRelicOffers.length === 0, 'fresh save has no relic pick pending');
@@ -353,12 +352,14 @@ try {
   check((await locate(page, 'runMod:vigil-oath')) !== null, 'hub run-mods bar shows sworn oath');
   await shot(page, 'hub-with-oath');
 
-  // ---- Stage B3: tree layer 2 (mana focus) + §D4 rebalance ------------------
-  console.log('Stage B3: sworn oath + prereq node → scroll → buy a layer-2 passive + its CD node');
+  // ---- Stage B3: Alpha 0.2 hourglass (shared mid → Vowstrike → crown) --------
+  console.log('Stage B3: scroll hourglass → Still Waters → shared mid → Vowstrike → crown');
+  // Level 12 (xp 660) → 12 talent points; seed spends 3, leaving room for the
+  // branch CD + shared mid + aspect + Wings + crown amp.
   await seedSave(
     page,
     baseSave({
-      xp: 100,
+      xp: 660,
       unlockedSpells: ['solemn-mend', 'zealous-mending'],
       subclass: 'vigil',
       treeRanks: { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-patient-vow': 1 },
@@ -367,30 +368,44 @@ try {
   await clickNamed(page, 'hubTree');
   await page.waitForTimeout(600);
 
-  // Scroll to layer 2: hover any on-screen tree control, then wheel enough
-  // to saturate the clamp (WORLD_HEIGHT 900 → max scroll 360). locate() then
-  // converts the scrolled world position to screen px for the click.
+  // WORLD_HEIGHT 1080 → max scroll 540. Wheel past the clamp, then locate()
+  // converts scrolled world positions to screen px for named clicks.
   await hoverNamed(page, 'treeBack');
-  await page.mouse.wheel(0, 720);
+  await page.mouse.wheel(0, 2000);
   await page.waitForTimeout(400);
-  await shot(page, 'tree-layer2-scrolled');
-
-  await clickNamed(page, 'treeNode:vigil-deep-well');
-  await page.waitForTimeout(400);
-  save = await readSave(page);
-  check(save.treeRanks['vigil-deep-well'] === 1, 'bought Deep Well (layer-2 mana passive)');
+  await shot(page, 'tree-hourglass-scrolled');
 
   await clickNamed(page, 'treeNode:vigil-still-waters');
   await page.waitForTimeout(400);
   save = await readSave(page);
-  check(save.treeRanks['vigil-still-waters'] === 1, 'bought Still Waters (layer-2 CD grant node)');
-  await shot(page, 'tree-layer2-bought');
+  check(save.treeRanks['vigil-still-waters'] === 1, 'bought Still Waters (oath-branch CD)');
+
+  await clickNamed(page, 'treeNode:shared-mend-potency');
+  await page.waitForTimeout(400);
+  save = await readSave(page);
+  check(save.treeRanks['shared-mend-potency'] === 1, 'bought shared-mid Solemn Mend potency');
+
+  await clickNamed(page, 'treeNode:vowstrike-virtue');
+  await page.waitForTimeout(400);
+  save = await readSave(page);
+  check(save.treeRanks['vowstrike-virtue'] === 1, 'bought Vowstrike: Absolution (Virtue aspect)');
+  check(!save.treeRanks['vowstrike-vengeance'], 'Vengeance aspect remains locked/unowned');
+
+  await clickNamed(page, 'treeNode:wrath-ascendant');
+  await page.waitForTimeout(400);
+  save = await readSave(page);
+  check(save.treeRanks['wrath-ascendant'] === 1, 'bought Wrath Ascendant (crown Wings CD)');
+
+  await clickNamed(page, 'treeNode:vowbound-crown');
+  await page.waitForTimeout(400);
+  save = await readSave(page);
+  check(save.treeRanks['vowbound-crown'] === 1, 'bought Vowbound crown amp');
+  await shot(page, 'tree-crown-owned');
 
   await clickNamed(page, 'treeBack');
   await page.waitForTimeout(400);
 
-  // §D4 rebalance: zealot-steady-hands takes the retired zealot-desperate-zeal
-  // slot (same position, no scroll) — separate lean seed, own branch is enough.
+  // Zealot Steady Hands remains purchasable on a lean seed (no scroll needed).
   await seedSave(
     page,
     baseSave({
@@ -405,7 +420,7 @@ try {
   await clickNamed(page, 'treeNode:zealot-steady-hands');
   await page.waitForTimeout(400);
   save = await readSave(page);
-  check(save.treeRanks['zealot-steady-hands'] === 1, 'Steady Hands purchasable at the retired Desperate Zeal slot');
+  check(save.treeRanks['zealot-steady-hands'] === 1, 'Steady Hands purchasable on Zealot path');
   await shot(page, 'tree-zealot-steady-hands-rebalance');
 
   // ---- Stage B2: Vigil kit in combat — tooltip reflects tree modifiers -------

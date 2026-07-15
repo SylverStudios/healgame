@@ -179,6 +179,16 @@ export class CombatEngine {
       }
     }
 
+    // Alpha 0.2: loadout/level manaRegen merges with relic regen — sum amounts,
+    // take the minimum interval across every contributing source.
+    if (options?.manaRegen) {
+      this.relicStats.manaRegenAmount += options.manaRegen.amount;
+      this.relicStats.manaRegenIntervalMs =
+        this.relicStats.manaRegenIntervalMs === null
+          ? options.manaRegen.intervalMs
+          : Math.min(this.relicStats.manaRegenIntervalMs, options.manaRegen.intervalMs);
+    }
+
     const healerMana = PARTY.startingMana + (options?.bonusMaxMana ?? 0) + this.relicStats.bonusMaxMana;
     this.relicRegenRemainingMs = this.relicStats.manaRegenIntervalMs;
 
@@ -317,10 +327,8 @@ export class CombatEngine {
     if (cd.def.effect.kind === 'freeNextHeal') {
       cd.armed = true;
     } else {
-      // manaCostReduction: re-activating while the window is still open resets it to full
-      // duration rather than stacking (Alpha 0.1 §D6). Not reachable with current data
-      // (cooldownMs === durationMs means the CD isn't ready until after the window closes),
-      // but correct if a future CD has cooldownMs < durationMs.
+      // manaCostReduction / healBonus: re-activating while the window is still open
+      // resets it to full duration rather than stacking (Alpha 0.1 §D6 / 0.2 §D6).
       cd.buffRemainingMs = cd.def.effect.durationMs;
     }
     this.pending.push({ type: 'cooldownActivated', id: cd.def.id, name: cd.def.name });
@@ -358,7 +366,11 @@ export class CombatEngine {
   private nextTimerBoundary(): number {
     let min = Infinity;
     if (this.gcdRemainingMs > 0) min = Math.min(min, this.gcdRemainingMs);
-    if (this.playerCast) min = Math.min(min, this.playerCast.remainingMs);
+    // Instant casts (castMs === 0) complete synchronously in beginCast; never
+    // surface a 0 remainingMs here — that would freeze advance() at step 0.
+    if (this.playerCast && this.playerCast.remainingMs > 0) {
+      min = Math.min(min, this.playerCast.remainingMs);
+    }
     for (const remaining of this.swingTimers.values()) min = Math.min(min, remaining);
     if (this.bossCastState) min = Math.min(min, this.bossCastState.remainingMs);
     if (this.bossCastTimerRemainingMs !== null) min = Math.min(min, this.bossCastTimerRemainingMs);
@@ -506,6 +518,11 @@ export class CombatEngine {
     this.gcdRemainingMs = GCD_MS;
     out.push({ type: 'castStarted', cast: { ...this.playerCast } });
     if (freeHealCd) out.push({ type: 'cooldownBuffEnded', id: freeHealCd.def.id });
+    // Alpha 0.2 §D4: castMs === 0 is a true instant — heal resolves in this same
+    // call (no cast-bar occupancy). GCD still runs from cast start.
+    if (spell.castMs === 0) {
+      this.completePlayerCast(out);
+    }
   }
 
   /** Refunds the active cast's reserved mana (escape/target-dead cancel). Symmetric with beginCast's debit. */
@@ -581,13 +598,22 @@ export class CombatEngine {
           fullHealthBonus += fh.bonusHeal;
         }
       }
+      // Alpha 0.2 §D6 healBonus: after synergy / missing / full-health / relic
+      // bonusHealing; multiple open healBonus windows sum.
+      let healBonus = 0;
+      for (const cd of this.cooldowns) {
+        if (cd.def.effect.kind === 'healBonus' && cd.buffRemainingMs > 0) {
+          healBonus += cd.def.effect.bonusHeal;
+        }
+      }
       const raw =
         spell.heal +
         synergyBonus +
         missingHealthBonus +
         missingHealthPctBonus +
         fullHealthBonus +
-        this.relicStats.bonusHealing;
+        this.relicStats.bonusHealing +
+        healBonus;
       const applied = Math.min(raw, missing);
       const overheal = raw - applied;
       target.hp += applied;
