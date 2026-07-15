@@ -725,3 +725,26 @@ New ability kinds landed in the engine (`partyDoT`, `manaSiphon`) with events
 the typed catalogs (`enemyAbilities/`, `mobs/`, `dungeons/`) and validated via
 `npm run content -- validate|preview`. Hub buttons auto-wire from
 `ORDERED_DUNGEONS`; journey names: `hubCinderVault`, `hubBlackChoir`.
+
+---
+
+# Content DX + Verdant Rift proof dungeon (2026-07-15)
+
+Status: current · Last verified: 2026-07-15
+
+## Authoring DX
+
+- `npm run content -- balance <id|--all>` runs maxed Vigil/Zealot disciplined
+  bots via shared `combat/balanceBot.ts` (same harness as balance gates).
+- Hub dungeon journey names are always `hubDungeon:<id>` from
+  `hubDungeonTargetName` — no HubScene per-id switch.
+- CLI validate/list/preview/balance tests derive expectations from live
+  catalogs so adding a data-only dungeon does not require hand-pinned count
+  strings.
+
+## Verdant Rift (Dungeon 4)
+
+Proof add that reused `tunnelVision` (Needle Gaze) with new trash/boss data
+only. Clearable with maxed kits (≥3 alive, Needle Gaze lands ≥1). Inserted
+between Cinder Vault and Black Choir; Black Choir unlocks after Verdant Rift;
+The Maw is Dungeon 6.

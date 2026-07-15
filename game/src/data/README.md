@@ -25,13 +25,17 @@ source of truth.
    npm run content -- validate
    npm run content -- preview <dungeon-id>
    npm run content -- preview --all
+   npm run content -- balance <dungeon-id>   # maxed-kit disciplined bots
+   npm run content -- balance --all
    npm run verify:fast
    # Run full `npm run verify` when progression, scenes, or journey targets change.
    ```
 
 Use `statOverrides` only for encounter tuning that intentionally differs from
 a mob's base profile. Preview output always prints effective values and calls
-out overrides.
+out overrides. `balance` runs the shared disciplined bots from
+`combat/balanceBot.ts` (same harness as `balance.test.ts`) so you can tune
+before pinning gates.
 
 Dungeon reward data contains only `xpPerEnemy`. Every kill pays that XP even
 when the party later wipes. First-clear relic offers are meta-progression, not
@@ -48,15 +52,16 @@ encounter currency, and are assembled from `data/relics.ts`.
   existing visual key needs no sprite change.
 - Set `unlock: { kind: 'dungeonClear', dungeonId }` to an earlier dungeon.
   When inserting into the middle of the chain, update the downstream
-  dungeon's prerequisite too. Normal appends auto-wire Hub buttons,
-  first-clear rewards, and unlock checks from the ordered catalog.
-- Update `content/content.test.ts` pinned compiled values when shipped content
-  changes. Update `content/cli.test.ts` counts and output strings whenever the
-  catalog size/order changes. `ui/sprites.test.ts` enforces mob art coverage.
-- Add deterministic cases to `combat/balance.test.ts` for content that defines
-  a new difficulty gate, then record the result in `docs/poc-qa.md`.
-- Give every journey-targeted control a stable `setName(...)` and drive it
-  through `window.__healgame.locate`; never add coordinate tables.
+  dungeon's prerequisite too. Hub buttons auto-wire from `ORDERED_DUNGEONS`
+  with journey names `hubDungeon:<id>` via `hubDungeonTargetName` — no
+  HubScene switch or journey coordinate table.
+- Update `content/content.test.ts` pinned compiled values when shipped encounter
+  shape changes. CLI list/validate/preview/balance tests derive expectations
+  from the live catalogs, so catalog growth usually needs no CLI string edits.
+  `ui/sprites.test.ts` enforces mob art coverage.
+- Tune with `npm run content -- balance <id>`, then pin gates in
+  `combat/balance.test.ts` and record the result in `docs/poc-qa.md`.
+- Drive journey clicks through `window.__healgame.locate('hubDungeon:<id>')`.
 
 ## Runtime boundary
 
