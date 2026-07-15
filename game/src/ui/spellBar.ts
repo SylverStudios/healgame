@@ -1,8 +1,9 @@
 /**
  * Bottom row of spell buttons (poc-spec §4: click ally -> click spell/hotkey).
  * One button per unlocked spell; dimmed + crimson cost when mana is short;
- * dimmed when nothing is targeted or combat ended. Temp art only — flat
- * rectangles + text, no icons.
+ * dimmed when nothing is targeted or combat ended.
+ * Alpha 0.2 §D8: glyph (single char) is the primary label; full name + stats
+ * live in the hover tooltip. Compact sizing to fit up to 8 buttons on 960px.
  */
 
 import Phaser from 'phaser';
@@ -10,10 +11,13 @@ import type { CooldownDef, CooldownState, SpellDef } from '../combat/types';
 import type { CombatMods } from '../data/spellTree';
 import { buildCooldownTooltipLines } from './cooldownTooltip';
 import { SpellTooltip, buildTooltipLines } from './spellTooltip';
+import { glyphChar } from './glyph';
 
-const BUTTON_WIDTH = 160;
+/** Alpha 0.2 §D8: compact width so up to 8 buttons (spells + CDs) fit on 960px.
+ *  5 spell buttons + 3 CD buttons: 5×100 + 4×10 + 18 + 3×72 + 2×10 = 794px. */
+const BUTTON_WIDTH = 100;
 const BUTTON_HEIGHT = 52;
-const BUTTON_GAP = 14;
+const BUTTON_GAP = 10;
 const BUTTON_BG_COLOR = 0x3a2a22;
 const BUTTON_BG_OOM_COLOR = 0x2a1a18;
 const BUTTON_BORDER_COLOR = 0x0a0605;
@@ -25,25 +29,25 @@ const BUTTON_DISABLED_ALPHA = 0.28;
 const ARMED_BORDER_COLOR = 0xf2c14e;
 const ARMED_BORDER_WIDTH = 3;
 
-const NAME_FONT = '13px monospace';
-const NAME_COLOR = '#e8d8c8';
-const COST_FONT = '11px monospace';
+/** Glyph: large single-char primary label (§D8 temp art exception). */
+const GLYPH_FONT = '22px monospace';
+const GLYPH_COLOR = '#e8d8c8';
+const COST_FONT = '10px monospace';
 const COST_COLOR = '#a8c8f0';
 const COST_OOM_COLOR = '#e05a4e';
 const HOTKEY_FONT = '10px monospace';
 const HOTKEY_COLOR = '#e8d8c8';
-const KEYCAP_SIZE = 18;
+const KEYCAP_SIZE = 14;
 const KEYCAP_BG = 0x241a15;
 const KEYCAP_BORDER = 0x8a7868;
 
-/** Cooldown buttons (Alpha 0.1 §D6): a compact group right of the spell buttons. */
-const CD_BUTTON_WIDTH = 90;
+/** Cooldown buttons (Alpha 0.1 §D6): compact group right of the spell buttons. */
+const CD_BUTTON_WIDTH = 72;
 const CD_BUTTON_HEIGHT = 52;
-const CD_BUTTON_GAP = 14;
-const CD_GROUP_GAP = 24;
-const CD_NAME_FONT = '11px monospace';
-const CD_NAME_WRAP_WIDTH = CD_BUTTON_WIDTH - 10;
-const CD_TIMER_FONT = '13px monospace';
+const CD_BUTTON_GAP = 10;
+const CD_GROUP_GAP = 18;
+const CD_GLYPH_FONT = '20px monospace';
+const CD_TIMER_FONT = '12px monospace';
 const CD_TIMER_COLOR = '#a8c8f0';
 
 class SpellButton {
@@ -54,7 +58,8 @@ class SpellButton {
 
   private readonly bg: Phaser.GameObjects.Rectangle;
   private readonly keycap: Phaser.GameObjects.Rectangle;
-  private readonly nameText: Phaser.GameObjects.Text;
+  /** Large glyph char — primary visual (§D8 temp art exception). */
+  private readonly glyphText: Phaser.GameObjects.Text;
   private readonly costText: Phaser.GameObjects.Text;
   private readonly hotkeyText: Phaser.GameObjects.Text;
   private enabled = true;
@@ -92,15 +97,23 @@ class SpellButton {
       .rectangle(keycapX, keycapY, KEYCAP_SIZE, KEYCAP_SIZE, KEYCAP_BG)
       .setStrokeStyle(1, KEYCAP_BORDER);
 
-    this.nameText = scene.add
-      .text(x, y - 8, spell.name, { fontFamily: NAME_FONT, color: NAME_COLOR })
+    this.glyphText = scene.add
+      .text(x, y - 5, glyphChar(spell), {
+        fontFamily: 'monospace',
+        fontSize: GLYPH_FONT,
+        fontStyle: 'bold',
+        color: GLYPH_COLOR,
+        stroke: '#0a0605',
+        strokeThickness: 2,
+      })
       .setOrigin(0.5);
     this.costText = scene.add
-      .text(x, y + 11, `${spell.mana} mana`, { fontFamily: COST_FONT, color: COST_COLOR })
+      .text(x, y + 15, `${spell.mana}m`, { fontFamily: 'monospace', fontSize: COST_FONT, color: COST_COLOR })
       .setOrigin(0.5);
     this.hotkeyText = scene.add
       .text(keycapX, keycapY, hotkeyLabel, {
-        fontFamily: HOTKEY_FONT,
+        fontFamily: 'monospace',
+        fontSize: HOTKEY_FONT,
         color: HOTKEY_COLOR,
       })
       .setOrigin(0.5);
@@ -113,7 +126,7 @@ class SpellButton {
     this.bg.setFillStyle(canAfford ? BUTTON_BG_COLOR : BUTTON_BG_OOM_COLOR);
     this.bg.setAlpha(alpha);
     this.keycap.setAlpha(alpha);
-    this.nameText.setAlpha(alpha);
+    this.glyphText.setAlpha(alpha);
     this.costText.setAlpha(canAfford ? alpha : Math.max(alpha, 0.55));
     this.costText.setColor(canAfford ? COST_COLOR : COST_OOM_COLOR);
     this.hotkeyText.setAlpha(alpha);
@@ -129,19 +142,16 @@ class SpellButton {
   destroy(): void {
     this.bg.destroy();
     this.keycap.destroy();
-    this.nameText.destroy();
+    this.glyphText.destroy();
     this.costText.destroy();
     this.hotkeyText.destroy();
   }
 }
 
 /**
- * Cooldown button (Alpha 0.1 §D6): name up top (may wrap to two lines via
- * wordWrap — short single-line initials are not okay per the handoff), a
- * seconds-remaining readout below while on cooldown, dimmed alpha while on
- * cooldown (reuses BUTTON_DISABLED_ALPHA), gold accent border while its buff
- * is active (reuses the armed-synergy stroke). Clicking while on cooldown is
- * a no-op — `ready` gates the click handler, not just the visual.
+ * Cooldown button (Alpha 0.1 §D6): glyph primary label (§D8), timer readout
+ * while on cooldown, dimmed alpha while on cooldown, gold accent border while
+ * buff is active. Clicking while on cooldown is a no-op — `ready` gates it.
  */
 class CooldownButton {
   readonly cooldownId: string;
@@ -150,7 +160,8 @@ class CooldownButton {
 
   private readonly bg: Phaser.GameObjects.Rectangle;
   private readonly keycap: Phaser.GameObjects.Rectangle;
-  private readonly nameText: Phaser.GameObjects.Text;
+  /** Large glyph char — primary visual (§D8 temp art exception). */
+  private readonly glyphText: Phaser.GameObjects.Text;
   private readonly timerText: Phaser.GameObjects.Text;
   private readonly hotkeyText: Phaser.GameObjects.Text;
   private ready = true;
@@ -188,21 +199,24 @@ class CooldownButton {
       .rectangle(keycapX, keycapY, KEYCAP_SIZE, KEYCAP_SIZE, KEYCAP_BG)
       .setStrokeStyle(1, KEYCAP_BORDER);
 
-    this.nameText = scene.add
-      .text(x + 8, y - 10, def.name, {
-        fontFamily: CD_NAME_FONT,
-        color: NAME_COLOR,
-        align: 'center',
-        wordWrap: { width: CD_NAME_WRAP_WIDTH - 16 },
+    this.glyphText = scene.add
+      .text(x, y - 5, glyphChar(def), {
+        fontFamily: 'monospace',
+        fontSize: CD_GLYPH_FONT,
+        fontStyle: 'bold',
+        color: GLYPH_COLOR,
+        stroke: '#0a0605',
+        strokeThickness: 2,
       })
       .setOrigin(0.5);
     this.timerText = scene.add
-      .text(x, y + 14, '', { fontFamily: CD_TIMER_FONT, color: CD_TIMER_COLOR })
+      .text(x, y + 14, '', { fontFamily: 'monospace', fontSize: CD_TIMER_FONT, color: CD_TIMER_COLOR })
       .setOrigin(0.5)
       .setVisible(false);
     this.hotkeyText = scene.add
       .text(keycapX, keycapY, hotkeyLabel, {
-        fontFamily: HOTKEY_FONT,
+        fontFamily: 'monospace',
+        fontSize: HOTKEY_FONT,
         color: HOTKEY_COLOR,
       })
       .setOrigin(0.5);
@@ -231,7 +245,7 @@ class CooldownButton {
     const alpha = this.ready && this.combatRunning ? 1 : BUTTON_DISABLED_ALPHA;
     this.bg.setAlpha(alpha);
     this.keycap.setAlpha(alpha);
-    this.nameText.setAlpha(alpha);
+    this.glyphText.setAlpha(alpha);
     this.timerText.setAlpha(this.combatRunning ? 1 : BUTTON_DISABLED_ALPHA);
     this.hotkeyText.setAlpha(alpha);
   }
@@ -239,7 +253,7 @@ class CooldownButton {
   destroy(): void {
     this.bg.destroy();
     this.keycap.destroy();
-    this.nameText.destroy();
+    this.glyphText.destroy();
     this.timerText.destroy();
     this.hotkeyText.destroy();
   }

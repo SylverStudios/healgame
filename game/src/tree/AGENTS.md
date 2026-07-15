@@ -1,6 +1,6 @@
 # Skill tree — agent notes
 
-Status: current · Authority: skill-tree service + live SPELL_TREE wiring · Last verified: 2026-07-15
+Status: current · Authority: skill-tree service + live SPELL_TREE wiring · Last verified: 2026-07-15 (chunk 4)
 
 Config-driven tree service (`game/src/tree/`) plus the live spell-tree data and
 combat resolve (`game/src/data/spellTree.ts`). Phaser stays out of this folder.
@@ -132,11 +132,23 @@ Retained output/tempo nodes require `mode: 'any'` on either branch follow-up:
 - Vigil: thrift, still-waters (gate: patient-vow-1 OR measured-devotion)
 - Zealot: quick-breath, frenzied-liturgy (gate: fervent-chain-1 OR steady-hands)
 
-**TreeScene now scrolls.** The 960×540 base canvas (`main.ts`) had no room
-left below the existing rows. Layer 2 and new shared mid / vowstrike / crown
-rows live in extended world space inside `WORLD_HEIGHT` camera bounds; HUD
-chrome is pinned via `setScrollFactor(0)`. Journey reaches deep nodes by
+**TreeScene now scrolls.** `WORLD_HEIGHT = 1080`; max scroll = 1080 − 540 = 540.
+All rows including the crown (y ≈ 960) are reachable at maximum scroll.
+HUD chrome is pinned via `setScrollFactor(0)`. Journey reaches deep nodes by
 wheeling to scroll and clicking by name (`treeNode:<spotId>`).
+
+Row layout in `SPELL_TREE_POSITIONS` (y centers, 960px canvas):
+
+| y   | spots                                                             |
+|-----|-------------------------------------------------------------------|
+| 125 | `deep-reserves`                                                   |
+| 235 | `vigil-oath` (x 260) · `zealot-oath` (x 700)                     |
+| 355 | `vigil-patient-vow` (x 150) · `vigil-measured-devotion` (x 380) · `zealot-fervent-chain` (x 590) · `zealot-steady-hands` (x 820) |
+| 480 | `vigil-graven-scale` (x 150)                                      |
+| 600 | `vigil-thrift` (x 160) · `vigil-still-waters` (x 375) · `zealot-quick-breath` (x 585) · `zealot-frenzied-liturgy` (x 800) |
+| 720 | `shared-mend-potency` (x 320) · `shared-zealous-potency` (x 640) |
+| 840 | `vowstrike-virtue` (x 260) · `vowstrike-vengeance` (x 700)       |
+| 960 | `wrath-ascendant` (x 360) · `vowbound-crown` (x 600)             |
 
 ## Gates
 
