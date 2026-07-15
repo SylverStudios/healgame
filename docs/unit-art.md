@@ -1,6 +1,6 @@
 # Unit art — Kenney Tiny Dungeon
 
-Status: current · Authority: combat unit tile mapping · Last verified: 2026-07-13
+Status: current · Authority: combat unit tile mapping · Last verified: 2026-07-15
 
 Combat units render 16×16 tiles from Kenney's **Tiny Dungeon** pack (CC0, no
 attribution required). Everything else in the game stays temp art per
@@ -35,10 +35,11 @@ CLAUDE.md. Live mapping: `game/src/ui/sprites.ts`.
 ## Current casting
 
 tank→96 knight · dps1→98 fighter · dps2→112 ranger · healer→84 wizard ·
-Ash Husk / Iron Husk→121 ghost · Gate Warden→109 brute · Spire Lancer /
-Hollow King→110 demon. Party maps by unit id. Catalog enemies map by stable
-`Unit.mobId` → `MobDef.visualKey` → `MOB_VISUAL_FRAMES`; unknown mobs fall
-back to ghost/demon by role.
+Ash Husk / Iron Husk / Cinder Wraith / Choir Shade→121 ghost · Gate Warden /
+Ember Colossus→109 brute · Spire Lancer / Hollow King / Dirge Sovereign→110
+demon. Party maps by unit id. Catalog enemies map by stable `Unit.mobId` →
+`MobDef.visualKey` → `MOB_VISUAL_FRAMES`; unknown mobs fall back to
+ghost/demon by role.
 
 ## Adding a unit's art
 

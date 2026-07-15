@@ -134,6 +134,27 @@ function compileAbility(ability: EnemyAbilityDef): BossCastDef {
         tickMs: ability.tickMs,
         damagePerTick: ability.damagePerTick,
       };
+    case 'partyDoT':
+      return {
+        kind: 'partyDoT',
+        name: ability.name,
+        castMs: ability.castMs,
+        firstCastAtMs: ability.firstCastAtMs,
+        intervalMs: ability.intervalMs,
+        durationMs: ability.durationMs,
+        tickMs: ability.tickMs,
+        damagePerTick: ability.damagePerTick,
+      };
+    case 'manaSiphon':
+      return {
+        kind: 'manaSiphon',
+        name: ability.name,
+        castMs: ability.castMs,
+        firstCastAtMs: ability.firstCastAtMs,
+        intervalMs: ability.intervalMs,
+        partyDamage: ability.partyDamage,
+        manaBurn: ability.manaBurn,
+      };
   }
 }
 

@@ -3,8 +3,8 @@ import type { DungeonDef } from '../content/types';
 export const THE_MAW_DUNGEON = {
   id: 'the-maw',
   name: 'The Maw',
-  order: 3,
-  unlock: { kind: 'dungeonClear', dungeonId: 'iron-pass' },
+  order: 5,
+  unlock: { kind: 'dungeonClear', dungeonId: 'black-choir' },
   rewards: {
     xpPerEnemy: 1,
   },

@@ -127,8 +127,9 @@ export class HubScene extends Phaser.Scene {
     const dungeonStartY = 270;
 
     unlockedDungeons.forEach((dungeon, visibleIndex) => {
-      // A single bounded row handles the current one-to-three dungeon catalog.
-      // In particular, Dungeon 2 no longer consumes the footer's restart space.
+      // A single bounded grid handles the ordered dungeon catalog (up to three
+      // columns). Later dungeons wrap to additional rows without eating the
+      // footer's restart space.
       const column = visibleIndex % columns;
       const row = Math.floor(visibleIndex / columns);
       const rowCount = Math.min(columns, unlockedDungeons.length - row * columns);
@@ -207,6 +208,10 @@ function hubDungeonButtonName(dungeonId: string): string {
       return 'hubAshGate';
     case 'iron-pass':
       return 'hubIronPass';
+    case 'cinder-vault':
+      return 'hubCinderVault';
+    case 'black-choir':
+      return 'hubBlackChoir';
     case 'the-maw':
       return 'hubMaw';
     default:

@@ -1,0 +1,15 @@
+import type { EnemyAbilityDef } from '../content/types';
+
+/** Cinder Vault boss mechanic: telegraph, then party-wide ember DoT. */
+export const EMBERFALL = {
+  id: 'emberfall',
+  name: 'Emberfall',
+  kind: 'partyDoT',
+  castMs: 4_000,
+  firstCastAtMs: 5_000,
+  intervalMs: 15_000,
+  durationMs: 4_000,
+  tickMs: 1_000,
+  damagePerTick: 1,
+  visualKey: 'emberfall',
+} as const satisfies EnemyAbilityDef;

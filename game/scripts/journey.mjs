@@ -270,13 +270,14 @@ try {
   check(save?.relicIds.includes('triage-bell'), 'relic choice survives a full reload without being re-offered');
   await shot(page, 'hub-relic-after-reload');
 
-  // ---- Stage D2: Ash Gate clear unlocks Iron Pass (not yet The Maw) --------
-  console.log('Stage D2: Ash-Gate-cleared save → Iron Pass unlocked on hub, The Maw still gated');
+  // ---- Stage D2: Ash Gate clear unlocks Iron Pass (not yet Cinder Vault / Maw) --------
+  console.log('Stage D2: Ash-Gate-cleared save → Iron Pass unlocked on hub, later dungeons still gated');
   await seedSave(page, baseSave({ clearedDungeons: ['ash-gate'] }));
   await shot(page, 'hub-iron-pass-unlocked'); // visual: Iron Pass button present, no Maw button below it
 
-  // The Maw button must not exist yet — locate is null (not an inert pixel click).
-  check((await locate(page, 'hubMaw')) === null, 'The Maw button absent before Iron Pass is cleared');
+  // Later dungeon buttons must not exist yet — locate is null (not an inert pixel click).
+  check((await locate(page, 'hubMaw')) === null, 'The Maw button absent before Black Choir is cleared');
+  check((await locate(page, 'hubCinderVault')) === null, 'Cinder Vault absent before Iron Pass is cleared');
   check((await locate(page, 'hubIronPass')) !== null, 'Iron Pass button present after Ash Gate clear');
 
   await clickNamed(page, 'hubIronPass');
@@ -450,13 +451,21 @@ try {
   await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(800);
 
-  // ---- Stage C: Maw gating (§D1) — gated on Iron Pass, still unwinnable -----
-  console.log('Stage C: Maw gating — absent after Ash Gate alone, present + unwinnable after Iron Pass too');
+  // ---- Stage C: Maw gating — gated on Black Choir, still unwinnable -----
+  console.log('Stage C: Maw gating — absent after Iron Pass alone, present + unwinnable after Black Choir');
   await seedSave(page, baseSave({ clearedDungeons: ['ash-gate', 'iron-pass'] }));
+  check((await locate(page, 'hubCinderVault')) !== null, 'Cinder Vault present after Iron Pass clear');
+  check((await locate(page, 'hubMaw')) === null, 'The Maw still gated after Iron Pass alone');
+  await seedSave(
+    page,
+    baseSave({
+      clearedDungeons: ['ash-gate', 'iron-pass', 'cinder-vault', 'black-choir'],
+    }),
+  );
   save = await readSave(page);
   const xpBeforeMaw = save.xp;
-  await shot(page, 'hub-maw-unlocked'); // visual: The Maw button now present below Iron Pass
-  check((await locate(page, 'hubMaw')) !== null, 'The Maw button present after Iron Pass clear');
+  await shot(page, 'hub-maw-unlocked'); // visual: The Maw button now present
+  check((await locate(page, 'hubMaw')) !== null, 'The Maw button present after Black Choir clear');
   await clickNamed(page, 'hubMaw');
   await page.waitForTimeout(1000);
   await shot(page, 'maw-combat-start');

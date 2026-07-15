@@ -1,6 +1,6 @@
 # Combat engine (Chunk 1)
 
-Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-07-14
+Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-07-15
 
 Pure, deterministic TypeScript. No Phaser, no wall-clock, no randomness — driven
 entirely by `advance(dtMs)`. Chunk 2 builds the Phaser view against exactly
@@ -155,12 +155,13 @@ and compiles the ordered dungeon catalog into the engine's resolved
   independently of generated per-wave `Unit.id`. Presentation uses `mobId` to
   resolve `MobDef.visualKey`; combat decisions use only resolved encounter
   values.
-- **Boss cast union** (Alpha 0.1 §D3): `BossDef.cast` is a discriminated union,
-  `BossCastDef = PartyAoECastDef | TunnelVisionCastDef`. `kind` is optional on
-  `PartyAoECastDef` (defaults to that arm) so every pre-existing encounter
-  (Ash Gate's Bonehowl, The Maw's Extinction) keeps compiling and behaving
-  identically without setting `kind` at all — only `TunnelVisionCastDef`
-  requires `kind: 'tunnelVision'`.
+- **Boss cast union**: `BossDef.cast` is a discriminated union,
+  `BossCastDef = PartyAoECastDef | TunnelVisionCastDef | PartyDoTCastDef |
+  ManaSiphonCastDef`. `kind` is optional on `PartyAoECastDef` (defaults to
+  that arm) so every pre-existing encounter (Ash Gate's Bonehowl, The Maw's
+  Extinction) keeps compiling and behaving identically without setting `kind`
+  at all — `tunnelVision`, `partyDoT`, and `manaSiphon` require an explicit
+  `kind`.
 - **Bonehowl / Extinction (`partyAoE`)**: `firstCastAtMs`/`intervalMs` are
   start-to-start; the gap before each subsequent cast is `intervalMs - castMs`.
   The boss keeps auto-attacking while casting (not a channel).
@@ -198,6 +199,16 @@ and compiles the ordered dungeon catalog into the engine's resolved
     excluded from `eligible` on the next activation without resetting or
     skipping the cursor (e.g. with `[dps1, dps2, healer]` and `dps1` dead,
     `focusIndex` continuing at 1 lands on `healer`, not `dps2`).
+- **Emberfall (`partyDoT`)**: telegraphed with `castMs` like `partyAoE`. On
+  finish, starts a party-wide DoT that ticks `damagePerTick` every `tickMs`
+  for `durationMs` against every living party member (via the shared damage
+  pipeline). Emits `partyDoTStarted` / `partyDoTEnded`. A refreshed cast
+  replaces any prior DoT window (no stacking). Cadence matches `partyAoE`;
+  the lingering DoT does **not** block the next telegraph.
+- **Soul Toll (`manaSiphon`)**: telegraphed like `partyAoE`. On finish,
+  applies `partyDamage` to every living party member, then drains up to
+  `manaBurn` mana from the living healer (clamped to current mana) and emits
+  `manaBurned { amount }` when any mana was taken. Cadence matches `partyAoE`.
 - **Synergy and heal-formula bonuses** (Chunk 1, phase-2-handoff; extended
   Alpha 0.1 §D4): all are resolved into the existing `heal` event — no new
   event types. A cast's raw heal value is `spell.heal + synergyBonuses +
@@ -272,11 +283,12 @@ and compiles the ordered dungeon catalog into the engine's resolved
 
 Simultaneous events resolve in a fixed priority each tick: **cooldown buff
 windows that expired this tick** (`manaCostReduction` → `cooldownBuffEnded`) →
-player cast completes → queued cast fires → boss cast completes (`partyAoE`
-party damage, or a `tunnelVision` telegraph finishing into a channel) → boss
-focus tick (`tunnelVision` channel damage, if one landed this tick) → merc
-autos (tank, dps1, dps2) → enemy/boss autos (spawn order) → boss cast timer
-starts a new telegraph/cast (blocked while a `tunnelVision` channel is
+player cast completes → queued cast fires → boss cast completes (`partyAoE` /
+`manaSiphon` party damage, a `partyDoT` window starting, or a `tunnelVision`
+telegraph finishing into a channel) → boss focus tick (`tunnelVision` channel
+damage, if one landed this tick) → party DoT tick (`partyDoT`, if active) →
+merc autos (tank, dps1, dps2) → enemy/boss autos (spawn order) → boss cast
+timer starts a new telegraph/cast (blocked while a `tunnelVision` channel is
 active). `advance()` sub-steps to the next timer boundary — cooldown
 (`remainingCooldownMs`) and buff-window (`manaCostReduction`'s
 `buffRemainingMs`) timers participate in that boundary calculation too, so a

@@ -516,6 +516,22 @@ export class CombatScene extends Phaser.Scene {
         case 'bossCastFinished':
           shakeBossImpact(this);
           break;
+        case 'partyDoTStarted':
+          this.focusCalloutText.setText(`${event.name.toUpperCase()} — PARTY BURN`).setVisible(true);
+          this.combatLog.push(
+            `${this.formatTimestamp()} ${this.encounter.boss.name} scorches the party — ${event.name}!`,
+          );
+          break;
+        case 'partyDoTEnded':
+          this.focusCalloutText.setVisible(false).setText('');
+          this.combatLog.push(`${this.formatTimestamp()} ${event.name} fades.`);
+          break;
+        case 'manaBurned':
+          this.showToast(`Mana burned (−${event.amount})`);
+          this.combatLog.push(
+            `${this.formatTimestamp()} ${this.encounter.boss.name} drains ${event.amount} mana!`,
+          );
+          break;
         case 'bossFocusStarted': {
           // Tunnel Vision channel begins on one party member (alpha-0.1 §D3).
           // The telegraph's bossCastFinished already fired the small shake.

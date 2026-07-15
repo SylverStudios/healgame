@@ -1,6 +1,6 @@
 # Dungeon content authoring
 
-Status: current · Authority: enemy ability, mob, dungeon, validation, assembly, and preview contracts · Last verified: 2026-07-14
+Status: current · Authority: enemy ability, mob, dungeon, validation, assembly, and preview contracts · Last verified: 2026-07-15
 
 Dungeon content is typed TypeScript data. The game and authoring tools consume
 the same validated catalogs; there is no generated file or second JSON/YAML
@@ -66,13 +66,13 @@ lookups. `data/encounters.ts` is the live registry and fails during module
 loading when catalog validation fails.
 
 The current runtime supports at most one scheduled ability on a boss
-(`partyAoE` or `tunnelVision`) and no active trash abilities. Add a
-discriminated `EnemyAbilityDef` member together with its engine behavior
-before authoring content that uses another mechanic. Do not turn ability data
-into an arbitrary scripting language.
+(`partyAoE`, `tunnelVision`, `partyDoT`, or `manaSiphon`) and no active trash
+abilities. Add a discriminated `EnemyAbilityDef` member together with its
+engine behavior before authoring content that uses another mechanic. Do not
+turn ability data into an arbitrary scripting language.
 
-Reusing `partyAoE` or `tunnelVision` requires data changes only. A new `kind`
-also requires coordinated changes in `content/types.ts`, `validate.ts`,
+Reusing an existing `kind` requires data changes only. A new `kind` also
+requires coordinated changes in `content/types.ts`, `validate.ts`,
 `compile.ts`, `preview.ts`, `combat/types.ts` (`BossCastDef`),
 `combat/engine.ts`, `combat/README.md`, mechanic tests, and any new event/VFX
 handling in `scenes/CombatScene.ts`.

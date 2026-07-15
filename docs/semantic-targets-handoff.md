@@ -27,7 +27,7 @@ and hovers by name — no hard-coded layout coordinates.
 | Name | Object | Where |
 |---|---|---|
 | `tutorialLearn` | learn-button rect | `TutorialScene.ts` |
-| `hubAshGate` / `hubIronPass` / `hubMaw` | dungeon button rects | `HubScene.ts` `makeButton` via dungeon id |
+| `hubAshGate` / `hubIronPass` / `hubCinderVault` / `hubBlackChoir` / `hubMaw` | dungeon button rects | `HubScene.ts` `makeButton` via dungeon id |
 | `hubTree` | Spell Tree button | `HubScene.ts` |
 | `hubRestart` | restart text label | `HubScene.ts` |
 | `runMod:<id>` | oath/relic icon hit target (top bar) | `ui/runModsBar.ts` (Hub / Combat / Tree) |
