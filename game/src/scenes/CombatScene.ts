@@ -208,6 +208,7 @@ export class CombatScene extends Phaser.Scene {
 
     this.engine = new CombatEngine(encounter, spells, {
       bonusMaxMana: this.sceneData.loadout.bonusMaxMana,
+      manaRegen: this.sceneData.loadout.manaRegen,
       synergies: this.sceneData.loadout.synergies,
       missingHealthBonuses: this.sceneData.loadout.missingHealthBonuses,
       missingHealthPctBonuses: this.sceneData.loadout.missingHealthPctBonuses,
