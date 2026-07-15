@@ -103,6 +103,8 @@ export interface CooldownDef {
   description: string;
   cooldownMs: number;
   effect: CooldownEffect;
+  /** Alpha 0.2 §D8 — placeholder glyph key/character for tree + spell bar. */
+  glyph?: string;
 }
 
 /**
