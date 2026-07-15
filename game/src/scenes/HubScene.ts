@@ -19,7 +19,7 @@ import {
 import { loadoutFromSave } from '../data/spellTree';
 import { runModsFromSave } from '../data/runMods';
 import { levelForXp, SPELLS, xpForLevel } from '../data/constants';
-import { ORDERED_DUNGEONS } from '../data/dungeons';
+import { ORDERED_DUNGEONS, hubDungeonTargetName } from '../data/dungeons';
 import { RunModsBar } from '../ui/runModsBar';
 import type { CombatResult, CombatSceneData } from './CombatScene';
 
@@ -152,7 +152,7 @@ export class HubScene extends Phaser.Scene {
           };
           this.scene.start(SceneKeys.Combat, combatData);
         },
-        hubDungeonButtonName(dungeon.id),
+        hubDungeonTargetName(dungeon.id),
       );
     });
 
@@ -198,23 +198,5 @@ export class HubScene extends Phaser.Scene {
       .setName(name);
     this.add.text(x, y, label, { fontFamily: FONT, fontSize: '18px', color: TEXT_COLOR }).setOrigin(0.5);
     rect.on('pointerdown', onClick);
-  }
-}
-
-/** Journey/semantic names for hub dungeon buttons (docs/semantic-targets-handoff.md). */
-function hubDungeonButtonName(dungeonId: string): string {
-  switch (dungeonId) {
-    case 'ash-gate':
-      return 'hubAshGate';
-    case 'iron-pass':
-      return 'hubIronPass';
-    case 'cinder-vault':
-      return 'hubCinderVault';
-    case 'black-choir':
-      return 'hubBlackChoir';
-    case 'the-maw':
-      return 'hubMaw';
-    default:
-      return `hubDungeon:${dungeonId}`;
   }
 }

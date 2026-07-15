@@ -1,14 +1,14 @@
 import type { DungeonDef } from '../content/types';
 
 /**
- * Dungeon 4 — soft gate after Cinder Vault. Maxed current tree kits wipe to
+ * Dungeon 5 — soft gate after Verdant Rift. Maxed current tree kits wipe to
  * Soul Toll mana pressure; Extinction-scale impossibility stays on The Maw.
  */
 export const BLACK_CHOIR_DUNGEON = {
   id: 'black-choir',
   name: 'Black Choir',
-  order: 4,
-  unlock: { kind: 'dungeonClear', dungeonId: 'cinder-vault' },
+  order: 5,
+  unlock: { kind: 'dungeonClear', dungeonId: 'verdant-rift' },
   rewards: {
     xpPerEnemy: 1,
   },

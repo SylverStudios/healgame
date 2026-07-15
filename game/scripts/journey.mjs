@@ -209,7 +209,7 @@ try {
   // ---- Stage A2: level ding auto-grants Zealous Mending ----------------------
   console.log('Stage A2: run that crosses 10 XP → Zealous Mending auto-grant');
   await seedSave(page, baseSave({ xp: 8 }));
-  await clickNamed(page, 'hubAshGate');
+  await clickNamed(page, 'hubDungeon:ash-gate');
   await page.waitForTimeout(1000);
   save = await playCombat(page, (s) => s.xp >= 10);
   check(save.unlockedSpells.includes('zealous-mending'), 'level 2 auto-granted Zealous Mending (no spend UI)');
@@ -276,11 +276,11 @@ try {
   await shot(page, 'hub-iron-pass-unlocked'); // visual: Iron Pass button present, no Maw button below it
 
   // Later dungeon buttons must not exist yet — locate is null (not an inert pixel click).
-  check((await locate(page, 'hubMaw')) === null, 'The Maw button absent before Black Choir is cleared');
-  check((await locate(page, 'hubCinderVault')) === null, 'Cinder Vault absent before Iron Pass is cleared');
-  check((await locate(page, 'hubIronPass')) !== null, 'Iron Pass button present after Ash Gate clear');
+  check((await locate(page, 'hubDungeon:the-maw')) === null, 'The Maw button absent before Black Choir is cleared');
+  check((await locate(page, 'hubDungeon:cinder-vault')) === null, 'Cinder Vault absent before Iron Pass is cleared');
+  check((await locate(page, 'hubDungeon:iron-pass')) !== null, 'Iron Pass button present after Ash Gate clear');
 
-  await clickNamed(page, 'hubIronPass');
+  await clickNamed(page, 'hubDungeon:iron-pass');
   await page.waitForTimeout(1200);
   await shot(page, 'iron-pass-combat-entered'); // visual: Iron Pass encounter running (Iron Husk wave)
   // No need to play this out live — Iron Pass's clearability is an engine-level
@@ -426,7 +426,7 @@ try {
       clearedDungeons: ['ash-gate'],
     }),
   );
-  await clickNamed(page, 'hubAshGate');
+  await clickNamed(page, 'hubDungeon:ash-gate');
   await page.waitForTimeout(1200);
   await clickNamed(page, 'combatPaceToggle');
   await page.waitForTimeout(300);
@@ -454,19 +454,19 @@ try {
   // ---- Stage C: Maw gating — gated on Black Choir, still unwinnable -----
   console.log('Stage C: Maw gating — absent after Iron Pass alone, present + unwinnable after Black Choir');
   await seedSave(page, baseSave({ clearedDungeons: ['ash-gate', 'iron-pass'] }));
-  check((await locate(page, 'hubCinderVault')) !== null, 'Cinder Vault present after Iron Pass clear');
-  check((await locate(page, 'hubMaw')) === null, 'The Maw still gated after Iron Pass alone');
+  check((await locate(page, 'hubDungeon:cinder-vault')) !== null, 'Cinder Vault present after Iron Pass clear');
+  check((await locate(page, 'hubDungeon:the-maw')) === null, 'The Maw still gated after Iron Pass alone');
   await seedSave(
     page,
     baseSave({
-      clearedDungeons: ['ash-gate', 'iron-pass', 'cinder-vault', 'black-choir'],
+      clearedDungeons: ['ash-gate', 'iron-pass', 'cinder-vault', 'verdant-rift', 'black-choir'],
     }),
   );
   save = await readSave(page);
   const xpBeforeMaw = save.xp;
   await shot(page, 'hub-maw-unlocked'); // visual: The Maw button now present
-  check((await locate(page, 'hubMaw')) !== null, 'The Maw button present after Black Choir clear');
-  await clickNamed(page, 'hubMaw');
+  check((await locate(page, 'hubDungeon:the-maw')) !== null, 'The Maw button present after Black Choir clear');
+  await clickNamed(page, 'hubDungeon:the-maw');
   await page.waitForTimeout(1000);
   await shot(page, 'maw-combat-start');
   await page.waitForTimeout(24_000);

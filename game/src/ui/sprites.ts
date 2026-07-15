@@ -42,6 +42,8 @@ const MOB_VISUAL_FRAMES = {
   'ember-colossus': FRAME.brute,
   'choir-shade': FRAME.ghost,
   'dirge-sovereign': FRAME.demon,
+  'thorn-husk': FRAME.ghost,
+  'thorn-matriarch': FRAME.brute,
 } as const satisfies Readonly<Record<MobVisualKey, number>>;
 
 /** Supported tile frame for an authored mob visual key. */

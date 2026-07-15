@@ -3,7 +3,7 @@ import type { DungeonDef } from '../content/types';
 export const THE_MAW_DUNGEON = {
   id: 'the-maw',
   name: 'The Maw',
-  order: 5,
+  order: 6,
   unlock: { kind: 'dungeonClear', dungeonId: 'black-choir' },
   rewards: {
     xpPerEnemy: 1,

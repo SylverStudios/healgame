@@ -35,8 +35,8 @@ CLAUDE.md. Live mapping: `game/src/ui/sprites.ts`.
 ## Current casting
 
 tank→96 knight · dps1→98 fighter · dps2→112 ranger · healer→84 wizard ·
-Ash Husk / Iron Husk / Cinder Wraith / Choir Shade→121 ghost · Gate Warden /
-Ember Colossus→109 brute · Spire Lancer / Hollow King / Dirge Sovereign→110
+Ash Husk / Iron Husk / Cinder Wraith / Choir Shade / Thorn Husk→121 ghost · Gate Warden /
+Ember Colossus / Thorn Matriarch→109 brute · Spire Lancer / Hollow King / Dirge Sovereign→110
 demon. Party maps by unit id. Catalog enemies map by stable `Unit.mobId` →
 `MobDef.visualKey` → `MOB_VISUAL_FRAMES`; unknown mobs fall back to
 ghost/demon by role.

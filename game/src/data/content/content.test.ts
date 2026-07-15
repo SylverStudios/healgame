@@ -181,12 +181,13 @@ describe('live dungeon content', () => {
       'ash-gate',
       'iron-pass',
       'cinder-vault',
+      'verdant-rift',
       'black-choir',
       'the-maw',
     ]);
     expect(all[0]).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[0]);
     expect(all[1]).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[1]);
-    expect(all[4]).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[2]);
+    expect(all[5]).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[2]);
   });
 
   it('assembles deterministically from explicit order, independent of catalog array order', () => {
@@ -200,6 +201,7 @@ describe('live dungeon content', () => {
       'ash-gate',
       'iron-pass',
       'cinder-vault',
+      'verdant-rift',
       'black-choir',
       'the-maw',
     ]);
@@ -219,7 +221,7 @@ describe('live dungeon content', () => {
   it('formats a stable preview with effective overrides and ability cadence', () => {
     expect(formatDungeonPreview('the-maw', CONTENT_CATALOGS)).toBe(
       [
-        'Dungeon 5: The Maw [the-maw]',
+        'Dungeon 6: The Maw [the-maw]',
         'Unlock: clear black-choir',
         'Rewards: XP 1/enemy, relic offer on first clear',
         'Visual: the-maw',

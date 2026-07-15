@@ -1,5 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
+import { CONTENT_CATALOGS } from './catalogs';
+import { ORDERED_DUNGEONS } from '../dungeons';
 
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
@@ -14,33 +16,52 @@ describe('content CLI', () => {
   it('validates and lists the live ordered catalog', () => {
     const validation = runContent('validate');
     expect(validation.status).toBe(0);
-    expect(validation.stdout).toContain('Content valid: 5 dungeons, 9 mobs, 5 abilities');
+    expect(validation.stdout).toContain(
+      `Content valid: ${CONTENT_CATALOGS.dungeons.length} dungeons, ${CONTENT_CATALOGS.mobs.length} mobs, ${CONTENT_CATALOGS.abilities.length} abilities`,
+    );
 
     const list = runContent('list');
     expect(list.status).toBe(0);
-    expect(list.stdout).toContain('1. Ash Gate [ash-gate] — always unlocked');
-    expect(list.stdout).toContain('2. Iron Pass [iron-pass] — unlocks after ash-gate');
-    expect(list.stdout).toContain('3. Cinder Vault [cinder-vault] — unlocks after iron-pass');
-    expect(list.stdout).toContain('4. Black Choir [black-choir] — unlocks after cinder-vault');
-    expect(list.stdout).toContain('5. The Maw [the-maw] — unlocks after black-choir');
+    for (const dungeon of ORDERED_DUNGEONS) {
+      const unlock =
+        dungeon.unlock.kind === 'always'
+          ? 'always unlocked'
+          : `unlocks after ${dungeon.unlock.dungeonId}`;
+      expect(list.stdout).toContain(
+        `${dungeon.order}. ${dungeon.name} [${dungeon.id}] — ${unlock}`,
+      );
+    }
   });
 
   it('previews one dungeon or the complete catalog', () => {
-    const one = runContent('preview', 'the-maw');
+    const first = ORDERED_DUNGEONS[0]!;
+    const last = ORDERED_DUNGEONS[ORDERED_DUNGEONS.length - 1]!;
+    const one = runContent('preview', last.id);
     expect(one.status).toBe(0);
-    expect(one.stdout).toContain('Dungeon 5: The Maw [the-maw]');
-    expect(one.stdout).toContain('Ability: Extinction [extinction] partyAoE');
+    expect(one.stdout).toContain(`Dungeon ${last.order}: ${last.name} [${last.id}]`);
 
     const all = runContent('preview', '--all');
     expect(all.status).toBe(0);
-    expect(all.stdout).toContain('Dungeon 1: Ash Gate [ash-gate]');
-    expect(all.stdout).toContain('Dungeon 2: Iron Pass [iron-pass]');
-    expect(all.stdout).toContain('Ability: Tunnel Vision [tunnel-vision] tunnelVision');
-    expect(all.stdout).toContain('Dungeon 3: Cinder Vault [cinder-vault]');
-    expect(all.stdout).toContain('Ability: Emberfall [emberfall] partyDoT');
-    expect(all.stdout).toContain('Dungeon 4: Black Choir [black-choir]');
-    expect(all.stdout).toContain('Ability: Soul Toll [soul-toll] manaSiphon');
-    expect(all.stdout).toContain('Dungeon 5: The Maw [the-maw]');
+    expect(all.stdout).toContain(`Dungeon ${first.order}: ${first.name} [${first.id}]`);
+    expect(all.stdout).toContain(`Dungeon ${last.order}: ${last.name} [${last.id}]`);
+    for (const dungeon of ORDERED_DUNGEONS) {
+      expect(all.stdout).toContain(`[${dungeon.id}]`);
+    }
+  });
+
+  it('runs the maxed-kit balance harness for a dungeon', () => {
+    const sample = ORDERED_DUNGEONS[0]!;
+    const one = runContent('balance', sample.id);
+    expect(one.status).toBe(0);
+    expect(one.stdout).toContain(`${sample.name} [${sample.id}]`);
+    expect(one.stdout).toContain('Vigil (Patient Vow):');
+    expect(one.stdout).toContain('Zealot:');
+
+    const all = runContent('balance', '--all');
+    expect(all.status).toBe(0);
+    for (const dungeon of ORDERED_DUNGEONS) {
+      expect(all.stdout).toContain(`[${dungeon.id}]`);
+    }
   });
 
   it('exits nonzero for bad arguments and unknown dungeon ids', () => {
@@ -51,5 +72,9 @@ describe('content CLI', () => {
     const unknown = runContent('preview', 'missing-dungeon');
     expect(unknown.status).toBe(1);
     expect(unknown.stderr).toContain('Cannot preview unknown dungeon "missing-dungeon"');
+
+    const unknownBalance = runContent('balance', 'missing-dungeon');
+    expect(unknownBalance.status).toBe(1);
+    expect(unknownBalance.stderr).toContain('Cannot balance unknown dungeon "missing-dungeon"');
   });
 });

@@ -3,6 +3,7 @@ import { BLACK_CHOIR_DUNGEON } from './blackChoir';
 import { CINDER_VAULT_DUNGEON } from './cinderVault';
 import { IRON_PASS_DUNGEON } from './ironPass';
 import { THE_MAW_DUNGEON } from './theMaw';
+import { VERDANT_RIFT_DUNGEON } from './verdantRift';
 import type { DungeonDef } from '../content/types';
 
 export { ASH_GATE_DUNGEON } from './ashGate';
@@ -10,11 +11,14 @@ export { BLACK_CHOIR_DUNGEON } from './blackChoir';
 export { CINDER_VAULT_DUNGEON } from './cinderVault';
 export { IRON_PASS_DUNGEON } from './ironPass';
 export { THE_MAW_DUNGEON } from './theMaw';
+export { VERDANT_RIFT_DUNGEON } from './verdantRift';
+export { hubDungeonTargetName } from './hubTarget';
 
 export const DUNGEON_ORDER = [
   'ash-gate',
   'iron-pass',
   'cinder-vault',
+  'verdant-rift',
   'black-choir',
   'the-maw',
 ] as const;
@@ -23,6 +27,7 @@ export const DUNGEONS = [
   ASH_GATE_DUNGEON,
   IRON_PASS_DUNGEON,
   CINDER_VAULT_DUNGEON,
+  VERDANT_RIFT_DUNGEON,
   BLACK_CHOIR_DUNGEON,
   THE_MAW_DUNGEON,
 ] as const satisfies readonly DungeonDef[];

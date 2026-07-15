@@ -1,348 +1,34 @@
 import { describe, expect, it } from 'vitest';
-import { CombatEngine } from './engine';
-import { ASH_GATE, IRON_PASS, CINDER_VAULT, BLACK_CHOIR, THE_MAW } from '../data/encounters';
+import {
+  BASE_KIT,
+  runBot,
+  runBuildBot,
+  VIGIL_EFFICIENCY_LOADOUT,
+  VIGIL_LOADOUT,
+  ZEALOT_LOADOUT,
+} from './balanceBot';
+import { ASH_GATE, BLACK_CHOIR, CINDER_VAULT, IRON_PASS, THE_MAW, VERDANT_RIFT } from '../data/encounters';
 import { SPELLS } from '../data/constants';
-import { loadoutFromSave, type CombatMods } from '../data/spellTree';
 import { RELICS } from '../data/relics';
-import type { SaveData } from '../save/save';
-import type { CombatEngineOptions, EncounterDef, RelicDef, SpellDef, Unit } from './types';
 
 /**
  * Balance gates for poc-spec §4.1 ("threat is mana, not raw HPS") and §7
  * ("Dungeon 2 cannot be cleared"), extended by alpha-0.1-handoff §Balance gate
- * amendments for Iron Pass (Dungeon 2) + relics:
+ * amendments for Iron Pass (Dungeon 2) + relics, mid-tier Cinder Vault / Black
+ * Choir, and later catalog dungeons. Bot implementation lives in balanceBot.ts
+ * (shared with `npm run content -- balance`).
  *
  *   1. Ash Gate with no healing at all → wipe (a healer must matter).
- *   2. Ash Gate, NAIVE healing (spam Solemn on the tank, overheal freely) on
- *      the starting kit → wipe. This is the spec's "expected first run":
- *      wasted mana loses the run, not raw HPS.
- *   3. Ash Gate, disciplined zero-overheal healing on the starting kit → no
- *      comfortable clear: either a wipe, or a pyrrhic win (healer fully OOM,
- *      at most 2 party members standing). Perfect play may scrape through;
- *      it must never cruise.
- *   4. Ash Gate, disciplined healing, BOTH maxed subclass builds (Vigil and
- *      Zealot — phase-2-handoff) → victory with at least 3 party members
- *      alive (the journey's step 6 must be reachable and progression felt,
- *      regardless of which subclass the player picked).
- *   5. Bonehowl actually lands at least once in a winning run (the 10s
- *      telegraph is part of the PoC experience) — checked on either build.
- *   6. Maxed Vigil save vs Iron Pass, disciplined healing → victory, >=3
- *      party alive, Tunnel Vision fires >=1 (alpha-0.1-handoff §Balance gate
- *      amendments gate 5).
- *   7. Maxed Zealot save vs Iron Pass, disciplined healing → victory, >=3
- *      party alive (gate 6).
- *   8. Maxed either build + any relic vs The Maw → wipe (sandbox; gate 7).
- *   9. Maxed either build vs Cinder Vault (Dungeon 3) → victory, >=3 alive,
- *      Emberfall lands >=1 (mid-tier content gate).
- *  10. Maxed either build vs Black Choir (Dungeon 4) → wipe (soft talent-point
- *      gate — not Extinction-scale; future tree nodes should reopen it).
+ *   2. Ash Gate, NAIVE healing on the starting kit → wipe.
+ *   3. Ash Gate, disciplined healing on the starting kit → never a comfortable clear.
+ *   4. Ash Gate, maxed Vigil/Zealot → victory, ≥3 alive.
+ *   5. Bonehowl lands ≥1 in a winning Ash Gate run.
+ *   6–7. Maxed kits clear Iron Pass; Tunnel Vision + CDs fire.
+ *   8. Maxed kits (+ relics) wipe on The Maw.
+ *   9. Maxed kits clear Cinder Vault; Emberfall lands ≥1.
+ *  10. Maxed kits clear Verdant Rift; Needle Gaze focus lands ≥1.
+ *  11. Maxed kits wipe on Black Choir; Soul Toll burns mana ≥1.
  */
-
-const STEP_MS = 250;
-const MAX_MS = 10 * 60 * 1000;
-
-const BASE_KIT: SpellDef[] = [SPELLS.solemnMend];
-
-/** Minimal synthetic SaveData for loadoutFromSave — only the fields the two maxed builds below need. */
-function makeSave(overrides: Partial<SaveData>): SaveData {
-  return {
-    version: 5,
-    tutorialDone: true,
-    xp: 0,
-    unlockedSpells: [],
-    treeRanks: {},
-    subclass: null,
-    clearedDungeons: [],
-    combatPaceTenths: 10,
-    relicIds: [],
-    pendingRelicOffers: [],
-    ...overrides,
-  };
-}
-
-/**
- * Maxed Vigil build (phase-2-handoff Chunk 1 brief, extended alpha-0.1-handoff
- * §D5 chunk 9a): Deep Reserves x5, Vigil oath + the Patient Vow power
- * specialization x3 (Mend->Vigil synergy), plus ALL Vigil tree layer-2 nodes
- * — Deep Well, Thrift, and Still Waters. Measured Devotion is the mutually
- * exclusive efficiency specialization and cannot stack with Patient Vow.
- */
-const VIGIL_SAVE: SaveData = makeSave({
-  unlockedSpells: ['solemn-mend', 'zealous-mending'],
-  treeRanks: {
-    'deep-reserves': 5,
-    'vigil-oath': 1,
-    'vigil-patient-vow': 3,
-    'vigil-deep-well': 1,
-    'vigil-thrift': 1,
-    'vigil-still-waters': 1,
-  },
-  subclass: 'vigil',
-});
-
-/** Maxed Vigil efficiency specialization: Measured Devotion instead of Patient Vow. */
-const VIGIL_EFFICIENCY_SAVE: SaveData = makeSave({
-  unlockedSpells: ['solemn-mend', 'zealous-mending'],
-  treeRanks: {
-    'deep-reserves': 5,
-    'vigil-oath': 1,
-    'vigil-measured-devotion': 1,
-    'vigil-deep-well': 1,
-    'vigil-thrift': 1,
-    'vigil-still-waters': 1,
-  },
-  subclass: 'vigil',
-});
-
-/**
- * Maxed Zealot build: Deep Reserves x5, Zealot oath + Fervent Chain x3
- * (Mending->Flare synergy) + Steady Hands (Alpha 0.1 §D4: Zealous Mending's
- * full-health bonus, replacing retired Desperate Zeal), plus ALL Zealot tree
- * layer-2 nodes (§D5 chunk 9a) — Quick Breath (Zealous Flare -200ms cast),
- * Spendthrift Grace (+3 max mana), Frenzied Liturgy (grants the CD).
- */
-const ZEALOT_SAVE: SaveData = makeSave({
-  unlockedSpells: ['solemn-mend', 'zealous-mending'],
-  treeRanks: {
-    'deep-reserves': 5,
-    'zealot-oath': 1,
-    'zealot-fervent-chain': 3,
-    'zealot-steady-hands': 1,
-    'zealot-quick-breath': 1,
-    'zealot-spendthrift-grace': 1,
-    'zealot-frenzied-liturgy': 1,
-  },
-  subclass: 'zealot',
-});
-
-const VIGIL_LOADOUT: CombatMods = loadoutFromSave(VIGIL_SAVE);
-const VIGIL_EFFICIENCY_LOADOUT: CombatMods = loadoutFromSave(VIGIL_EFFICIENCY_SAVE);
-const ZEALOT_LOADOUT: CombatMods = loadoutFromSave(ZEALOT_SAVE);
-
-interface BotRun {
-  status: 'victory' | 'wipe';
-  elapsedMs: number;
-  bonehowlLandings: number;
-  /** Alpha 0.1 §D3 chunk 9a: Tunnel Vision telegraph->channel activations (Iron Pass only). */
-  bossFocusStarted: number;
-  /** Mid-tier: Emberfall partyDoT activations (Cinder Vault). */
-  partyDoTStarted: number;
-  /** Mid-tier: Soul Toll mana-burn landings (Black Choir). */
-  manaBurns: number;
-  healsCast: number;
-  survivors: number;
-  healerManaLeft: number;
-  /** Alpha 0.1 §D6 chunk 9a: cooldown activations issued by the bot's CD policy. */
-  cdActivations: number;
-}
-
-type BotStyle = 'none' | 'naive' | 'disciplined';
-
-/**
- * Healer bots:
- * - 'none': never casts (control run — proves the healer matters).
- * - 'naive': the expected first-timer — targets the tank and spams Solemn
- *   Mend whenever it can, overhealing freely. Mana discipline is the fight's
- *   real threat, so this should lose.
- * - 'disciplined': ceiling play — only casts when free (never queues blind),
- *   heals the most-injured living ally, and only for full-value heals (zero
- *   overheal) outside emergencies. Two emergencies permit overheal, using the
- *   fastest available cast (Zealous Flare, else Zealous Mending, else Solemn
- *   Mend): a tank at <=6 hp (tank death cascades — mercs and the healer both
- *   lean on the tank soaking hits), and (alpha-0.1-handoff §D3, chunk 9a) a
- *   live Tunnel Vision focus target once it's dropped to <=50% hp — the
- *   marker a disciplined player reacts to, gated so the bot doesn't blow mana
- *   overhealing a target still near full between channel ticks. A critical
- *   tank outranks a critical focus target (losing the tank threatens the
- *   whole party), which outranks the plain lowest-hp%-ratio pick used the
- *   rest of the time. Outside emergencies it prefers Solemn Vigil (Vigil) at
- *   full value — the efficient big heal, arming/consuming the Mend<->Vigil
- *   synergy cadence — then falls back to Solemn Mend (which also arms both
- *   subclasses' synergies) and finally Zealous Mending. Solemn Vigil's slow
- *   cast is never used as the emergency button — far too slow.
- *
- * Cooldown policy (alpha-0.1-handoff §D6, chunk 9a): simple and rule-based,
- * driven off the build's granted `CooldownDef`s (not hardcoded ids) so it
- * generalizes to whichever cooldown a loadout owns:
- * - `manaCostReduction` (Frenzied Liturgy): activate whenever ready — a pure
- *   tempo window with no downside to popping early.
- * - `freeNextHeal` (Still Waters): activate whenever ready and a useful heal
- *   is intended. The charge has no downside and immediately makes that next
- *   action free.
- */
-function runBot(
-  encounter: EncounterDef,
-  spells: SpellDef[],
-  options: CombatEngineOptions,
-  style: BotStyle,
-): BotRun {
-  const engine = new CombatEngine(encounter, spells, options);
-  const solemnMend = spells.find((s) => s.id === SPELLS.solemnMend.id);
-  const zealousMending = spells.find((s) => s.id === SPELLS.zealousMending.id);
-  const solemnVigil = spells.find((s) => s.id === SPELLS.solemnVigil.id);
-  const zealousFlare = spells.find((s) => s.id === SPELLS.zealousFlare.id);
-  const cooldownDefs = options.cooldowns ?? [];
-  let elapsed = 0;
-  let bonehowlLandings = 0;
-  let bossFocusStarted = 0;
-  let partyDoTStarted = 0;
-  let manaBurns = 0;
-  let healsCast = 0;
-  let cdActivations = 0;
-  let focusTargetId: string | null = null;
-
-  while (elapsed < MAX_MS) {
-    const state = engine.state;
-    if (state.status !== 'running') break;
-
-    const healer = state.party.find((u) => u.role === 'healer');
-    const free = state.playerCast === null && state.gcdRemainingMs === 0;
-
-    if (style === 'naive' && healer && free && solemnMend) {
-      const tank = state.party.find((u) => u.role === 'tank');
-      const anyAlly = state.party.find((u) => u.alive);
-      const target = tank?.alive ? tank : anyAlly;
-      if (target && healer.mana >= solemnMend.mana) {
-        engine.setTarget(target.id);
-        engine.castSpell(solemnMend.id);
-        healsCast += 1;
-      }
-    }
-
-    if (style === 'disciplined' && healer) {
-      const injured = state.party
-        .filter((u) => u.alive && u.maxHp - u.hp > 0)
-        .sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp);
-      const tank = state.party.find((u) => u.role === 'tank');
-      const tankCriticalUnit = tank && tank.alive && tank.hp <= 6 ? tank : undefined;
-      const focusUnit =
-        focusTargetId != null
-          ? state.party.find((u) => u.id === focusTargetId && u.alive && u.hp * 2 <= u.maxHp)
-          : undefined;
-      const target: Unit | undefined = tankCriticalUnit ?? focusUnit ?? injured[0];
-
-      if (target) {
-        const missing = target.maxHp - target.hp;
-        const emergency = target === tankCriticalUnit || target === focusUnit;
-
-        let intended: SpellDef | undefined;
-        if (emergency) {
-          if (zealousFlare) intended = zealousFlare;
-          else if (zealousMending) intended = zealousMending;
-          else if (solemnMend) intended = solemnMend;
-        } else if (solemnVigil && missing >= solemnVigil.heal) {
-          intended = solemnVigil;
-        } else if (solemnMend && missing >= solemnMend.heal) {
-          intended = solemnMend;
-        } else if (zealousMending && missing >= zealousMending.heal) {
-          intended = zealousMending;
-        }
-
-        // Cooldown policy — see function doc comment.
-        for (const def of cooldownDefs) {
-          const cdState = state.cooldowns.find((c) => c.id === def.id);
-          if (!cdState || cdState.remainingCooldownMs > 0) continue;
-          if (def.effect.kind === 'manaCostReduction') {
-            engine.activateCooldown(def.id);
-            cdActivations += 1;
-          } else if (def.effect.kind === 'freeNextHeal' && intended) {
-            engine.activateCooldown(def.id);
-            cdActivations += 1;
-          }
-        }
-
-        // Re-read fresh — activateCooldown mutates the engine immediately (event follows on
-        // the next advance()), so a charge armed above is visible to this same tick's cast.
-        const armedFreeHeal = engine.state.cooldowns.some(
-          (c) => c.activeRemainingMs > 0 && cooldownDefs.find((d) => d.id === c.id)?.effect.kind === 'freeNextHeal',
-        );
-
-        if (free) {
-          let spell: SpellDef | undefined;
-          if (emergency) {
-            if (zealousFlare && (healer.mana >= zealousFlare.mana || armedFreeHeal)) spell = zealousFlare;
-            else if (zealousMending && (healer.mana >= zealousMending.mana || armedFreeHeal)) spell = zealousMending;
-            else if (solemnMend && (healer.mana >= solemnMend.mana || armedFreeHeal)) spell = solemnMend;
-          } else if (
-            solemnVigil &&
-            missing >= solemnVigil.heal &&
-            (healer.mana >= solemnVigil.mana || armedFreeHeal)
-          ) {
-            spell = solemnVigil;
-          } else if (
-            solemnMend &&
-            missing >= solemnMend.heal &&
-            (healer.mana >= solemnMend.mana || armedFreeHeal)
-          ) {
-            spell = solemnMend;
-          } else if (
-            zealousMending &&
-            missing >= zealousMending.heal &&
-            (healer.mana >= zealousMending.mana || armedFreeHeal)
-          ) {
-            spell = zealousMending;
-          }
-
-          if (spell) {
-            engine.setTarget(target.id);
-            engine.castSpell(spell.id);
-            healsCast += 1;
-          }
-        }
-      }
-    }
-
-    for (const event of engine.advance(STEP_MS)) {
-      if (event.type === 'bossCastFinished') bonehowlLandings += 1;
-      if (event.type === 'bossFocusStarted') {
-        bossFocusStarted += 1;
-        focusTargetId = event.targetId;
-      }
-      if (event.type === 'bossFocusEnded') focusTargetId = null;
-      if (event.type === 'partyDoTStarted') partyDoTStarted += 1;
-      if (event.type === 'manaBurned') manaBurns += 1;
-    }
-    elapsed += STEP_MS;
-  }
-
-  const status = engine.state.status;
-  if (status === 'running') throw new Error('balance bot hit the 10-minute cap');
-  const healer = engine.state.party.find((u) => u.role === 'healer');
-  return {
-    status,
-    elapsedMs: elapsed,
-    bonehowlLandings,
-    bossFocusStarted,
-    partyDoTStarted,
-    manaBurns,
-    healsCast,
-    survivors: engine.state.party.filter((u) => u.alive).length,
-    healerManaLeft: healer?.mana ?? 0,
-    cdActivations,
-  };
-}
-
-function runBuildBot(
-  encounter: EncounterDef,
-  loadout: CombatMods,
-  style: BotStyle,
-  relics: RelicDef[] = [],
-): BotRun {
-  return runBot(
-    encounter,
-    loadout.spells,
-    {
-      bonusMaxMana: loadout.bonusMaxMana,
-      synergies: loadout.synergies,
-      missingHealthBonuses: loadout.missingHealthBonuses,
-      missingHealthPctBonuses: loadout.missingHealthPctBonuses,
-      fullHealthBonuses: loadout.fullHealthBonuses,
-      cooldowns: loadout.cooldowns,
-      relics,
-    },
-    style,
-  );
-}
 
 describe('Ash Gate difficulty shape (poc-spec §4.1)', () => {
   it('wipes with no healing at all — the healer must matter', () => {
@@ -383,7 +69,7 @@ describe('Ash Gate difficulty shape (poc-spec §4.1)', () => {
   it('the Bonehowl telegraph lands at least once in a winning run (either subclass build)', () => {
     const vigilRun = runBuildBot(ASH_GATE, VIGIL_LOADOUT, 'disciplined');
     const zealotRun = runBuildBot(ASH_GATE, ZEALOT_LOADOUT, 'disciplined');
-    expect(vigilRun.bonehowlLandings >= 1 || zealotRun.bonehowlLandings >= 1).toBe(true);
+    expect(vigilRun.bossCastFinished >= 1 || zealotRun.bossCastFinished >= 1).toBe(true);
   });
 });
 
@@ -435,7 +121,30 @@ describe('Cinder Vault difficulty shape (mid-tier Dungeon 3)', () => {
   });
 });
 
-describe('Black Choir is a soft talent-point gate (Dungeon 4)', () => {
+describe('Verdant Rift difficulty shape (Dungeon 4)', () => {
+  it('a maxed Vigil build clears Verdant Rift with Needle Gaze landing at least once', () => {
+    const run = runBuildBot(VERDANT_RIFT, VIGIL_LOADOUT, 'disciplined');
+    expect(run.status).toBe('victory');
+    expect(run.survivors).toBeGreaterThanOrEqual(3);
+    expect(run.bossFocusStarted).toBeGreaterThanOrEqual(1);
+  });
+
+  it('the mutually exclusive Vigil efficiency build also clears Verdant Rift', () => {
+    const run = runBuildBot(VERDANT_RIFT, VIGIL_EFFICIENCY_LOADOUT, 'disciplined');
+    expect(run.status).toBe('victory');
+    expect(run.survivors).toBeGreaterThanOrEqual(3);
+    expect(run.bossFocusStarted).toBeGreaterThanOrEqual(1);
+  });
+
+  it('a maxed Zealot build clears Verdant Rift with disciplined play', () => {
+    const run = runBuildBot(VERDANT_RIFT, ZEALOT_LOADOUT, 'disciplined');
+    expect(run.status).toBe('victory');
+    expect(run.survivors).toBeGreaterThanOrEqual(3);
+    expect(run.bossFocusStarted).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('Black Choir is a soft talent-point gate (Dungeon 5)', () => {
   it('wipes with either maxed subclass build and disciplined healing (no relic)', () => {
     const vigil = runBuildBot(BLACK_CHOIR, VIGIL_LOADOUT, 'disciplined');
     const vigilEff = runBuildBot(BLACK_CHOIR, VIGIL_EFFICIENCY_LOADOUT, 'disciplined');
@@ -443,7 +152,6 @@ describe('Black Choir is a soft talent-point gate (Dungeon 4)', () => {
     expect(vigil.status).toBe('wipe');
     expect(vigilEff.status).toBe('wipe');
     expect(zealot.status).toBe('wipe');
-    // Soul Toll must actually press the mana/heal threat — not a trash-only wipe.
     expect(vigil.manaBurns + vigilEff.manaBurns + zealot.manaBurns).toBeGreaterThanOrEqual(1);
   });
 });
