@@ -1,6 +1,6 @@
 # Skill tree — agent notes
 
-Status: current · Authority: skill-tree service + live SPELL_TREE wiring · Last verified: 2026-07-14
+Status: current · Authority: skill-tree service + live SPELL_TREE wiring · Last verified: 2026-07-15
 
 Config-driven tree service (`game/src/tree/`) plus the live spell-tree data and
 combat resolve (`game/src/data/spellTree.ts`). Phaser stays out of this folder.
@@ -62,26 +62,81 @@ extend it.
    into `CombatMods.cooldowns` (deduped by id; unknown id ignored, same as an
    unknown `grantSpell` id).
 
-## Tree layer 2 (Alpha 0.1 §D5)
+## Tree topology — Alpha 0.2 hourglass (§D1)
 
-Six 1-rank nodes sit below the existing branch rows, gated by an **any-of**
-prereq (`requires: { mode: 'any', nodes: [...] }`) on either follow-up into
-that branch — `vigil-patient-vow-1` OR `vigil-measured-devotion` for Vigil;
-`zealot-fervent-chain-1` OR `zealot-steady-hands` for Zealot. `mode: 'any'`
-is native to the tree service (`tree/types.ts` `NodeRequires`); no service
-change was needed.
+```
+[Shared early]   deep-reserves ×3 (was 5; ids deep-reserves-1..3)
+       │
+  Vigil │ Zealot  exclusiveGroup: subclass
+       │
+[Oath wedge]     branch follow-ups; pure-mana nodes cut (deep-well / spendthrift-grace)
+       │
+[Shared mid]     shared-mend-potency / shared-zealous-potency
+                 requires: { mode: 'any', nodes: [vigil-patient-vow-1, vigil-measured-devotion,
+                                                  zealot-fervent-chain-1, zealot-steady-hands] }
+       │
+ Virtue │ Vengeance  exclusiveGroup: vowstrike-aspect
+       │
+[Crown]          wrath-ascendant / vowbound-crown
+                 requires: { mode: 'any', nodes: [vowstrike-virtue, vowstrike-vengeance] }
+```
+
+**Removed in Alpha 0.2**: `vigil-deep-well` and `zealot-spendthrift-grace` (pure-mana pads).
+Legacy saves that held these nodes simply drop them on load (unknown ids not emitted by
+`ownedIdsFromLegacyRanks`).
+
+## New effect kinds (Alpha 0.2 §D5/D6)
+
+`SpellTreeEffect` gains two new members:
+
+| Kind | Shape | Resolved in |
+|------|-------|-------------|
+| `castMod` (extended) | `healDelta?: number` optional field | `resolveCombatMods` bakes `spell.heal += healDelta ?? 0` after `castMs`/`mana` |
+| `ampOwnedSpells` | `{ spellIds: string[]; healDelta: number }` | After castMod baking: for each id already in the loadout, adds `healDelta` to spell.heal (clamp ≥ 0) |
+
+`SpellTreeContent` gains optional `glyph?: string` (single char for tree node display, §D8).
+
+`CombatMods` gains optional `manaRegen?: { amount: number; intervalMs: number }` (§D2).
+
+## Level mana in loadoutFromSave (§D2)
+
+`loadoutFromSave` now accepts `xp?: number`. It calls `manaBonusesForLevel` (from
+`data/levelMana.ts`) and adds the result on top of tree/relic bonuses:
+
+```ts
+mods.bonusMaxMana += levelMana.bonusMaxMana;
+if (levelMana.manaRegen !== null) mods.manaRegen = levelMana.manaRegen;
+```
+
+**Circular-import resolution**: `manaBonusesForLevel` lives in `data/levelMana.ts`
+(imports only `data/constants.ts`) and is re-exported from `meta/progression.ts`
+for backward compatibility. `data/spellTree.ts` imports from `data/levelMana.ts`
+directly — no cycle.
+
+## Oath × Vowstrike twists (§D5)
+
+`applyOathVowstrikeTwists(mods, contents)` is called at the end of
+`resolveCombatMods`. Detects oath via `subclass` tag or `grantSpell` ids,
+detects aspect via owned spell ids in mods, then applies:
+
+| Oath × Aspect      | Twist applied to mods                              |
+|--------------------|----------------------------------------------------|
+| Vigil × Virtue     | vowstrike-virtue `mana −1`                         |
+| Vigil × Vengeance  | `missingHealthBonus` healPer10PctMissing +1        |
+| Zealot × Virtue    | `synergy` trigger vowstrike-virtue→zealous-mending +1 |
+| Zealot × Vengeance | vowstrike-vengeance `heal +1`                      |
+
+## Tree layer 2 (Alpha 0.1 §D5, trimmed in Alpha 0.2)
+
+Retained output/tempo nodes require `mode: 'any'` on either branch follow-up:
+- Vigil: thrift, still-waters (gate: patient-vow-1 OR measured-devotion)
+- Zealot: quick-breath, frenzied-liturgy (gate: fervent-chain-1 OR steady-hands)
 
 **TreeScene now scrolls.** The 960×540 base canvas (`main.ts`) had no room
-left below the existing rows (deep-reserves 130 → oaths 260 → branch
-follow-ups 400 → graven-scale 550, itself already past the fold). Layer 2
-lives in world space at y 650 (4 passives) and y 800 (2 CD-grant nodes),
-inside a `WORLD_HEIGHT = 900` camera bounds; HUD chrome (title, wallet,
-status/feedback lines, back button) is pinned via `setScrollFactor(0)` so it
-stays on-screen while tree content pans. Scroll input is mouse wheel only
-(`this.input.on('wheel', ...)`, clamped `0..WORLD_HEIGHT-height`). Journey
-reaches layer 2 by hovering a named tree control, wheeling to max scroll, then
-`clickNamed('treeNode:vigil-deep-well')` (etc.) — `locate` converts world
-bounds through camera scroll, so journey does not hard-code screen y.
+left below the existing rows. Layer 2 and new shared mid / vowstrike / crown
+rows live in extended world space inside `WORLD_HEIGHT` camera bounds; HUD
+chrome is pinned via `setScrollFactor(0)`. Journey reaches deep nodes by
+wheeling to scroll and clicking by name (`treeNode:<spotId>`).
 
 ## Gates
 

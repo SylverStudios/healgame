@@ -7,7 +7,7 @@
  * `buildLoadout` is a thin alias kept for existing call sites/tests.
  */
 
-import { LEVEL_MANA, levelForXp, SPELLS } from '../data/constants';
+import { levelForXp, SPELLS } from '../data/constants';
 import { getDungeonById, isDungeonIdUnlocked } from '../data/dungeons';
 import { chooseRelicOffers } from '../data/relics';
 import { loadoutFromSave, type CombatMods } from '../data/spellTree';
@@ -19,31 +19,9 @@ export interface HubNotice {
   text: string;
 }
 
-export interface LevelManaBonuses {
-  bonusMaxMana: number;
-  manaRegen: { amount: number; intervalMs: number } | null;
-}
-
-/**
- * Alpha 0.2 §D2 — pure level → combat mana pool + regen. Relics and tree
- * bonuses stack on top at loadout / engine construction time.
- */
-export function manaBonusesForLevel(level: number): LevelManaBonuses {
-  const safeLevel = Math.max(1, Math.floor(level));
-  const bonusMaxMana = LEVEL_MANA.poolPerLevel * Math.max(0, safeLevel - 1);
-  if (safeLevel < LEVEL_MANA.regenFirstLevel) {
-    return { bonusMaxMana, manaRegen: null };
-  }
-  const ranks =
-    1 + Math.floor((safeLevel - LEVEL_MANA.regenFirstLevel) / LEVEL_MANA.regenEveryLevels);
-  return {
-    bonusMaxMana,
-    manaRegen: {
-      amount: LEVEL_MANA.regenAmountPerRank * ranks,
-      intervalMs: LEVEL_MANA.regenIntervalMs,
-    },
-  };
-}
+// Re-exported from data/levelMana.ts so callers don't need to update imports.
+export type { LevelManaBonuses } from '../data/levelMana';
+export { manaBonusesForLevel } from '../data/levelMana';
 
 /**
  * XP always accrues, including on a wipe. Levels grant one tree point each;

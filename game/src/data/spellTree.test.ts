@@ -5,8 +5,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildLoadout } from '../meta/progression';
 import { newSaveData, type SaveData } from '../save/save';
-import { SPELLS } from './constants';
-import { STILL_WATERS, FRENZIED_LITURGY } from './cooldowns';
+import { SPELLS, LEVEL_MANA } from './constants';
+import { STILL_WATERS, FRENZIED_LITURGY, WRATH_ASCENDANT } from './cooldowns';
 import {
   SPELL_TREE,
   combatModsFromTree,
@@ -15,6 +15,7 @@ import {
   ownedIdsFromLegacyRanks,
   resolveCombatMods,
   treeStateFromLegacy,
+  type CombatMods,
   type SpellTreeContent,
 } from './spellTree';
 import { create, ownedContents, ownedOf, update, validateConfig, view, walletOf } from '../tree';
@@ -38,12 +39,16 @@ describe('SPELL_TREE config', () => {
       'vigil-graven-scale',
       'zealot-fervent-chain',
       'zealot-steady-hands',
-      'vigil-deep-well',
       'vigil-thrift',
       'vigil-still-waters',
       'zealot-quick-breath',
-      'zealot-spendthrift-grace',
       'zealot-frenzied-liturgy',
+      'shared-mend-potency',
+      'shared-zealous-potency',
+      'vowstrike-virtue',
+      'vowstrike-vengeance',
+      'wrath-ascendant',
+      'vowbound-crown',
     ]);
   });
 
@@ -52,10 +57,22 @@ describe('SPELL_TREE config', () => {
     expect(SPELL_TREE.nodes.map((n) => n.id)).not.toContain('zealot-desperate-zeal');
   });
 
+  it('retires vigil-deep-well and zealot-spendthrift-grace (Alpha 0.2)', () => {
+    expect(SPELL_TREE.spots.map((s) => s.id)).not.toContain('vigil-deep-well');
+    expect(SPELL_TREE.spots.map((s) => s.id)).not.toContain('zealot-spendthrift-grace');
+    expect(SPELL_TREE.nodes.map((n) => n.id)).not.toContain('vigil-deep-well');
+    expect(SPELL_TREE.nodes.map((n) => n.id)).not.toContain('zealot-spendthrift-grace');
+  });
+
   it('models multi-rank nodes as chains', () => {
-    expect(SPELL_TREE.spots.find((s) => s.id === 'deep-reserves')?.chain).toHaveLength(5);
+    expect(SPELL_TREE.spots.find((s) => s.id === 'deep-reserves')?.chain).toHaveLength(3);
     expect(SPELL_TREE.spots.find((s) => s.id === 'vigil-patient-vow')?.chain).toHaveLength(3);
     expect(SPELL_TREE.spots.find((s) => s.id === 'zealot-fervent-chain')?.chain).toHaveLength(3);
+  });
+
+  it('deep-reserves max ranks is 3 (Alpha 0.2 — was 5)', () => {
+    const chain = SPELL_TREE.spots.find((s) => s.id === 'deep-reserves')?.chain ?? [];
+    expect(chain).toEqual(['deep-reserves-1', 'deep-reserves-2', 'deep-reserves-3']);
   });
 
   it('costs one talent point for every live node', () => {
@@ -218,82 +235,169 @@ describe('resolveCombatMods', () => {
     expect(vigil?.mana).toBe(SPELLS.solemnVigil.mana - 3);
     expect(SPELLS.solemnVigil.castMs).toBe(3000); // catalog untouched
   });
+
+  it('castMod bakes optional healDelta into the spell def', () => {
+    const mods = resolveCombatMods(
+      [
+        {
+          name: 'Mend Potency',
+          description: '',
+          effect: {
+            kind: 'castMod',
+            spellId: SPELLS.solemnMend.id,
+            castMsDelta: 0,
+            manaDelta: 0,
+            healDelta: 1,
+          },
+        },
+      ],
+      [SPELLS.solemnMend.id],
+    );
+    const mend = mods.spells.find((sp) => sp.id === SPELLS.solemnMend.id);
+    expect(mend?.heal).toBe(SPELLS.solemnMend.heal + 1);
+    expect(mend?.castMs).toBe(SPELLS.solemnMend.castMs);
+    expect(mend?.mana).toBe(SPELLS.solemnMend.mana);
+    expect(SPELLS.solemnMend.heal).toBe(4); // catalog untouched
+  });
+
+  it('castMod healDelta defaults to 0 when omitted', () => {
+    const mods = resolveCombatMods(
+      [
+        {
+          name: 'Thrift',
+          description: '',
+          effect: {
+            kind: 'castMod',
+            spellId: SPELLS.solemnMend.id,
+            castMsDelta: 0,
+            manaDelta: -1,
+          },
+        },
+      ],
+      [SPELLS.solemnMend.id],
+    );
+    const mend = mods.spells.find((sp) => sp.id === SPELLS.solemnMend.id);
+    expect(mend?.heal).toBe(SPELLS.solemnMend.heal); // unchanged
+  });
+
+  it('ampOwnedSpells adds healDelta to owned vowstrike spells', () => {
+    const mods = resolveCombatMods(
+      [
+        {
+          name: 'Path of the Vigil',
+          description: '',
+          effect: { kind: 'grantSpell', spellId: SPELLS.vowstrikeVirtue.id },
+        },
+        {
+          name: 'Vowbound Crown',
+          description: '',
+          effect: {
+            kind: 'ampOwnedSpells',
+            spellIds: [SPELLS.vowstrikeVirtue.id, SPELLS.vowstrikeVengeance.id],
+            healDelta: 1,
+          },
+        },
+      ],
+      [],
+    );
+    const virtue = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVirtue.id);
+    expect(virtue?.heal).toBe(SPELLS.vowstrikeVirtue.heal + 1);
+    expect(SPELLS.vowstrikeVirtue.heal).toBe(3); // catalog untouched
+  });
+
+  it('ampOwnedSpells skips spells not in the loadout', () => {
+    const mods = resolveCombatMods(
+      [
+        {
+          name: 'Vowbound Crown',
+          description: '',
+          effect: {
+            kind: 'ampOwnedSpells',
+            spellIds: [SPELLS.vowstrikeVirtue.id, SPELLS.vowstrikeVengeance.id],
+            healDelta: 1,
+          },
+        },
+      ],
+      [],
+    );
+    expect(mods.spells).toEqual([]);
+  });
 });
 
-describe('tree layer 2 (Alpha 0.1 §D5)', () => {
-  const VIGIL_LAYER2_SPOTS = ['vigil-deep-well', 'vigil-thrift', 'vigil-still-waters'];
-  const ZEALOT_LAYER2_SPOTS = ['zealot-quick-breath', 'zealot-spendthrift-grace', 'zealot-frenzied-liturgy'];
+describe('tree layer 2 (Alpha 0.1 §D5 — output nodes only after Alpha 0.2 trim)', () => {
+  const VIGIL_OUTPUT_SPOTS = ['vigil-thrift', 'vigil-still-waters'];
+  const ZEALOT_OUTPUT_SPOTS = ['zealot-quick-breath', 'zealot-frenzied-liturgy'];
 
-  it('locks Vigil layer 2 without any owned branch node', () => {
+  it('locks Vigil output layer without any owned branch node', () => {
     const state = treeStateFromLegacy({ 'deep-reserves': 1, 'vigil-oath': 1 }, 3);
     const spots = view(SPELL_TREE, state).spots;
-    for (const id of VIGIL_LAYER2_SPOTS) {
+    for (const id of VIGIL_OUTPUT_SPOTS) {
       expect(spots.find((s) => s.id === id)?.status).toBe('locked');
     }
   });
 
-  it('unlocks Vigil layer 2 via patient-vow rank 1 alone', () => {
+  it('unlocks Vigil output layer via patient-vow rank 1 alone', () => {
     const state = treeStateFromLegacy(
       { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-patient-vow': 1 },
       3,
     );
     const spots = view(SPELL_TREE, state).spots;
-    for (const id of VIGIL_LAYER2_SPOTS) {
+    for (const id of VIGIL_OUTPUT_SPOTS) {
       expect(spots.find((s) => s.id === id)?.status).toBe('affordable');
     }
   });
 
-  it('unlocks Vigil layer 2 via measured-devotion alone (any-of prereq)', () => {
+  it('unlocks Vigil output layer via measured-devotion alone (any-of prereq)', () => {
     const state = treeStateFromLegacy(
       { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-measured-devotion': 1 },
       3,
     );
     const spots = view(SPELL_TREE, state).spots;
-    for (const id of VIGIL_LAYER2_SPOTS) {
+    for (const id of VIGIL_OUTPUT_SPOTS) {
       expect(spots.find((s) => s.id === id)?.status).toBe('affordable');
     }
   });
 
-  it('locks Zealot layer 2 without any owned branch node', () => {
+  it('locks Zealot output layer without any owned branch node', () => {
     const state = treeStateFromLegacy({ 'deep-reserves': 1, 'zealot-oath': 1 }, 3);
     const spots = view(SPELL_TREE, state).spots;
-    for (const id of ZEALOT_LAYER2_SPOTS) {
+    for (const id of ZEALOT_OUTPUT_SPOTS) {
       expect(spots.find((s) => s.id === id)?.status).toBe('locked');
     }
   });
 
-  it('unlocks Zealot layer 2 via fervent-chain rank 1 alone', () => {
+  it('unlocks Zealot output layer via fervent-chain rank 1 alone', () => {
     const state = treeStateFromLegacy(
       { 'deep-reserves': 1, 'zealot-oath': 1, 'zealot-fervent-chain': 1 },
       3,
     );
     const spots = view(SPELL_TREE, state).spots;
-    for (const id of ZEALOT_LAYER2_SPOTS) {
+    for (const id of ZEALOT_OUTPUT_SPOTS) {
       expect(spots.find((s) => s.id === id)?.status).toBe('affordable');
     }
   });
 
-  it('unlocks Zealot layer 2 via steady-hands alone (any-of prereq)', () => {
+  it('unlocks Zealot output layer via steady-hands alone (any-of prereq)', () => {
     const state = treeStateFromLegacy(
       { 'deep-reserves': 1, 'zealot-oath': 1, 'zealot-steady-hands': 1 },
       3,
     );
     const spots = view(SPELL_TREE, state).spots;
-    for (const id of ZEALOT_LAYER2_SPOTS) {
+    for (const id of ZEALOT_OUTPUT_SPOTS) {
       expect(spots.find((s) => s.id === id)?.status).toBe('affordable');
     }
   });
 
-  it('vigil-deep-well and zealot-spendthrift-grace bonusMaxMana sum with Deep Reserves', () => {
+  it('bonusMaxMana from deep-reserves ranks sum correctly (3 ranks max)', () => {
     const mods = resolveCombatMods(
       [
-        { name: 'Deep Reserves', description: '', effect: { kind: 'bonusMaxMana', amount: 5 } },
-        { name: 'Deep Well', description: '', effect: { kind: 'bonusMaxMana', amount: 4 } },
-        { name: 'Spendthrift Grace', description: '', effect: { kind: 'bonusMaxMana', amount: 3 } },
+        { name: 'Deep Reserves', description: '', effect: { kind: 'bonusMaxMana', amount: 6 } },
+        { name: 'Deep Reserves', description: '', effect: { kind: 'bonusMaxMana', amount: 6 } },
+        { name: 'Deep Reserves', description: '', effect: { kind: 'bonusMaxMana', amount: 6 } },
       ],
       ['solemn-mend'],
     );
-    expect(mods.bonusMaxMana).toBe(12);
+    expect(mods.bonusMaxMana).toBe(18);
   });
 
   it('vigil-thrift castMod reduces Solemn Mend mana by 1', () => {
@@ -418,26 +522,458 @@ describe('tree layer 2 (Alpha 0.1 §D5)', () => {
     expect(mods.cooldowns).toEqual([FRENZIED_LITURGY]);
   });
 
-  it('round-trips all six layer-2 node ids through the legacy bridge', () => {
-    const ranks = {
+  it('round-trips output layer-2 node ids through the legacy bridge', () => {
+    const vigilRanks = {
       'deep-reserves': 1,
       'vigil-oath': 1,
       'vigil-patient-vow': 1,
-      'vigil-deep-well': 1,
       'vigil-thrift': 1,
       'vigil-still-waters': 1,
     };
-    expect(legacyRanksFromOwned(ownedIdsFromLegacyRanks(ranks))).toEqual(ranks);
+    expect(legacyRanksFromOwned(ownedIdsFromLegacyRanks(vigilRanks))).toEqual(vigilRanks);
 
     const zealotRanks = {
       'deep-reserves': 1,
       'zealot-oath': 1,
       'zealot-fervent-chain': 1,
       'zealot-quick-breath': 1,
-      'zealot-spendthrift-grace': 1,
       'zealot-frenzied-liturgy': 1,
     };
     expect(legacyRanksFromOwned(ownedIdsFromLegacyRanks(zealotRanks))).toEqual(zealotRanks);
+  });
+});
+
+describe('shared mid (Alpha 0.2)', () => {
+  const SHARED_MID_SPOTS = ['shared-mend-potency', 'shared-zealous-potency'];
+
+  it('locks shared mid nodes without any oath follow-up', () => {
+    const state = treeStateFromLegacy({ 'deep-reserves': 1, 'vigil-oath': 1 }, 5);
+    const spots = view(SPELL_TREE, state).spots;
+    for (const id of SHARED_MID_SPOTS) {
+      expect(spots.find((s) => s.id === id)?.status).toBe('locked');
+    }
+  });
+
+  it('unlocks shared mid via vigil-patient-vow rank 1', () => {
+    const state = treeStateFromLegacy(
+      { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-patient-vow': 1 },
+      5,
+    );
+    const spots = view(SPELL_TREE, state).spots;
+    for (const id of SHARED_MID_SPOTS) {
+      expect(spots.find((s) => s.id === id)?.status).toBe('affordable');
+    }
+  });
+
+  it('unlocks shared mid via vigil-measured-devotion', () => {
+    const state = treeStateFromLegacy(
+      { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-measured-devotion': 1 },
+      5,
+    );
+    const spots = view(SPELL_TREE, state).spots;
+    for (const id of SHARED_MID_SPOTS) {
+      expect(spots.find((s) => s.id === id)?.status).toBe('affordable');
+    }
+  });
+
+  it('unlocks shared mid via zealot-fervent-chain rank 1', () => {
+    const state = treeStateFromLegacy(
+      { 'deep-reserves': 1, 'zealot-oath': 1, 'zealot-fervent-chain': 1 },
+      5,
+    );
+    const spots = view(SPELL_TREE, state).spots;
+    for (const id of SHARED_MID_SPOTS) {
+      expect(spots.find((s) => s.id === id)?.status).toBe('affordable');
+    }
+  });
+
+  it('unlocks shared mid via zealot-steady-hands', () => {
+    const state = treeStateFromLegacy(
+      { 'deep-reserves': 1, 'zealot-oath': 1, 'zealot-steady-hands': 1 },
+      5,
+    );
+    const spots = view(SPELL_TREE, state).spots;
+    for (const id of SHARED_MID_SPOTS) {
+      expect(spots.find((s) => s.id === id)?.status).toBe('affordable');
+    }
+  });
+
+  it('shared-mend-potency adds +1 heal to Solemn Mend', () => {
+    const state = treeStateFromLegacy(
+      { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-patient-vow': 1, 'shared-mend-potency': 1 },
+      0,
+    );
+    const mods = combatModsFromTree(state, [SPELLS.solemnMend.id]);
+    const mend = mods.spells.find((sp) => sp.id === SPELLS.solemnMend.id);
+    expect(mend?.heal).toBe(SPELLS.solemnMend.heal + 1);
+  });
+
+  it('shared-zealous-potency adds +1 heal to Zealous Mending', () => {
+    const state = treeStateFromLegacy(
+      { 'deep-reserves': 1, 'zealot-oath': 1, 'zealot-steady-hands': 1, 'shared-zealous-potency': 1 },
+      0,
+    );
+    const mods = combatModsFromTree(state, [SPELLS.zealousMending.id]);
+    const mending = mods.spells.find((sp) => sp.id === SPELLS.zealousMending.id);
+    expect(mending?.heal).toBe(SPELLS.zealousMending.heal + 1);
+  });
+});
+
+describe('vowstrike fork (Alpha 0.2)', () => {
+  it('locks vowstrike nodes without shared mid', () => {
+    const state = treeStateFromLegacy(
+      { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-patient-vow': 1 },
+      5,
+    );
+    const spots = view(SPELL_TREE, state).spots;
+    expect(spots.find((s) => s.id === 'vowstrike-virtue')?.status).toBe('locked');
+    expect(spots.find((s) => s.id === 'vowstrike-vengeance')?.status).toBe('locked');
+  });
+
+  it('unlocks vowstrike nodes via shared-mend-potency', () => {
+    const state = treeStateFromLegacy(
+      { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-patient-vow': 1, 'shared-mend-potency': 1 },
+      5,
+    );
+    const spots = view(SPELL_TREE, state).spots;
+    expect(spots.find((s) => s.id === 'vowstrike-virtue')?.status).toBe('affordable');
+    expect(spots.find((s) => s.id === 'vowstrike-vengeance')?.status).toBe('affordable');
+  });
+
+  it('unlocks vowstrike nodes via shared-zealous-potency', () => {
+    const state = treeStateFromLegacy(
+      { 'deep-reserves': 1, 'zealot-oath': 1, 'zealot-steady-hands': 1, 'shared-zealous-potency': 1 },
+      5,
+    );
+    const spots = view(SPELL_TREE, state).spots;
+    expect(spots.find((s) => s.id === 'vowstrike-virtue')?.status).toBe('affordable');
+    expect(spots.find((s) => s.id === 'vowstrike-vengeance')?.status).toBe('affordable');
+  });
+
+  it('makes vowstrike-virtue and vowstrike-vengeance mutually exclusive', () => {
+    let state = treeStateFromLegacy(
+      {
+        'deep-reserves': 1,
+        'vigil-oath': 1,
+        'vigil-patient-vow': 1,
+        'shared-mend-potency': 1,
+      },
+      2,
+    );
+    const virtue = update(SPELL_TREE, state, { type: 'purchase', spotId: 'vowstrike-virtue' });
+    expect(virtue.ok).toBe(true);
+    if (!virtue.ok) return;
+    state = virtue.state;
+
+    const vengeance = update(SPELL_TREE, state, {
+      type: 'purchase',
+      spotId: 'vowstrike-vengeance',
+    });
+    expect(vengeance.ok).toBe(false);
+    if (vengeance.ok) return;
+    expect(vengeance.reason).toBe('exclusive-locked');
+  });
+
+  it('vowstrike-virtue grantSpell adds the virtue spell to CombatMods', () => {
+    const state = treeStateFromLegacy(
+      {
+        'deep-reserves': 1,
+        'vigil-oath': 1,
+        'vigil-patient-vow': 1,
+        'shared-mend-potency': 1,
+        'vowstrike-virtue': 1,
+      },
+      0,
+    );
+    const mods = combatModsFromTree(state, ['solemn-mend']);
+    expect(mods.spells.map((sp) => sp.id)).toContain(SPELLS.vowstrikeVirtue.id);
+  });
+
+  it('vowstrike-vengeance grantSpell adds the vengeance spell to CombatMods', () => {
+    const state = treeStateFromLegacy(
+      {
+        'deep-reserves': 1,
+        'zealot-oath': 1,
+        'zealot-fervent-chain': 1,
+        'shared-zealous-potency': 1,
+        'vowstrike-vengeance': 1,
+      },
+      0,
+    );
+    const mods = combatModsFromTree(state, ['solemn-mend']);
+    expect(mods.spells.map((sp) => sp.id)).toContain(SPELLS.vowstrikeVengeance.id);
+  });
+});
+
+describe('shared crown (Alpha 0.2)', () => {
+  it('locks crown nodes without any vowstrike aspect', () => {
+    const state = treeStateFromLegacy(
+      {
+        'deep-reserves': 1,
+        'vigil-oath': 1,
+        'vigil-patient-vow': 1,
+        'shared-mend-potency': 1,
+      },
+      5,
+    );
+    const spots = view(SPELL_TREE, state).spots;
+    expect(spots.find((s) => s.id === 'wrath-ascendant')?.status).toBe('locked');
+    expect(spots.find((s) => s.id === 'vowbound-crown')?.status).toBe('locked');
+  });
+
+  it('unlocks crown nodes after purchasing vowstrike-virtue', () => {
+    const state = treeStateFromLegacy(
+      {
+        'deep-reserves': 1,
+        'vigil-oath': 1,
+        'vigil-patient-vow': 1,
+        'shared-mend-potency': 1,
+        'vowstrike-virtue': 1,
+      },
+      5,
+    );
+    const spots = view(SPELL_TREE, state).spots;
+    expect(spots.find((s) => s.id === 'wrath-ascendant')?.status).toBe('affordable');
+    expect(spots.find((s) => s.id === 'vowbound-crown')?.status).toBe('affordable');
+  });
+
+  it('unlocks crown nodes after purchasing vowstrike-vengeance', () => {
+    const state = treeStateFromLegacy(
+      {
+        'deep-reserves': 1,
+        'zealot-oath': 1,
+        'zealot-fervent-chain': 1,
+        'shared-zealous-potency': 1,
+        'vowstrike-vengeance': 1,
+      },
+      5,
+    );
+    const spots = view(SPELL_TREE, state).spots;
+    expect(spots.find((s) => s.id === 'wrath-ascendant')?.status).toBe('affordable');
+    expect(spots.find((s) => s.id === 'vowbound-crown')?.status).toBe('affordable');
+  });
+
+  it('wrath-ascendant grants Wrath Ascendant CD', () => {
+    const state = treeStateFromLegacy(
+      {
+        'deep-reserves': 1,
+        'vigil-oath': 1,
+        'vigil-patient-vow': 1,
+        'shared-mend-potency': 1,
+        'vowstrike-virtue': 1,
+        'wrath-ascendant': 1,
+      },
+      0,
+    );
+    const mods = combatModsFromTree(state, ['solemn-mend']);
+    expect(mods.cooldowns).toContainEqual(WRATH_ASCENDANT);
+  });
+
+  it('vowbound-crown adds +1 heal to owned Vowstrike via ampOwnedSpells', () => {
+    const state = treeStateFromLegacy(
+      {
+        'deep-reserves': 1,
+        'vigil-oath': 1,
+        'vigil-patient-vow': 1,
+        'shared-mend-potency': 1,
+        'vowstrike-virtue': 1,
+        'vowbound-crown': 1,
+      },
+      0,
+    );
+    const mods = combatModsFromTree(state, ['solemn-mend']);
+    const virtue = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVirtue.id);
+    expect(virtue?.heal).toBe(SPELLS.vowstrikeVirtue.heal + 1);
+    // Vengeance not owned — not affected
+    expect(mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVengeance.id)).toBeUndefined();
+  });
+
+  it('vowbound-crown does not amp an unowned vengeance vowstrike', () => {
+    const mods = resolveCombatMods(
+      [
+        {
+          name: 'Vowbound Crown',
+          description: '',
+          effect: {
+            kind: 'ampOwnedSpells',
+            spellIds: [SPELLS.vowstrikeVirtue.id, SPELLS.vowstrikeVengeance.id],
+            healDelta: 1,
+          },
+        },
+      ],
+      [],
+    );
+    expect(mods.spells).toEqual([]);
+  });
+});
+
+describe('oath × vowstrike twists (Alpha 0.2 §D5)', () => {
+  function makeBaseMods(oath: 'vigil' | 'zealot', aspect: 'virtue' | 'vengeance'): CombatMods {
+    const oathSpellId = oath === 'vigil' ? SPELLS.solemnVigil.id : SPELLS.zealousFlare.id;
+    const aspectSpellId =
+      aspect === 'virtue' ? SPELLS.vowstrikeVirtue.id : SPELLS.vowstrikeVengeance.id;
+    const contents: SpellTreeContent[] = [
+      {
+        name: oath === 'vigil' ? 'Path of the Vigil' : 'Path of the Zealot',
+        description: '',
+        subclass: oath,
+        effect: { kind: 'grantSpell', spellId: oathSpellId },
+      },
+      {
+        name: aspect === 'virtue' ? 'Vowstrike: Absolution' : 'Vowstrike: Reckoning',
+        description: '',
+        effect: { kind: 'grantSpell', spellId: aspectSpellId },
+      },
+    ];
+    return resolveCombatMods(contents, ['solemn-mend']);
+  }
+
+  it('Vigil × Virtue: vowstrike-virtue mana reduced by 1', () => {
+    const mods = makeBaseMods('vigil', 'virtue');
+    const virtue = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVirtue.id);
+    expect(virtue?.mana).toBe(SPELLS.vowstrikeVirtue.mana - 1);
+    expect(virtue?.heal).toBe(SPELLS.vowstrikeVirtue.heal); // heal unchanged
+    expect(SPELLS.vowstrikeVirtue.mana).toBe(2); // catalog untouched
+  });
+
+  it('Vigil × Vengeance: missingHealthBonus added for vowstrike-vengeance', () => {
+    const mods = makeBaseMods('vigil', 'vengeance');
+    expect(mods.missingHealthBonuses).toContainEqual({
+      spellId: SPELLS.vowstrikeVengeance.id,
+      healPer10PctMissing: 1,
+    });
+    // Mana and heal unchanged
+    const vengeance = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVengeance.id);
+    expect(vengeance?.mana).toBe(SPELLS.vowstrikeVengeance.mana);
+    expect(vengeance?.heal).toBe(SPELLS.vowstrikeVengeance.heal);
+  });
+
+  it('Zealot × Virtue: synergy trigger vowstrike-virtue → buff zealous-mending added', () => {
+    const mods = makeBaseMods('zealot', 'virtue');
+    expect(mods.synergies).toContainEqual({
+      triggerSpellId: SPELLS.vowstrikeVirtue.id,
+      buffedSpellId: SPELLS.zealousMending.id,
+      bonusHeal: 1,
+    });
+    // Mana and heal unchanged
+    const virtue = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVirtue.id);
+    expect(virtue?.mana).toBe(SPELLS.vowstrikeVirtue.mana);
+  });
+
+  it('Zealot × Vengeance: vowstrike-vengeance heal +1', () => {
+    const mods = makeBaseMods('zealot', 'vengeance');
+    const vengeance = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVengeance.id);
+    expect(vengeance?.heal).toBe(SPELLS.vowstrikeVengeance.heal + 1);
+    expect(vengeance?.mana).toBe(SPELLS.vowstrikeVengeance.mana); // mana unchanged
+    expect(SPELLS.vowstrikeVengeance.heal).toBe(2); // catalog untouched
+  });
+
+  it('no twist when aspect is absent', () => {
+    const contents: SpellTreeContent[] = [
+      {
+        name: 'Path of the Vigil',
+        description: '',
+        subclass: 'vigil',
+        effect: { kind: 'grantSpell', spellId: SPELLS.solemnVigil.id },
+      },
+    ];
+    const mods = resolveCombatMods(contents, ['solemn-mend']);
+    expect(mods.missingHealthBonuses).toEqual([]);
+    expect(mods.synergies).toEqual([]);
+  });
+
+  it('no twist when oath is absent', () => {
+    const contents: SpellTreeContent[] = [
+      {
+        name: 'Vowstrike: Absolution',
+        description: '',
+        effect: { kind: 'grantSpell', spellId: SPELLS.vowstrikeVirtue.id },
+      },
+    ];
+    const mods = resolveCombatMods(contents, []);
+    const virtue = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVirtue.id);
+    expect(virtue?.mana).toBe(SPELLS.vowstrikeVirtue.mana); // unchanged
+  });
+
+  it('Vigil × Vengeance merges with an existing missingHealthBonus for the same spell', () => {
+    const contents: SpellTreeContent[] = [
+      {
+        name: 'Some node',
+        description: '',
+        effect: {
+          kind: 'missingHealthBonus',
+          spellId: SPELLS.vowstrikeVengeance.id,
+          healPer10PctMissing: 2,
+        },
+      },
+      {
+        name: 'Path of the Vigil',
+        description: '',
+        subclass: 'vigil',
+        effect: { kind: 'grantSpell', spellId: SPELLS.solemnVigil.id },
+      },
+      {
+        name: 'Vowstrike: Reckoning',
+        description: '',
+        effect: { kind: 'grantSpell', spellId: SPELLS.vowstrikeVengeance.id },
+      },
+    ];
+    const mods = resolveCombatMods(contents, []);
+    const bonus = mods.missingHealthBonuses.find(
+      (m) => m.spellId === SPELLS.vowstrikeVengeance.id,
+    );
+    expect(bonus?.healPer10PctMissing).toBe(3); // 2 from node + 1 from twist
+  });
+
+  it('full Vigil + Virtue round-trip via combatModsFromTree', () => {
+    const state = treeStateFromLegacy(
+      {
+        'deep-reserves': 1,
+        'vigil-oath': 1,
+        'vigil-patient-vow': 1,
+        'shared-mend-potency': 1,
+        'vowstrike-virtue': 1,
+      },
+      0,
+    );
+    const mods = combatModsFromTree(state, ['solemn-mend']);
+    const virtue = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVirtue.id);
+    // Vigil × Virtue: mana -1
+    expect(virtue?.mana).toBe(SPELLS.vowstrikeVirtue.mana - 1);
+  });
+});
+
+describe('level mana in loadoutFromSave (Alpha 0.2 §D2)', () => {
+  it('adds no bonus at level 1 (xp=0)', () => {
+    const mods = loadoutFromSave({ treeRanks: {}, unlockedSpells: ['solemn-mend'], xp: 0 });
+    expect(mods.bonusMaxMana).toBe(0);
+    expect(mods.manaRegen).toBeUndefined();
+  });
+
+  it('adds bonusMaxMana + manaRegen for level 5 (xp=100)', () => {
+    // level 5 → bonusMaxMana = 3*(5-1) = 12, regen = 2/10s (ranks at L2, L5)
+    const mods = loadoutFromSave({ treeRanks: {}, unlockedSpells: ['solemn-mend'], xp: 100 });
+    expect(mods.bonusMaxMana).toBe(12);
+    expect(mods.manaRegen).toEqual({
+      amount: 2,
+      intervalMs: LEVEL_MANA.regenIntervalMs,
+    });
+  });
+
+  it('stacks level mana on top of deep-reserves tree bonus', () => {
+    // deep-reserves rank 1 = +6 mana; level 5 = +12 mana → total 18
+    const mods = loadoutFromSave({
+      treeRanks: { 'deep-reserves': 1 },
+      unlockedSpells: ['solemn-mend'],
+      xp: 100,
+    });
+    expect(mods.bonusMaxMana).toBe(6 + 12);
+  });
+
+  it('xp defaults to 0 when omitted', () => {
+    const mods = loadoutFromSave({ treeRanks: {}, unlockedSpells: ['solemn-mend'] });
+    expect(mods.bonusMaxMana).toBe(0);
+    expect(mods.manaRegen).toBeUndefined();
   });
 });
 
@@ -446,6 +982,7 @@ describe('parity with buildLoadout', () => {
     const legacy = buildLoadout(save({ treeRanks, unlockedSpells }));
     const state = treeStateFromLegacy(treeRanks, 0);
     const next = combatModsFromTree(state, unlockedSpells);
+    // buildLoadout with xp=0 (level 1) adds no level mana, so both should match.
     expect(next.bonusMaxMana).toBe(legacy.bonusMaxMana);
     expect(next.spells).toEqual(legacy.spells);
     expect(next.synergies).toEqual(legacy.synergies);
@@ -459,10 +996,10 @@ describe('parity with buildLoadout', () => {
     expectParity({}, ['solemn-mend']);
   });
 
-  it('matches maxed Vigil build', () => {
+  it('matches maxed Vigil build (deep-reserves capped at 3)', () => {
     expectParity(
       {
-        'deep-reserves': 5,
+        'deep-reserves': 3,
         'vigil-oath': 1,
         'vigil-patient-vow': 3,
       },
@@ -470,10 +1007,10 @@ describe('parity with buildLoadout', () => {
     );
   });
 
-  it('matches maxed Zealot build', () => {
+  it('matches maxed Zealot build (deep-reserves capped at 3)', () => {
     expectParity(
       {
-        'deep-reserves': 5,
+        'deep-reserves': 3,
         'zealot-oath': 1,
         'zealot-fervent-chain': 3,
         'zealot-steady-hands': 1,
@@ -485,7 +1022,7 @@ describe('parity with buildLoadout', () => {
   it('matches maxed Vigil build with Graven Scale', () => {
     expectParity(
       {
-        'deep-reserves': 5,
+        'deep-reserves': 3,
         'vigil-oath': 1,
         'vigil-patient-vow': 3,
         'vigil-graven-scale': 1,
@@ -510,9 +1047,17 @@ describe('parity with buildLoadout', () => {
     ]);
   });
 
+  it('ownedIdsFromLegacyRanks caps deep-reserves at 3 (Alpha 0.2)', () => {
+    expect(ownedIdsFromLegacyRanks({ 'deep-reserves': 5 })).toEqual([
+      'deep-reserves-1',
+      'deep-reserves-2',
+      'deep-reserves-3',
+    ]);
+  });
+
   it('round-trips an efficiency-specialized Vigil build', () => {
     const ranks = {
-      'deep-reserves': 5,
+      'deep-reserves': 3,
       'vigil-oath': 1,
       'vigil-measured-devotion': 1,
     };
@@ -533,7 +1078,7 @@ describe('parity with buildLoadout', () => {
     ]);
   });
 
-  it('round-trips the new Alpha 0.1 node ids through the legacy bridge', () => {
+  it('round-trips Alpha 0.1 node ids through the legacy bridge', () => {
     const ranks = {
       'deep-reserves': 1,
       'vigil-oath': 1,
@@ -547,6 +1092,28 @@ describe('parity with buildLoadout', () => {
       'zealot-oath': 1,
       'zealot-fervent-chain': 1,
       'zealot-steady-hands': 1,
+    };
+    expect(legacyRanksFromOwned(ownedIdsFromLegacyRanks(zealotRanks))).toEqual(zealotRanks);
+  });
+
+  it('round-trips new Alpha 0.2 node ids through the legacy bridge', () => {
+    const ranks = {
+      'deep-reserves': 1,
+      'vigil-oath': 1,
+      'vigil-patient-vow': 1,
+      'shared-mend-potency': 1,
+      'vowstrike-virtue': 1,
+      'wrath-ascendant': 1,
+      'vowbound-crown': 1,
+    };
+    expect(legacyRanksFromOwned(ownedIdsFromLegacyRanks(ranks))).toEqual(ranks);
+
+    const zealotRanks = {
+      'deep-reserves': 1,
+      'zealot-oath': 1,
+      'zealot-fervent-chain': 1,
+      'shared-zealous-potency': 1,
+      'vowstrike-vengeance': 1,
     };
     expect(legacyRanksFromOwned(ownedIdsFromLegacyRanks(zealotRanks))).toEqual(zealotRanks);
   });
@@ -572,19 +1139,24 @@ describe('parity with buildLoadout', () => {
   });
 
   it('preserves available talent points while omitting retired legacy nodes', () => {
-    const state = treeStateFromLegacy({ 'zealot-oath': 1, 'zealot-desperate-zeal': 1 }, 2);
+    const state = treeStateFromLegacy(
+      { 'zealot-oath': 1, 'zealot-desperate-zeal': 1, 'vigil-deep-well': 1, 'zealot-spendthrift-grace': 1 },
+      2,
+    );
     expect(ownedOf(state)).not.toContain('zealot-desperate-zeal');
+    expect(ownedOf(state)).not.toContain('vigil-deep-well');
+    expect(ownedOf(state)).not.toContain('zealot-spendthrift-grace');
     expect(walletOf(state)['talent']).toBe(2);
   });
 
-  it('loadoutFromSave matches combatModsFromTree for a maxed Vigil save', () => {
+  it('loadoutFromSave matches combatModsFromTree at level 1 (no level mana bonus)', () => {
     const ranks = {
-      'deep-reserves': 5,
+      'deep-reserves': 3,
       'vigil-oath': 1,
       'vigil-patient-vow': 3,
     };
     const unlocked = ['solemn-mend', 'zealous-mending'];
-    const viaSave = loadoutFromSave({ treeRanks: ranks, unlockedSpells: unlocked });
+    const viaSave = loadoutFromSave({ treeRanks: ranks, unlockedSpells: unlocked, xp: 0 });
     const viaState = combatModsFromTree(treeStateFromLegacy(ranks, 0), unlocked);
     expect(viaSave).toEqual(viaState);
   });

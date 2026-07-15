@@ -157,9 +157,9 @@ describe('buildLoadout', () => {
     ]);
   });
 
-  it('scales bonusMaxMana with deep-reserves ranks', () => {
+  it('scales bonusMaxMana with deep-reserves ranks (max 3 in Alpha 0.2)', () => {
     expect(buildLoadout(save({ treeRanks: { 'deep-reserves': 1 } })).bonusMaxMana).toBe(6);
-    expect(buildLoadout(save({ treeRanks: { 'deep-reserves': 5 } })).bonusMaxMana).toBe(30);
+    expect(buildLoadout(save({ treeRanks: { 'deep-reserves': 3 } })).bonusMaxMana).toBe(18);
   });
 
   it('emits synergies scaled by ranks', () => {
