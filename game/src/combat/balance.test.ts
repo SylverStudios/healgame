@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CombatEngine } from './engine';
-import { ASH_GATE, IRON_PASS, THE_MAW } from '../data/encounters';
+import { ASH_GATE, IRON_PASS, CINDER_VAULT, BLACK_CHOIR, THE_MAW } from '../data/encounters';
 import { SPELLS } from '../data/constants';
 import { loadoutFromSave, type CombatMods } from '../data/spellTree';
 import { RELICS } from '../data/relics';
@@ -32,6 +32,10 @@ import type { CombatEngineOptions, EncounterDef, RelicDef, SpellDef, Unit } from
  *   7. Maxed Zealot save vs Iron Pass, disciplined healing → victory, >=3
  *      party alive (gate 6).
  *   8. Maxed either build + any relic vs The Maw → wipe (sandbox; gate 7).
+ *   9. Maxed either build vs Cinder Vault (Dungeon 3) → victory, >=3 alive,
+ *      Emberfall lands >=1 (mid-tier content gate).
+ *  10. Maxed either build vs Black Choir (Dungeon 4) → wipe (soft talent-point
+ *      gate — not Extinction-scale; future tree nodes should reopen it).
  */
 
 const STEP_MS = 250;
@@ -121,6 +125,10 @@ interface BotRun {
   bonehowlLandings: number;
   /** Alpha 0.1 §D3 chunk 9a: Tunnel Vision telegraph->channel activations (Iron Pass only). */
   bossFocusStarted: number;
+  /** Mid-tier: Emberfall partyDoT activations (Cinder Vault). */
+  partyDoTStarted: number;
+  /** Mid-tier: Soul Toll mana-burn landings (Black Choir). */
+  manaBurns: number;
   healsCast: number;
   survivors: number;
   healerManaLeft: number;
@@ -177,6 +185,8 @@ function runBot(
   let elapsed = 0;
   let bonehowlLandings = 0;
   let bossFocusStarted = 0;
+  let partyDoTStarted = 0;
+  let manaBurns = 0;
   let healsCast = 0;
   let cdActivations = 0;
   let focusTargetId: string | null = null;
@@ -289,6 +299,8 @@ function runBot(
         focusTargetId = event.targetId;
       }
       if (event.type === 'bossFocusEnded') focusTargetId = null;
+      if (event.type === 'partyDoTStarted') partyDoTStarted += 1;
+      if (event.type === 'manaBurned') manaBurns += 1;
     }
     elapsed += STEP_MS;
   }
@@ -301,6 +313,8 @@ function runBot(
     elapsedMs: elapsed,
     bonehowlLandings,
     bossFocusStarted,
+    partyDoTStarted,
+    manaBurns,
     healsCast,
     survivors: engine.state.party.filter((u) => u.alive).length,
     healerManaLeft: healer?.mana ?? 0,
@@ -395,6 +409,42 @@ describe('Iron Pass difficulty shape (alpha-0.1-handoff §D2/§D3, chunk 9a)', (
     expect(run.status).toBe('victory');
     expect(run.survivors).toBeGreaterThanOrEqual(3);
     expect(run.cdActivations).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('Cinder Vault difficulty shape (mid-tier Dungeon 3)', () => {
+  it('a maxed Vigil build clears Cinder Vault with disciplined play, Emberfall landing at least once', () => {
+    const run = runBuildBot(CINDER_VAULT, VIGIL_LOADOUT, 'disciplined');
+    expect(run.status).toBe('victory');
+    expect(run.survivors).toBeGreaterThanOrEqual(3);
+    expect(run.partyDoTStarted).toBeGreaterThanOrEqual(1);
+  });
+
+  it('the mutually exclusive Vigil efficiency build also clears Cinder Vault', () => {
+    const run = runBuildBot(CINDER_VAULT, VIGIL_EFFICIENCY_LOADOUT, 'disciplined');
+    expect(run.status).toBe('victory');
+    expect(run.survivors).toBeGreaterThanOrEqual(3);
+    expect(run.partyDoTStarted).toBeGreaterThanOrEqual(1);
+  });
+
+  it('a maxed Zealot build clears Cinder Vault with disciplined play', () => {
+    const run = runBuildBot(CINDER_VAULT, ZEALOT_LOADOUT, 'disciplined');
+    expect(run.status).toBe('victory');
+    expect(run.survivors).toBeGreaterThanOrEqual(3);
+    expect(run.partyDoTStarted).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('Black Choir is a soft talent-point gate (Dungeon 4)', () => {
+  it('wipes with either maxed subclass build and disciplined healing (no relic)', () => {
+    const vigil = runBuildBot(BLACK_CHOIR, VIGIL_LOADOUT, 'disciplined');
+    const vigilEff = runBuildBot(BLACK_CHOIR, VIGIL_EFFICIENCY_LOADOUT, 'disciplined');
+    const zealot = runBuildBot(BLACK_CHOIR, ZEALOT_LOADOUT, 'disciplined');
+    expect(vigil.status).toBe('wipe');
+    expect(vigilEff.status).toBe('wipe');
+    expect(zealot.status).toBe('wipe');
+    // Soul Toll must actually press the mana/heal threat — not a trash-only wipe.
+    expect(vigil.manaBurns + vigilEff.manaBurns + zealot.manaBurns).toBeGreaterThanOrEqual(1);
   });
 });
 

@@ -79,12 +79,19 @@ export function validateContent(catalogs: ContentCatalogs): ContentValidationRes
       error('empty-name', `${path}.name`, 'ability name must not be empty');
     }
     const timingFields =
-      ability.kind === 'partyAoE'
+      ability.kind === 'partyAoE' || ability.kind === 'partyDoT' || ability.kind === 'manaSiphon'
         ? ([
             ['castMs', ability.castMs],
             ['firstCastAtMs', ability.firstCastAtMs],
             ['intervalMs', ability.intervalMs],
-            ['partyDamage', ability.partyDamage],
+            ...(ability.kind === 'partyAoE' || ability.kind === 'manaSiphon'
+              ? ([['partyDamage', ability.partyDamage]] as const)
+              : ([
+                  ['durationMs', ability.durationMs],
+                  ['tickMs', ability.tickMs],
+                  ['damagePerTick', ability.damagePerTick],
+                ] as const)),
+            ...(ability.kind === 'manaSiphon' ? ([['manaBurn', ability.manaBurn]] as const) : []),
           ] as const)
         : ([
             ['telegraphMs', ability.telegraphMs],
@@ -100,7 +107,9 @@ export function validateContent(catalogs: ContentCatalogs): ContentValidationRes
       }
     });
     const activeDuration =
-      ability.kind === 'partyAoE' ? ability.castMs : ability.telegraphMs + ability.channelMs;
+      ability.kind === 'tunnelVision'
+        ? ability.telegraphMs + ability.channelMs
+        : ability.castMs;
     if (isPositiveInteger(ability.intervalMs) && ability.intervalMs < activeDuration) {
       error(
         'invalid-cast-cadence',
@@ -109,15 +118,17 @@ export function validateContent(catalogs: ContentCatalogs): ContentValidationRes
       );
     }
     if (
-      ability.kind === 'tunnelVision' &&
-      isPositiveInteger(ability.channelMs) &&
+      (ability.kind === 'tunnelVision' || ability.kind === 'partyDoT') &&
+      isPositiveInteger(ability.kind === 'tunnelVision' ? ability.channelMs : ability.durationMs) &&
       isPositiveInteger(ability.tickMs) &&
-      ability.channelMs % ability.tickMs !== 0
+      (ability.kind === 'tunnelVision' ? ability.channelMs : ability.durationMs) % ability.tickMs !== 0
     ) {
       error(
         'invalid-channel-cadence',
         `${path}.tickMs`,
-        `tickMs ${ability.tickMs} must divide channelMs ${ability.channelMs}`,
+        `tickMs ${ability.tickMs} must divide ${
+          ability.kind === 'tunnelVision' ? 'channelMs' : 'durationMs'
+        } ${ability.kind === 'tunnelVision' ? ability.channelMs : ability.durationMs}`,
       );
     }
     checkVisualKey(ability.visualKey, `${path}.visualKey`);

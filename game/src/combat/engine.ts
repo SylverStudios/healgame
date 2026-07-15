@@ -21,6 +21,7 @@ import type {
   FullHealthBonusRule,
   MissingHealthBonusRule,
   MissingHealthPctBonusRule,
+  PartyDoTCastDef,
   SpellDef,
   SynergyRule,
   TunnelVisionCastDef,
@@ -38,6 +39,19 @@ interface BossFocusState {
   /** Total ms remaining in the channel (ends the channel at/below 0). */
   remainingMs: number;
   /** Countdown to the next tick. */
+  tickRemainingMs: number;
+  tickMs: number;
+  damagePerTick: number;
+}
+
+/**
+ * Internal engine-only state for an active party-wide DoT after a partyDoT
+ * telegraph finishes. Presentation drives off partyDoTStarted/Ended plus the
+ * normal damage events from each tick.
+ */
+interface PartyDoTState {
+  name: string;
+  remainingMs: number;
   tickRemainingMs: number;
   tickMs: number;
   damagePerTick: number;
@@ -107,6 +121,7 @@ export class CombatEngine {
 
   /** Active Tunnel Vision channel (telegraph already finished); null otherwise. */
   private bossFocusState: BossFocusState | null = null;
+  private partyDoTState: PartyDoTState | null = null;
   /** Deterministic round-robin cursor into the eligible (non-tank, living) focus targets; never Math.random. */
   private focusIndex = 0;
 
@@ -350,6 +365,9 @@ export class CombatEngine {
     if (this.bossFocusState) {
       min = Math.min(min, this.bossFocusState.remainingMs, this.bossFocusState.tickRemainingMs);
     }
+    if (this.partyDoTState) {
+      min = Math.min(min, this.partyDoTState.remainingMs, this.partyDoTState.tickRemainingMs);
+    }
     for (const cd of this.cooldowns) {
       if (cd.remainingCooldownMs > 0) min = Math.min(min, cd.remainingCooldownMs);
       if (cd.buffRemainingMs > 0) min = Math.min(min, cd.buffRemainingMs);
@@ -368,6 +386,10 @@ export class CombatEngine {
     if (this.bossFocusState) {
       this.bossFocusState.remainingMs -= step;
       this.bossFocusState.tickRemainingMs -= step;
+    }
+    if (this.partyDoTState) {
+      this.partyDoTState.remainingMs -= step;
+      this.partyDoTState.tickRemainingMs -= step;
     }
     if (this.relicRegenRemainingMs !== null) this.relicRegenRemainingMs -= step;
     // Cooldown timers (Alpha 0.1 §D6): plain cooldown countdown (no event on reaching
@@ -402,13 +424,17 @@ export class CombatEngine {
     if (this.gcdRemainingMs <= 0 && this.playerCast === null) {
       this.fireQueuedCast(events);
     }
-    // 4. boss cast completes -> party-wide damage (partyAoE) or telegraph ends -> focus channel begins (tunnelVision)
+    // 4. boss cast completes -> partyAoE / manaSiphon damage, partyDoT start, or tunnelVision channel
     if (this.status === 'running' && this.bossCastState && this.bossCastState.remainingMs <= 0) {
       this.completeBossCast(events);
     }
     // 5. boss focus tick (Tunnel Vision channel damage)
     if (this.status === 'running' && this.bossFocusState && this.bossFocusState.tickRemainingMs <= 0) {
       this.resolveBossFocusTick(events);
+    }
+    // 5b. party DoT tick (partyDoT lingering burn)
+    if (this.status === 'running' && this.partyDoTState && this.partyDoTState.tickRemainingMs <= 0) {
+      this.resolvePartyDoTTick(events);
     }
     // 6. merc auto-attacks
     if (this.status === 'running') {
@@ -660,6 +686,7 @@ export class CombatEngine {
       // instant the channel ends (the "next boundary after it ends").
       this.bossCastTimerRemainingMs = castDef.intervalMs;
     } else {
+      // partyAoE / partyDoT / manaSiphon: cast-bar occupancy is castMs only.
       this.bossCastState = { name: castDef.name, remainingMs: castDef.castMs, totalMs: castDef.castMs };
       this.bossCastTimerRemainingMs = null;
     }
@@ -680,10 +707,19 @@ export class CombatEngine {
       return;
     }
 
+    if (castDef.kind === 'partyDoT') {
+      this.startPartyDoT(castDef, events);
+      if (this.status === 'running') {
+        this.bossCastTimerRemainingMs = castDef.intervalMs - castDef.castMs;
+      }
+      return;
+    }
+
+    const partyDamage = castDef.partyDamage;
     const bossId = this.boss!.id;
     for (const unit of this.party) {
       if (!unit.alive) continue;
-      const damage = this.damageAfterArmor(unit, castDef.partyDamage);
+      const damage = this.damageAfterArmor(unit, partyDamage);
       unit.hp = Math.max(0, unit.hp - damage);
       events.push({ type: 'damage', targetId: unit.id, amount: damage, sourceId: bossId });
       if (unit.hp <= 0) {
@@ -694,11 +730,47 @@ export class CombatEngine {
         this.cancelCastIfTargeting(unit.id, events);
       }
     }
+    if (castDef.kind === 'manaSiphon' && this.status === 'running') {
+      const healer = this.getUnit('healer');
+      if (healer && healer.alive && castDef.manaBurn > 0) {
+        const burned = Math.min(healer.mana, castDef.manaBurn);
+        healer.mana -= burned;
+        if (burned > 0) events.push({ type: 'manaBurned', amount: burned });
+      }
+    }
     this.checkWipe(events);
     if (this.status === 'running') {
       // Start-to-start cadence: the gap before the next cast is intervalMs - castMs.
       this.bossCastTimerRemainingMs = castDef.intervalMs - castDef.castMs;
     }
+  }
+
+  private startPartyDoT(castDef: PartyDoTCastDef, events: CombatEvent[]): void {
+    // A refreshed Emberfall replaces any previous DoT window (no stacking).
+    this.partyDoTState = {
+      name: castDef.name,
+      remainingMs: castDef.durationMs,
+      tickRemainingMs: castDef.tickMs,
+      tickMs: castDef.tickMs,
+      damagePerTick: castDef.damagePerTick,
+    };
+    events.push({ type: 'partyDoTStarted', name: castDef.name, totalMs: castDef.durationMs });
+  }
+
+  private resolvePartyDoTTick(events: CombatEvent[]): void {
+    const dot = this.partyDoTState!;
+    const bossId = this.boss!.id;
+    for (const unit of [...this.party]) {
+      if (this.status !== 'running') break;
+      if (!unit.alive) continue;
+      this.applyDamageToUnit(unit, dot.damagePerTick, bossId, events);
+    }
+    if (dot.remainingMs <= 0 || this.status !== 'running') {
+      this.partyDoTState = null;
+      events.push({ type: 'partyDoTEnded', name: dot.name });
+      return;
+    }
+    dot.tickRemainingMs = dot.tickMs;
   }
 
   /**

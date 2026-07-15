@@ -55,15 +55,17 @@ describe('applyCombatResult', () => {
     expect(notices).toEqual([]);
   });
 
-  it.each(['ash-gate', 'iron-pass', 'the-maw'])(
+  it.each(['ash-gate', 'iron-pass', 'cinder-vault', 'black-choir', 'the-maw'])(
     'queues three deterministic relic offers on the first %s clear',
     (encounterId) => {
-      const priorClears =
-        encounterId === 'ash-gate'
-          ? []
-          : encounterId === 'iron-pass'
-            ? ['ash-gate']
-            : ['ash-gate', 'iron-pass'];
+      const priorById: Record<string, string[]> = {
+        'ash-gate': [],
+        'iron-pass': ['ash-gate'],
+        'cinder-vault': ['ash-gate', 'iron-pass'],
+        'black-choir': ['ash-gate', 'iron-pass', 'cinder-vault'],
+        'the-maw': ['ash-gate', 'iron-pass', 'cinder-vault', 'black-choir'],
+      };
+      const priorClears = priorById[encounterId] ?? [];
       const expectedClears = [...priorClears, encounterId];
       const s = save({ clearedDungeons: priorClears });
       const notices = applyCombatResult(
@@ -248,8 +250,18 @@ describe('isMawUnlocked', () => {
     expect(isMawUnlocked(save({ clearedDungeons: ['ash-gate'] }))).toBe(false);
   });
 
-  it('is true once iron-pass has been cleared', () => {
-    expect(isMawUnlocked(save({ clearedDungeons: ['ash-gate', 'iron-pass'] }))).toBe(true);
+  it('is still false after Iron Pass alone — mid-tier dungeons gate The Maw', () => {
+    expect(isMawUnlocked(save({ clearedDungeons: ['ash-gate', 'iron-pass'] }))).toBe(false);
+  });
+
+  it('is true once black-choir has been cleared', () => {
+    expect(
+      isMawUnlocked(
+        save({
+          clearedDungeons: ['ash-gate', 'iron-pass', 'cinder-vault', 'black-choir'],
+        }),
+      ),
+    ).toBe(true);
   });
 });
 
@@ -286,12 +298,20 @@ describe('isDungeonUnlocked', () => {
     const fresh = save();
     expect(isDungeonUnlocked(fresh, 'ash-gate')).toBe(true);
     expect(isDungeonUnlocked(fresh, 'iron-pass')).toBe(false);
+    expect(isDungeonUnlocked(fresh, 'cinder-vault')).toBe(false);
+    expect(isDungeonUnlocked(fresh, 'black-choir')).toBe(false);
     expect(isDungeonUnlocked(fresh, 'the-maw')).toBe(false);
     expect(isDungeonUnlocked(save({ clearedDungeons: ['ash-gate'] }), 'iron-pass')).toBe(true);
     expect(isDungeonUnlocked(save({ clearedDungeons: ['ash-gate'] }), 'the-maw')).toBe(false);
     expect(
+      isDungeonUnlocked(save({ clearedDungeons: ['ash-gate', 'iron-pass'] }), 'cinder-vault'),
+    ).toBe(true);
+    expect(
+      isDungeonUnlocked(save({ clearedDungeons: ['ash-gate', 'iron-pass'] }), 'the-maw'),
+    ).toBe(false);
+    expect(
       isDungeonUnlocked(
-        save({ clearedDungeons: ['ash-gate', 'iron-pass'] }),
+        save({ clearedDungeons: ['ash-gate', 'iron-pass', 'cinder-vault', 'black-choir'] }),
         'the-maw',
       ),
     ).toBe(true);
@@ -311,7 +331,9 @@ describe('THE_MAW data sanity', () => {
   it('has a named party-wide cast (Extinction) defined', () => {
     const cast = THE_MAW.boss.cast;
     expect(cast?.name).toBe('Extinction');
-    if (!cast || cast.kind === 'tunnelVision') throw new Error('Extinction must be a party-AoE cast');
+    if (!cast || cast.kind === 'tunnelVision' || cast.kind === 'partyDoT' || cast.kind === 'manaSiphon') {
+      throw new Error('Extinction must be a party-AoE cast');
+    }
     expect(cast.partyDamage).toBeGreaterThan(0);
     expect(cast.castMs).toBe(10_000);
   });

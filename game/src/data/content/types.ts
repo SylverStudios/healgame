@@ -9,13 +9,21 @@ export const MOB_VISUAL_KEYS = [
   'gate-warden',
   'spire-lancer',
   'hollow-king',
+  'cinder-wraith',
+  'ember-colossus',
+  'choir-shade',
+  'dirge-sovereign',
 ] as const;
 export type MobVisualKey = (typeof MOB_VISUAL_KEYS)[number];
 
-export type EnemyAbilityDef = PartyAoeAbilityDef | TunnelVisionAbilityDef;
+export type EnemyAbilityDef =
+  | PartyAoeAbilityDef
+  | TunnelVisionAbilityDef
+  | PartyDoTAbilityDef
+  | ManaSiphonAbilityDef;
 
 /**
- * The runtime currently supports one telegraphed party-wide boss cast.
+ * The runtime currently supports one telegraphed boss cast per boss.
  * Add future mechanics as new `kind` members instead of optional fields here.
  */
 export interface PartyAoeAbilityDef {
@@ -39,6 +47,40 @@ export interface TunnelVisionAbilityDef {
   channelMs: number;
   tickMs: number;
   damagePerTick: number;
+  visualKey: string;
+}
+
+/**
+ * Telegraphed cast that then scorches every living party member for a fixed
+ * DoT window (Cinder Vault / Emberfall). DoT duration is not part of cast
+ * occupancy — a later telegraph may start while ticks are still landing.
+ */
+export interface PartyDoTAbilityDef {
+  id: string;
+  name: string;
+  kind: 'partyDoT';
+  castMs: number;
+  firstCastAtMs: number;
+  intervalMs: number;
+  durationMs: number;
+  tickMs: number;
+  damagePerTick: number;
+  visualKey: string;
+}
+
+/**
+ * Telegraphed party spike that also drains healer mana (Black Choir / Soul
+ * Toll). Mana burn is the soft gate that current tree mana pools cannot outpace.
+ */
+export interface ManaSiphonAbilityDef {
+  id: string;
+  name: string;
+  kind: 'manaSiphon';
+  castMs: number;
+  firstCastAtMs: number;
+  intervalMs: number;
+  partyDamage: number;
+  manaBurn: number;
   visualKey: string;
 }
 

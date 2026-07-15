@@ -172,6 +172,9 @@ export type CombatEvent =
   | { type: 'bossFocusStarted'; targetId: string; name: string; totalMs: number }
   | { type: 'bossFocusTick'; targetId: string; amount: number }
   | { type: 'bossFocusEnded'; targetId: string; name: string }
+  | { type: 'partyDoTStarted'; name: string; totalMs: number }
+  | { type: 'partyDoTEnded'; name: string }
+  | { type: 'manaBurned'; amount: number }
   | { type: 'cooldownActivated'; id: string; name: string }
   | { type: 'cooldownBuffEnded'; id: string }
   | { type: 'unitDied'; unitId: string }
@@ -252,7 +255,41 @@ export interface TunnelVisionCastDef {
   damagePerTick: number;
 }
 
-export type BossCastDef = PartyAoECastDef | TunnelVisionCastDef;
+/**
+ * Emberfall-style telegraphed cast: on finish, a party-wide DoT ticks for
+ * `durationMs`. Cadence matches partyAoE (cast-start-to-cast-start); the DoT
+ * may still be ticking when the next telegraph begins.
+ */
+export interface PartyDoTCastDef {
+  kind: 'partyDoT';
+  name: string;
+  castMs: number;
+  firstCastAtMs: number;
+  intervalMs: number;
+  durationMs: number;
+  tickMs: number;
+  damagePerTick: number;
+}
+
+/**
+ * Soul Toll-style telegraphed cast: party-wide damage plus a fixed mana drain
+ * on the healer. Cadence matches partyAoE.
+ */
+export interface ManaSiphonCastDef {
+  kind: 'manaSiphon';
+  name: string;
+  castMs: number;
+  firstCastAtMs: number;
+  intervalMs: number;
+  partyDamage: number;
+  manaBurn: number;
+}
+
+export type BossCastDef =
+  | PartyAoECastDef
+  | TunnelVisionCastDef
+  | PartyDoTCastDef
+  | ManaSiphonCastDef;
 
 export interface BossDef {
   id: string;

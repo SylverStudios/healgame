@@ -176,7 +176,17 @@ describe('live dungeon content', () => {
     expect(compileDungeon('ash-gate', CONTENT_CATALOGS)).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[0]);
     expect(compileDungeon('iron-pass', CONTENT_CATALOGS)).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[1]);
     expect(compileDungeon('the-maw', CONTENT_CATALOGS)).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[2]);
-    expect(compileAllDungeons(CONTENT_CATALOGS)).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS);
+    const all = compileAllDungeons(CONTENT_CATALOGS);
+    expect(all.map((e) => e.id)).toEqual([
+      'ash-gate',
+      'iron-pass',
+      'cinder-vault',
+      'black-choir',
+      'the-maw',
+    ]);
+    expect(all[0]).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[0]);
+    expect(all[1]).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[1]);
+    expect(all[4]).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[2]);
   });
 
   it('assembles deterministically from explicit order, independent of catalog array order', () => {
@@ -186,7 +196,13 @@ describe('live dungeon content', () => {
       mobs: [...CONTENT_CATALOGS.mobs].reverse(),
       dungeons: [...CONTENT_CATALOGS.dungeons].reverse(),
     };
-    expect(compileAllDungeons(reordered)).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS);
+    expect(compileAllDungeons(reordered).map((e) => e.id)).toEqual([
+      'ash-gate',
+      'iron-pass',
+      'cinder-vault',
+      'black-choir',
+      'the-maw',
+    ]);
     expect(compileAllDungeons(reordered)).toEqual(compileAllDungeons(reordered));
   });
 
@@ -203,8 +219,8 @@ describe('live dungeon content', () => {
   it('formats a stable preview with effective overrides and ability cadence', () => {
     expect(formatDungeonPreview('the-maw', CONTENT_CATALOGS)).toBe(
       [
-        'Dungeon 3: The Maw [the-maw]',
-        'Unlock: clear iron-pass',
+        'Dungeon 5: The Maw [the-maw]',
+        'Unlock: clear black-choir',
         'Rewards: XP 1/enemy, relic offer on first clear',
         'Visual: the-maw',
         'Wave 1:',

@@ -23,4 +23,6 @@ function requiredEncounter(id: string): EncounterDef {
 
 export const ASH_GATE = requiredEncounter('ash-gate');
 export const IRON_PASS = requiredEncounter('iron-pass');
+export const CINDER_VAULT = requiredEncounter('cinder-vault');
+export const BLACK_CHOIR = requiredEncounter('black-choir');
 export const THE_MAW = requiredEncounter('the-maw');

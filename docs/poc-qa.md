@@ -1,6 +1,6 @@
 # PoC QA — journey checklist & verification
 
-Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-14
+Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-15
 
 **Date:** 2026-07-08 · **Verdict: PoC complete.** Every poc-spec §1 criterion is
 implemented, and all of them are enforced by automated gates that run headless.
@@ -705,3 +705,23 @@ proc text. Selected relics accumulate and appear in the shared run-mod bar.
 Save v5 deliberately rotates the local-storage key and deletes the old
 development key. There is no migration contract before release: stale or
 unrecognized payloads return the player to a fresh tutorial.
+
+---
+
+# Mid-tier dungeons — Cinder Vault & Black Choir (2026-07-15)
+
+Status: current · Last verified: 2026-07-15
+
+Inserted two dungeons between Iron Pass and The Maw:
+
+| Order | Dungeon | Boss | Mechanic | Balance gate |
+|------|---------|------|----------|--------------|
+| 3 | Cinder Vault | Ember Colossus | `partyDoT` Emberfall | Maxed Vigil/Zealot + efficiency Vigil clear with ≥3 alive; DoT lands ≥1 |
+| 4 | Black Choir | Dirge Sovereign | `manaSiphon` Soul Toll | Maxed kits wipe; Soul Toll mana-burns at least once (soft talent-point gate) |
+| 5 | The Maw | Hollow King | Extinction | Still Extinction-scale unwinnable; unlock now requires Black Choir clear |
+
+New ability kinds landed in the engine (`partyDoT`, `manaSiphon`) with events
+`partyDoTStarted` / `partyDoTEnded` / `manaBurned`. Content authored through
+the typed catalogs (`enemyAbilities/`, `mobs/`, `dungeons/`) and validated via
+`npm run content -- validate|preview`. Hub buttons auto-wire from
+`ORDERED_DUNGEONS`; journey names: `hubCinderVault`, `hubBlackChoir`.

@@ -64,5 +64,9 @@ function formatAbility(ability: EnemyAbilityDef): string {
       return `${ability.name} [${ability.id}] partyAoE — cast ${ability.castMs}ms, first ${ability.firstCastAtMs}ms, interval ${ability.intervalMs}ms, party damage ${ability.partyDamage}`;
     case 'tunnelVision':
       return `${ability.name} [${ability.id}] tunnelVision — telegraph ${ability.telegraphMs}ms, first ${ability.firstCastAtMs}ms, interval ${ability.intervalMs}ms, channel ${ability.channelMs}ms, tick ${ability.tickMs}ms, tick damage ${ability.damagePerTick}`;
+    case 'partyDoT':
+      return `${ability.name} [${ability.id}] partyDoT — cast ${ability.castMs}ms, first ${ability.firstCastAtMs}ms, interval ${ability.intervalMs}ms, duration ${ability.durationMs}ms, tick ${ability.tickMs}ms, tick damage ${ability.damagePerTick}`;
+    case 'manaSiphon':
+      return `${ability.name} [${ability.id}] manaSiphon — cast ${ability.castMs}ms, first ${ability.firstCastAtMs}ms, interval ${ability.intervalMs}ms, party damage ${ability.partyDamage}, mana burn ${ability.manaBurn}`;
   }
 }
