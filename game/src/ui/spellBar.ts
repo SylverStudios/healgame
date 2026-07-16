@@ -9,6 +9,7 @@
 import Phaser from 'phaser';
 import type { CooldownDef, CooldownState, SpellDef } from '../combat/types';
 import type { CombatMods } from '../data/spellTree';
+import { actionHotkeyLabel } from './actionHotkeys';
 import { buildCooldownTooltipLines } from './cooldownTooltip';
 import { SpellTooltip, buildTooltipLines } from './spellTooltip';
 import { glyphChar } from './glyph';
@@ -37,7 +38,9 @@ const COST_COLOR = '#a8c8f0';
 const COST_OOM_COLOR = '#e05a4e';
 const HOTKEY_FONT = '10px monospace';
 const HOTKEY_COLOR = '#e8d8c8';
-const KEYCAP_SIZE = 14;
+/** Wide enough for two-char Shift labels (`sQ`); height stays compact. */
+const KEYCAP_WIDTH = 18;
+const KEYCAP_HEIGHT = 14;
 const KEYCAP_BG = 0x241a15;
 const KEYCAP_BORDER = 0x8a7868;
 
@@ -91,10 +94,10 @@ class SpellButton {
     this.bg.on('pointerover', () => onHoverStart(this.spellId, this.centerX, this.topY));
     this.bg.on('pointerout', () => onHoverEnd());
 
-    const keycapX = x - BUTTON_WIDTH / 2 + 6 + KEYCAP_SIZE / 2;
-    const keycapY = y - BUTTON_HEIGHT / 2 + 6 + KEYCAP_SIZE / 2;
+    const keycapX = x - BUTTON_WIDTH / 2 + 6 + KEYCAP_WIDTH / 2;
+    const keycapY = y - BUTTON_HEIGHT / 2 + 6 + KEYCAP_HEIGHT / 2;
     this.keycap = scene.add
-      .rectangle(keycapX, keycapY, KEYCAP_SIZE, KEYCAP_SIZE, KEYCAP_BG)
+      .rectangle(keycapX, keycapY, KEYCAP_WIDTH, KEYCAP_HEIGHT, KEYCAP_BG)
       .setStrokeStyle(1, KEYCAP_BORDER);
 
     this.glyphText = scene.add
@@ -193,10 +196,10 @@ class CooldownButton {
     this.bg.on('pointerover', () => onHoverStart(this.cooldownId, this.centerX, this.topY));
     this.bg.on('pointerout', () => onHoverEnd());
 
-    const keycapX = x - CD_BUTTON_WIDTH / 2 + 6 + KEYCAP_SIZE / 2;
-    const keycapY = y - CD_BUTTON_HEIGHT / 2 + 6 + KEYCAP_SIZE / 2;
+    const keycapX = x - CD_BUTTON_WIDTH / 2 + 6 + KEYCAP_WIDTH / 2;
+    const keycapY = y - CD_BUTTON_HEIGHT / 2 + 6 + KEYCAP_HEIGHT / 2;
     this.keycap = scene.add
-      .rectangle(keycapX, keycapY, KEYCAP_SIZE, KEYCAP_SIZE, KEYCAP_BG)
+      .rectangle(keycapX, keycapY, KEYCAP_WIDTH, KEYCAP_HEIGHT, KEYCAP_BG)
       .setStrokeStyle(1, KEYCAP_BORDER);
 
     this.glyphText = scene.add
@@ -259,9 +262,10 @@ class CooldownButton {
   }
 }
 
-/** A centered row of spell buttons; index order also drives 1..N hotkeys. Cooldown buttons
- *  (Alpha 0.1 §D6), if any, sit in a compact group to the right — absent entirely (zero layout
- *  shift) when the loadout grants none, e.g. Ash Gate before any CD-granting node is bought. */
+/** A centered row of spell buttons; index order drives QWER / Shift+QWER hotkeys
+ *  (max 8). Cooldown buttons (Alpha 0.1 §D6), if any, sit in a compact group to the
+ *  right — absent entirely (zero layout shift) when the loadout grants none, e.g.
+ *  Ash Gate before any CD-granting node is bought. */
 export class SpellBar {
   private readonly buttons: SpellButton[] = [];
   private readonly cooldownButtons: CooldownButton[] = [];
@@ -296,7 +300,8 @@ export class SpellBar {
     const startX = centerX - totalWidth / 2 + BUTTON_WIDTH / 2;
     spells.forEach((spell, i) => {
       const x = startX + i * (BUTTON_WIDTH + BUTTON_GAP);
-      this.buttons.push(new SpellButton(scene, x, y, spell, `${i + 1}`, onCast, showTooltip, hideTooltip));
+      const label = actionHotkeyLabel(i) ?? '';
+      this.buttons.push(new SpellButton(scene, x, y, spell, label, onCast, showTooltip, hideTooltip));
     });
 
     if (cooldowns.length > 0) {
@@ -304,13 +309,14 @@ export class SpellBar {
       const cdStartX = lastSpellRightEdge + CD_GROUP_GAP + CD_BUTTON_WIDTH / 2;
       cooldowns.forEach((def, i) => {
         const x = cdStartX + i * (CD_BUTTON_WIDTH + CD_BUTTON_GAP);
+        const label = actionHotkeyLabel(spells.length + i) ?? '';
         this.cooldownButtons.push(
           new CooldownButton(
             scene,
             x,
             y,
             def,
-            `${spells.length + i + 1}`,
+            label,
             onCooldownClick,
             showCooldownTooltip,
             hideTooltip,
