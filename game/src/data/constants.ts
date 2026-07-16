@@ -48,6 +48,11 @@ export const MERCS = {
 } as const;
 
 export const SPELLS = {
+  /**
+   * Starter stick-bonk: 1 damage to the front enemy, true instant, GCD only.
+   * Default Q-slot filler until the player replaces it on the action bar.
+   */
+  bonk: { id: 'bonk', name: 'Bonk', heal: 0, damage: 1, mana: 0, castMs: 0, glyph: '/' },
   solemnMend: { id: 'solemn-mend', name: 'Solemn Mend', heal: 4, mana: 3, castMs: 2000, glyph: 'M' },
   zealousMending: { id: 'zealous-mending', name: 'Zealous Mending', heal: 4, mana: 4, castMs: 1000, glyph: 'Z' },
   /** Vigil subclass spell (phase-2-handoff): slow, efficient. Granted by the vigil-oath tree node. */
@@ -59,6 +64,9 @@ export const SPELLS = {
   /** Alpha 0.2 §D4 — Vengeance/dark Vowstrike. True instant; granted by vowstrike-vengeance tree node. */
   vowstrikeVengeance: { id: 'vowstrike-vengeance', name: 'Vowstrike: Reckoning', heal: 2, mana: 2, castMs: 0, glyph: 'X' },
 } as const;
+
+/** QWER action-bar length (Shift+QWER still maps CD slots after spells). */
+export const ACTION_BAR_SLOTS = 4;
 
 export const REWARDS = {
   /** Every defeated enemy advances the account, including kills in a wipe. */

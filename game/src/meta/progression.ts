@@ -11,7 +11,7 @@ import { levelForXp, SPELLS } from '../data/constants';
 import { getDungeonById, isDungeonIdUnlocked } from '../data/dungeons';
 import { chooseRelicOffers } from '../data/relics';
 import { loadoutFromSave, type CombatMods } from '../data/spellTree';
-import type { SaveData } from '../save/save';
+import { placeOnActionBar, type SaveData } from '../save/save';
 import type { CombatResult } from '../scenes/CombatScene';
 
 export interface HubNotice {
@@ -48,6 +48,7 @@ export function applyCombatResult(
 
   if (levelAfter >= 2 && !save.unlockedSpells.includes(SPELLS.zealousMending.id)) {
     save.unlockedSpells.push(SPELLS.zealousMending.id);
+    placeOnActionBar(save, SPELLS.zealousMending.id);
     notices.push({
       kind: 'spellLearned',
       text: `${SPELLS.zealousMending.name} learned!`,

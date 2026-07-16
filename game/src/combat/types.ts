@@ -25,6 +25,11 @@ export interface SpellDef {
   heal: number;
   mana: number;
   castMs: number;
+  /**
+   * Optional player damage. When `damage > 0`, the cast auto-targets the
+   * front living enemy (no ally click) and skips the heal pipeline.
+   */
+  damage?: number;
   /** Alpha 0.2 §D8 — placeholder glyph key/character for tree + spell bar. */
   glyph?: string;
 }

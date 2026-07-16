@@ -8,6 +8,7 @@ import type { SpellDef } from '../combat/types';
 import { SPELLS } from './constants';
 
 export const ALL_SPELLS: SpellDef[] = [
+  SPELLS.bonk,
   SPELLS.solemnMend,
   SPELLS.zealousMending,
   SPELLS.solemnVigil,

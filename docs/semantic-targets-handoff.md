@@ -1,7 +1,7 @@
 # Semantic click targets — handoff
 
 Status: historical — shipped 2026-07-13 (see poc-qa.md Semantic click targets
-section) · Authority: none — archive · Last verified: 2026-07-14
+section) · Authority: none — archive · Last verified: 2026-07-15
 
 Note: `hubRelicIcon` was superseded by `runMod:<id>` when the shared run-mods
 top bar shipped (oath + cumulative relics, Hub/Combat/Tree).
@@ -29,7 +29,11 @@ and hovers by name — no hard-coded layout coordinates.
 | `tutorialLearn` | learn-button rect | `TutorialScene.ts` |
 | `hubDungeon:<id>` (e.g. `hubDungeon:ash-gate`) | dungeon button rects | `HubScene.ts` via `hubDungeonTargetName` |
 | `hubTree` | Spell Tree button | `HubScene.ts` |
+| `hubLoadout` | Loadout button | `HubScene.ts` |
 | `hubRestart` | restart text label | `HubScene.ts` |
+| `loadoutSlot:<i>` | action-bar slot rect | `LoadoutScene.ts` |
+| `loadoutPick:<spellId>` / `loadoutPick:empty` | spell picker row | `LoadoutScene.ts` |
+| `loadoutBack` | back button | `LoadoutScene.ts` |
 | `runMod:<id>` | oath/relic icon hit target (top bar) | `ui/runModsBar.ts` (Hub / Combat / Tree) |
 | `treeNode:<spotId>` | node bg rect | `TreeScene.ts` (e.g. `treeNode:deep-reserves`) |
 | `treeBack` | back-button rect | `TreeScene.ts` |

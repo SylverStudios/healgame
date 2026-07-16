@@ -635,7 +635,12 @@ export class CombatScene extends Phaser.Scene {
     this.syncBossCastBar(state);
 
     const healer = state.party.find((u) => u.role === 'healer');
-    this.spellBar.setState(healer?.mana ?? 0, state.targetId !== null, state.status === 'running');
+    this.spellBar.setState(
+      healer?.mana ?? 0,
+      state.targetId !== null,
+      state.status === 'running',
+      state.enemies.some((e) => e.alive),
+    );
     this.spellBar.setArmedSpellIds(state.armedBuffedSpellIds);
     this.spellBar.updateCooldowns(state.cooldowns);
     this.syncHealerRune(state);

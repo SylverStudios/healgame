@@ -789,6 +789,8 @@ export function combatModsFromTree(
 /**
  * Canonical combat entry point: save → tree state → flat CombatMods.
  * Applies level-derived mana bonuses (§D2) on top of tree bonuses.
+ * When `actionBar` is present, fight spells follow non-empty bar slots
+ * (duplicates allowed); omitted `actionBar` keeps all owned spells (tests/bots).
  * Hub / tutorial / balance bots call this at fight start; the engine never
  * sees the skill-tree graph.
  */
@@ -796,6 +798,7 @@ export function loadoutFromSave(save: {
   treeRanks: Record<string, number>;
   unlockedSpells: readonly string[];
   xp?: number;
+  actionBar?: readonly string[];
 }): CombatMods {
   const state = treeStateFromLegacy(save.treeRanks, 0);
   const mods = combatModsFromTree(state, save.unlockedSpells);
@@ -805,7 +808,44 @@ export function loadoutFromSave(save: {
   if (levelMana.manaRegen !== null) {
     mods.manaRegen = levelMana.manaRegen;
   }
+  if (save.actionBar !== undefined && save.actionBar.some((id) => id.length > 0)) {
+    mods.spells = spellsFromActionBar(mods.spells, save.actionBar);
+  }
   return mods;
+}
+
+/**
+ * Order (and optionally duplicate) owned spell defs by action-bar slot ids.
+ * Empty strings are skipped; unknown ids are skipped.
+ */
+export function spellsFromActionBar(
+  owned: readonly SpellDef[],
+  actionBar: readonly string[],
+): SpellDef[] {
+  const byId = new Map(owned.map((spell) => [spell.id, spell]));
+  const out: SpellDef[] = [];
+  for (const id of actionBar) {
+    if (!id) continue;
+    const spell = byId.get(id);
+    if (spell) out.push({ ...spell });
+  }
+  return out;
+}
+
+/**
+ * All owned spells (tree + unlocked) with mods baked — ignores action bar.
+ * LoadoutScene uses this for the picker list.
+ */
+export function ownedSpellsFromSave(save: {
+  treeRanks: Record<string, number>;
+  unlockedSpells: readonly string[];
+  xp?: number;
+}): SpellDef[] {
+  return loadoutFromSave({
+    treeRanks: save.treeRanks,
+    unlockedSpells: save.unlockedSpells,
+    ...(save.xp !== undefined ? { xp: save.xp } : {}),
+  }).spells;
 }
 
 // ---------------------------------------------------------------------------

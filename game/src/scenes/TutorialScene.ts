@@ -42,8 +42,8 @@ export class TutorialScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const instructions = [
-      'In combat: click an ally to target them, then click a spell button',
-      '(or press its number key) to cast it on them.',
+      'In combat: click an ally to target them, then click a heal (or press its',
+      'QWER key). Bonk (Q) hits the front enemy — no target click needed.',
       '',
       "Ash Gate will wipe your party the first time through — that's expected.",
       'XP from every enemy kill is kept even if you wipe.',
@@ -73,9 +73,15 @@ export class TutorialScene extends Phaser.Scene {
 
   private onLearnSpell(): void {
     const save = loadSave();
+    if (!save.unlockedSpells.includes(SPELLS.bonk.id)) {
+      save.unlockedSpells.push(SPELLS.bonk.id);
+    }
     if (!save.unlockedSpells.includes(SPELLS.solemnMend.id)) {
       save.unlockedSpells.push(SPELLS.solemnMend.id);
     }
+    // Q = Bonk (starter), W = Solemn Mend for the first fight.
+    if (save.actionBar[0] !== SPELLS.bonk.id) save.actionBar[0] = SPELLS.bonk.id;
+    if (save.actionBar[1] !== SPELLS.solemnMend.id) save.actionBar[1] = SPELLS.solemnMend.id;
     save.tutorialDone = true;
     saveGame(save);
 

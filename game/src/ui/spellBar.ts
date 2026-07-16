@@ -56,12 +56,13 @@ const CD_TIMER_COLOR = '#a8c8f0';
 class SpellButton {
   readonly spellId: string;
   readonly mana: number;
+  readonly requiresAllyTarget: boolean;
   readonly centerX: number;
   readonly topY: number;
 
   private readonly bg: Phaser.GameObjects.Rectangle;
   private readonly keycap: Phaser.GameObjects.Rectangle;
-  /** Large glyph char — primary visual (§D8 temp art exception). */
+  /** Large glyph char — primary visual (§D8). */
   private readonly glyphText: Phaser.GameObjects.Text;
   private readonly costText: Phaser.GameObjects.Text;
   private readonly hotkeyText: Phaser.GameObjects.Text;
@@ -80,6 +81,7 @@ class SpellButton {
   ) {
     this.spellId = spell.id;
     this.mana = spell.mana;
+    this.requiresAllyTarget = (spell.damage ?? 0) <= 0;
     this.centerX = x;
     this.topY = y - BUTTON_HEIGHT / 2;
 
@@ -326,10 +328,17 @@ export class SpellBar {
     }
   }
 
-  /** Toggle each button's look from healer mana / target / running state. */
-  setState(healerMana: number, hasTarget: boolean, isRunning: boolean): void {
+  /** Toggle each button's look from healer mana / target / running state.
+   *  Damage spells need a living enemy instead of an ally heal target. */
+  setState(
+    healerMana: number,
+    hasAllyTarget: boolean,
+    isRunning: boolean,
+    hasEnemyTarget = true,
+  ): void {
     for (const button of this.buttons) {
       const canAfford = healerMana >= button.mana;
+      const hasTarget = button.requiresAllyTarget ? hasAllyTarget : hasEnemyTarget;
       const enabled = isRunning && hasTarget && canAfford;
       button.setCastability(enabled, canAfford);
     }

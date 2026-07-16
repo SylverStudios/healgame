@@ -157,9 +157,12 @@ export class HubScene extends Phaser.Scene {
     });
 
     const treeY = dungeonStartY + rows * 62 + 22;
-    this.makeButton(centerX, treeY, 300, 52, 'Spell Tree', () => {
+    this.makeButton(centerX - 160, treeY, 280, 52, 'Spell Tree', () => {
       this.scene.start(SceneKeys.Tree);
     }, 'hubTree');
+    this.makeButton(centerX + 160, treeY, 280, 52, 'Loadout', () => {
+      this.scene.start(SceneKeys.Loadout);
+    }, 'hubLoadout');
 
     this.buildRestartControl(centerX, height - 28);
   }

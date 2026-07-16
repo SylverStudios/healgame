@@ -7,7 +7,7 @@
  *
  * Stages:
  *   A  fresh save → tutorial → learn Solemn Mend → Ash Gate → naive-heal to a
- *      wipe → hub applies kill XP (save is v6 from birth)
+ *      wipe → hub applies kill XP (save is v7 from birth)
  *   A2 seeded 8 XP → one more run crosses level 2 (Zealous auto-grant ribbon)
  *   M  seeded stale v4 payload → boot discards it and starts fresh
  *   Relic  seeded post-first-clear save with a pending three-card offer
@@ -50,7 +50,7 @@ const shotsDir = (() => {
 mkdirSync(shotsDir, { recursive: true });
 
 const PORT = 4174;
-const SAVE_KEY = 'healgame-save-v6';
+const SAVE_KEY = 'healgame-save-v7';
 
 /** Resolve a semantic GameObject name via window.__healgame (src/debug/testHooks.ts). */
 const locate = (page, name) =>
@@ -135,10 +135,11 @@ async function seedSave(page, save) {
 
 function baseSave(overrides) {
   return {
-    version: 6,
+    version: 7,
     tutorialDone: true,
     xp: 0,
-    unlockedSpells: ['solemn-mend'],
+    unlockedSpells: ['bonk', 'solemn-mend'],
+    actionBar: ['bonk', 'solemn-mend', '', ''],
     treeRanks: {},
     subclass: null,
     clearedDungeons: [],
@@ -150,15 +151,19 @@ function baseSave(overrides) {
 }
 
 /**
- * Naive combat loop: target the tank, then every 2s press "q" (slot 0 cast) and
- * conditionally click Return when the result overlay exists (locate null
- * mid-fight). Ends when `until(save)` first holds.
+ * Naive combat loop: target the tank, then every 2s cast Solemn Mend (by
+ * semantic name so Bonk-on-Q loadouts still heal) and click Return when the
+ * result overlay exists. Ends when `until(save)` first holds.
  */
 async function playCombat(page, until, timeoutMs = 180_000) {
   await clickNamed(page, 'combatAlly:tank');
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    await page.keyboard.press('q');
+    if (await locate(page, 'combatSpell:solemn-mend')) {
+      await clickNamed(page, 'combatSpell:solemn-mend');
+    } else {
+      await page.keyboard.press('q');
+    }
     if (await locate(page, 'combatReturn')) {
       await clickNamed(page, 'combatReturn');
     }
@@ -191,9 +196,12 @@ try {
   await clickNamed(page, 'tutorialLearn');
   await page.waitForTimeout(800);
   let save = await readSave(page);
-  check(save?.version === 6, 'new saves are written as v6');
+  check(save?.version === 7, 'new saves are written as v7');
   check(save?.tutorialDone === true, 'tutorial click sets tutorialDone');
   check(save?.unlockedSpells.includes('solemn-mend') === true, 'Solemn Mend unlocked via tutorial');
+  check(save?.unlockedSpells.includes('bonk') === true, 'Bonk is unlocked from the start');
+  check(save?.actionBar?.[0] === 'bonk', 'Bonk sits on Q by default');
+  check(save?.actionBar?.[1] === 'solemn-mend', 'Solemn Mend sits on W after tutorial');
   check(save?.relicIds.length === 0 && save?.pendingRelicOffers.length === 0, 'fresh save has no relic pick pending');
   await page.waitForTimeout(3500); // let autos land so lunge/'*' feedback is in frame
   await shot(page, 'ash-gate-first-run-feedback');
@@ -429,7 +437,8 @@ try {
     page,
     baseSave({
       xp: 150,
-      unlockedSpells: ['solemn-mend', 'zealous-mending'],
+      unlockedSpells: ['bonk', 'solemn-mend', 'zealous-mending'],
+      actionBar: ['bonk', 'solemn-mend', 'solemn-vigil', ''],
       subclass: 'vigil',
       treeRanks: {
         'deep-reserves': 2,

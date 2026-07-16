@@ -15,7 +15,8 @@ import { IRON_PASS, THE_MAW } from '../data/encounters';
 import type { CombatResult } from '../scenes/CombatScene';
 
 function save(overrides: Partial<SaveData> = {}): SaveData {
-  return { ...newSaveData(), ...overrides };
+  // Empty actionBar → loadoutFromSave keeps all owned spells (bar not under test).
+  return { ...newSaveData(), actionBar: ['', '', '', ''], ...overrides };
 }
 
 function result(overrides: Partial<CombatResult> = {}): CombatResult {
