@@ -4,7 +4,7 @@ export const GATE_WARDEN_MOB = {
   id: 'gate-warden',
   name: 'Gate Warden',
   tags: ['boss'],
-  hp: 145,
+  hp: 195,
   autoDamage: 4,
   swingIntervalMs: 3_500,
   abilityIds: ['bonehowl'],

@@ -281,7 +281,7 @@ describe('resolveCombatMods', () => {
     expect(mend?.heal).toBe(SPELLS.solemnMend.heal); // unchanged
   });
 
-  it('ampOwnedSpells adds healDelta to owned vowstrike spells', () => {
+  it('ampOwnedSpells adds damageDelta to owned vowstrike spells', () => {
     const mods = resolveCombatMods(
       [
         {
@@ -295,15 +295,15 @@ describe('resolveCombatMods', () => {
           effect: {
             kind: 'ampOwnedSpells',
             spellIds: [SPELLS.vowstrikeVirtue.id, SPELLS.vowstrikeVengeance.id],
-            healDelta: 1,
+            damageDelta: 1,
           },
         },
       ],
       [],
     );
     const virtue = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVirtue.id);
-    expect(virtue?.heal).toBe(SPELLS.vowstrikeVirtue.heal + 1);
-    expect(SPELLS.vowstrikeVirtue.heal).toBe(3); // catalog untouched
+    expect(virtue?.damage).toBe((SPELLS.vowstrikeVirtue.damage ?? 0) + 1);
+    expect(SPELLS.vowstrikeVirtue.damage).toBe(5); // catalog untouched
   });
 
   it('ampOwnedSpells skips spells not in the loadout', () => {
@@ -315,7 +315,7 @@ describe('resolveCombatMods', () => {
           effect: {
             kind: 'ampOwnedSpells',
             spellIds: [SPELLS.vowstrikeVirtue.id, SPELLS.vowstrikeVengeance.id],
-            healDelta: 1,
+            damageDelta: 1,
           },
         },
       ],
@@ -770,7 +770,7 @@ describe('shared crown (Alpha 0.2)', () => {
     expect(mods.cooldowns).toContainEqual(WRATH_ASCENDANT);
   });
 
-  it('vowbound-crown adds +1 heal to owned Vowstrike via ampOwnedSpells', () => {
+  it('vowbound-crown adds +1 damage to owned Vowstrike via ampOwnedSpells', () => {
     const state = treeStateFromLegacy(
       {
         'deep-reserves': 1,
@@ -784,7 +784,7 @@ describe('shared crown (Alpha 0.2)', () => {
     );
     const mods = combatModsFromTree(state, ['solemn-mend']);
     const virtue = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVirtue.id);
-    expect(virtue?.heal).toBe(SPELLS.vowstrikeVirtue.heal + 1);
+    expect(virtue?.damage).toBe((SPELLS.vowstrikeVirtue.damage ?? 0) + 1);
     // Vengeance not owned — not affected
     expect(mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVengeance.id)).toBeUndefined();
   });
@@ -798,7 +798,7 @@ describe('shared crown (Alpha 0.2)', () => {
           effect: {
             kind: 'ampOwnedSpells',
             spellIds: [SPELLS.vowstrikeVirtue.id, SPELLS.vowstrikeVengeance.id],
-            healDelta: 1,
+            damageDelta: 1,
           },
         },
       ],
@@ -833,20 +833,17 @@ describe('oath × vowstrike twists (Alpha 0.2 §D5)', () => {
     const mods = makeBaseMods('vigil', 'virtue');
     const virtue = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVirtue.id);
     expect(virtue?.mana).toBe(SPELLS.vowstrikeVirtue.mana - 1);
-    expect(virtue?.heal).toBe(SPELLS.vowstrikeVirtue.heal); // heal unchanged
-    expect(SPELLS.vowstrikeVirtue.mana).toBe(2); // catalog untouched
+    expect(virtue?.damage).toBe(SPELLS.vowstrikeVirtue.damage);
+    expect(SPELLS.vowstrikeVirtue.mana).toBe(3); // catalog untouched
   });
 
-  it('Vigil × Vengeance: missingHealthBonus added for vowstrike-vengeance', () => {
+  it('Vigil × Vengeance: vowstrike-vengeance damage +1 and potency +15', () => {
     const mods = makeBaseMods('vigil', 'vengeance');
-    expect(mods.missingHealthBonuses).toContainEqual({
-      spellId: SPELLS.vowstrikeVengeance.id,
-      healPer10PctMissing: 1,
-    });
-    // Mana and heal unchanged
     const vengeance = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVengeance.id);
+    expect(vengeance?.damage).toBe((SPELLS.vowstrikeVengeance.damage ?? 0) + 1);
     expect(vengeance?.mana).toBe(SPELLS.vowstrikeVengeance.mana);
-    expect(vengeance?.heal).toBe(SPELLS.vowstrikeVengeance.heal);
+    expect(vengeance?.castBuff).toEqual({ kind: 'nextHealPotencyPct', pct: 40 });
+    expect(mods.missingHealthBonuses).toEqual([]);
   });
 
   it('Zealot × Virtue: synergy trigger vowstrike-virtue → buff zealous-mending added', () => {
@@ -856,17 +853,16 @@ describe('oath × vowstrike twists (Alpha 0.2 §D5)', () => {
       buffedSpellId: SPELLS.zealousMending.id,
       bonusHeal: 1,
     });
-    // Mana and heal unchanged
     const virtue = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVirtue.id);
     expect(virtue?.mana).toBe(SPELLS.vowstrikeVirtue.mana);
   });
 
-  it('Zealot × Vengeance: vowstrike-vengeance heal +1', () => {
+  it('Zealot × Vengeance: vowstrike-vengeance damage +1', () => {
     const mods = makeBaseMods('zealot', 'vengeance');
     const vengeance = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVengeance.id);
-    expect(vengeance?.heal).toBe(SPELLS.vowstrikeVengeance.heal + 1);
-    expect(vengeance?.mana).toBe(SPELLS.vowstrikeVengeance.mana); // mana unchanged
-    expect(SPELLS.vowstrikeVengeance.heal).toBe(2); // catalog untouched
+    expect(vengeance?.damage).toBe((SPELLS.vowstrikeVengeance.damage ?? 0) + 1);
+    expect(vengeance?.mana).toBe(SPELLS.vowstrikeVengeance.mana);
+    expect(SPELLS.vowstrikeVengeance.damage).toBe(5); // catalog untouched
   });
 
   it('no twist when aspect is absent', () => {
@@ -896,15 +892,15 @@ describe('oath × vowstrike twists (Alpha 0.2 §D5)', () => {
     expect(virtue?.mana).toBe(SPELLS.vowstrikeVirtue.mana); // unchanged
   });
 
-  it('Vigil × Vengeance merges with an existing missingHealthBonus for the same spell', () => {
+  it('Vigil × Vengeance stacks damageDelta from ampOwnedSpells and the oath twist', () => {
     const contents: SpellTreeContent[] = [
       {
-        name: 'Some node',
+        name: 'Vowbound Crown',
         description: '',
         effect: {
-          kind: 'missingHealthBonus',
-          spellId: SPELLS.vowstrikeVengeance.id,
-          healPer10PctMissing: 2,
+          kind: 'ampOwnedSpells',
+          spellIds: [SPELLS.vowstrikeVengeance.id],
+          damageDelta: 1,
         },
       },
       {
@@ -920,10 +916,8 @@ describe('oath × vowstrike twists (Alpha 0.2 §D5)', () => {
       },
     ];
     const mods = resolveCombatMods(contents, []);
-    const bonus = mods.missingHealthBonuses.find(
-      (m) => m.spellId === SPELLS.vowstrikeVengeance.id,
-    );
-    expect(bonus?.healPer10PctMissing).toBe(3); // 2 from node + 1 from twist
+    const vengeance = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVengeance.id);
+    expect(vengeance?.damage).toBe((SPELLS.vowstrikeVengeance.damage ?? 0) + 2);
   });
 
   it('full Vigil + Virtue round-trip via combatModsFromTree', () => {

@@ -1,7 +1,7 @@
 /**
- * Action-bar editor: four QWER slots. Click a slot → pick an owned spell.
- * Duplicates allowed (keeps the picker trivial). Empty slots stay vacant.
- * Temp art only — rects + monospace, Hub palette.
+ * Spellbook: four QWER slots with Shift+QWER finger hints above each.
+ * Click a slot → pick an owned spell. Duplicates allowed (keeps the picker
+ * trivial). Empty slots stay vacant. Temp art only — Hub palette.
  */
 
 import Phaser from 'phaser';
@@ -9,7 +9,7 @@ import { SceneKeys } from './keys';
 import { loadSave, saveGame, emptyActionBar } from '../save/save';
 import { ownedSpellsFromSave } from '../data/spellTree';
 import { ACTION_BAR_SLOTS } from '../data/constants';
-import { actionHotkeyLabel } from '../ui/actionHotkeys';
+import { ACTION_HOTKEY_LETTERS, actionHotkeyLabel } from '../ui/actionHotkeys';
 import { glyphChar } from '../ui/glyph';
 import type { SpellDef } from '../combat/types';
 
@@ -24,7 +24,7 @@ const DIM_COLOR = '#a89888';
 const FONT = 'monospace';
 
 const SLOT_W = 110;
-const SLOT_H = 72;
+const SLOT_H = 88;
 const SLOT_GAP = 16;
 const PICK_W = 220;
 const PICK_H = 36;
@@ -53,10 +53,10 @@ export class LoadoutScene extends Phaser.Scene {
       save.actionBar.length === ACTION_BAR_SLOTS ? [...save.actionBar] : emptyActionBar();
 
     this.add
-      .text(width / 2, 40, 'Loadout', { fontFamily: FONT, fontSize: '28px', color: TEXT_COLOR })
+      .text(width / 2, 40, 'Spellbook', { fontFamily: FONT, fontSize: '28px', color: TEXT_COLOR })
       .setOrigin(0.5);
     this.add
-      .text(width / 2, 72, 'Click a QWER slot, then pick a spell. Duplicates OK.', {
+      .text(width / 2, 72, 'Click a slot, then pick a spell. Shift row = same finger (major CDs).', {
         fontFamily: FONT,
         fontSize: '14px',
         color: DIM_COLOR,
@@ -65,7 +65,7 @@ export class LoadoutScene extends Phaser.Scene {
 
     const totalW = ACTION_BAR_SLOTS * SLOT_W + (ACTION_BAR_SLOTS - 1) * SLOT_GAP;
     const startX = width / 2 - totalW / 2 + SLOT_W / 2;
-    const slotY = 160;
+    const slotY = 168;
 
     for (let i = 0; i < ACTION_BAR_SLOTS; i++) {
       const x = startX + i * (SLOT_W + SLOT_GAP);
@@ -77,24 +77,32 @@ export class LoadoutScene extends Phaser.Scene {
         .setStrokeStyle(selected ? 3 : 2, selected ? ACCENT_BORDER : BORDER_COLOR)
         .setInteractive({ useHandCursor: true })
         .setName(`loadoutSlot:${i}`);
-      const key = actionHotkeyLabel(i) ?? '?';
+      const letter = ACTION_HOTKEY_LETTERS[i] ?? '?';
+      const shiftLabel = actionHotkeyLabel(ACTION_HOTKEY_LETTERS.length + i) ?? `s${letter}`;
       this.add
-        .text(x - SLOT_W / 2 + 10, slotY - SLOT_H / 2 + 8, key, {
+        .text(x, slotY - SLOT_H / 2 + 14, shiftLabel, {
           fontFamily: FONT,
           fontSize: '12px',
+          color: DIM_COLOR,
+        })
+        .setOrigin(0.5);
+      this.add
+        .text(x, slotY - SLOT_H / 2 + 30, letter, {
+          fontFamily: FONT,
+          fontSize: '14px',
           color: ACCENT_COLOR,
         })
-        .setOrigin(0, 0);
+        .setOrigin(0.5);
       this.add
-        .text(x, slotY + 4, spell ? glyphChar(spell) : '·', {
+        .text(x, slotY + 8, spell ? glyphChar(spell) : '·', {
           fontFamily: FONT,
-          fontSize: '28px',
+          fontSize: '26px',
           fontStyle: 'bold',
           color: spell ? TEXT_COLOR : DIM_COLOR,
         })
         .setOrigin(0.5);
       this.add
-        .text(x, slotY + 26, spell?.name ?? '(empty)', {
+        .text(x, slotY + 30, spell?.name ?? '(empty)', {
           fontFamily: FONT,
           fontSize: '11px',
           color: DIM_COLOR,
@@ -117,8 +125,9 @@ export class LoadoutScene extends Phaser.Scene {
 
   private buildPicker(owned: SpellDef[], slotIndex: number): void {
     const { width } = this.scale;
+    const letter = ACTION_HOTKEY_LETTERS[slotIndex] ?? '?';
     this.add
-      .text(width / 2, 230, `Assign slot ${actionHotkeyLabel(slotIndex)}`, {
+      .text(width / 2, 240, `Assign ${letter} (Shift+${letter} is the CD finger)`, {
         fontFamily: FONT,
         fontSize: '16px',
         color: ACCENT_COLOR,
@@ -133,7 +142,7 @@ export class LoadoutScene extends Phaser.Scene {
     const cols = 2;
     const gridW = cols * PICK_W + (cols - 1) * PICK_GAP;
     const startX = width / 2 - gridW / 2 + PICK_W / 2;
-    const startY = 270;
+    const startY = 280;
 
     choices.forEach((choice, i) => {
       const col = i % cols;

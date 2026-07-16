@@ -16,8 +16,8 @@ export const VERDANT_RIFT_DUNGEON = {
   waves: [
     { enemies: [{ mobId: 'thorn-husk', count: 2 }] },
     { enemies: [{ mobId: 'thorn-husk', count: 3 }] },
-    { enemies: [{ mobId: 'thorn-husk', count: 3, statOverrides: { hp: 12 } }] },
-    { enemies: [{ mobId: 'thorn-husk', count: 4, statOverrides: { hp: 12 } }] },
+    { enemies: [{ mobId: 'thorn-husk', count: 3, statOverrides: { hp: 14 } }] },
+    { enemies: [{ mobId: 'thorn-husk', count: 4, statOverrides: { hp: 14 } }] },
     { enemies: [{ mobId: 'thorn-matriarch', count: 1 }] },
   ],
 } as const satisfies DungeonDef;

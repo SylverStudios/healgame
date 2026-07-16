@@ -12,8 +12,8 @@ export const IRON_PASS_DUNGEON = {
   waves: [
     { enemies: [{ mobId: 'iron-husk', count: 2 }] },
     { enemies: [{ mobId: 'iron-husk', count: 3 }] },
-    { enemies: [{ mobId: 'iron-husk', count: 3, statOverrides: { hp: 10 } }] },
-    { enemies: [{ mobId: 'iron-husk', count: 4, statOverrides: { hp: 10 } }] },
+    { enemies: [{ mobId: 'iron-husk', count: 3, statOverrides: { hp: 14 } }] },
+    { enemies: [{ mobId: 'iron-husk', count: 4, statOverrides: { hp: 14 } }] },
     { enemies: [{ mobId: 'spire-lancer', count: 1 }] },
   ],
 } as const satisfies DungeonDef;

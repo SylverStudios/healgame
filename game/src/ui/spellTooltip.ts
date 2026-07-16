@@ -47,6 +47,23 @@ export function buildTooltipLines(spell: SpellDef, loadout: CombatMods): Tooltip
       color: DEFAULT_LINE_COLOR,
     },
   );
+  if ((spell.cooldownMs ?? 0) > 0) {
+    lines.push({
+      text: `Cooldown: ${(spell.cooldownMs! / 1000).toFixed(0)}s`,
+      color: DEFAULT_LINE_COLOR,
+    });
+  }
+  if (spell.castBuff?.kind === 'nextSpellManaReduction') {
+    lines.push({
+      text: `Next spell costs ${spell.castBuff.amount} less mana`,
+      color: SYNERGY_LINE_COLOR,
+    });
+  } else if (spell.castBuff?.kind === 'nextHealPotencyPct') {
+    lines.push({
+      text: `Next heal +${spell.castBuff.pct}% potency`,
+      color: SYNERGY_LINE_COLOR,
+    });
+  }
 
   for (const synergy of loadout.synergies) {
     if (synergy.buffedSpellId === spell.id) {

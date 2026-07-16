@@ -1,6 +1,6 @@
 # Skill tree — agent notes
 
-Status: current · Authority: skill-tree service + live SPELL_TREE wiring · Last verified: 2026-07-15 (chunk 4)
+Status: current · Authority: skill-tree service + live SPELL_TREE wiring · Last verified: 2026-07-15
 
 Config-driven tree service (`game/src/tree/`) plus the live spell-tree data and
 combat resolve (`game/src/data/spellTree.ts`). Phaser stays out of this folder.
@@ -92,7 +92,7 @@ Legacy saves that held these nodes simply drop them on load (unknown ids not emi
 | Kind | Shape | Resolved in |
 |------|-------|-------------|
 | `castMod` (extended) | `healDelta?: number` optional field | `resolveCombatMods` bakes `spell.heal += healDelta ?? 0` after `castMs`/`mana` |
-| `ampOwnedSpells` | `{ spellIds: string[]; healDelta: number }` | After castMod baking: for each id already in the loadout, adds `healDelta` to spell.heal (clamp ≥ 0) |
+| `ampOwnedSpells` | `{ spellIds: string[]; healDelta?: number; damageDelta?: number }` | After castMod baking: for each id already in the loadout, adds deltas to spell.heal / spell.damage (clamp ≥ 0) |
 
 `SpellTreeContent` gains optional `glyph?: string` (single char for tree node display, §D8).
 
@@ -122,9 +122,9 @@ detects aspect via owned spell ids in mods, then applies:
 | Oath × Aspect      | Twist applied to mods                              |
 |--------------------|----------------------------------------------------|
 | Vigil × Virtue     | vowstrike-virtue `mana −1`                         |
-| Vigil × Vengeance  | `missingHealthBonus` healPer10PctMissing +1        |
+| Vigil × Vengeance  | vowstrike-vengeance `damage +1`, next-heal potency `+15`  |
 | Zealot × Virtue    | `synergy` trigger vowstrike-virtue→zealous-mending +1 |
-| Zealot × Vengeance | vowstrike-vengeance `heal +1`                      |
+| Zealot × Vengeance | vowstrike-vengeance `damage +1`                            |
 
 ## Tree layer 2 (Alpha 0.1 §D5, trimmed in Alpha 0.2)
 

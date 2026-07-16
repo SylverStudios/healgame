@@ -19,6 +19,16 @@ export interface Unit {
   alive: boolean;
 }
 
+/**
+ * Self-buff granted when a spell finishes (Vowstrike). Consumed by the next
+ * qualifying player cast — integers only.
+ */
+export type SpellCastBuff =
+  /** Next spell reserves `max(0, mana - amount)`. */
+  | { kind: 'nextSpellManaReduction'; amount: number }
+  /** Next heal's raw value gains `ceil(base * pct / 100)` before clamps. */
+  | { kind: 'nextHealPotencyPct'; pct: number };
+
 export interface SpellDef {
   id: string;
   name: string;
@@ -27,9 +37,14 @@ export interface SpellDef {
   castMs: number;
   /**
    * Optional player damage. When `damage > 0`, the cast auto-targets the
-   * front living enemy (no ally click) and skips the heal pipeline.
+   * front living enemy (no ally click) and skips the heal pipeline (unless
+   * heal > 0 as well — not used today).
    */
   damage?: number;
+  /** Personal reuse timer after a successful cast start (sim ms). */
+  cooldownMs?: number;
+  /** Buff applied to the healer when this cast completes. */
+  castBuff?: SpellCastBuff;
   /** Alpha 0.2 §D8 — placeholder glyph key/character for tree + spell bar. */
   glyph?: string;
 }
@@ -216,6 +231,12 @@ export interface CombatState {
   armedBuffedSpellIds: string[];
   /** Alpha 0.1 §D6: live cooldown state, same order as the constructor's `cooldowns` option; empty when none. */
   cooldowns: CooldownState[];
+  /** Personal spell reuse timers (Vowstrike etc.), keyed by spell id. */
+  spellCooldowns: Array<{ spellId: string; remainingMs: number }>;
+  /** Pending Absolution-style discount for the next cast start. */
+  nextSpellManaReduction: number;
+  /** Pending Reckoning-style potency for the next heal completion. */
+  nextHealPotencyPct: number;
 }
 
 /**

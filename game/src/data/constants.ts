@@ -59,13 +59,39 @@ export const SPELLS = {
   solemnVigil: { id: 'solemn-vigil', name: 'Solemn Vigil', heal: 6, mana: 5, castMs: 3000, glyph: 'G' },
   /** Zealot subclass spell (phase-2-handoff): fast, pricey per point. Granted by the zealot-oath tree node. */
   zealousFlare: { id: 'zealous-flare', name: 'Zealous Flare', heal: 2, mana: 2, castMs: 500, glyph: 'F' },
-  /** Alpha 0.2 §D4 — Virtue/light Vowstrike. True instant; granted by vowstrike-virtue tree node. */
-  vowstrikeVirtue: { id: 'vowstrike-virtue', name: 'Vowstrike: Absolution', heal: 3, mana: 2, castMs: 0, glyph: 'V' },
-  /** Alpha 0.2 §D4 — Vengeance/dark Vowstrike. True instant; granted by vowstrike-vengeance tree node. */
-  vowstrikeVengeance: { id: 'vowstrike-vengeance', name: 'Vowstrike: Reckoning', heal: 2, mana: 2, castMs: 0, glyph: 'X' },
+  /**
+   * Virtue/light Vowstrike: strike the front enemy, then discount the next spell's
+   * mana. Personal CD keeps it from being a filler spam button.
+   */
+  vowstrikeVirtue: {
+    id: 'vowstrike-virtue',
+    name: 'Vowstrike: Absolution',
+    heal: 0,
+    damage: 5,
+    mana: 3,
+    castMs: 0,
+    cooldownMs: 10_000,
+    castBuff: { kind: 'nextSpellManaReduction', amount: 2 },
+    glyph: 'V',
+  },
+  /**
+   * Vengeance/dark Vowstrike: strike the front enemy, then empower the next heal
+   * (+25% of base heal, rounded up).
+   */
+  vowstrikeVengeance: {
+    id: 'vowstrike-vengeance',
+    name: 'Vowstrike: Reckoning',
+    heal: 0,
+    damage: 5,
+    mana: 3,
+    castMs: 0,
+    cooldownMs: 10_000,
+    castBuff: { kind: 'nextHealPotencyPct', pct: 25 },
+    glyph: 'X',
+  },
 } as const;
 
-/** QWER action-bar length (Shift+QWER still maps CD slots after spells). */
+/** QWER spell slots; Shift+QWER is reserved for major CD finger columns. */
 export const ACTION_BAR_SLOTS = 4;
 
 export const REWARDS = {

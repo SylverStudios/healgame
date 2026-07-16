@@ -49,11 +49,11 @@ export type SpellTreeEffect =
   | { kind: 'combatPace'; multiplierTenths: number }
   | { kind: 'grantCooldown'; cooldownId: string }
   /**
-   * Alpha 0.2 §D6 crown amp: after spells are baked, add `healDelta` to every
-   * outgoing spell whose id appears in `spellIds` (only spells already owned
-   * are affected; unknown ids are skipped). Clamp heal ≥ 0.
+   * Alpha 0.2 §D6 crown amp: after spells are baked, add `healDelta` and/or
+   * `damageDelta` to every outgoing spell whose id appears in `spellIds`
+   * (only spells already owned are affected; unknown ids are skipped).
    */
-  | { kind: 'ampOwnedSpells'; spellIds: string[]; healDelta: number };
+  | { kind: 'ampOwnedSpells'; spellIds: string[]; healDelta?: number; damageDelta?: number };
 
 /** Opaque-to-tree payload: display + effect (+ optional subclass tag for oaths). */
 export interface SpellTreeContent {
@@ -447,8 +447,10 @@ const vowstrikeVirtueNode: NodeDef = {
   content: content({
     name: SPELLS.vowstrikeVirtue.name,
     description:
-      `Gain ${SPELLS.vowstrikeVirtue.name}: instant direct heal ` +
-      `(${SPELLS.vowstrikeVirtue.heal} heal, ${SPELLS.vowstrikeVirtue.mana} mana, 0s cast). ` +
+      `Gain ${SPELLS.vowstrikeVirtue.name}: strike the front enemy for ` +
+      `${SPELLS.vowstrikeVirtue.damage} damage, then your next spell costs ` +
+      `${SPELLS.vowstrikeVirtue.castBuff.amount} less mana ` +
+      `(${SPELLS.vowstrikeVirtue.mana} mana, instant, 10s CD). ` +
       `Locks Vowstrike: Reckoning.`,
     glyph: 'V',
     effect: { kind: 'grantSpell', spellId: SPELLS.vowstrikeVirtue.id },
@@ -463,8 +465,10 @@ const vowstrikeVengeanceNode: NodeDef = {
   content: content({
     name: SPELLS.vowstrikeVengeance.name,
     description:
-      `Gain ${SPELLS.vowstrikeVengeance.name}: instant direct heal, stronger when target is hurt ` +
-      `(${SPELLS.vowstrikeVengeance.heal} heal, ${SPELLS.vowstrikeVengeance.mana} mana, 0s cast). ` +
+      `Gain ${SPELLS.vowstrikeVengeance.name}: strike the front enemy for ` +
+      `${SPELLS.vowstrikeVengeance.damage} damage, then your next heal gains ` +
+      `+${SPELLS.vowstrikeVengeance.castBuff.pct}% potency ` +
+      `(${SPELLS.vowstrikeVengeance.mana} mana, instant, 10s CD). ` +
       `Locks Vowstrike: Absolution.`,
     glyph: 'X',
     effect: { kind: 'grantSpell', spellId: SPELLS.vowstrikeVengeance.id },
@@ -498,12 +502,12 @@ const vowboundCrownNode: NodeDef = {
   cost: { currency: 'talent', amount: 1 },
   content: content({
     name: 'Vowbound Crown',
-    description: 'Your Vowstrike heals for 1 more.',
+    description: 'Your Vowstrike deals 1 more damage.',
     glyph: 'C',
     effect: {
       kind: 'ampOwnedSpells',
       spellIds: [SPELLS.vowstrikeVirtue.id, SPELLS.vowstrikeVengeance.id],
-      healDelta: 1,
+      damageDelta: 1,
     },
   }),
 };
@@ -575,10 +579,10 @@ if (configError) {
  *
  * | Oath × Aspect      | Twist                                                     |
  * |--------------------|-----------------------------------------------------------|
- * | Vigil × Virtue     | vowstrike-virtue manaDelta −1                             |
- * | Vigil × Vengeance  | missingHealthBonus vowstrike-vengeance healPer10PctMissing +1 |
+ * | Vigil × Virtue     | vowstrike-virtue mana −1                                  |
+ * | Vigil × Vengeance  | vowstrike-vengeance damage +1, next-heal potency +15      |
  * | Zealot × Virtue    | synergy: trigger vowstrike-virtue → buff zealous-mending +1 |
- * | Zealot × Vengeance | vowstrike-vengeance healDelta +1                          |
+ * | Zealot × Vengeance | vowstrike-vengeance damage +1                             |
  */
 export function applyOathVowstrikeTwists(
   mods: CombatMods,
@@ -606,16 +610,14 @@ export function applyOathVowstrikeTwists(
     const spell = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVirtue.id);
     if (spell) spell.mana = Math.max(0, spell.mana - 1);
   } else if (oath === 'vigil' && aspect === 'vengeance') {
-    const existing = mods.missingHealthBonuses.find(
-      (m) => m.spellId === SPELLS.vowstrikeVengeance.id,
-    );
-    if (existing) {
-      existing.healPer10PctMissing += 1;
-    } else {
-      mods.missingHealthBonuses.push({
-        spellId: SPELLS.vowstrikeVengeance.id,
-        healPer10PctMissing: 1,
-      });
+    const spell = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVengeance.id);
+    if (spell) {
+      spell.damage = Math.max(0, (spell.damage ?? 0) + 1);
+      // Compensate for losing the old instant-heal Vowstrike on this path:
+      // stronger next-heal potency so Vigil×Reckoning stays crown-viable.
+      if (spell.castBuff?.kind === 'nextHealPotencyPct') {
+        spell.castBuff = { kind: 'nextHealPotencyPct', pct: spell.castBuff.pct + 15 };
+      }
     }
   } else if (oath === 'zealot' && aspect === 'virtue') {
     const existing = mods.synergies.find(
@@ -634,7 +636,7 @@ export function applyOathVowstrikeTwists(
     }
   } else if (oath === 'zealot' && aspect === 'vengeance') {
     const spell = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVengeance.id);
-    if (spell) spell.heal = Math.max(0, spell.heal + 1);
+    if (spell) spell.damage = Math.max(0, (spell.damage ?? 0) + 1);
   }
 }
 
@@ -756,7 +758,9 @@ export function resolveCombatMods(
   for (const amp of ampSpells) {
     for (const id of amp.spellIds) {
       const spell = spells.find((sp) => sp.id === id);
-      if (spell) spell.heal = Math.max(0, spell.heal + amp.healDelta);
+      if (!spell) continue;
+      if (amp.healDelta) spell.heal = Math.max(0, spell.heal + amp.healDelta);
+      if (amp.damageDelta) spell.damage = Math.max(0, (spell.damage ?? 0) + amp.damageDelta);
     }
   }
 

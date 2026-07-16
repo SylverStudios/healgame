@@ -4,7 +4,7 @@ export const CHOIR_SHADE = {
   id: 'choir-shade',
   name: 'Choir Shade',
   tags: ['trash'],
-  hp: 11,
+  hp: 15,
   autoDamage: 2,
   swingIntervalMs: 2_800,
   abilityIds: [],

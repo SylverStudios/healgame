@@ -4,7 +4,7 @@ export const THORN_HUSK = {
   id: 'thorn-husk',
   name: 'Thorn Husk',
   tags: ['trash'],
-  hp: 11,
+  hp: 15,
   autoDamage: 2,
   swingIntervalMs: 2_900,
   abilityIds: [],

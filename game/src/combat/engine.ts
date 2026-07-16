@@ -114,6 +114,12 @@ export class CombatEngine {
   private queuedCast: { spellId: string; targetId: string } | null = null;
   private gcdRemainingMs = 0;
   private targetId: string | null = null;
+  /** Personal spell reuse timers (Vowstrike). */
+  private readonly spellCooldownRemaining = new Map<string, number>();
+  /** Absolution buff: flat mana discount consumed at the next cast start. */
+  private nextSpellManaReduction = 0;
+  /** Reckoning buff: % of base heal added on the next heal completion. */
+  private nextHealPotencyPct = 0;
 
   private bossCastState: BossCastState | null = null;
   /** Countdown to the next boss cast start; null while a party-AoE cast is active or the boss has no cast. */
@@ -269,6 +275,7 @@ export class CombatEngine {
     if (this.status !== 'running') return;
     const spell = this.spellById(spellId);
     if (!spell) return;
+    if ((this.spellCooldownRemaining.get(spellId) ?? 0) > 0) return;
     const targetId = this.resolveCastTargetId(spell);
     if (!targetId) return;
 
@@ -287,7 +294,8 @@ export class CombatEngine {
       // free heal — skip mana gate
     } else {
       const healer = this.getUnit('healer')!;
-      if (healer.mana < this.effectiveManaCost(spell)) return;
+      const cost = Math.max(0, this.effectiveManaCost(spell) - this.nextSpellManaReduction);
+      if (healer.mana < cost) return;
     }
     const out: CombatEvent[] = [];
     this.beginCast(spellId, targetId, out);
@@ -366,6 +374,11 @@ export class CombatEngine {
             cd.def.effect.kind === 'freeNextHeal' ? (cd.armed ? 1 : 0) : Math.max(0, cd.buffRemainingMs),
         }),
       ),
+      spellCooldowns: [...this.spellCooldownRemaining.entries()]
+        .filter(([, ms]) => ms > 0)
+        .map(([spellId, remainingMs]) => ({ spellId, remainingMs: Math.max(0, remainingMs) })),
+      nextSpellManaReduction: this.nextSpellManaReduction,
+      nextHealPotencyPct: this.nextHealPotencyPct,
     };
   }
 
@@ -397,6 +410,9 @@ export class CombatEngine {
       if (cd.buffRemainingMs > 0) min = Math.min(min, cd.buffRemainingMs);
     }
     if (this.relicRegenRemainingMs !== null) min = Math.min(min, this.relicRegenRemainingMs);
+    for (const remaining of this.spellCooldownRemaining.values()) {
+      if (remaining > 0) min = Math.min(min, remaining);
+    }
     return min;
   }
 
@@ -416,6 +432,13 @@ export class CombatEngine {
       this.partyDoTState.tickRemainingMs -= step;
     }
     if (this.relicRegenRemainingMs !== null) this.relicRegenRemainingMs -= step;
+    for (const [id, remaining] of this.spellCooldownRemaining) {
+      if (remaining > 0) {
+        const next = remaining - step;
+        if (next <= 0) this.spellCooldownRemaining.delete(id);
+        else this.spellCooldownRemaining.set(id, next);
+      }
+    }
     // Cooldown timers (Alpha 0.1 §D6): plain cooldown countdown (no event on reaching
     // ready — the UI reads remainingCooldownMs === 0 off state) and manaCostReduction
     // buff windows, which emit cooldownBuffEnded exactly once on expiry (below). The
@@ -524,11 +547,19 @@ export class CombatEngine {
       freeHealCd.armed = false;
     } else {
       reservedMana = this.effectiveManaCost(spell);
+      // Absolution buff: flat discount stacked on top of liturgy, then consumed.
+      if (this.nextSpellManaReduction > 0) {
+        reservedMana = Math.max(0, reservedMana - this.nextSpellManaReduction);
+        this.nextSpellManaReduction = 0;
+      }
     }
     healer.mana = Math.max(0, healer.mana - reservedMana);
     this.playerCast = { spellId, targetId, remainingMs: spell.castMs, totalMs: spell.castMs };
     this.playerCastReservedMana = reservedMana;
     this.gcdRemainingMs = GCD_MS;
+    if ((spell.cooldownMs ?? 0) > 0) {
+      this.spellCooldownRemaining.set(spellId, spell.cooldownMs!);
+    }
     out.push({ type: 'castStarted', cast: { ...this.playerCast } });
     if (freeHealCd) out.push({ type: 'cooldownBuffEnded', id: freeHealCd.def.id });
     // Alpha 0.2 §D4: castMs === 0 is a true instant — heal resolves in this same
@@ -562,12 +593,17 @@ export class CombatEngine {
 
     const target = this.getUnit(cast.targetId);
 
-    // Damage spells (Bonk): hit the locked enemy target; no heal / synergy pipeline.
+    // Damage spells (Bonk / Vowstrike): hit the locked enemy target; then apply
+    // castBuff / synergy arming. Heal pipeline is skipped when heal === 0.
     if ((spell.damage ?? 0) > 0) {
       if (target && target.alive) {
         this.applyDamageToUnit(target, spell.damage!, 'healer', events);
       }
-      return;
+      this.applySpellCastBuff(spell);
+      for (const syn of this.synergies) {
+        if (syn.triggerSpellId === spell.id) syn.armed = true;
+      }
+      if (spell.heal <= 0) return;
     }
 
     // Phase 3 (handoff §D): a cast whose target dies mid-cast is auto-cancelled
@@ -627,6 +663,12 @@ export class CombatEngine {
           healBonus += cd.def.effect.bonusHeal;
         }
       }
+      // Reckoning: +ceil(baseHeal * pct / 100) on the next heal only.
+      let potencyBonus = 0;
+      if (this.nextHealPotencyPct > 0) {
+        potencyBonus = Math.ceil((spell.heal * this.nextHealPotencyPct) / 100);
+        this.nextHealPotencyPct = 0;
+      }
       const raw =
         spell.heal +
         synergyBonus +
@@ -634,7 +676,8 @@ export class CombatEngine {
         missingHealthPctBonus +
         fullHealthBonus +
         this.relicStats.bonusHealing +
-        healBonus;
+        healBonus +
+        potencyBonus;
       const applied = Math.min(raw, missing);
       const overheal = raw - applied;
       target.hp += applied;
@@ -649,6 +692,7 @@ export class CombatEngine {
     const spell = this.spellById(spellId);
     const target = this.getUnit(targetId);
     if (!spell || !target || !target.alive) return;
+    if ((this.spellCooldownRemaining.get(spellId) ?? 0) > 0) return;
     // A queued cast that fires while a Still Waters charge is armed counts as
     // "the first cast started" (Alpha 0.1 §D6) — same bypass as castSpell.
     // Damage spells never use the free-heal charge.
@@ -657,9 +701,20 @@ export class CombatEngine {
       // free heal — skip mana gate
     } else {
       const healer = this.getUnit('healer')!;
-      if (healer.mana < this.effectiveManaCost(spell)) return;
+      const cost = Math.max(0, this.effectiveManaCost(spell) - this.nextSpellManaReduction);
+      if (healer.mana < cost) return;
     }
     this.beginCast(spellId, targetId, events);
+  }
+
+  private applySpellCastBuff(spell: SpellDef): void {
+    const buff = spell.castBuff;
+    if (!buff) return;
+    if (buff.kind === 'nextSpellManaReduction') {
+      this.nextSpellManaReduction = Math.max(this.nextSpellManaReduction, buff.amount);
+    } else if (buff.kind === 'nextHealPotencyPct') {
+      this.nextHealPotencyPct = Math.max(this.nextHealPotencyPct, buff.pct);
+    }
   }
 
   // ---- internal: auto-attacks -----------------------------------------------------

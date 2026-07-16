@@ -464,7 +464,9 @@ try {
   await hoverNamed(page, 'combatCooldown:still-waters');
   await page.waitForTimeout(400);
   await shot(page, 'combat-still-waters-tooltip');
-  await page.keyboard.press('r');
+  await page.keyboard.down('Shift');
+  await page.keyboard.press('q');
+  await page.keyboard.up('Shift');
   await page.waitForTimeout(300);
   await shot(page, 'combat-still-waters-hotkey-armed');
   await page.mouse.move(480, 270); // off the button (viewport center; not a layout target)

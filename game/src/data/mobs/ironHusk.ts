@@ -4,7 +4,7 @@ export const IRON_HUSK = {
   id: 'iron-husk',
   name: 'Iron Husk',
   tags: ['trash'],
-  hp: 9,
+  hp: 13,
   autoDamage: 2,
   swingIntervalMs: 3_000,
   abilityIds: [],

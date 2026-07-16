@@ -21,9 +21,9 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
           {
             mobId: 'ash-husk',
             name: 'Ash Husk',
-            hp: 11,
+            hp: 15,
             count: 2,
-            autoDamage: 1,
+            autoDamage: 2,
             swingIntervalMs: 3000,
           },
         ],
@@ -33,9 +33,9 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
           {
             mobId: 'ash-husk',
             name: 'Ash Husk',
-            hp: 11,
+            hp: 15,
             count: 3,
-            autoDamage: 1,
+            autoDamage: 2,
             swingIntervalMs: 3000,
           },
         ],
@@ -44,7 +44,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
     boss: {
       id: 'gate-warden',
       name: 'Gate Warden',
-      hp: 145,
+      hp: 195,
       autoDamage: 4,
       swingIntervalMs: 3500,
       cast: {
@@ -66,7 +66,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
           {
             mobId: 'iron-husk',
             name: 'Iron Husk',
-            hp: 9,
+            hp: 13,
             count: 2,
             autoDamage: 2,
             swingIntervalMs: 3000,
@@ -78,7 +78,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
           {
             mobId: 'iron-husk',
             name: 'Iron Husk',
-            hp: 9,
+            hp: 13,
             count: 3,
             autoDamage: 2,
             swingIntervalMs: 3000,
@@ -90,7 +90,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
           {
             mobId: 'iron-husk',
             name: 'Iron Husk',
-            hp: 10,
+            hp: 14,
             count: 3,
             autoDamage: 2,
             swingIntervalMs: 3000,
@@ -102,7 +102,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
           {
             mobId: 'iron-husk',
             name: 'Iron Husk',
-            hp: 10,
+            hp: 14,
             count: 4,
             autoDamage: 2,
             swingIntervalMs: 3000,
@@ -113,7 +113,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
     boss: {
       id: 'spire-lancer',
       name: 'Spire Lancer',
-      hp: 190,
+      hp: 245,
       autoDamage: 3,
       swingIntervalMs: 3500,
       cast: {
@@ -138,9 +138,9 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
           {
             mobId: 'ash-husk',
             name: 'Ash Husk',
-            hp: 4,
+            hp: 6,
             count: 2,
-            autoDamage: 1,
+            autoDamage: 2,
             swingIntervalMs: 3000,
           },
         ],
@@ -150,7 +150,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
       id: 'hollow-king',
       name: 'Hollow King',
       hp: 9999,
-      autoDamage: 3,
+      autoDamage: 4,
       swingIntervalMs: 3500,
       cast: {
         name: 'Extinction',
@@ -226,10 +226,10 @@ describe('live dungeon content', () => {
         'Rewards: XP 1/enemy, relic offer on first clear',
         'Visual: the-maw',
         'Wave 1:',
-        '  2x Ash Husk [ash-husk] — HP 4, auto 1/3000ms, boss no, overrides hp=4',
+        '  2x Ash Husk [ash-husk] — HP 6, auto 2/3000ms, boss no, overrides hp=6',
         '    Abilities: none',
         'Wave 2 (boss):',
-        '  1x Hollow King [hollow-king] — HP 9999, auto 3/3500ms, boss yes, overrides hp=9999',
+        '  1x Hollow King [hollow-king] — HP 9999, auto 4/3500ms, boss yes, overrides hp=9999',
         '    Ability: Extinction [extinction] partyAoE — cast 10000ms, first 15000ms, interval 25000ms, party damage 10',
       ].join('\n'),
     );
