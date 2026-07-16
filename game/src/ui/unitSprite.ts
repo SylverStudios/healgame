@@ -56,9 +56,12 @@ const LUNGE_DISTANCE = 12;
 const LUNGE_OUT_MS = 90;
 const LUNGE_BACK_MS = 120;
 
-/** `-N`/`+N` floats: modest rise + fade (tuned post–Phase 3 for readability). */
-const FLOAT_RISE_DISTANCE = 20;
-const FLOAT_DURATION_MS = 550;
+/** `-N` damage floats: modest rise + fade (tuned post–Phase 3 for readability). */
+const DAMAGE_FLOAT_RISE_DISTANCE = 20;
+const DAMAGE_FLOAT_DURATION_MS = 550;
+/** `+N` heal floats linger longer so the basic heal reads as satisfying juice. */
+const HEAL_FLOAT_RISE_DISTANCE = 36;
+const HEAL_FLOAT_DURATION_MS = 980;
 const FLOAT_FONT = 'monospace';
 const FLOAT_DEPTH = 50;
 
@@ -94,7 +97,8 @@ const HALO_WIDTH = 52;
 const HALO_HEIGHT = 14;
 const HALO_DEPTH = -2;
 const DAMAGE_FLOAT_COLOR = '#e05a4e';
-const HEAL_FLOAT_COLOR = '#7ad67a';
+/** Brighter mint so heal numbers pop against the ash background. */
+const HEAL_FLOAT_COLOR = '#5dff7a';
 const FLOAT_STROKE_COLOR = '#0a0605';
 const FLOAT_STROKE_WIDTH = 3;
 
@@ -345,16 +349,34 @@ export class UnitSprite {
   /** Spawns a `-N` float at this unit's home position for a `damage` event on it. Always
    *  shown — including 0 and overkill raw amounts (handoff §A: no clamping to remaining HP). */
   spawnDamageFloat(amount: number): void {
-    this.spawnFloatText(`-${amount}`, DAMAGE_FLOAT_COLOR, floatFontPx(amount));
+    this.spawnFloatText(
+      `-${amount}`,
+      DAMAGE_FLOAT_COLOR,
+      floatFontPx(amount),
+      DAMAGE_FLOAT_RISE_DISTANCE,
+      DAMAGE_FLOAT_DURATION_MS,
+    );
   }
 
   /** Spawns a `+N` float at this unit's home position for an effective (`amount > 0`) heal. */
   spawnHealFloat(amount: number): void {
     if (amount <= 0) return;
-    this.spawnFloatText(`+${amount}`, HEAL_FLOAT_COLOR, floatFontPx(amount));
+    this.spawnFloatText(
+      `+${amount}`,
+      HEAL_FLOAT_COLOR,
+      floatFontPx(amount),
+      HEAL_FLOAT_RISE_DISTANCE,
+      HEAL_FLOAT_DURATION_MS,
+    );
   }
 
-  private spawnFloatText(text: string, color: string, fontSize: string): void {
+  private spawnFloatText(
+    text: string,
+    color: string,
+    fontSize: string,
+    riseDistance: number,
+    durationMs: number,
+  ): void {
     const obj = this.scene.add
       .text(this.homeX, this.homeY, text, { fontFamily: FLOAT_FONT, fontSize, color })
       .setStroke(FLOAT_STROKE_COLOR, FLOAT_STROKE_WIDTH)
@@ -363,9 +385,9 @@ export class UnitSprite {
     this.activeFloats.add(obj);
     this.scene.tweens.add({
       targets: obj,
-      y: this.homeY - FLOAT_RISE_DISTANCE,
+      y: this.homeY - riseDistance,
       alpha: 0,
-      duration: FLOAT_DURATION_MS,
+      duration: durationMs,
       onComplete: () => {
         this.activeFloats.delete(obj);
         obj.destroy();

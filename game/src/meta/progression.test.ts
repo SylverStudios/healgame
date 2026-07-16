@@ -4,6 +4,7 @@ import {
   applyCombatResult,
   availableTalentPoints,
   buildLoadout,
+  currentChallengeDungeon,
   isDungeonUnlocked,
   isIronPassUnlocked,
   isMawUnlocked,
@@ -327,6 +328,36 @@ describe('isDungeonUnlocked', () => {
   it('is false for an unknown dungeon id even if that id appears cleared', () => {
     expect(isDungeonUnlocked(save({ clearedDungeons: ['unknown-dungeon'] }), 'unknown-dungeon')).toBe(false);
     expect(isDungeonUnlocked(save({ clearedDungeons: ['toString'] }), 'toString')).toBe(false);
+  });
+});
+
+describe('currentChallengeDungeon', () => {
+  it('is Ash Gate on a fresh save', () => {
+    expect(currentChallengeDungeon(save())?.id).toBe('ash-gate');
+  });
+
+  it('advances to the next unlocked uncleared dungeon', () => {
+    expect(currentChallengeDungeon(save({ clearedDungeons: ['ash-gate'] }))?.id).toBe('iron-pass');
+    expect(
+      currentChallengeDungeon(save({ clearedDungeons: ['ash-gate', 'iron-pass'] }))?.id,
+    ).toBe('cinder-vault');
+  });
+
+  it('is null when the full progression is cleared', () => {
+    expect(
+      currentChallengeDungeon(
+        save({
+          clearedDungeons: [
+            'ash-gate',
+            'iron-pass',
+            'cinder-vault',
+            'verdant-rift',
+            'black-choir',
+            'the-maw',
+          ],
+        }),
+      ),
+    ).toBeNull();
   });
 });
 

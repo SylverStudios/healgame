@@ -1,6 +1,6 @@
 # Skill tree — agent notes
 
-Status: current · Authority: skill-tree service + live SPELL_TREE wiring · Last verified: 2026-07-15
+Status: current · Authority: skill-tree service + live SPELL_TREE wiring · Last verified: 2026-07-16
 
 Config-driven tree service (`game/src/tree/`) plus the live spell-tree data and
 combat resolve (`game/src/data/spellTree.ts`). Phaser stays out of this folder.
@@ -27,7 +27,7 @@ TreeConfig  +  TreeState  →  update(action)  →  new state | reject + feedbac
 | Concern | Where |
 |---|---|
 | Authoritative config | `SPELL_TREE` in `data/spellTree.ts` |
-| Tree UI | `scenes/TreeScene.ts` — `view` + `layoutSpots` + `update` |
+| Tree UI | `scenes/TreeScene.ts` — round glyph nodes (`NODE_RADIUS`), hover tooltips, `view` + `layoutSpots` + `update` |
 | Layout | `layoutSpots(treeView, { width, overrides? })` — overrides keep journey click coords |
 | Fight start | `loadoutFromSave(save)` → `CombatMods` → `CombatScene` / engine options |
 | Save shape | `treeRanks`; level-derived unplaced talent points form the tree wallet |

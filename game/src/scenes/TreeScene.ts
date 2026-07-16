@@ -48,8 +48,9 @@ const OWNED_COLOR = '#7ad67a';
 const DANGER_COLOR = '#e05a4e';
 const FONT = 'monospace';
 
-const NODE_WIDTH = 192;
-const NODE_HEIGHT = 62;
+const NODE_RADIUS = 28;
+/** Hit/tooltip extent — matches the circular node diameter. */
+const NODE_SIZE = NODE_RADIUS * 2;
 
 /**
  * Alpha 0.2 §D8 hourglass tree: rows extend to y≈960 (crown), past the
@@ -362,8 +363,7 @@ export class TreeScene extends Phaser.Scene {
     let bgColor = NODE_BG_LOCKED;
     let borderColor = BORDER_COLOR;
     let alpha = 1;
-    let nameColor = DIM_COLOR;
-    let costColor = DIM_COLOR;
+    let glyphColor = DIM_COLOR;
 
     if (spot.status === 'exclusive-locked') {
       bgColor = NODE_BG_LOCKED;
@@ -371,20 +371,19 @@ export class TreeScene extends Phaser.Scene {
     } else if (isArmed) {
       bgColor = NODE_BG_AFFORDABLE;
       borderColor = ARM_HEX;
-      nameColor = TEXT_COLOR;
-      costColor = ACCENT_COLOR;
+      glyphColor = TEXT_COLOR;
     } else if (purchasable) {
       bgColor = NODE_BG_AFFORDABLE;
       borderColor = ACCENT_HEX;
-      nameColor = TEXT_COLOR;
-      costColor = ACCENT_COLOR;
+      glyphColor = TEXT_COLOR;
     } else if (spot.status === 'complete' || (owned && spot.status !== 'locked')) {
       bgColor = NODE_BG_OWNED;
-      nameColor = OWNED_COLOR;
+      glyphColor = OWNED_COLOR;
     }
 
+    // Round node — glyph is the icon; name / cost / description live in the hover tooltip.
     const bg = this.add
-      .rectangle(pos.x, pos.y, NODE_WIDTH, NODE_HEIGHT, bgColor)
+      .circle(pos.x, pos.y, NODE_RADIUS, bgColor)
       .setStrokeStyle(2, borderColor)
       .setAlpha(alpha)
       .setInteractive({ useHandCursor: purchasable })
@@ -394,50 +393,55 @@ export class TreeScene extends Phaser.Scene {
     bg.on('pointerout', () => this.hideTooltip());
     bg.on('pointerdown', () => this.onSpotClicked(spot));
 
-    // Large glyph is the primary visual; full name + stats stay in the tooltip.
     const node = showingNode(spot);
     const content = node ? asContent(node.content) : null;
-    // Pass content directly when available (name: string satisfies exactOptionalPropertyTypes);
-    // fall back to spot/node id when content could not be cast.
     const glyph = content ? glyphChar(content) : glyphChar({ id: node?.id ?? spot.id });
     const glyphText = this.add
-      .text(pos.x, pos.y - 6, glyph, {
+      .text(pos.x, pos.y - (spot.chainLength > 1 ? 3 : 0), glyph, {
         fontFamily: FONT,
-        fontSize: '26px',
+        fontSize: '22px',
         fontStyle: 'bold',
-        color: nameColor,
+        color: glyphColor,
         stroke: '#0a0605',
         strokeThickness: 2,
       })
       .setOrigin(0.5)
       .setAlpha(alpha);
 
-    // Small status indicator below the glyph: ranks or cost or LOCKED.
-    const costStr = spot.next
-      ? costLabel(spot.next.cost.currency, spot.next.cost.amount)
-      : spot.status === 'complete'
-        ? 'owned'
-        : '';
-    const rankSuffix = spot.chainLength > 1 ? ` ${spot.owned.length}/${spot.chainLength}` : '';
-    const statusLabel =
-      spot.status === 'exclusive-locked'
-        ? 'LOCKED'
-        : rankSuffix
-          ? costStr
-            ? `${costStr}${rankSuffix}`
-            : rankSuffix.trim()
-          : costStr;
-    const statusColor = spot.status === 'exclusive-locked' ? DANGER_COLOR : costColor;
-    const costText = this.add
-      .text(pos.x, pos.y + 16, statusLabel, {
-        fontFamily: FONT,
-        fontSize: '10px',
-        color: statusColor,
-      })
-      .setOrigin(0.5)
-      .setAlpha(alpha);
+    const extras: Phaser.GameObjects.GameObject[] = [bg, glyphText];
 
-    this.nodesContainer.add([bg, glyphText, costText]);
+    // Rank pips for multi-rank spots (replaces on-node cost/rank text).
+    if (spot.chainLength > 1) {
+      const pipY = pos.y + NODE_RADIUS - 10;
+      const totalW = (spot.chainLength - 1) * 8;
+      for (let i = 0; i < spot.chainLength; i++) {
+        const filled = i < spot.owned.length;
+        const pip = this.add
+          .circle(pos.x - totalW / 2 + i * 8, pipY, 3, filled ? EDGE_OWNED : 0x5a4a3a)
+          .setStrokeStyle(1, BORDER_COLOR)
+          .setAlpha(alpha);
+        extras.push(pip);
+      }
+    } else if (spot.status === 'exclusive-locked') {
+      const lockMark = this.add
+        .text(pos.x, pos.y + 14, '×', {
+          fontFamily: FONT,
+          fontSize: '12px',
+          color: DANGER_COLOR,
+        })
+        .setOrigin(0.5)
+        .setAlpha(alpha);
+      extras.push(lockMark);
+    } else if (purchasable && spot.next) {
+      // Tiny affordability tick — full cost string stays in the tooltip.
+      const tick = this.add
+        .circle(pos.x + NODE_RADIUS - 6, pos.y - NODE_RADIUS + 6, 4, ACCENT_HEX)
+        .setStrokeStyle(1, BORDER_COLOR)
+        .setAlpha(alpha);
+      extras.push(tick);
+    }
+
+    this.nodesContainer.add(extras);
   }
 
   /**
@@ -459,11 +463,11 @@ export class TreeScene extends Phaser.Scene {
 
     const x = Phaser.Math.Clamp(pos.x - panelWidth / 2, 0, Math.max(0, canvasWidth - panelWidth));
 
-    const aboveScreen = screenY - NODE_HEIGHT / 2 - TOOLTIP_GAP - panelHeight;
+    const aboveScreen = screenY - NODE_SIZE / 2 - TOOLTIP_GAP - panelHeight;
     const screenY2 =
       aboveScreen >= 0
         ? aboveScreen
-        : Phaser.Math.Clamp(screenY + NODE_HEIGHT / 2 + TOOLTIP_GAP, 0, canvasHeight - panelHeight);
+        : Phaser.Math.Clamp(screenY + NODE_SIZE / 2 + TOOLTIP_GAP, 0, canvasHeight - panelHeight);
     const y = screenY2 + scrollY;
 
     this.tooltipContainer.setPosition(x, y);

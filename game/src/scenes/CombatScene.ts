@@ -24,7 +24,14 @@ import { UnitSprite } from '../ui/unitSprite';
 import { frameForUnit } from '../ui/sprites';
 import { SpellBar } from '../ui/spellBar';
 import { CombatLog } from '../ui/combatLog';
-import { shakeBossImpact, showCastBeam, showHealRipple } from '../ui/combatFx';
+import {
+  ManaSpendAura,
+  shakeBossImpact,
+  shakeHealImpact,
+  showCastBeam,
+  showHealParticles,
+  showHealRipple,
+} from '../ui/combatFx';
 import { PaceToggle } from '../ui/paceToggle';
 import { loadSave, saveGame } from '../save/save';
 import { relicsById } from '../data/relics';
@@ -175,6 +182,10 @@ export class CombatScene extends Phaser.Scene {
   private paceToggle!: PaceToggle;
   private combatPaceTenths = 10;
   private healerRune: Phaser.GameObjects.Triangle | null = null;
+  /** Presentation-only DBZ-style aura: intensity from mana spent in the last 30s. */
+  private manaAura: ManaSpendAura | null = null;
+  /** Wall-clock delta of the last update() tick — drives aura pulse without pacing. */
+  private lastFrameDtMs = 16;
 
   private resultShown = false;
 
@@ -252,11 +263,13 @@ export class CombatScene extends Phaser.Scene {
 
     this.combatLog = new CombatLog(this, VIEW_WIDTH);
     this.buildToast();
+    this.manaAura = new ManaSpendAura(this);
 
     this.syncView();
   }
 
   update(_time: number, delta: number): void {
+    this.lastFrameDtMs = delta;
     const simDelta = Math.max(0, Math.floor((delta * this.combatPaceTenths) / 10));
     this.elapsedMs += simDelta;
     const events = this.engine.advance(simDelta);
@@ -502,7 +515,11 @@ export class CombatScene extends Phaser.Scene {
           const target = this.findSprite(event.targetId);
           target?.flashHeal();
           target?.spawnHealFloat(event.amount);
-          if (target) showHealRipple(this, target.getHomeX(), GROUND_Y);
+          if (target) {
+            showHealRipple(this, target.getHomeX(), GROUND_Y);
+            showHealParticles(this, target.getHomeX(), target.getHomeY());
+            shakeHealImpact(this);
+          }
           const overheal = event.overheal > 0 ? ` (${event.overheal} over)` : '';
           this.combatLog.push(
             `${this.formatTimestamp()} ${this.resolveSpellName(event.spellId)} heals ${this.resolveUnitName(event.targetId)} +${event.amount}${overheal}`,
@@ -521,6 +538,12 @@ export class CombatScene extends Phaser.Scene {
               castTarget.getHomeX(),
               castTarget.getHomeY(),
             );
+          }
+          // Presentation-only spend estimate (base spell cost). Discounts / free
+          // charges may mean the engine reserved less — aura is juice, not accounting.
+          const castSpell = this.sceneData.loadout.spells.find((s) => s.id === event.cast.spellId);
+          if (castSpell && castSpell.mana > 0) {
+            this.manaAura?.recordSpend(castSpell.mana, this.elapsedMs);
           }
           break;
         }
@@ -652,6 +675,7 @@ export class CombatScene extends Phaser.Scene {
     this.spellBar.updateCooldowns(state.cooldowns);
     this.spellBar.updateSpellCooldowns(state.spellCooldowns);
     this.syncHealerRune(state);
+    this.syncManaAura();
 
     this.waveText.setText(
       state.waveIndex < this.encounter.waves.length
@@ -681,6 +705,18 @@ export class CombatScene extends Phaser.Scene {
     } else {
       this.healerRune.setPosition(x, y);
     }
+  }
+
+  /** DBZ-style power glow around the healer — intensity from recent mana spend. */
+  private syncManaAura(): void {
+    const healerSprite = this.partySprites.get('healer');
+    if (!this.manaAura || !healerSprite) return;
+    this.manaAura.update(
+      this.elapsedMs,
+      healerSprite.getHomeX(),
+      healerSprite.getHomeY(),
+      this.lastFrameDtMs,
+    );
   }
 
   private syncPlayerCastBar(state: CombatState): void {
