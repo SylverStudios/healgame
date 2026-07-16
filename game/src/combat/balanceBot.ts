@@ -27,13 +27,15 @@ export interface BotRun {
   cdActivations: number;
 }
 
-/** Minimal synthetic SaveData for loadoutFromSave. */
+/** Minimal synthetic SaveData for loadoutFromSave. Omits `actionBar` so
+ *  loadout keeps every unlocked/tree spell (full kit for balance bots). */
 export function makeBalanceSave(overrides: Partial<SaveData>): SaveData {
   return {
-    version: 6,
+    version: 7,
     tutorialDone: true,
     xp: 0,
     unlockedSpells: [],
+    actionBar: ['', '', '', ''],
     treeRanks: {},
     subclass: null,
     clearedDungeons: [],

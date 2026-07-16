@@ -21,7 +21,8 @@ import {
 import { create, ownedContents, ownedOf, update, validateConfig, view, walletOf } from '../tree';
 
 function save(overrides: Partial<SaveData> = {}): SaveData {
-  return { ...newSaveData(), ...overrides };
+  // Empty actionBar → loadoutFromSave keeps all owned spells (bar not under test).
+  return { ...newSaveData(), actionBar: ['', '', '', ''], ...overrides };
 }
 
 describe('SPELL_TREE config', () => {
@@ -948,6 +949,16 @@ describe('level mana in loadoutFromSave (Alpha 0.2 §D2)', () => {
     const mods = loadoutFromSave({ treeRanks: {}, unlockedSpells: ['solemn-mend'], xp: 0 });
     expect(mods.bonusMaxMana).toBe(0);
     expect(mods.manaRegen).toBeUndefined();
+  });
+
+  it('orders fight spells from actionBar (duplicates allowed)', () => {
+    const mods = loadoutFromSave({
+      treeRanks: {},
+      unlockedSpells: ['bonk', 'solemn-mend', 'zealous-mending'],
+      actionBar: ['solemn-mend', 'bonk', 'solemn-mend', ''],
+      xp: 0,
+    });
+    expect(mods.spells.map((s) => s.id)).toEqual(['solemn-mend', 'bonk', 'solemn-mend']);
   });
 
   it('adds bonusMaxMana + manaRegen for level 5 (xp=100)', () => {

@@ -6,10 +6,11 @@
 
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
-import { loadSave, saveGame, type SaveData } from '../save/save';
+import { loadSave, placeOnActionBar, saveGame, type SaveData } from '../save/save';
 import {
   SPELL_TREE,
   applyTreeStateToSave,
+  ownedSpellsFromSave,
   treeStateFromLegacy,
   type SpellTreeContent,
 } from '../data/spellTree';
@@ -512,10 +513,14 @@ export class TreeScene extends Phaser.Scene {
   }
 
   private tryPurchase(spotId: string): void {
+    const before = new Set(ownedSpellsFromSave(this.save).map((s) => s.id));
     const result = update(SPELL_TREE, this.treeState, { type: 'purchase', spotId });
     if (result.ok) {
       this.treeState = result.state;
       applyTreeStateToSave(this.save, this.treeState);
+      for (const spell of ownedSpellsFromSave(this.save)) {
+        if (!before.has(spell.id)) placeOnActionBar(this.save, spell.id);
+      }
       saveGame(this.save);
       this.feedback = '';
       this.syncRunModsBar();

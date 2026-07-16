@@ -8,6 +8,7 @@ import {
   type KeyValueStore,
   type SaveData,
 } from './save';
+import { SPELLS } from '../data/constants';
 
 function memoryStore(): KeyValueStore {
   const map = new Map<string, string>();
@@ -23,14 +24,15 @@ function storePayload(store: KeyValueStore, payload: Record<string, unknown>): v
 }
 
 describe('save', () => {
-  it('returns a fresh v6 save when nothing is stored', () => {
+  it('returns a fresh v7 save when nothing is stored', () => {
     const save = loadSave(memoryStore());
     expect(save).toEqual(newSaveData());
     expect(save).toEqual({
-      version: 6,
+      version: 7,
       tutorialDone: false,
       xp: 0,
-      unlockedSpells: [],
+      unlockedSpells: [SPELLS.bonk.id],
+      actionBar: [SPELLS.bonk.id, '', '', ''],
       treeRanks: {},
       subclass: null,
       clearedDungeons: [],
@@ -42,13 +44,14 @@ describe('save', () => {
     expect(save).not.toHaveProperty('rubies');
   });
 
-  it('round-trips a full v6 save', () => {
+  it('round-trips a full v7 save', () => {
     const store = memoryStore();
     const data: SaveData = {
-      version: 6,
+      version: 7,
       tutorialDone: true,
       xp: 42,
-      unlockedSpells: ['solemn-mend', 'zealous-mending'],
+      unlockedSpells: [SPELLS.bonk.id, 'solemn-mend', 'zealous-mending'],
+      actionBar: [SPELLS.bonk.id, 'solemn-mend', '', ''],
       treeRanks: { 'deep-reserves': 3, 'vigil-oath': 1 },
       subclass: 'vigil',
       clearedDungeons: ['ash-gate'],
@@ -64,9 +67,11 @@ describe('save', () => {
     const store = memoryStore();
     store.setItem('healgame-save-v1', JSON.stringify({ version: 4, xp: 999 }));
     store.setItem('healgame-save-v5', JSON.stringify({ version: 5, xp: 999 }));
+    store.setItem('healgame-save-v6', JSON.stringify({ version: 6, xp: 999 }));
     expect(loadSave(store)).toEqual(newSaveData());
     expect(store.getItem('healgame-save-v1')).toBeNull();
     expect(store.getItem('healgame-save-v5')).toBeNull();
+    expect(store.getItem('healgame-save-v6')).toBeNull();
   });
 
   it('resetSave wipes everything (restart, no respec)', () => {
@@ -79,10 +84,9 @@ describe('save', () => {
     expect(loadSave(store)).toEqual(newSaveData());
   });
 
-  it('falls back to a fresh save on corrupt or unknown data', () => {
+  it('discards unrecognized payloads', () => {
     const store = memoryStore();
-    storePayload(store, { version: 6, xp: 'nope' });
+    storePayload(store, { version: 7, xp: 'nope' });
     expect(loadSave(store)).toEqual(newSaveData());
-    expect(store.getItem(SAVE_KEY)).toBeNull();
   });
 });

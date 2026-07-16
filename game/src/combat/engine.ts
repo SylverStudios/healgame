@@ -261,17 +261,16 @@ export class CombatEngine {
   }
 
   /**
-   * Cast (or queue) a spell on the current target. Silently ignored if illegal:
-   * unknown spell, no/dead target, or insufficient mana. See README for full rules.
+   * Cast (or queue) a spell. Heals require a living ally target; damage spells
+   * (`damage > 0`) auto-target the front living enemy. Silently ignored if
+   * illegal: unknown spell, no/dead target, or insufficient mana. See README.
    */
   castSpell(spellId: string): void {
     if (this.status !== 'running') return;
     const spell = this.spellById(spellId);
     if (!spell) return;
-    const targetId = this.targetId;
+    const targetId = this.resolveCastTargetId(spell);
     if (!targetId) return;
-    const target = this.party.find((u) => u.id === targetId);
-    if (!target || !target.alive) return;
 
     const busy = this.playerCast !== null || this.gcdRemainingMs > 0;
     if (busy) {
@@ -282,14 +281,27 @@ export class CombatEngine {
 
     // Still Waters (Alpha 0.1 §D6): an armed freeNextHeal charge bypasses the
     // affordability check entirely (castable even at 0 mana) — beginCast
-    // reserves 0 mana and consumes the charge.
-    if (!this.findArmedFreeHealCooldown()) {
+    // reserves 0 mana and consumes the charge. Damage spells never use it.
+    const isDamage = (spell.damage ?? 0) > 0;
+    if (!isDamage && this.findArmedFreeHealCooldown()) {
+      // free heal — skip mana gate
+    } else {
       const healer = this.getUnit('healer')!;
       if (healer.mana < this.effectiveManaCost(spell)) return;
     }
     const out: CombatEvent[] = [];
     this.beginCast(spellId, targetId, out);
     this.pending.push(...out);
+  }
+
+  /** Ally target for heals; front living enemy for damage spells. */
+  private resolveCastTargetId(spell: SpellDef): string | null {
+    if ((spell.damage ?? 0) > 0) {
+      return this.activeEnemies.find((e) => e.alive)?.id ?? null;
+    }
+    if (!this.targetId) return null;
+    const target = this.party.find((u) => u.id === this.targetId);
+    return target?.alive ? target.id : null;
   }
 
   /**
@@ -501,7 +513,8 @@ export class CombatEngine {
   private beginCast(spellId: string, targetId: string, out: CombatEvent[]): void {
     const spell = this.spellById(spellId)!;
     const healer = this.getUnit('healer')!;
-    const freeHealCd = this.findArmedFreeHealCooldown();
+    // Free-heal charges only apply to heal casts — Bonk / damage never consume them.
+    const freeHealCd = (spell.damage ?? 0) > 0 ? undefined : this.findArmedFreeHealCooldown();
     let reservedMana: number;
     if (freeHealCd) {
       reservedMana = 0;
@@ -548,6 +561,14 @@ export class CombatEngine {
     events.push({ type: 'castFinished', spellId: cast.spellId });
 
     const target = this.getUnit(cast.targetId);
+
+    // Damage spells (Bonk): hit the locked enemy target; no heal / synergy pipeline.
+    if ((spell.damage ?? 0) > 0) {
+      if (target && target.alive) {
+        this.applyDamageToUnit(target, spell.damage!, 'healer', events);
+      }
+      return;
+    }
 
     // Phase 3 (handoff §D): a cast whose target dies mid-cast is auto-cancelled
     // (cancelCastIfTargeting) the instant that death is applied, so a cast only
@@ -630,7 +651,11 @@ export class CombatEngine {
     if (!spell || !target || !target.alive) return;
     // A queued cast that fires while a Still Waters charge is armed counts as
     // "the first cast started" (Alpha 0.1 §D6) — same bypass as castSpell.
-    if (!this.findArmedFreeHealCooldown()) {
+    // Damage spells never use the free-heal charge.
+    const isDamage = (spell.damage ?? 0) > 0;
+    if (!isDamage && this.findArmedFreeHealCooldown()) {
+      // free heal — skip mana gate
+    } else {
       const healer = this.getUnit('healer')!;
       if (healer.mana < this.effectiveManaCost(spell)) return;
     }

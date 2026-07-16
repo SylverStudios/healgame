@@ -5,6 +5,7 @@ export const SceneKeys = {
   Hub: 'Hub',
   Tree: 'Tree',
   Relic: 'Relic',
+  Loadout: 'Loadout',
 } as const;
 
 export type SceneKey = (typeof SceneKeys)[keyof typeof SceneKeys];

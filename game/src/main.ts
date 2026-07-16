@@ -5,6 +5,7 @@ import { CombatScene } from './scenes/CombatScene';
 import { HubScene } from './scenes/HubScene';
 import { TreeScene } from './scenes/TreeScene';
 import { RelicScene } from './scenes/RelicScene';
+import { LoadoutScene } from './scenes/LoadoutScene';
 import { installTestHooks } from './debug/testHooks';
 
 const game = new Phaser.Game({
@@ -20,6 +21,6 @@ const game = new Phaser.Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [BootScene, TutorialScene, CombatScene, HubScene, TreeScene, RelicScene],
+  scene: [BootScene, TutorialScene, CombatScene, HubScene, TreeScene, RelicScene, LoadoutScene],
 });
 installTestHooks(game);

@@ -34,12 +34,19 @@ function spellName(id: string, loadout: CombatMods): string {
 
 /** Builds the pinned content lines (order matters — see phase-2-handoff) for one spell button. */
 export function buildTooltipLines(spell: SpellDef, loadout: CombatMods): TooltipLine[] {
-  const lines: TooltipLine[] = [
-    { text: spell.name, color: NAME_LINE_COLOR },
-    { text: `Heals ${spell.heal}`, color: DEFAULT_LINE_COLOR },
+  const lines: TooltipLine[] = [{ text: spell.name, color: NAME_LINE_COLOR }];
+  if ((spell.damage ?? 0) > 0) {
+    lines.push({ text: `Damages ${spell.damage} (front enemy)`, color: DEFAULT_LINE_COLOR });
+  } else {
+    lines.push({ text: `Heals ${spell.heal}`, color: DEFAULT_LINE_COLOR });
+  }
+  lines.push(
     { text: `Costs ${spell.mana} mana`, color: DEFAULT_LINE_COLOR },
-    { text: `Cast: ${(spell.castMs / 1000).toFixed(1)}s`, color: DEFAULT_LINE_COLOR },
-  ];
+    {
+      text: spell.castMs === 0 ? 'Cast: Instant' : `Cast: ${(spell.castMs / 1000).toFixed(1)}s`,
+      color: DEFAULT_LINE_COLOR,
+    },
+  );
 
   for (const synergy of loadout.synergies) {
     if (synergy.buffedSpellId === spell.id) {

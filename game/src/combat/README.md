@@ -43,7 +43,11 @@ and compiles the ordered dungeon catalog into the engine's resolved
   `beginCast` on the same call stack (no cast-bar occupancy / no 0ms
   `remainingMs` stuck in `nextTimerBoundary`). Mana is still reserved at start;
   GCD still applies; synergy arm/consume and heal bonuses still run through
-  `completePlayerCast`. UI must hide the cast bar when `totalMs === 0`.
+  `completePlayerCast` for heals. UI must hide the cast bar when `totalMs === 0`.
+- **Damage spells** (`SpellDef.damage > 0`, e.g. Bonk): no ally target — auto
+  hit the front living enemy (same pick as merc swings). Skip the heal /
+  synergy pipeline; emit a normal `damage` event with `sourceId: 'healer'`.
+  Still Waters free-heal charges are never consumed by damage casts.
 - **Queue**: one slot; `castSpell` while busy queues `{spellId, targetId}` (target
   locked in at queue time), replacing any existing queue entry. Re-validated
   (target alive, mana available) the instant busy ends; dropped silently if it's
