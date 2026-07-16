@@ -30,6 +30,7 @@ import { loadSave, saveGame } from '../save/save';
 import { relicsById } from '../data/relics';
 import { runModsFromSave } from '../data/runMods';
 import { RunModsBar } from '../ui/runModsBar';
+import { ACTION_HOTKEY_LETTERS, actionHotkeySlot } from '../ui/actionHotkeys';
 import type { CombatMods } from '../data/spellTree';
 
 /** Pinned contract: callers pass fully resolved CombatMods (from loadoutFromSave). */
@@ -117,8 +118,6 @@ const OVERLAY_DEPTH = 1000;
 const OVERLAY_ALPHA = 0.85;
 const OVERLAY_FADE_MS = 250;
 const RESULT_REVEAL_MS = 220;
-
-const DIGIT_KEY_NAMES = ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE'] as const;
 
 const HUD_FONT = 'monospace';
 
@@ -421,19 +420,21 @@ export class CombatScene extends Phaser.Scene {
     this.tweens.add({ targets: this.toastText, alpha: 0, duration: TOAST_FADE_MS });
   }
 
+  /** QWER then Shift+QWER for slots 0–7 (spells then CDs). Extras unbound. */
   private registerHotkeys(spells: SpellDef[], cooldowns: CombatSceneData['loadout']['cooldowns']): void {
     const keyboard = this.input.keyboard;
     if (!keyboard) return;
-    spells.forEach((spell, i) => {
-      const keyName = DIGIT_KEY_NAMES[i];
-      if (!keyName) return;
-      keyboard.on(`keydown-${keyName}`, () => this.onSpellCast(spell.id));
-    });
-    cooldowns.forEach((cooldown, i) => {
-      const keyName = DIGIT_KEY_NAMES[spells.length + i];
-      if (!keyName) return;
-      keyboard.on(`keydown-${keyName}`, () => this.onCooldownActivate(cooldown.id));
-    });
+    const actions: Array<() => void> = [
+      ...spells.map((spell) => () => this.onSpellCast(spell.id)),
+      ...cooldowns.map((cooldown) => () => this.onCooldownActivate(cooldown.id)),
+    ];
+    for (const letter of ACTION_HOTKEY_LETTERS) {
+      keyboard.on(`keydown-${letter}`, (event: KeyboardEvent) => {
+        const slot = actionHotkeySlot(letter, event.shiftKey);
+        if (slot === null) return;
+        actions[slot]?.();
+      });
+    }
   }
 
   /** Escape cancels the active cast + queue (handoff §D); the castCancelled event it emits on

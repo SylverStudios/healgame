@@ -150,7 +150,7 @@ function baseSave(overrides) {
 }
 
 /**
- * Naive combat loop: target the tank, then every 2s press "1" (cast) and
+ * Naive combat loop: target the tank, then every 2s press "q" (slot 0 cast) and
  * conditionally click Return when the result overlay exists (locate null
  * mid-fight). Ends when `until(save)` first holds.
  */
@@ -158,7 +158,7 @@ async function playCombat(page, until, timeoutMs = 180_000) {
   await clickNamed(page, 'combatAlly:tank');
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    await page.keyboard.press('1');
+    await page.keyboard.press('q');
     if (await locate(page, 'combatReturn')) {
       await clickNamed(page, 'combatReturn');
     }
@@ -455,7 +455,7 @@ try {
   await hoverNamed(page, 'combatCooldown:still-waters');
   await page.waitForTimeout(400);
   await shot(page, 'combat-still-waters-tooltip');
-  await page.keyboard.press('4');
+  await page.keyboard.press('r');
   await page.waitForTimeout(300);
   await shot(page, 'combat-still-waters-hotkey-armed');
   await page.mouse.move(480, 270); // off the button (viewport center; not a layout target)

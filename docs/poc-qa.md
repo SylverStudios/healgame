@@ -1,6 +1,6 @@
 # PoC QA — journey checklist & verification
 
-Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-15
+Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-16
 
 **Date:** 2026-07-08 · **Verdict: PoC complete.** Every poc-spec §1 criterion is
 implemented, and all of them are enforced by automated gates that run headless.
@@ -790,7 +790,7 @@ npm run content -- validate
 7. **Black Choir:** Dirge Sovereign `statOverrides.hp: 200` (was mob base 260) so crown kits clear under Soul Toll; gate flipped wipe→clear for all oath×aspect kits.
 8. **The Maw:** Hollow King `hp: 9999`; bots treat 10‑min sim cap as wipe (`capAsWipe`). Still unwinnable ± any relic.
 9. **Glyphs:** single-char placeholders (`M/Z/G/F/V/X/S/L/W`…). Tree WORLD_HEIGHT 1080; journey clicks by name.
-10. **QWER stretch parked:** digit hotkeys remain; note for a later pass (handoff §D7).
+10. **QWER hotkeys:** slots 0–7 bind **Q W E R** then **Shift+Q/W/E/R** (spells then CDs in display order). Keycaps show `Q`…`R` / `sQ`…`sR`. Digits removed; Escape cancel unchanged. Max 8; extras unbound.
 
 ## Journey notes
 
