@@ -4,7 +4,7 @@ export const DIRGE_SOVEREIGN_MOB = {
   id: 'dirge-sovereign',
   name: 'Dirge Sovereign',
   tags: ['boss'],
-  hp: 260,
+  hp: 320,
   autoDamage: 4,
   swingIntervalMs: 2_800,
   abilityIds: ['soul-toll'],

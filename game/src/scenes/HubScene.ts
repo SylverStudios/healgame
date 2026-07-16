@@ -160,7 +160,7 @@ export class HubScene extends Phaser.Scene {
     this.makeButton(centerX - 160, treeY, 280, 52, 'Spell Tree', () => {
       this.scene.start(SceneKeys.Tree);
     }, 'hubTree');
-    this.makeButton(centerX + 160, treeY, 280, 52, 'Loadout', () => {
+    this.makeButton(centerX + 160, treeY, 280, 52, 'Spellbook', () => {
       this.scene.start(SceneKeys.Loadout);
     }, 'hubLoadout');
 

@@ -30,7 +30,7 @@ import { loadSave, saveGame } from '../save/save';
 import { relicsById } from '../data/relics';
 import { runModsFromSave } from '../data/runMods';
 import { RunModsBar } from '../ui/runModsBar';
-import { ACTION_HOTKEY_LETTERS, actionHotkeySlot } from '../ui/actionHotkeys';
+import { ACTION_HOTKEY_LETTERS, MAX_ACTION_HOTKEYS, actionHotkeySlot } from '../ui/actionHotkeys';
 import type { CombatMods } from '../data/spellTree';
 
 /** Pinned contract: callers pass fully resolved CombatMods (from loadoutFromSave). */
@@ -102,7 +102,7 @@ const BOSS_CAST_BAR_HEIGHT = 20;
 const BOSS_CAST_BAR_Y = 54;
 const BOSS_CAST_FILL_COLOR = 0xe05a4e;
 
-const SPELL_BAR_Y = 502;
+const SPELL_BAR_Y = 508;
 
 const PACE_TOGGLE_X = 20;
 const PACE_TOGGLE_Y = VIEW_HEIGHT - 8;
@@ -420,14 +420,21 @@ export class CombatScene extends Phaser.Scene {
     this.tweens.add({ targets: this.toastText, alpha: 0, duration: TOAST_FADE_MS });
   }
 
-  /** QWER then Shift+QWER for slots 0–7 (spells then CDs). Extras unbound. */
+  /** QWER = spell slots 0–3; Shift+QWER = major CD slots 0–3 (finger columns). */
   private registerHotkeys(spells: SpellDef[], cooldowns: CombatSceneData['loadout']['cooldowns']): void {
     const keyboard = this.input.keyboard;
     if (!keyboard) return;
-    const actions: Array<() => void> = [
-      ...spells.map((spell) => () => this.onSpellCast(spell.id)),
-      ...cooldowns.map((cooldown) => () => this.onCooldownActivate(cooldown.id)),
-    ];
+    const actions: Array<(() => void) | undefined> = new Array(MAX_ACTION_HOTKEYS);
+    spells.forEach((spell, i) => {
+      if (i < ACTION_HOTKEY_LETTERS.length) {
+        actions[i] = () => this.onSpellCast(spell.id);
+      }
+    });
+    cooldowns.forEach((cooldown, i) => {
+      if (i < ACTION_HOTKEY_LETTERS.length) {
+        actions[ACTION_HOTKEY_LETTERS.length + i] = () => this.onCooldownActivate(cooldown.id);
+      }
+    });
     for (const letter of ACTION_HOTKEY_LETTERS) {
       keyboard.on(`keydown-${letter}`, (event: KeyboardEvent) => {
         const slot = actionHotkeySlot(letter, event.shiftKey);
@@ -643,6 +650,7 @@ export class CombatScene extends Phaser.Scene {
     );
     this.spellBar.setArmedSpellIds(state.armedBuffedSpellIds);
     this.spellBar.updateCooldowns(state.cooldowns);
+    this.spellBar.updateSpellCooldowns(state.spellCooldowns);
     this.syncHealerRune(state);
 
     this.waveText.setText(

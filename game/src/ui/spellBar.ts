@@ -14,11 +14,12 @@ import { buildCooldownTooltipLines } from './cooldownTooltip';
 import { SpellTooltip, buildTooltipLines } from './spellTooltip';
 import { glyphChar } from './glyph';
 
-/** Alpha 0.2 §D8: compact width so up to 8 buttons (spells + CDs) fit on 960px.
- *  5 spell buttons + 3 CD buttons: 5×100 + 4×10 + 18 + 3×72 + 2×10 = 794px. */
+/** Alpha 0.2 §D8: compact width so up to 4 QWER columns fit on 960px.
+ *  Shift+QWER major CDs sit in a matching row above (same finger columns). */
 const BUTTON_WIDTH = 100;
 const BUTTON_HEIGHT = 52;
 const BUTTON_GAP = 10;
+const ROW_GAP = 10;
 const BUTTON_BG_COLOR = 0x3a2a22;
 const BUTTON_BG_OOM_COLOR = 0x2a1a18;
 const BUTTON_BORDER_COLOR = 0x0a0605;
@@ -44,14 +45,15 @@ const KEYCAP_HEIGHT = 14;
 const KEYCAP_BG = 0x241a15;
 const KEYCAP_BORDER = 0x8a7868;
 
-/** Cooldown buttons (Alpha 0.1 §D6): compact group right of the spell buttons. */
-const CD_BUTTON_WIDTH = 72;
-const CD_BUTTON_HEIGHT = 52;
-const CD_BUTTON_GAP = 10;
-const CD_GROUP_GAP = 18;
+/** Cooldown buttons (Alpha 0.1 §D6): same footprint as spell buttons so the
+ *  Shift row lines up with QWER columns. */
+const CD_BUTTON_WIDTH = BUTTON_WIDTH;
+const CD_BUTTON_HEIGHT = BUTTON_HEIGHT;
 const CD_GLYPH_FONT = '20px monospace';
 const CD_TIMER_FONT = '12px monospace';
 const CD_TIMER_COLOR = '#a8c8f0';
+const SPELL_TIMER_FONT = '11px monospace';
+const SPELL_TIMER_COLOR = '#a8c8f0';
 
 class SpellButton {
   readonly spellId: string;
@@ -66,8 +68,11 @@ class SpellButton {
   private readonly glyphText: Phaser.GameObjects.Text;
   private readonly costText: Phaser.GameObjects.Text;
   private readonly hotkeyText: Phaser.GameObjects.Text;
+  private readonly timerText: Phaser.GameObjects.Text;
   private enabled = true;
   private armed = false;
+  private onSpellCooldown = false;
+  private lastCanAfford = true;
 
   constructor(
     scene: Phaser.Scene,
@@ -91,7 +96,7 @@ class SpellButton {
       .setInteractive({ useHandCursor: true })
       .setName(`combatSpell:${spell.id}`);
     this.bg.on('pointerdown', () => {
-      if (this.enabled) onClick(this.spellId);
+      if (this.enabled && !this.onSpellCooldown) onClick(this.spellId);
     });
     this.bg.on('pointerover', () => onHoverStart(this.spellId, this.centerX, this.topY));
     this.bg.on('pointerout', () => onHoverEnd());
@@ -115,6 +120,10 @@ class SpellButton {
     this.costText = scene.add
       .text(x, y + 15, `${spell.mana}m`, { fontFamily: 'monospace', fontSize: COST_FONT, color: COST_COLOR })
       .setOrigin(0.5);
+    this.timerText = scene.add
+      .text(x, y + 15, '', { fontFamily: 'monospace', fontSize: SPELL_TIMER_FONT, color: SPELL_TIMER_COLOR })
+      .setOrigin(0.5)
+      .setVisible(false);
     this.hotkeyText = scene.add
       .text(keycapX, keycapY, hotkeyLabel, {
         fontFamily: 'monospace',
@@ -124,10 +133,28 @@ class SpellButton {
       .setOrigin(0.5);
   }
 
-  /** Enabled = clickable (running + target + affordable). OOM always paints crimson cost. */
+  /** Enabled = clickable (running + target + affordable + not on personal CD). OOM paints crimson. */
   setCastability(enabled: boolean, canAfford: boolean): void {
     this.enabled = enabled;
-    const alpha = enabled ? 1 : BUTTON_DISABLED_ALPHA;
+    this.lastCanAfford = canAfford;
+    this.refreshAlpha(canAfford);
+  }
+
+  /** Personal spell CD (Vowstrike): shows seconds and blocks clicks. */
+  setSpellCooldown(remainingMs: number): void {
+    this.onSpellCooldown = remainingMs > 0;
+    this.timerText.setVisible(this.onSpellCooldown);
+    if (this.onSpellCooldown) {
+      this.timerText.setText(`${Math.ceil(remainingMs / 1000)}s`);
+      this.costText.setVisible(false);
+    } else {
+      this.costText.setVisible(true);
+    }
+    this.refreshAlpha(this.lastCanAfford);
+  }
+
+  private refreshAlpha(canAfford: boolean): void {
+    const alpha = this.enabled && !this.onSpellCooldown ? 1 : BUTTON_DISABLED_ALPHA;
     this.bg.setFillStyle(canAfford ? BUTTON_BG_COLOR : BUTTON_BG_OOM_COLOR);
     this.bg.setAlpha(alpha);
     this.keycap.setAlpha(alpha);
@@ -135,6 +162,7 @@ class SpellButton {
     this.costText.setAlpha(canAfford ? alpha : Math.max(alpha, 0.55));
     this.costText.setColor(canAfford ? COST_COLOR : COST_OOM_COLOR);
     this.hotkeyText.setAlpha(alpha);
+    this.timerText.setAlpha(alpha);
   }
 
   /** Thicker accent stroke while a synergy buffing this spell is armed; default border otherwise. */
@@ -149,6 +177,7 @@ class SpellButton {
     this.keycap.destroy();
     this.glyphText.destroy();
     this.costText.destroy();
+    this.timerText.destroy();
     this.hotkeyText.destroy();
   }
 }
@@ -157,6 +186,7 @@ class SpellButton {
  * Cooldown button (Alpha 0.1 §D6): glyph primary label (§D8), timer readout
  * while on cooldown, dimmed alpha while on cooldown, gold accent border while
  * buff is active. Clicking while on cooldown is a no-op — `ready` gates it.
+ * Lives on the Shift+QWER row above the spell buttons (same finger columns).
  */
 class CooldownButton {
   readonly cooldownId: string;
@@ -264,10 +294,9 @@ class CooldownButton {
   }
 }
 
-/** A centered row of spell buttons; index order drives QWER / Shift+QWER hotkeys
- *  (max 8). Cooldown buttons (Alpha 0.1 §D6), if any, sit in a compact group to the
- *  right — absent entirely (zero layout shift) when the loadout grants none, e.g.
- *  Ash Gate before any CD-granting node is bought. */
+/** Two-row action bar: QWER spells on the bottom, Shift+QWER major CDs above
+ *  (same finger columns). Empty CD row is omitted entirely when the loadout
+ *  grants none. */
 export class SpellBar {
   private readonly buttons: SpellButton[] = [];
   private readonly cooldownButtons: CooldownButton[] = [];
@@ -298,34 +327,35 @@ export class SpellBar {
       this.tooltip.show(buttonCenterX, buttonTopY, buildCooldownTooltipLines(cooldown));
     };
 
-    const totalWidth = spells.length * BUTTON_WIDTH + Math.max(0, spells.length - 1) * BUTTON_GAP;
+    const columns = Math.max(spells.length, cooldowns.length, 1);
+    const totalWidth = columns * BUTTON_WIDTH + Math.max(0, columns - 1) * BUTTON_GAP;
     const startX = centerX - totalWidth / 2 + BUTTON_WIDTH / 2;
+    const spellY = y;
+    const cdY = y - BUTTON_HEIGHT - ROW_GAP;
+
     spells.forEach((spell, i) => {
       const x = startX + i * (BUTTON_WIDTH + BUTTON_GAP);
       const label = actionHotkeyLabel(i) ?? '';
-      this.buttons.push(new SpellButton(scene, x, y, spell, label, onCast, showTooltip, hideTooltip));
+      this.buttons.push(new SpellButton(scene, x, spellY, spell, label, onCast, showTooltip, hideTooltip));
     });
 
-    if (cooldowns.length > 0) {
-      const lastSpellRightEdge = startX + (spells.length - 1) * (BUTTON_WIDTH + BUTTON_GAP) + BUTTON_WIDTH / 2;
-      const cdStartX = lastSpellRightEdge + CD_GROUP_GAP + CD_BUTTON_WIDTH / 2;
-      cooldowns.forEach((def, i) => {
-        const x = cdStartX + i * (CD_BUTTON_WIDTH + CD_BUTTON_GAP);
-        const label = actionHotkeyLabel(spells.length + i) ?? '';
-        this.cooldownButtons.push(
-          new CooldownButton(
-            scene,
-            x,
-            y,
-            def,
-            label,
-            onCooldownClick,
-            showCooldownTooltip,
-            hideTooltip,
-          ),
-        );
-      });
-    }
+    cooldowns.forEach((def, i) => {
+      const x = startX + i * (BUTTON_WIDTH + BUTTON_GAP);
+      // Shift row always maps to slots 4–7 (finger columns), not "after spells".
+      const label = actionHotkeyLabel(4 + i) ?? '';
+      this.cooldownButtons.push(
+        new CooldownButton(
+          scene,
+          x,
+          cdY,
+          def,
+          label,
+          onCooldownClick,
+          showCooldownTooltip,
+          hideTooltip,
+        ),
+      );
+    });
   }
 
   /** Toggle each button's look from healer mana / target / running state.
@@ -351,11 +381,19 @@ export class SpellBar {
     for (const button of this.buttons) button.setArmed(armedSet.has(button.spellId));
   }
 
-  /** Per-frame sync for the cooldown buttons (Alpha 0.1 §D6); no-op when none were constructed. */
+  /** Per-frame sync for major CD buttons (Alpha 0.1 §D6). */
   updateCooldowns(states: CooldownState[]): void {
     for (const button of this.cooldownButtons) {
       const state = states.find((s) => s.id === button.cooldownId);
       if (state) button.update(state);
+    }
+  }
+
+  /** Per-frame sync for personal spell reuse timers (Vowstrike). */
+  updateSpellCooldowns(states: Array<{ spellId: string; remainingMs: number }>): void {
+    for (const button of this.buttons) {
+      const state = states.find((s) => s.spellId === button.spellId);
+      button.setSpellCooldown(state?.remainingMs ?? 0);
     }
   }
 

@@ -15,7 +15,7 @@ export const THE_MAW_DUNGEON = {
         {
           mobId: 'ash-husk',
           count: 2,
-          statOverrides: { hp: 4 },
+          statOverrides: { hp: 6 },
         },
       ],
     },

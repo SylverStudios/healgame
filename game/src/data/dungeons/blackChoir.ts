@@ -17,7 +17,7 @@ export const BLACK_CHOIR_DUNGEON = {
   waves: [
     { enemies: [{ mobId: 'choir-shade', count: 2 }] },
     { enemies: [{ mobId: 'choir-shade', count: 3 }] },
-    { enemies: [{ mobId: 'choir-shade', count: 3, statOverrides: { hp: 12 } }] },
-    { enemies: [{ mobId: 'dirge-sovereign', count: 1, statOverrides: { hp: 200 } }] },
+    { enemies: [{ mobId: 'choir-shade', count: 3, statOverrides: { hp: 14 } }] },
+    { enemies: [{ mobId: 'dirge-sovereign', count: 1, statOverrides: { hp: 175 } }] },
   ],
 } as const satisfies DungeonDef;

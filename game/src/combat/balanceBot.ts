@@ -48,6 +48,52 @@ export function makeBalanceSave(overrides: Partial<SaveData>): SaveData {
 
 export const BASE_KIT: SpellDef[] = [SPELLS.solemnMend];
 
+function spellOffCd(
+  spellId: string,
+  spellCooldowns: readonly { spellId: string; remainingMs: number }[],
+): boolean {
+  const cd = spellCooldowns.find((c) => c.spellId === spellId);
+  return (cd?.remainingMs ?? 0) <= 0;
+}
+
+/** Arm a Vowstrike buff before a non-emergency heal when the trade is worthwhile.
+ *  Reckoning is never substituted for a heal — that costs a GCD of throughput. */
+function pickVowstrikeBuff(
+  virtue: SpellDef | undefined,
+  _vengeance: SpellDef | undefined,
+  enemiesAlive: boolean,
+  healer: Unit,
+  spellCooldowns: readonly { spellId: string; remainingMs: number }[],
+  healIntent: SpellDef,
+  _missing: number,
+  emergency: boolean,
+): SpellDef | undefined {
+  if (emergency || !enemiesAlive) return undefined;
+  const canCast = (spell?: SpellDef) =>
+    spell !== undefined && spellOffCd(spell.id, spellCooldowns) && healer.mana >= spell.mana;
+
+  // Absolution: spend a GCD to discount the next expensive heal when mana is tight.
+  if (canCast(virtue) && healIntent.mana >= 4 && healer.mana < healIntent.mana + 3) return virtue;
+  return undefined;
+}
+
+/** Spend a free GCD on Vowstrike damage when the party does not need a heal. */
+function pickVowstrikeFiller(
+  virtue: SpellDef | undefined,
+  vengeance: SpellDef | undefined,
+  enemiesAlive: boolean,
+  healer: Unit,
+  spellCooldowns: readonly { spellId: string; remainingMs: number }[],
+): SpellDef | undefined {
+  if (!enemiesAlive) return undefined;
+  const canCast = (spell?: SpellDef) =>
+    spell !== undefined && spellOffCd(spell.id, spellCooldowns) && healer.mana >= spell.mana;
+  // Prefer Reckoning filler — arms +25% on the next heal while dealing damage.
+  if (canCast(vengeance)) return vengeance;
+  if (canCast(virtue)) return virtue;
+  return undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Alpha 0.2 crown kits — xp: 910 = xpForLevel(14), so level mana applies.
 // Each kit owns one oath × one Vowstrike aspect × shared crown.
@@ -243,31 +289,27 @@ export function runBot(
           ? state.party.find((u) => u.id === focusTargetId && u.alive && u.hp * 2 <= u.maxHp)
           : undefined;
       const target: Unit | undefined = tankCriticalUnit ?? focusUnit ?? injured[0];
+      const enemiesAlive = state.enemies.some((e) => e.alive);
 
       if (target) {
         const missing = target.maxHp - target.hp;
         const emergency = target === tankCriticalUnit || target === focusUnit;
 
-        // Determine the intended next spell (used for CD activation decisions).
-        // Must mirror the cast priority in the `if (free)` block below.
-        let intended: SpellDef | undefined;
+        // Determine the intended next heal (used for CD activation decisions).
+        // Must mirror the heal priority in the `if (free)` block below.
+        let intendedHeal: SpellDef | undefined;
         if (emergency) {
-          // Instants first in emergency — quick heal + continue with larger spell next GCD.
-          const quickInstant = vowstrikeVengeance ?? vowstrikeVirtue;
-          if (quickInstant) intended = quickInstant;
-          else if (zealousFlare) intended = zealousFlare;
-          else if (zealousMending) intended = zealousMending;
-          else if (solemnMend) intended = solemnMend;
+          if (zealousFlare) intendedHeal = zealousFlare;
+          else if (zealousMending) intendedHeal = zealousMending;
+          else if (solemnMend) intendedHeal = solemnMend;
         } else if (solemnVigil && missing >= solemnVigil.heal) {
-          intended = solemnVigil;
+          intendedHeal = solemnVigil;
         } else if (solemnMend && missing >= solemnMend.heal) {
-          intended = solemnMend;
+          intendedHeal = solemnMend;
         } else if (zealousMending && missing >= zealousMending.heal) {
-          intended = zealousMending;
-        } else {
-          // Small deficit: triage instant (Absolution preferred as cheap filler).
-          const triageInstant = vowstrikeVirtue ?? vowstrikeVengeance;
-          if (triageInstant && missing >= triageInstant.heal) intended = triageInstant;
+          intendedHeal = zealousMending;
+        } else if (zealousFlare && missing >= zealousFlare.heal) {
+          intendedHeal = zealousFlare;
         }
 
         // Spike pressure signal for healBonus (Wrath Ascendant) activation.
@@ -285,7 +327,7 @@ export function runBot(
           if (def.effect.kind === 'manaCostReduction') {
             engine.activateCooldown(def.id);
             cdActivations += 1;
-          } else if (def.effect.kind === 'freeNextHeal' && intended) {
+          } else if (def.effect.kind === 'freeNextHeal' && intendedHeal) {
             engine.activateCooldown(def.id);
             cdActivations += 1;
           } else if (def.effect.kind === 'healBonus' && underPressure) {
@@ -302,54 +344,64 @@ export function runBot(
         );
 
         if (free) {
-          let spell: SpellDef | undefined;
+          let healIntent: SpellDef | undefined;
           if (emergency) {
-            // Instant Vowstrike first — immediate response, no cast delay.
-            const quickInstant = vowstrikeVengeance ?? vowstrikeVirtue;
-            if (quickInstant && (healer.mana >= quickInstant.mana || armedFreeHeal)) {
-              spell = quickInstant;
-            } else if (zealousFlare && (healer.mana >= zealousFlare.mana || armedFreeHeal)) spell = zealousFlare;
+            if (zealousFlare && (healer.mana >= zealousFlare.mana || armedFreeHeal)) healIntent = zealousFlare;
             else if (zealousMending && (healer.mana >= zealousMending.mana || armedFreeHeal))
-              spell = zealousMending;
-            else if (solemnMend && (healer.mana >= solemnMend.mana || armedFreeHeal)) spell = solemnMend;
+              healIntent = zealousMending;
+            else if (solemnMend && (healer.mana >= solemnMend.mana || armedFreeHeal)) healIntent = solemnMend;
+          } else if (solemnVigil && missing >= solemnVigil.heal && (healer.mana >= solemnVigil.mana || armedFreeHeal)) {
+            healIntent = solemnVigil;
+          } else if (solemnMend && missing >= solemnMend.heal && (healer.mana >= solemnMend.mana || armedFreeHeal)) {
+            healIntent = solemnMend;
+          } else if (
+            zealousMending &&
+            missing >= zealousMending.heal &&
+            (healer.mana >= zealousMending.mana || armedFreeHeal)
+          ) {
+            healIntent = zealousMending;
+          } else if (zealousFlare && missing >= zealousFlare.heal && (healer.mana >= zealousFlare.mana || armedFreeHeal)) {
+            healIntent = zealousFlare;
+          }
+
+          let spell: SpellDef | undefined;
+          if (healIntent) {
+            spell =
+              pickVowstrikeBuff(
+                vowstrikeVirtue,
+                vowstrikeVengeance,
+                enemiesAlive,
+                healer,
+                state.spellCooldowns,
+                healIntent,
+                missing,
+                emergency,
+              ) ?? healIntent;
           } else {
-            // Non-emergency: prefer Vowstrike instants for throughput when the
-            // healer has them. Instants complete on the same tick they're cast,
-            // letting the bot cycle through all injured members between Soul Toll
-            // fires — critical for AoE-damage recovery. Cast-time spells are used
-            // as fallback when no instant covers the deficit.
-            const triageInstant = vowstrikeVirtue ?? vowstrikeVengeance;
-            if (triageInstant && missing >= triageInstant.heal && (healer.mana >= triageInstant.mana || armedFreeHeal)) {
-              spell = triageInstant;
-            } else if (
-              solemnVigil &&
-              missing >= solemnVigil.heal &&
-              (healer.mana >= solemnVigil.mana || armedFreeHeal)
-            ) {
-              spell = solemnVigil;
-            } else if (
-              solemnMend &&
-              missing >= solemnMend.heal &&
-              (healer.mana >= solemnMend.mana || armedFreeHeal)
-            ) {
-              spell = solemnMend;
-            } else if (
-              zealousMending &&
-              missing >= zealousMending.heal &&
-              (healer.mana >= zealousMending.mana || armedFreeHeal)
-            ) {
-              spell = zealousMending;
-            } else if (zealousFlare && missing >= zealousFlare.heal && (healer.mana >= zealousFlare.mana || armedFreeHeal)) {
-              spell = zealousFlare;
-            }
+            spell = pickVowstrikeFiller(
+              vowstrikeVirtue,
+              vowstrikeVengeance,
+              enemiesAlive,
+              healer,
+              state.spellCooldowns,
+            );
           }
 
           if (spell) {
-            engine.setTarget(target.id);
+            if ((spell.damage ?? 0) === 0) engine.setTarget(target.id);
             engine.castSpell(spell.id);
-            healsCast += 1;
+            if ((spell.damage ?? 0) === 0) healsCast += 1;
           }
         }
+      } else if (free && enemiesAlive) {
+        const vowstrike = pickVowstrikeFiller(
+          vowstrikeVirtue,
+          vowstrikeVengeance,
+          enemiesAlive,
+          healer,
+          state.spellCooldowns,
+        );
+        if (vowstrike) engine.castSpell(vowstrike.id);
       }
     }
 

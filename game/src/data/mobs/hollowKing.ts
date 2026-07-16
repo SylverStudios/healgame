@@ -5,7 +5,7 @@ export const HOLLOW_KING_MOB = {
   name: 'Hollow King',
   tags: ['boss'],
   hp: 999,
-  autoDamage: 3,
+  autoDamage: 4,
   swingIntervalMs: 3_500,
   abilityIds: ['extinction'],
   visualKey: 'hollow-king',

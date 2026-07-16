@@ -276,10 +276,10 @@ describe('IRON_PASS data sanity', () => {
       hp: w.enemies[0]?.hp,
     }));
     expect(shapes).toEqual([
-      { count: 2, hp: 9 },
-      { count: 3, hp: 9 },
-      { count: 3, hp: 10 },
-      { count: 4, hp: 10 },
+      { count: 2, hp: 13 },
+      { count: 3, hp: 13 },
+      { count: 3, hp: 14 },
+      { count: 4, hp: 14 },
     ]);
   });
 

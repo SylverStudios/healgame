@@ -13,8 +13,8 @@ export const CINDER_VAULT_DUNGEON = {
   waves: [
     { enemies: [{ mobId: 'cinder-wraith', count: 2 }] },
     { enemies: [{ mobId: 'cinder-wraith', count: 3 }] },
-    { enemies: [{ mobId: 'cinder-wraith', count: 3, statOverrides: { hp: 12 } }] },
-    { enemies: [{ mobId: 'cinder-wraith', count: 4, statOverrides: { hp: 12 } }] },
+    { enemies: [{ mobId: 'cinder-wraith', count: 3, statOverrides: { hp: 14 } }] },
+    { enemies: [{ mobId: 'cinder-wraith', count: 4, statOverrides: { hp: 14 } }] },
     { enemies: [{ mobId: 'ember-colossus', count: 1 }] },
   ],
 } as const satisfies DungeonDef;

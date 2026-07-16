@@ -4,7 +4,7 @@ export const EMBER_COLOSSUS_MOB = {
   id: 'ember-colossus',
   name: 'Ember Colossus',
   tags: ['boss'],
-  hp: 210,
+  hp: 240,
   autoDamage: 3,
   swingIntervalMs: 3_200,
   abilityIds: ['emberfall'],
