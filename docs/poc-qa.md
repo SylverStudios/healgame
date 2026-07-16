@@ -795,3 +795,27 @@ npm run content -- validate
 ## Journey notes
 
 Stage B3 scrolls the hourglass and buys Still Waters → shared mid → Virtue Vowstrike → Wrath Ascendant → Vowbound crown (named targets). Cut nodes `vigil-deep-well` / `zealot-spendthrift-grace` are gone.
+
+---
+
+# Playtest polish — heal juice, round tree, hub challenge (2026-07-16)
+
+Light presentation pass before external playtests. No combat-rule or balance
+changes; presentation + hub/tree layout only.
+
+## Checklist
+
+| # | Criterion | Status | Notes |
+|---|-----------|--------|-------|
+| 1 | Basic heal feels juicier | ✅ | Soft camera shake, brighter green `+N` floats (~980ms), green ripple, simple particle dots |
+| 2 | Mana-spend aura on healer | ✅ | DBZ-style ellipses + orbiting sparks; intensity from mana spent in last 30s (`manaSpendTracker.ts`) |
+| 3 | Spell tree: round icon nodes | ✅ | Circles + glyph icon; rank pips; name/cost/desc on hover only |
+| 4 | Hub: vertical dungeon list + CURRENT | ✅ | Stacked wide buttons; `currentChallengeDungeon()` marks first unlocked uncleared |
+| 5 | No text spill on dungeon buttons | ✅ | Name left-aligned inside 440px button; CURRENT/cleared badge on the right |
+
+## Decisions
+
+1. **Heal shake** intentionally reopens the older juice-handoff "no heal shake" rule — playtest feedback wanted Nintendo-basic-action juice.
+2. **Mana aura** is presentation-only (base spell mana on `castStarted`); discounts / free charges are ignored for intensity.
+3. **Hub meta buttons** (Spell Tree / Spellbook) sit *above* the dungeon stack so a long unlock list cannot push them off the 540px canvas.
+4. Journey still clicks `hubDungeon:<id>` / `treeNode:<spotId>` by name — layout changes do not require journey coordinate edits.

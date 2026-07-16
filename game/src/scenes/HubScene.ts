@@ -1,10 +1,10 @@
 /**
  * Hub: shows XP/level/talent progress, applies the combat result that just
- * ended, routes pending first-clear relic offers, and launches
- * Ash Gate, the spell tree, Iron Pass (Dungeon 2, once
- * Ash Gate is cleared — alpha-0.1-handoff §D1), and The Maw (Dungeon 3, once
- * Iron Pass is cleared). Run mods (oath + relics) live in the shared top-right
- * RunModsBar. Temp art only — panels + text buttons, dark palette, monospace.
+ * ended, applies pending first-clear relic offers, and launches unlocked
+ * dungeons from a vertical challenge list (current uncleared dungeon marked
+ * CURRENT). Spell Tree / Spellbook sit above the dungeon stack. Run mods
+ * (oath + relics) live in the shared top-right RunModsBar. Temp art only —
+ * panels + text buttons, dark palette, monospace.
  */
 
 import Phaser from 'phaser';
@@ -13,6 +13,7 @@ import { loadSave, resetSave, saveGame, type SaveData } from '../save/save';
 import {
   applyCombatResult,
   availableTalentPoints,
+  currentChallengeDungeon,
   isDungeonUnlocked,
   type HubNotice,
 } from '../meta/progression';
@@ -22,6 +23,7 @@ import { levelForXp, SPELLS, xpForLevel } from '../data/constants';
 import { ORDERED_DUNGEONS, hubDungeonTargetName } from '../data/dungeons';
 import { RunModsBar } from '../ui/runModsBar';
 import type { CombatResult, CombatSceneData } from './CombatScene';
+import type { DungeonDef } from '../data/content/types';
 
 interface HubSceneData {
   combatResult?: CombatResult;
@@ -29,13 +31,22 @@ interface HubSceneData {
 
 const BG_COLOR = 0x1a1210;
 const BUTTON_COLOR = 0x3a2a22;
+const BUTTON_CURRENT_COLOR = 0x4a3820;
 const BORDER_COLOR = 0x0a0605;
+const BORDER_CURRENT = 0xf2c14e;
 const NOTICE_BG_COLOR = 0x3a2a10;
 const TEXT_COLOR = '#e8d8c8';
 const ACCENT_COLOR = '#f2c14e';
 const DIM_COLOR = '#a89888';
 const DANGER_COLOR = '#e05a4e';
+const CLEARED_COLOR = '#7ad67a';
 const FONT = 'monospace';
+
+/** Wide enough for full dungeon names without spilling; vertical stack only. */
+const DUNGEON_BUTTON_WIDTH = 440;
+const DUNGEON_BUTTON_HEIGHT = 38;
+const DUNGEON_ROW_GAP = 6;
+const META_BUTTON_Y = 175;
 
 export class HubScene extends Phaser.Scene {
   private sceneData: HubSceneData = {};
@@ -116,55 +127,81 @@ export class HubScene extends Phaser.Scene {
     const unlockedDungeons = ORDERED_DUNGEONS.filter((dungeon) =>
       isDungeonUnlocked(save, dungeon.id),
     );
-    const columns = Math.min(3, Math.max(1, unlockedDungeons.length));
-    const rows = Math.ceil(unlockedDungeons.length / columns);
-    const columnGap = 20;
-    const sideMargin = 40;
-    const dungeonButtonWidth = Math.min(
-      300,
-      (width - sideMargin * 2 - columnGap * (columns - 1)) / columns,
-    );
-    const dungeonStartY = 270;
+    const challenge = currentChallengeDungeon(save);
 
-    unlockedDungeons.forEach((dungeon, visibleIndex) => {
-      // A single bounded grid handles the ordered dungeon catalog (up to three
-      // columns). Later dungeons wrap to additional rows without eating the
-      // footer's restart space.
-      const column = visibleIndex % columns;
-      const row = Math.floor(visibleIndex / columns);
-      const rowCount = Math.min(columns, unlockedDungeons.length - row * columns);
-      const rowWidth = rowCount * dungeonButtonWidth + (rowCount - 1) * columnGap;
-      const rowStartX = centerX - rowWidth / 2 + dungeonButtonWidth / 2;
-      const x = rowStartX + column * (dungeonButtonWidth + columnGap);
-      const y = dungeonStartY + row * 62;
-      const suffix = dungeon.order === 1 ? '' : ` (Dungeon ${dungeon.order})`;
-      this.makeButton(
-        x,
-        y,
-        dungeonButtonWidth,
-        48,
-        `Enter ${dungeon.name}${suffix}`,
-        () => {
-          const combatData: CombatSceneData = {
-            encounterId: dungeon.id,
-            loadout: loadoutFromSave(save),
-            returnTo: SceneKeys.Hub,
-          };
-          this.scene.start(SceneKeys.Combat, combatData);
-        },
-        hubDungeonTargetName(dungeon.id),
-      );
-    });
-
-    const treeY = dungeonStartY + rows * 62 + 22;
-    this.makeButton(centerX - 160, treeY, 280, 52, 'Spell Tree', () => {
+    // Meta destinations stay above the dungeon stack so a long unlock list
+    // never pushes Spell Tree / Spellbook off the 540px canvas.
+    this.makeButton(centerX - 160, META_BUTTON_Y, 280, 44, 'Spell Tree', () => {
       this.scene.start(SceneKeys.Tree);
     }, 'hubTree');
-    this.makeButton(centerX + 160, treeY, 280, 52, 'Spellbook', () => {
+    this.makeButton(centerX + 160, META_BUTTON_Y, 280, 44, 'Spellbook', () => {
       this.scene.start(SceneKeys.Loadout);
     }, 'hubLoadout');
 
+    const dungeonStartY = META_BUTTON_Y + 52;
+    unlockedDungeons.forEach((dungeon, visibleIndex) => {
+      const y = dungeonStartY + visibleIndex * (DUNGEON_BUTTON_HEIGHT + DUNGEON_ROW_GAP);
+      const isCurrent = challenge?.id === dungeon.id;
+      const cleared = save.clearedDungeons.includes(dungeon.id);
+      this.makeDungeonButton(centerX, y, dungeon, isCurrent, cleared, () => {
+        const combatData: CombatSceneData = {
+          encounterId: dungeon.id,
+          loadout: loadoutFromSave(save),
+          returnTo: SceneKeys.Hub,
+        };
+        this.scene.start(SceneKeys.Combat, combatData);
+      });
+    });
+
     this.buildRestartControl(centerX, height - 28);
+  }
+
+  private makeDungeonButton(
+    x: number,
+    y: number,
+    dungeon: DungeonDef,
+    isCurrent: boolean,
+    cleared: boolean,
+    onClick: () => void,
+  ): void {
+    const bgColor = isCurrent ? BUTTON_CURRENT_COLOR : BUTTON_COLOR;
+    const borderColor = isCurrent ? BORDER_CURRENT : BORDER_COLOR;
+    const borderWidth = isCurrent ? 3 : 2;
+    const rect = this.add
+      .rectangle(x, y, DUNGEON_BUTTON_WIDTH, DUNGEON_BUTTON_HEIGHT, bgColor)
+      .setStrokeStyle(borderWidth, borderColor)
+      .setInteractive({ useHandCursor: true })
+      .setName(hubDungeonTargetName(dungeon.id));
+    rect.on('pointerdown', onClick);
+
+    const orderLabel = dungeon.order === 1 ? '' : ` · ${dungeon.order}`;
+    const titleColor = isCurrent ? ACCENT_COLOR : TEXT_COLOR;
+    this.add
+      .text(x - DUNGEON_BUTTON_WIDTH / 2 + 16, y, `${dungeon.name}${orderLabel}`, {
+        fontFamily: FONT,
+        fontSize: '16px',
+        color: titleColor,
+      })
+      .setOrigin(0, 0.5);
+
+    if (isCurrent) {
+      this.add
+        .text(x + DUNGEON_BUTTON_WIDTH / 2 - 14, y, 'CURRENT', {
+          fontFamily: FONT,
+          fontSize: '12px',
+          fontStyle: 'bold',
+          color: ACCENT_COLOR,
+        })
+        .setOrigin(1, 0.5);
+    } else if (cleared) {
+      this.add
+        .text(x + DUNGEON_BUTTON_WIDTH / 2 - 14, y, 'cleared', {
+          fontFamily: FONT,
+          fontSize: '12px',
+          color: CLEARED_COLOR,
+        })
+        .setOrigin(1, 0.5);
+    }
   }
 
   private buildRestartControl(x: number, y: number): void {
@@ -199,7 +236,15 @@ export class HubScene extends Phaser.Scene {
       .setStrokeStyle(2, BORDER_COLOR)
       .setInteractive({ useHandCursor: true })
       .setName(name);
-    this.add.text(x, y, label, { fontFamily: FONT, fontSize: '18px', color: TEXT_COLOR }).setOrigin(0.5);
+    this.add
+      .text(x, y, label, {
+        fontFamily: FONT,
+        fontSize: '18px',
+        color: TEXT_COLOR,
+        wordWrap: { width: w - 24 },
+        align: 'center',
+      })
+      .setOrigin(0.5);
     rect.on('pointerdown', onClick);
   }
 }
