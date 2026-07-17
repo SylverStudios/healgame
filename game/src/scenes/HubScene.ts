@@ -24,6 +24,7 @@ import { ORDERED_DUNGEONS, hubDungeonTargetName } from '../data/dungeons';
 import { RunModsBar } from '../ui/runModsBar';
 import type { CombatResult, CombatSceneData } from './CombatScene';
 import type { DungeonDef } from '../data/content/types';
+import { loadTelemetry, recordReset, sendPlaytestMail } from '../telemetry';
 
 interface HubSceneData {
   combatResult?: CombatResult;
@@ -56,7 +57,12 @@ const NOTICE_TO_META_GAP = 12;
 
 export class HubScene extends Phaser.Scene {
   private sceneData: HubSceneData = {};
-  private restartArmed = false;
+  /** Restart confirm: idle → armed → chooser (send feedback first?). */
+  private restartPhase: 'idle' | 'armed' | 'chooser' = 'idle';
+  private restartLabel: Phaser.GameObjects.Text | null = null;
+  private feedbackLabel: Phaser.GameObjects.Text | null = null;
+  private wipeChooser: Phaser.GameObjects.GameObject[] = [];
+  private statusText: Phaser.GameObjects.Text | null = null;
 
   constructor() {
     super(SceneKeys.Hub);
@@ -64,7 +70,11 @@ export class HubScene extends Phaser.Scene {
 
   init(data: HubSceneData): void {
     this.sceneData = data ?? {};
-    this.restartArmed = false;
+    this.restartPhase = 'idle';
+    this.restartLabel = null;
+    this.feedbackLabel = null;
+    this.wipeChooser = [];
+    this.statusText = null;
   }
 
   create(): void {
@@ -166,7 +176,48 @@ export class HubScene extends Phaser.Scene {
       });
     });
 
-    this.buildRestartControl(centerX, height - 28);
+    // Bottom corners: feedback (left) and restart (right) so wipe-confirm
+    // options can sit in the clear center without stacking on either control.
+    this.buildFeedbackControl(16, height - 20);
+    this.buildRestartControl(width - 16, height - 20);
+  }
+
+  private buildFeedbackControl(x: number, y: number): void {
+    this.feedbackLabel = this.add
+      .text(x, y, '✨ Send Aaron feedback', {
+        fontFamily: FONT,
+        fontSize: '13px',
+        color: DIM_COLOR,
+      })
+      .setOrigin(0, 0.5)
+      .setInteractive({ useHandCursor: true })
+      .setName('hubSendFeedback');
+    this.feedbackLabel.on('pointerdown', () => {
+      void this.openPlaytestMail();
+    });
+  }
+
+  private async openPlaytestMail(): Promise<void> {
+    const result = await sendPlaytestMail();
+    if (!result.ok) {
+      this.showStatus(result.reason ?? 'Could not open mail.', DANGER_COLOR);
+      return;
+    }
+    const note = result.copied
+      ? 'Mail opened — full JSON copied to clipboard.'
+      : 'Mail opened — paste was unavailable; body may be truncated.';
+    this.showStatus(note, ACCENT_COLOR);
+  }
+
+  private showStatus(text: string, color: string): void {
+    if (this.statusText) this.statusText.destroy();
+    this.statusText = this.add
+      .text(this.scale.width / 2, this.scale.height - 48, text, {
+        fontFamily: FONT,
+        fontSize: '12px',
+        color,
+      })
+      .setOrigin(0.5);
   }
 
   private makeDungeonButton(
@@ -218,21 +269,108 @@ export class HubScene extends Phaser.Scene {
   }
 
   private buildRestartControl(x: number, y: number): void {
-    const label = this.add
+    this.restartLabel = this.add
       .text(x, y, 'Restart (wipe save)', { fontFamily: FONT, fontSize: '14px', color: DIM_COLOR })
-      .setOrigin(0.5)
+      .setOrigin(1, 0.5)
       .setInteractive({ useHandCursor: true })
       .setName('hubRestart');
 
-    label.on('pointerdown', () => {
-      if (!this.restartArmed) {
-        this.restartArmed = true;
-        label.setText('Really wipe everything?').setColor(DANGER_COLOR);
+    this.restartLabel.on('pointerdown', () => {
+      if (this.restartPhase === 'idle') {
+        this.restartPhase = 'armed';
+        this.restartLabel?.setText('Really wipe everything?').setColor(DANGER_COLOR);
         return;
       }
-      resetSave();
-      this.scene.start(SceneKeys.Tutorial);
+      if (this.restartPhase === 'armed') {
+        const log = loadTelemetry();
+        if (log.runs.length > 0 || log.playMs > 0) {
+          this.showWipeChooser();
+          return;
+        }
+        this.confirmWipe();
+      }
     });
+  }
+
+  private showWipeChooser(): void {
+    this.restartPhase = 'chooser';
+    this.restartLabel?.setVisible(false).disableInteractive();
+    this.feedbackLabel?.setVisible(false).disableInteractive();
+    this.clearWipeChooser();
+
+    const { width, height } = this.scale;
+    const cx = width / 2;
+    // Center band above the corner controls so options never cover feedback/restart.
+    const promptY = height - 56;
+    const optionsY = height - 28;
+
+    const prompt = this.add
+      .text(cx, promptY, 'Please send Aaron feedback first?', {
+        fontFamily: FONT,
+        fontSize: '13px',
+        color: ACCENT_COLOR,
+      })
+      .setOrigin(0.5)
+      .setName('hubWipePrompt');
+
+    const sendThenWipe = this.add
+      .text(cx - 180, optionsY, 'Send, then wipe', {
+        fontFamily: FONT,
+        fontSize: '13px',
+        color: TEXT_COLOR,
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .setName('hubWipeSendThen');
+    sendThenWipe.on('pointerdown', () => {
+      void this.openPlaytestMail().then(() => this.confirmWipe());
+    });
+
+    const wipeOnly = this.add
+      .text(cx, optionsY, 'Wipe without sending', {
+        fontFamily: FONT,
+        fontSize: '13px',
+        color: DANGER_COLOR,
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .setName('hubWipeWithoutSend');
+    wipeOnly.on('pointerdown', () => this.confirmWipe());
+
+    const cancel = this.add
+      .text(cx + 180, optionsY, 'Cancel', {
+        fontFamily: FONT,
+        fontSize: '13px',
+        color: DIM_COLOR,
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .setName('hubWipeCancel');
+    cancel.on('pointerdown', () => this.cancelWipeChooser());
+
+    this.wipeChooser = [prompt, sendThenWipe, wipeOnly, cancel];
+  }
+
+  private clearWipeChooser(): void {
+    for (const obj of this.wipeChooser) obj.destroy();
+    this.wipeChooser = [];
+  }
+
+  private cancelWipeChooser(): void {
+    this.clearWipeChooser();
+    this.restartPhase = 'idle';
+    this.restartLabel
+      ?.setVisible(true)
+      .setInteractive({ useHandCursor: true })
+      .setText('Restart (wipe save)')
+      .setColor(DIM_COLOR);
+    this.feedbackLabel?.setVisible(true).setInteractive({ useHandCursor: true });
+  }
+
+  private confirmWipe(): void {
+    recordReset();
+    resetSave();
+    this.scene.start(SceneKeys.Tutorial);
   }
 
   private makeButton(

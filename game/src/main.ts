@@ -7,6 +7,7 @@ import { TreeScene } from './scenes/TreeScene';
 import { RelicScene } from './scenes/RelicScene';
 import { LoadoutScene } from './scenes/LoadoutScene';
 import { installTestHooks } from './debug/testHooks';
+import { installPlaytimeTracker } from './telemetry';
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -24,3 +25,4 @@ const game = new Phaser.Game({
   scene: [BootScene, TutorialScene, CombatScene, HubScene, TreeScene, RelicScene, LoadoutScene],
 });
 installTestHooks(game);
+installPlaytimeTracker();

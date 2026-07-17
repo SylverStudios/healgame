@@ -20,6 +20,11 @@ by name.
 | `hubTree` | Talent Tree button | `HubScene.ts` |
 | `hubLoadout` | Spellbook button | `HubScene.ts` |
 | `hubRestart` | restart text label | `HubScene.ts` |
+| `hubSendFeedback` | "✨ Send Aaron feedback" text (bottom-left) | `HubScene.ts` |
+| `hubWipePrompt` | wipe-confirm telemetry prompt | `HubScene.ts` |
+| `hubWipeSendThen` | "Send, then wipe" text | `HubScene.ts` |
+| `hubWipeWithoutSend` | "Wipe without sending" text | `HubScene.ts` |
+| `hubWipeCancel` | wipe-confirm cancel text | `HubScene.ts` |
 | `loadoutSlot:<i>` | action-bar slot rect | `LoadoutScene.ts` |
 | `loadoutPick:<spellId>` / `loadoutPick:empty` | spell picker row | `LoadoutScene.ts` |
 | `loadoutBack` | back button | `LoadoutScene.ts` |

@@ -7,6 +7,15 @@ Newest first. Numbers and rule detail live in `game/src/data/` and
 
 ---
 
+## 2026-07-17 — Playtest telemetry + feedback mailto
+
+- Local balance log (`healgame-telemetry-v1`): per-dungeon runs with level,
+  talents, action bar, relics, spell/CD press counts (key vs click), timestamps,
+  playtime, and wipe-save reset count. Survives Restart (separate from save).
+- Hub: **✨ Send Aaron feedback** (bottom-left; mailto with write space + telemetry
+  summary/JSON on clipboard). Restart (bottom-right) asks to send first when a
+  log exists. Glance CLI: `npm run telemetry -- path/to.json`.
+
 ## 2026-07-17 — Mid-boss pressure (Emberfall / Matriarch / Dirge)
 
 - Emberfall DoT ticks harder (2/tick, 3s window) so the burn can’t be ignored.

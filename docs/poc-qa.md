@@ -891,3 +891,27 @@ Status: current · Last verified: 2026-07-17
 3. **Tab** cycles combat heal targets in engine order
    (`tank → dps1 → dps2 → healer`), skips dead, wraps. Click targeting
    unchanged. Digits 1–4 remain out of scope.
+
+---
+
+# Playtest telemetry export (2026-07-17)
+
+Status: current · Last verified: 2026-07-17
+
+Balance-focused local telemetry for friend playtests (no analytics SDK):
+
+1. **Storage** — `healgame-telemetry-v1` (not the game save). Restart wipe
+   increments `resetCount` but keeps the log so players can still export.
+2. **Per run** — dungeon id, start/end ISO timestamps, sim duration, win/wipe,
+   level + xp, subclass, `treeRanks`, `actionBar`, `relicIds`, and press counts
+   per spell/CD split into `key` vs `click` (counts attempts, including GCD/CD
+   misses that reach the scene handlers).
+3. **Playtime** — focused-tab wall clock accumulated into `playMs`.
+4. **Export** — One Hub control (**✨ Send Aaron feedback**, bottom-left) copies
+   full JSON to clipboard and opens mail to `sylverstudiosdev@gmail.com`
+   (`game/src/telemetry/config.ts`) with a blank feedback block + telemetry
+   summary. Restart sits bottom-right; wipe confirm hides corner controls and
+   prompts to send first when a log exists.
+5. **Glance CLI** — `npm run telemetry -- path/to.json` prints deterministic
+   rollups (dungeon win rates, presses key/click, talent frequency) before
+   handing the full dump to an agent.
