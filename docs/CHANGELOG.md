@@ -7,6 +7,18 @@ Newest first. Numbers and rule detail live in `game/src/data/` and
 
 ---
 
+## 2026-07-17 — Mid-boss pressure (Emberfall / Matriarch / Dirge)
+
+- Emberfall DoT ticks harder (2/tick, 3s window) so the burn can’t be ignored.
+- Thorn Matriarch autos harder; Needle Gaze comes a bit earlier/more often.
+- Dirge / Black Choir: more HP + heavier Soul Toll mana burn — mid-tree wipes;
+  crown kits still clear (tree-depth gate).
+- Ash Gate / Gate Warden left alone.
+- Relic glyphs: grey defense, red offense, green healing.
+- Tree tooltips show rank capacity `(owned/max)` instead of redundant `1 point`.
+- Graven Scale laid out as a left dead-end spur (no longer on the vow→thrift line).
+- Combat: Tab cycles party heal targets (skips dead, wraps).
+
 ## 2026-07-16 — Playtest polish
 
 - Juicier basic heals (soft shake, brighter floats, ripple, particles).

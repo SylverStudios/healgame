@@ -779,7 +779,8 @@ npm run content -- validate
    migration. **Superseded by save v7** (Bonk + actionBar) — see section below.
 5. **Tree hourglass:** spots include `shared-mend-potency`, `shared-zealous-potency`, `vowstrike-*`, `wrath-ascendant`, `vowbound-crown`. Exclusive group `vowstrike-aspect`. Crown amp via `ampOwnedSpells`.
 6. **Oath×aspect twists:** Vigil+Virtue mana−1 Absolution; Vigil+Vengeance missing-health Reckoning; Zealot+Virtue Absolution→Zealous Mending synergy; Zealot+Vengeance Reckoning +1 heal.
-7. **Black Choir:** Dirge Sovereign `statOverrides.hp: 200` (was mob base 260) so crown kits clear under Soul Toll; gate flipped wipe→clear for all oath×aspect kits.
+7. **Black Choir:** Dirge Sovereign HP override + Soul Toll burn retuned (see
+   2026-07-17 Dirge section); crown kits clear, mid-tree wipes.
 8. **The Maw:** Hollow King `hp: 9999`; bots treat 10‑min sim cap as wipe (`capAsWipe`). Still unwinnable ± any relic.
 9. **Glyphs:** single-char placeholders (`M/Z/G/F/V/X/S/L/W`…). Tree WORLD_HEIGHT 1080; journey clicks by name.
 10. **QWER hotkeys:** slots 0–7 bind **Q W E R** then **Shift+Q/W/E/R** (spells then CDs in display order). Keycaps show `Q`…`R` / `sQ`…`sR`. Digits removed; Escape cancel unchanged. Max 8; extras unbound.
@@ -833,3 +834,60 @@ Status: current · Last verified: 2026-07-17
 
 Covered by save/loadout/talentTree tests and full `npm run verify` (journey uses
 named loadout + combat targets).
+
+---
+
+# Mid-boss pressure retune — Emberfall + Thorn Matriarch (2026-07-17)
+
+Status: current · Last verified: 2026-07-17
+
+Playtest: Emberfall was skippable; Thorn Matriarch was too soft; Ash Gate /
+Gate Warden difficulty is intentionally unchanged (liked as a grind).
+
+Scripted-bot probe (then deleted) against maxed crown kits; gate shape held
+(clear with ≥3 alive, mechanic lands ≥1). Ash Gate telemetry byte-identical.
+
+| Value | Old | New |
+|---|---|---|
+| Emberfall `damagePerTick` | 1 | 2 |
+| Emberfall `durationMs` | 4000 | 3000 (3 ticks → 6 party damage vs old 4) |
+| Thorn Matriarch `autoDamage` | 3 | 4 |
+| Needle Gaze `firstCastAtMs` | 6000 | 5000 |
+| Needle Gaze `intervalMs` | 26000 | 24000 |
+
+Ember Colossus autos/HP untouched. `balance.test.ts` + `npm run content -- balance`
+for cinder-vault / verdant-rift / ash-gate green.
+
+---
+
+# Dirge / Black Choir tree-depth retune (2026-07-17)
+
+Status: current · Last verified: 2026-07-17
+
+Playtest: Dirge Sovereign was clearable without deep tree investment. Re-tuned
+so oath-path kits (no Vowstrike / Wrath / crown) wipe, while all four
+oath×aspect crown kits still clear with ≥3 alive (gate shape preserved).
+
+| Value | Old | New |
+|---|---|---|
+| Dirge dungeon HP override | 175 | 225 |
+| Dirge `swingIntervalMs` | 2800 | 3200 |
+| Soul Toll `manaBurn` | 7 | 10 |
+
+New balance gate: `VIGIL_MID_TREE_LOADOUT` / `ZEALOT_MID_TREE_LOADOUT` wipe on
+Black Choir. Ash Gate unchanged.
+
+---
+
+# Tree UX + Tab targeting (2026-07-17)
+
+Status: current · Last verified: 2026-07-17
+
+1. **Talent tooltips** show rank capacity `(owned/max)` instead of redundant
+   `1 point` (every live node still costs one talent point; "Need 1 point"
+   feedback when unaffordable remains).
+2. **Graven Scale** is a Vigil dead-end spur at `(40, 430)` — left of the
+   Patient Vow → Thrift column so edges no longer overlap.
+3. **Tab** cycles combat heal targets in engine order
+   (`tank → dps1 → dps2 → healer`), skips dead, wraps. Click targeting
+   unchanged. Digits 1–4 remain out of scope.

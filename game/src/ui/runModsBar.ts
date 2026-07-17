@@ -7,6 +7,7 @@
 
 import Phaser from 'phaser';
 import type { RunModDisplay, RunModKind } from '../data/runMods';
+import { relicGlyphColorById } from './relicColors';
 
 const ICON_RADIUS = 12;
 const ICON_GAP = 8;
@@ -24,20 +25,10 @@ const TOOLTIP_MAX_WIDTH = 220;
 const TOOLTIP_DEPTH = 300;
 const FONT = 'monospace';
 
-/** Presentation colors / shapes — not gameplay numbers. */
-const GLYPH_COLOR: Record<string, number> = {
+/** Oath diamonds keep distinct subclass hues; relics use role scales. */
+const OATH_GLYPH_COLOR: Record<string, number> = {
   'vigil-oath': 0x6a9cc8, // calm blue
   'zealot-oath': 0xe05a4e, // zeal red
-  'ember-ledger': 0xe0703a,
-  'triage-bell': 0xf2c14e,
-  'still-reservoir': 0x6a8aa0,
-  'vital-ember': 0xd87878,
-  'bastion-plate': 0x8797a8,
-  'iron-ward': 0x6f7b86,
-  'twin-fang': 0xc86a5a,
-  quicksteel: 0x8fc7c7,
-  'warblood-gem': 0xa84f4f,
-  'vanguard-sigil': 0xb58b5d,
 };
 
 export interface RunModsBarOptions {
@@ -63,14 +54,15 @@ export function drawRunModGlyph(
   kind: RunModKind,
   radius = ICON_RADIUS,
 ): Phaser.GameObjects.Shape {
-  const color = GLYPH_COLOR[modId] ?? 0xa89888;
   if (kind === 'oath') {
+    const color = OATH_GLYPH_COLOR[modId] ?? 0xa89888;
     // Diamond (rotated square) — reads distinct from relic circles.
     return scene.add
       .rectangle(x, y, radius * 1.6, radius * 1.6, color)
       .setAngle(45)
       .setStrokeStyle(2, ICON_BORDER);
   }
+  const color = relicGlyphColorById(modId);
   return scene.add.circle(x, y, radius, color).setStrokeStyle(2, ICON_BORDER);
 }
 

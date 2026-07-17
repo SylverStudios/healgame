@@ -202,11 +202,50 @@ export const ZEALOT_VENGEANCE_SAVE: SaveData = makeBalanceSave({
   subclass: 'zealot',
 });
 
+/**
+ * Oath-path Vigil without Vowstrike / Wrath / crown — clears mid dungeons,
+ * should wipe on Black Choir (tree-depth gate).
+ */
+export const VIGIL_MID_TREE_SAVE: SaveData = makeBalanceSave({
+  xp: 400,
+  unlockedSpells: ['solemn-mend', 'zealous-mending'],
+  treeRanks: {
+    'deep-reserves': 3,
+    'vigil-oath': 1,
+    'vigil-patient-vow': 3,
+    'vigil-graven-scale': 1,
+    'vigil-thrift': 1,
+    'vigil-still-waters': 1,
+    'shared-mend-potency': 1,
+    'shared-zealous-potency': 1,
+  },
+  subclass: 'vigil',
+});
+
+/** Oath-path Zealot without Vowstrike / Wrath / crown. */
+export const ZEALOT_MID_TREE_SAVE: SaveData = makeBalanceSave({
+  xp: 400,
+  unlockedSpells: ['solemn-mend', 'zealous-mending'],
+  treeRanks: {
+    'deep-reserves': 3,
+    'zealot-oath': 1,
+    'zealot-fervent-chain': 3,
+    'zealot-steady-hands': 1,
+    'zealot-quick-breath': 1,
+    'zealot-frenzied-liturgy': 1,
+    'shared-mend-potency': 1,
+    'shared-zealous-potency': 1,
+  },
+  subclass: 'zealot',
+});
+
 export const VIGIL_LOADOUT: CombatMods = loadoutFromSave(VIGIL_SAVE);
 export const VIGIL_VENGEANCE_LOADOUT: CombatMods = loadoutFromSave(VIGIL_VENGEANCE_SAVE);
 export const VIGIL_EFFICIENCY_LOADOUT: CombatMods = loadoutFromSave(VIGIL_EFFICIENCY_SAVE);
 export const ZEALOT_LOADOUT: CombatMods = loadoutFromSave(ZEALOT_SAVE);
 export const ZEALOT_VENGEANCE_LOADOUT: CombatMods = loadoutFromSave(ZEALOT_VENGEANCE_SAVE);
+export const VIGIL_MID_TREE_LOADOUT: CombatMods = loadoutFromSave(VIGIL_MID_TREE_SAVE);
+export const ZEALOT_MID_TREE_LOADOUT: CombatMods = loadoutFromSave(ZEALOT_MID_TREE_SAVE);
 
 /**
  * All maxed builds for `npm run content -- balance`.

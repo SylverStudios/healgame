@@ -9,6 +9,7 @@
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { CombatEngine } from '../combat/engine';
+import { nextPartyTargetId } from '../combat/partyTarget';
 import type {
   CombatEvent,
   CombatState,
@@ -249,6 +250,7 @@ export class CombatScene extends Phaser.Scene {
     );
     this.registerHotkeys(spells, this.sceneData.loadout.cooldowns);
     this.registerEscapeKey();
+    this.registerTabTargetKey();
 
     const available = this.sceneData.loadout.paceMultipliersTenths;
     this.combatPaceTenths = available.includes(save.combatPaceTenths) ? save.combatPaceTenths : 10;
@@ -465,6 +467,20 @@ export class CombatScene extends Phaser.Scene {
     keyboard.on('keydown-ESC', () => {
       if (this.engine.state.status !== 'running') return;
       this.engine.cancelCast();
+    });
+  }
+
+  /** Tab cycles heal target: tank → dps1 → dps2 → healer → wrap (skips dead). */
+  private registerTabTargetKey(): void {
+    const keyboard = this.input.keyboard;
+    if (!keyboard) return;
+    keyboard.on('keydown-TAB', (event: KeyboardEvent) => {
+      event.preventDefault();
+      if (this.engine.state.status !== 'running') return;
+      const next = nextPartyTargetId(this.engine.state.party, this.engine.state.targetId);
+      if (next === null) return;
+      this.engine.setTarget(next);
+      this.syncView();
     });
   }
 

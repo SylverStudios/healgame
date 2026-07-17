@@ -8,8 +8,8 @@ export const EMBERFALL = {
   castMs: 4_000,
   firstCastAtMs: 5_000,
   intervalMs: 15_000,
-  durationMs: 4_000,
+  durationMs: 3_000,
   tickMs: 1_000,
-  damagePerTick: 1,
+  damagePerTick: 2,
   visualKey: 'emberfall',
 } as const satisfies EnemyAbilityDef;
