@@ -1,6 +1,6 @@
 # Repository documentation review
 
-Status: current · Authority: repeatable maintenance task · Last verified: 2026-07-13
+Status: current · Authority: repeatable maintenance task · Last verified: 2026-07-17
 
 ## Goal
 

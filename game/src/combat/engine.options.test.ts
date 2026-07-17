@@ -5,7 +5,7 @@ import { makeTestEncounter, TEST_SPELLS } from './testFixtures';
 
 /**
  * Focused test for the Chunk 3 constructor extension: `options.bonusMaxMana`
- * (e.g. from the "Deep Reserves" spell-tree node) adds to the healer's max
+ * (e.g. from the "Deep Reserves" talent-tree node) adds to the healer's max
  * AND starting mana. Everything else about the engine is unchanged.
  */
 describe('CombatEngine constructor options', () => {

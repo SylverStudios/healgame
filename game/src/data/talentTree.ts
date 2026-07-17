@@ -1,10 +1,11 @@
 /**
- * Live spell-tree config + combat resolve (new tree service).
+ * Live talent-tree config + combat resolve (new tree service).
  *
  * Alpha 0.2: hourglass topology
  *   Deep Reserves (×3 chain) → Vigil | Zealot oaths (exclusive) → branch
- *   follow-ups → [shared mid: mend/zealous potency] → Vowstrike fork
- *   (light/dark, exclusive) → shared crown (Wrath Ascendant + Vowbound Crown).
+ *   follow-ups → layer-2 output → [shared mid: mend/zealous potency] →
+ *   Vowstrike fork (light/dark, exclusive) → shared crown
+ *   (Wrath Ascendant + Vowbound Crown).
  *
  * Multi-rank nodes are spot chains (one purchase = one content entry).
  * Combat never sees the graph — call `combatModsFromTree` (or
@@ -38,7 +39,7 @@ import {
 const s = (ms: number): string => `${(ms / 1000).toFixed(1)}s`;
 
 /** Gameplay effect carried in node content — tree service never reads this. */
-export type SpellTreeEffect =
+export type TalentTreeEffect =
   | { kind: 'bonusMaxMana'; amount: number }
   | { kind: 'grantSpell'; spellId: string }
   | { kind: 'synergy'; triggerSpellId: string; buffedSpellId: string; bonusHeal: number }
@@ -56,10 +57,10 @@ export type SpellTreeEffect =
   | { kind: 'ampOwnedSpells'; spellIds: string[]; healDelta?: number; damageDelta?: number };
 
 /** Opaque-to-tree payload: display + effect (+ optional subclass tag for oaths). */
-export interface SpellTreeContent {
+export interface TalentTreeContent {
   name: string;
   description: string;
-  effect: SpellTreeEffect;
+  effect: TalentTreeEffect;
   subclass?: SubclassId;
   /** Alpha 0.2 §D8 — single-char placeholder glyph for tree node display. */
   glyph?: string;
@@ -83,7 +84,7 @@ export interface CombatMods {
   manaRegen?: { amount: number; intervalMs: number };
 }
 
-function content(c: SpellTreeContent): SpellTreeContent {
+function content(c: TalentTreeContent): TalentTreeContent {
   return c;
 }
 
@@ -96,7 +97,7 @@ function rankSpot(args: {
   requiresFirst?: NodeDef['requires'];
   exclusiveGroup?: string;
   exclusiveGroupFirst?: string;
-  contentForRank: (rank: number) => SpellTreeContent;
+  contentForRank: (rank: number) => TalentTreeContent;
 }): { nodes: NodeDef[]; spot: SpotDef } {
   const nodes: NodeDef[] = [];
   const chain: string[] = [];
@@ -146,10 +147,7 @@ const vigilOath: NodeDef = {
   cost: { currency: 'talent', amount: 1 },
   content: content({
     name: 'Path of the Vigil',
-    description:
-      `Swear the Vigil oath (locks out the Zealot). Grants ${SPELLS.solemnVigil.name}: ` +
-      `heals ${SPELLS.solemnVigil.heal}, costs ${SPELLS.solemnVigil.mana} mana, ` +
-      `${s(SPELLS.solemnVigil.castMs)} cast — slow, efficient.`,
+    description: 'Swear the Vigil oath (locks out the Zealot). Grants a slow, efficient heal.',
     glyph: 'G',
     subclass: 'vigil',
     effect: { kind: 'grantSpell', spellId: SPELLS.solemnVigil.id },
@@ -163,10 +161,7 @@ const zealotOath: NodeDef = {
   cost: { currency: 'talent', amount: 1 },
   content: content({
     name: 'Path of the Zealot',
-    description:
-      `Swear the Zealot oath (locks out the Vigil). Grants ${SPELLS.zealousFlare.name}: ` +
-      `heals ${SPELLS.zealousFlare.heal}, costs ${SPELLS.zealousFlare.mana} mana, ` +
-      `${s(SPELLS.zealousFlare.castMs)} cast — fast, pricey per point.`,
+    description: 'Swear the Zealot oath (locks out the Vigil). Grants a fast, pricey panic heal.',
     glyph: 'F',
     subclass: 'zealot',
     effect: { kind: 'grantSpell', spellId: SPELLS.zealousFlare.id },
@@ -386,12 +381,19 @@ const zealotFrenziedLiturgy: NodeDef = {
 };
 
 // ---------------------------------------------------------------------------
-// Shared mid (Alpha 0.2 NEW) — gate: any of oath follow-ups
+// Shared mid (Alpha 0.2) — gate: any layer-2 output node (not the specialization
+// forks). Keeps Patient Vow / Measured Devotion / Fervent Chain / Steady Hands
+// from fanning out to mid + branch options at once.
 // ---------------------------------------------------------------------------
 
 const SHARED_MID_REQUIRES: NodeDef['requires'] = {
   mode: 'any',
-  nodes: ['vigil-patient-vow-1', 'vigil-measured-devotion', 'zealot-fervent-chain-1', 'zealot-steady-hands'],
+  nodes: [
+    'vigil-thrift',
+    'vigil-still-waters',
+    'zealot-quick-breath',
+    'zealot-frenzied-liturgy',
+  ],
 };
 
 const sharedMendPotency: NodeDef = {
@@ -446,12 +448,7 @@ const vowstrikeVirtueNode: NodeDef = {
   cost: { currency: 'talent', amount: 1 },
   content: content({
     name: SPELLS.vowstrikeVirtue.name,
-    description:
-      `Gain ${SPELLS.vowstrikeVirtue.name}: strike the front enemy for ` +
-      `${SPELLS.vowstrikeVirtue.damage} damage, then your next spell costs ` +
-      `${SPELLS.vowstrikeVirtue.castBuff.amount} less mana ` +
-      `(${SPELLS.vowstrikeVirtue.mana} mana, instant, 10s CD). ` +
-      `Locks Vowstrike: Reckoning.`,
+    description: 'Strike, then discount your next spell. Locks Vowstrike: Reckoning.',
     glyph: 'V',
     effect: { kind: 'grantSpell', spellId: SPELLS.vowstrikeVirtue.id },
   }),
@@ -464,12 +461,7 @@ const vowstrikeVengeanceNode: NodeDef = {
   cost: { currency: 'talent', amount: 1 },
   content: content({
     name: SPELLS.vowstrikeVengeance.name,
-    description:
-      `Gain ${SPELLS.vowstrikeVengeance.name}: strike the front enemy for ` +
-      `${SPELLS.vowstrikeVengeance.damage} damage, then your next heal gains ` +
-      `+${SPELLS.vowstrikeVengeance.castBuff.pct}% potency ` +
-      `(${SPELLS.vowstrikeVengeance.mana} mana, instant, 10s CD). ` +
-      `Locks Vowstrike: Absolution.`,
+    description: 'Strike, then empower your next heal. Locks Vowstrike: Absolution.',
     glyph: 'X',
     effect: { kind: 'grantSpell', spellId: SPELLS.vowstrikeVengeance.id },
   }),
@@ -516,8 +508,8 @@ const vowboundCrownNode: NodeDef = {
 // Authoritative config
 // ---------------------------------------------------------------------------
 
-/** Authoritative spell-tree config for the new service. */
-export const SPELL_TREE: TreeConfig = {
+/** Authoritative talent-tree config for the new service. */
+export const TALENT_TREE: TreeConfig = {
   nodes: [
     ...deepReserves.nodes,
     vigilOath,
@@ -562,9 +554,9 @@ export const SPELL_TREE: TreeConfig = {
   ],
 };
 
-const configError = validateConfig(SPELL_TREE);
+const configError = validateConfig(TALENT_TREE);
 if (configError) {
-  throw new Error(`SPELL_TREE invalid: ${configError.message}`);
+  throw new Error(`TALENT_TREE invalid: ${configError.message}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -586,7 +578,7 @@ if (configError) {
  */
 export function applyOathVowstrikeTwists(
   mods: CombatMods,
-  contents: readonly SpellTreeContent[],
+  contents: readonly TalentTreeContent[],
 ): void {
   const hasVigil = contents.some(
     (c) =>
@@ -651,7 +643,7 @@ export function applyOathVowstrikeTwists(
  * baking; oath×vowstrike twists are applied last.
  */
 export function resolveCombatMods(
-  contents: readonly SpellTreeContent[],
+  contents: readonly TalentTreeContent[],
   unlockedSpellIds: readonly string[],
 ): CombatMods {
   const spellIds = [...unlockedSpellIds];
@@ -660,8 +652,8 @@ export function resolveCombatMods(
   const missingMap = new Map<string, MissingHealthBonusRule>();
   const missingPctMap = new Map<string, MissingHealthPctBonusRule>();
   const fullHealthMap = new Map<string, FullHealthBonusRule>();
-  const castMods: Extract<SpellTreeEffect, { kind: 'castMod' }>[] = [];
-  const ampSpells: Extract<SpellTreeEffect, { kind: 'ampOwnedSpells' }>[] = [];
+  const castMods: Extract<TalentTreeEffect, { kind: 'castMod' }>[] = [];
+  const ampSpells: Extract<TalentTreeEffect, { kind: 'ampOwnedSpells' }>[] = [];
   const paceTenths = new Set<number>([10]);
   const cooldownMap = new Map<string, CooldownDef>();
 
@@ -787,7 +779,7 @@ export function combatModsFromTree(
   state: TreeState,
   unlockedSpellIds: readonly string[],
 ): CombatMods {
-  return resolveCombatMods(ownedContents<SpellTreeContent>(SPELL_TREE, state), unlockedSpellIds);
+  return resolveCombatMods(ownedContents<TalentTreeContent>(TALENT_TREE, state), unlockedSpellIds);
 }
 
 /**
@@ -860,7 +852,7 @@ export function ownedSpellsFromSave(save: {
  * Map legacy `treeRanks` (nodeId → ranks) onto owned chain node ids for the
  * new config. Used by parity tests and save migration. Retired node ids
  * (e.g. `zealot-desperate-zeal`, `vigil-deep-well`, `zealot-spendthrift-grace`)
- * are never emitted — they no longer exist in `SPELL_TREE` and `create()`
+ * are never emitted — they no longer exist in `TALENT_TREE` and `create()`
  * throws on unknown owned ids.
  */
 export function ownedIdsFromLegacyRanks(treeRanks: Record<string, number>): string[] {
@@ -901,7 +893,7 @@ export function treeStateFromLegacy(
   treeRanks: Record<string, number>,
   availableTalentPoints: number,
 ): TreeState {
-  return create(SPELL_TREE, { talent: availableTalentPoints }, ownedIdsFromLegacyRanks(treeRanks));
+  return create(TALENT_TREE, { talent: availableTalentPoints }, ownedIdsFromLegacyRanks(treeRanks));
 }
 
 const MULTI_RANK_PREFIXES: { prefix: string; max: number }[] = [

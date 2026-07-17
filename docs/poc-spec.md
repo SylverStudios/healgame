@@ -19,7 +19,7 @@ The PoC is successful when a player can:
 2. Enter **Ash Gate**, wipe (expected), return to hub with **gold + XP**.
 3. Understand hub well enough on the second visit to spend / see progression.
 4. Gain a **second skill from XP** (level ding → skill, no extra click required).
-5. Unlock **one skill from the spell tree** (gold spend).
+5. Unlock **one skill from the talent tree** (gold spend).
 6. Clear Ash Gate, earn **1 ruby** (first completion of that dungeon).
 7. Spend that ruby on a **subclass split** (see §6) that opens one branch and locks the other.
 8. Enter **Dungeon 2** with an **insanely overpowered boss**, die forever in an endless sandbox (no clear expected; no further dungeons).
@@ -70,9 +70,9 @@ New game
   → Enter Ash Gate (expected wipe)
   → Hub: gold + XP from enemies killed; UI already familiar from tutorial
   → Play more: level ding → second skill auto-unlocks (XP skill)
-  → Spend gold on spell tree → unlock one tree skill
+  → Spend gold on talent tree → unlock one tree skill
   → Eventually clear Ash Gate → 1 ruby
-  → Spend ruby → subclass A or B in the spell tree (rival path LOCKED, not hidden)
+  → Spend ruby → subclass A or B in the talent tree (rival path LOCKED, not hidden)
   → Ash Gate replayable for gold + XP
   → Unlock Dungeon 2 → overpowered boss sandbox (cannot clear / no need to)
 ```
@@ -134,7 +134,7 @@ Dungeon 2 boss: absurd HP / damage so the party cannot win with PoC power. Sandb
 | Channel | What it does in PoC |
 |---------|---------------------|
 | **XP / level** | **Kit breadth.** At a level threshold, **auto-grant** a skill (PoC: Zealous Mending at Lv 2). No spend UI. Further XP has no extra sinks yet. |
-| **Gold** | **Tree growth.** Spend on **spell tree** nodes (Deep Reserves, forsaken-path tempo, …). |
+| **Gold** | **Tree growth.** Spend on **talent tree** nodes (Deep Reserves, forsaken-path tempo, …). |
 | **Ruby** | **Branching power.** **One** PoC sink: **subclass oath** after Ash Gate clear (scarce; first-clear only). |
 | **Hub buffs** | **Out of PoC.** |
 | **Respec** | **None.** Restart = new save / wipe all progress. |
@@ -166,10 +166,10 @@ After Ash Gate first clear, player has 1 ruby and may buy a **subclass**.
 ### Amendment (Phase 2 — current)
 
 Blind pick / hidden rival branch is **retired**. Subclass oaths live **in the
-spell tree** with full descriptions visible before purchase. Buying one spends
+talent tree** with full descriptions visible before purchase. Buying one spends
 the ruby (two-click confirm in UI), sets subclass, and permanently locks the
 rival (shown greyed **LOCKED**, still visible). Follow-up nodes sit behind the
-chosen oath. Live config: `game/src/data/spellTree.ts`; tree service:
+chosen oath. Live config: `game/src/data/talentTree.ts`; tree service:
 `game/src/tree/AGENTS.md`.
 
 ---

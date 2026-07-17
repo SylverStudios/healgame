@@ -9,8 +9,8 @@ Your job: take the content the user gives you (task description, spec pointers,
 and optionally a chunk layout), understand it, and produce **one excellent goal
 statement** the user pastes into `/goal` in a new session. The agent receiving
 that goal becomes the central delegator; your output determines whether it
-succeeds. This playbook is distilled from the Phase 1 PoC run (see
-`docs/phase-1-poc-outcome.md` if in the healgame repo), which shipped 6/6
+succeeds. This playbook is distilled from healgame's Phase 1 PoC run (see
+`docs/CHANGELOG.md` / `docs/poc-qa.md` in that repo), which shipped 6/6
 chunks with all gates green.
 
 ## Step 1 — Understand before writing

@@ -52,13 +52,54 @@ export const SPELLS = {
    * Starter stick-bonk: 1 damage to the front enemy, true instant, GCD only.
    * Default Q-slot filler until the player replaces it on the action bar.
    */
-  bonk: { id: 'bonk', name: 'Bonk', heal: 0, damage: 1, mana: 0, castMs: 0, glyph: '/' },
-  solemnMend: { id: 'solemn-mend', name: 'Solemn Mend', heal: 4, mana: 3, castMs: 2000, glyph: 'M' },
-  zealousMending: { id: 'zealous-mending', name: 'Zealous Mending', heal: 4, mana: 4, castMs: 1000, glyph: 'Z' },
+  bonk: {
+    id: 'bonk',
+    name: 'Bonk',
+    heal: 0,
+    damage: 1,
+    mana: 0,
+    castMs: 0,
+    glyph: '/',
+    description: 'Stick poke. Free filler until you replace it on the bar.',
+  },
+  solemnMend: {
+    id: 'solemn-mend',
+    name: 'Solemn Mend',
+    heal: 4,
+    mana: 3,
+    castMs: 2000,
+    glyph: 'M',
+    description: 'Efficient single-target mend. Prefer when the fight is calm.',
+  },
+  zealousMending: {
+    id: 'zealous-mending',
+    name: 'Zealous Mending',
+    heal: 4,
+    mana: 4,
+    castMs: 1000,
+    glyph: 'Z',
+    description: 'Faster mend at a steeper mana cost.',
+  },
   /** Vigil subclass spell (phase-2-handoff): slow, efficient. Granted by the vigil-oath tree node. */
-  solemnVigil: { id: 'solemn-vigil', name: 'Solemn Vigil', heal: 6, mana: 5, castMs: 3000, glyph: 'G' },
+  solemnVigil: {
+    id: 'solemn-vigil',
+    name: 'Solemn Vigil',
+    heal: 6,
+    mana: 5,
+    castMs: 3000,
+    glyph: 'G',
+    description: 'Slow, efficient big heal — plan the cast.',
+  },
   /** Zealot subclass spell (phase-2-handoff): fast, pricey per point. Granted by the zealot-oath tree node. */
-  zealousFlare: { id: 'zealous-flare', name: 'Zealous Flare', heal: 2, mana: 2, castMs: 500, glyph: 'F' },
+  zealousFlare: {
+    id: 'zealous-flare',
+    name: 'Zealous Flare',
+    heal: 2,
+    mana: 2,
+    castMs: 500,
+    glyph: 'F',
+    description: 'Fast, pricey per point. Panic button.',
+  },
   /**
    * Virtue/light Vowstrike: strike the front enemy, then discount the next spell's
    * mana. Personal CD keeps it from being a filler spam button.
@@ -73,6 +114,7 @@ export const SPELLS = {
     cooldownMs: 10_000,
     castBuff: { kind: 'nextSpellManaReduction', amount: 2 },
     glyph: 'V',
+    description: 'Strike, then discount your next spell.',
   },
   /**
    * Vengeance/dark Vowstrike: strike the front enemy, then empower the next heal
@@ -88,6 +130,7 @@ export const SPELLS = {
     cooldownMs: 10_000,
     castBuff: { kind: 'nextHealPotencyPct', pct: 25 },
     glyph: 'X',
+    description: 'Strike, then empower your next heal.',
   },
 } as const;
 

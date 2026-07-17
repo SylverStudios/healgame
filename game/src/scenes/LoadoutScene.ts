@@ -7,7 +7,7 @@
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { loadSave, saveGame, emptyActionBar } from '../save/save';
-import { ownedSpellsFromSave } from '../data/spellTree';
+import { ownedSpellsFromSave } from '../data/talentTree';
 import { ACTION_BAR_SLOTS } from '../data/constants';
 import { ACTION_HOTKEY_LETTERS, actionHotkeyLabel } from '../ui/actionHotkeys';
 import { glyphChar } from '../ui/glyph';

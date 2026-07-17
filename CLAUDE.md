@@ -1,10 +1,11 @@
 # CLAUDE.md — operating healgame
 
-Status: current · Authority: gates, hard rules, working style · Last verified: 2026-07-14
+Status: current · Authority: gates, hard rules, working style · Last verified: 2026-07-17
 
-healgame is a healer-focused auto-battler PoC: Phaser 3 + TypeScript (strict) +
+healgame is a healer-focused auto-battler: Phaser 3 + TypeScript (strict) +
 Vite. The game lives in `game/`; design docs in `docs/`. Doc conventions and
-authority hierarchy: [`AGENTS.md`](AGENTS.md).
+authority hierarchy: [`AGENTS.md`](AGENTS.md). Ship history:
+[`docs/CHANGELOG.md`](docs/CHANGELOG.md).
 
 ## Doc authority (highest wins)
 
@@ -16,7 +17,7 @@ Full list in [`AGENTS.md`](AGENTS.md). Short form:
 4. Module docs — `game/src/tree/AGENTS.md`, `game/src/combat/README.md`,
    `game/src/data/README.md`
 5. This file — gates and hard rules
-6. Historical handoffs / `docs/tech-options.md` / `docs/GDD.md` / research — lower
+6. `docs/CHANGELOG.md` / `docs/GDD.md` / research — lower
 
 ## Commands (run from `game/`)
 
@@ -49,8 +50,8 @@ game/src/
   tree/     config-driven skill-tree service (opaque state, update/view).
             Agent contract: tree/AGENTS.md
   data/     ALL gameplay numbers as data: constants, spells, typed enemy
-            abilities/mobs/dungeons compiled into encounters, spellTree.ts
-            (live SPELL_TREE + loadoutFromSave). Authoring: data/README.md
+            abilities/mobs/dungeons compiled into encounters, talentTree.ts
+            (live TALENT_TREE + loadoutFromSave). Authoring: data/README.md
             tree.ts = legacy TREE_NODES (deprecated; tests only)
   meta/     pure progression (rewards, buildLoadout alias, dungeon unlock).
             purchaseNode is deprecated — TreeScene uses tree.update
@@ -79,12 +80,15 @@ game/src/
   16×16 tiles (CC0; sheet in `game/public/assets/`, unit→tile mapping in
   `game/src/ui/sprites.ts`, `pixelArt: true`). Everything else stays rects,
   bars, monospace text, dark palette (`#1a1210` bg) — reject polish creep.
-- **Scope discipline**: poc-spec §9 lists what stays out (procs, major CDs,
-  hub buffs, respec, Aegis/Wildbloom, party hotkeys, networking…). Reject
-  additions unless the user explicitly reopens scope.
+- **Scope discipline**: reject additions outside the active planning handoff
+  (or, if none, outside what [`docs/CHANGELOG.md`](docs/CHANGELOG.md) and
+  [`docs/poc-qa.md`](docs/poc-qa.md) already shipped). poc-spec §9 is the PoC
+  baseline out-list; Alpha reopened major CDs, mid dungeons, relics, and
+  loadout. Still out unless explicitly reopened: procs, hub buffs, respec,
+  Aegis/Wildbloom, party-target hotkeys, networking, polished final art.
 - **Interactive objects ↔ journey.mjs**: every clickable/hoverable GameObject
   a journey stage may aim at carries a stable `setName(...)` (see the table in
-  [`docs/semantic-targets-handoff.md`](docs/semantic-targets-handoff.md)).
+  [`docs/semantic-targets.md`](docs/semantic-targets.md)).
   Journey resolves via `window.__healgame.locate(name)` — layout changes must
   **not** require journey coordinate edits. Adding a new interactive control
   means naming it and clicking it by name.

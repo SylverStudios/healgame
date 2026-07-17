@@ -3,14 +3,14 @@
  * no Phaser. Scenes call these functions and immediately persist the mutated
  * SaveData via saveGame(); this module never touches storage itself.
  *
- * Combat loadouts are resolved by the spell-tree service (`loadoutFromSave`);
+ * Combat loadouts are resolved by the talent-tree service (`loadoutFromSave`);
  * `buildLoadout` is a thin alias kept for existing call sites/tests.
  */
 
 import { levelForXp, SPELLS } from '../data/constants';
 import { getDungeonById, isDungeonIdUnlocked, ORDERED_DUNGEONS } from '../data/dungeons';
 import { chooseRelicOffers } from '../data/relics';
-import { loadoutFromSave, type CombatMods } from '../data/spellTree';
+import { loadoutFromSave, type CombatMods } from '../data/talentTree';
 import { placeOnActionBar, type SaveData } from '../save/save';
 import type { CombatResult } from '../scenes/CombatScene';
 import type { DungeonDef } from '../data/content/types';
@@ -79,7 +79,7 @@ export function applyCombatResult(
  */
 export type Loadout = CombatMods;
 
-/** Builds the resolved Loadout for the current save via the spell-tree service. */
+/** Builds the resolved Loadout for the current save via the talent-tree service. */
 export function buildLoadout(save: SaveData): Loadout {
   return loadoutFromSave(save);
 }

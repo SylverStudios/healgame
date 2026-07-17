@@ -10,7 +10,7 @@ import type { CooldownDef } from '../combat/types';
 export const STILL_WATERS: CooldownDef = {
   id: 'still-waters',
   name: 'Still Waters',
-  description: 'Next completed heal costs no mana.',
+  description: 'Next heal cast costs no mana (consumed when the cast starts).',
   cooldownMs: 60_000,
   effect: { kind: 'freeNextHeal' },
   glyph: 'S',

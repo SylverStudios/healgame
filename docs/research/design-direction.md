@@ -1,8 +1,9 @@
 # Healgame — Design Direction (Phase 1)
 
-**Status:** Research + PoC decisions locked. Implementation next: tech + vertical-slice tasks.  
-**PoC authority:** [`../poc-spec.md`](../poc-spec.md)  
-**Long-term design:** [`../GDD.md`](../GDD.md)
+Status: historical · Authority: none — research / early PoC decisions · Last verified: 2026-07-17
+
+PoC authority: [`../poc-spec.md`](../poc-spec.md). Long-term design:
+[`../GDD.md`](../GDD.md). Ship history: [`../CHANGELOG.md`](../CHANGELOG.md).
 
 ---
 

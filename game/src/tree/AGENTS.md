@@ -1,9 +1,9 @@
 # Skill tree — agent notes
 
-Status: current · Authority: skill-tree service + live SPELL_TREE wiring · Last verified: 2026-07-16
+Status: current · Authority: skill-tree service + live TALENT_TREE wiring · Last verified: 2026-07-17
 
-Config-driven tree service (`game/src/tree/`) plus the live spell-tree data and
-combat resolve (`game/src/data/spellTree.ts`). Phaser stays out of this folder.
+Config-driven tree service (`game/src/tree/`) plus the live talent-tree data and
+combat resolve (`game/src/data/talentTree.ts`). Phaser stays out of this folder.
 
 ## Mental model
 
@@ -17,16 +17,16 @@ TreeConfig  +  TreeState  →  update(action)  →  new state | reject + feedbac
 - **Config** is pure data: nodes (cost, requires, exclusiveGroup, opaque
   `content`), spots (visual slots; `chain` length >1 = multi-unlock ranks).
 - **State** is opaque — only this module reads/mutates it. Persist via
-  `snapshot` / `restore`, or the live bridge in `spellTree.ts`
+  `snapshot` / `restore`, or the live bridge in `talentTree.ts`
   (`treeStateFromLegacy` / `applyTreeStateToSave`).
 - **Content is opaque to the tree.** Never branch on effect kinds inside
-  `tree.ts`. UI and combat interpret `SpellTreeContent` in `spellTree.ts`.
+  `tree.ts`. UI and combat interpret `TalentTreeContent` in `talentTree.ts`.
 
 ## Live game wiring
 
 | Concern | Where |
 |---|---|
-| Authoritative config | `SPELL_TREE` in `data/spellTree.ts` |
+| Authoritative config | `TALENT_TREE` in `data/talentTree.ts` |
 | Tree UI | `scenes/TreeScene.ts` — round glyph nodes (`NODE_RADIUS`), hover tooltips, `view` + `layoutSpots` + `update` |
 | Layout | `layoutSpots(treeView, { width, overrides? })` — overrides keep journey click coords |
 | Fight start | `loadoutFromSave(save)` → `CombatMods` → `CombatScene` / engine options |
@@ -38,7 +38,7 @@ extend it.
 
 ## Rules of thumb
 
-1. **Tune numbers in `SPELL_TREE`**, not in scenes or the engine. Every live
+1. **Tune numbers in `TALENT_TREE`**, not in scenes or the engine. Every live
    node costs exactly one `talent` point; total point capacity equals level.
 2. Multi-rank = spot **chain** (one content entry per purchase), not
    `maxRanks` / `amountPerRank` on the service.
@@ -50,7 +50,7 @@ extend it.
 5. **Forsaken-path consolation:** nodes with `availableIfExclusiveLocked: true`
    in a spot chain are offered when the natural next entry is `exclusive-locked`
    (e.g. `warped-tempo-via-zealot` on the zealot spot after swearing Vigil).
-   The tree service skips forward; `spellTree.ts` owns effect kinds.
+   The tree service skips forward; `talentTree.ts` owns effect kinds.
 6. Combat never sees the graph — only `CombatMods` (`spells` with castMod
    baked in, `bonusMaxMana`, `synergies`, `missingHealthBonuses`,
    `paceMultipliersTenths`, `cooldowns`).
@@ -72,8 +72,9 @@ extend it.
 [Oath wedge]     branch follow-ups; pure-mana nodes cut (deep-well / spendthrift-grace)
        │
 [Shared mid]     shared-mend-potency / shared-zealous-potency
-                 requires: { mode: 'any', nodes: [vigil-patient-vow-1, vigil-measured-devotion,
-                                                  zealot-fervent-chain-1, zealot-steady-hands] }
+                 requires: { mode: 'any', nodes: [vigil-thrift, vigil-still-waters,
+                                                  zealot-quick-breath, zealot-frenzied-liturgy] }
+                 (gated on layer-2 so specialization forks do not fan out to mid)
        │
  Virtue │ Vengeance  exclusiveGroup: vowstrike-aspect
        │
@@ -87,14 +88,14 @@ Legacy saves that held these nodes simply drop them on load (unknown ids not emi
 
 ## New effect kinds (Alpha 0.2 §D5/D6)
 
-`SpellTreeEffect` gains two new members:
+`TalentTreeEffect` gains two new members:
 
 | Kind | Shape | Resolved in |
 |------|-------|-------------|
 | `castMod` (extended) | `healDelta?: number` optional field | `resolveCombatMods` bakes `spell.heal += healDelta ?? 0` after `castMs`/`mana` |
 | `ampOwnedSpells` | `{ spellIds: string[]; healDelta?: number; damageDelta?: number }` | After castMod baking: for each id already in the loadout, adds deltas to spell.heal / spell.damage (clamp ≥ 0) |
 
-`SpellTreeContent` gains optional `glyph?: string` (single char for tree node display, §D8).
+`TalentTreeContent` gains optional `glyph?: string` (single char for tree node display, §D8).
 
 `CombatMods` gains optional `manaRegen?: { amount: number; intervalMs: number }` (§D2).
 
@@ -110,7 +111,7 @@ if (levelMana.manaRegen !== null) mods.manaRegen = levelMana.manaRegen;
 
 **Circular-import resolution**: `manaBonusesForLevel` lives in `data/levelMana.ts`
 (imports only `data/constants.ts`) and is re-exported from `meta/progression.ts`
-for backward compatibility. `data/spellTree.ts` imports from `data/levelMana.ts`
+for backward compatibility. `data/talentTree.ts` imports from `data/levelMana.ts`
 directly — no cycle.
 
 ## Oath × Vowstrike twists (§D5)
@@ -137,7 +138,7 @@ All rows including the crown (y ≈ 960) are reachable at maximum scroll.
 HUD chrome is pinned via `setScrollFactor(0)`. Journey reaches deep nodes by
 wheeling to scroll and clicking by name (`treeNode:<spotId>`).
 
-Row layout in `SPELL_TREE_POSITIONS` (y centers, 960px canvas):
+Row layout in `TALENT_TREE_POSITIONS` (y centers, 960px canvas):
 
 | y   | spots                                                             |
 |-----|-------------------------------------------------------------------|

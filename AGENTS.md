@@ -1,6 +1,7 @@
 # AGENTS.md — healgame documentation system
 
-Status: current · Authority: doc conventions for all agents · Last verified: 2026-07-15
+Status: current · Authority: doc conventions for all agents · Last verified: 2026-07-17
+
 
 How we keep docs trustworthy. Operating rules for the game itself live in
 [`CLAUDE.md`](CLAUDE.md). Module contracts live next to code (e.g.
@@ -14,7 +15,7 @@ Three fields, one line or a short block at the top:
 
 ```markdown
 Status: current | historical | planning
-Authority: what this doc wins (or "none — archive / research")
+Authority: what this doc wins (or "none — research / backlog")
 Last verified: YYYY-MM-DD
 ```
 
@@ -22,11 +23,12 @@ Last verified: YYYY-MM-DD
 |--------|---------|
 | `current` | Describes shipped reality; update when behavior changes |
 | `historical` | True for a past phase; do not use as a live map |
-| `planning` | Intended work not yet in code (active handoff) |
+| `planning` | Intended work not yet in code (active handoff only) |
 
-When you edit a living doc, bump `Last verified`. When a phase ships, set its
-handoff to `historical` (or move under `docs/archive/`) and append a section
-to [`docs/poc-qa.md`](docs/poc-qa.md).
+When you edit a living doc, bump `Last verified`. When a phase ships: append
+[`docs/poc-qa.md`](docs/poc-qa.md), prepend a short entry to
+[`docs/CHANGELOG.md`](docs/CHANGELOG.md), and delete the planning handoff (git
+history keeps it). Do not leave `Status: planning` on shipped work.
 
 ## Authority (highest wins)
 
@@ -38,10 +40,9 @@ to [`docs/poc-qa.md`](docs/poc-qa.md).
    - [`game/src/combat/README.md`](game/src/combat/README.md)
    - [`game/src/data/README.md`](game/src/data/README.md)
 5. [`CLAUDE.md`](CLAUDE.md) — gates, hard rules, working style
-6. Historical handoffs / outcomes — lessons only
-7. [`docs/tech-options.md`](docs/tech-options.md) — stack rationale
-8. [`docs/GDD.md`](docs/GDD.md) — long-term only
-9. [`docs/research/`](docs/research/) — never authoritative for implementation
+6. [`docs/CHANGELOG.md`](docs/CHANGELOG.md) — shipped-history summary
+7. [`docs/GDD.md`](docs/GDD.md) — long-term only
+8. [`docs/research/`](docs/research/) — never authoritative for implementation
 
 ## Quality gate
 
@@ -64,18 +65,19 @@ agents should prefer `verify`.
 | Kind | Location |
 |------|----------|
 | Living rules | `CLAUDE.md`, `docs/poc-spec.md`, `docs/poc-qa.md` |
+| Ship log | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) |
 | Active mission | None; check `docs/*-handoff.md` for a future `Status: planning` handoff |
-| Latest shipped phase | `docs/oathbound-depth-handoff.md` (`Status: historical` — Alpha 0.2 Oathbound Depth; Alpha 0.1 remains `docs/alpha-0.1-handoff.md`) |
-| PoC retrospective | `docs/poc-changelog.md` (`Status: historical`, frozen) |
 | Module contracts | Colocated `AGENTS.md` / `README.md` |
-| Historical | Bannered handoffs / outcomes (or `docs/archive/`) |
+| Journey names | [`docs/semantic-targets.md`](docs/semantic-targets.md) |
+| Idea backlog | [`docs/ideas.md`](docs/ideas.md) (`Status: current`, not a handoff) |
 | Research | `docs/research/` |
 | Art ops | `docs/unit-art.md` |
+| Long-term design | `docs/GDD.md` |
 
 ## Doc hygiene
 
 - **No duplicate source of truth.** Tunable numbers live in `game/src/data/`
-  (tree: `spellTree.ts`). Docs describe intent and point at files.
+  (tree: `talentTree.ts`). Docs describe intent and point at files.
 - **Implemented contracts → file refs.** Do not paste long TypeScript that
   already exists in the repo; link the file instead.
 - **Definition of done (doc touch):**
@@ -86,5 +88,5 @@ agents should prefer `verify`.
   | Combat rules | `game/src/combat/README.md`; balance shape → `poc-qa.md` |
   | Dungeon/mob/ability content pipeline | `game/src/data/README.md` |
   | Save shape | `save.ts` header + `poc-qa.md` note; bump version per CLAUDE.md |
-  | Scene layout / interactive targets | `setName` on the object + journey by name (`docs/semantic-targets-handoff.md`); do not reintroduce a coordinate `UI` table |
-  | Phase complete | Append `poc-qa.md`; mark handoff `historical` |
+  | Scene layout / interactive targets | `setName` on the object + journey by name ([`docs/semantic-targets.md`](docs/semantic-targets.md)); do not reintroduce a coordinate `UI` table |
+  | Phase complete | Append `poc-qa.md`; prepend `CHANGELOG.md`; delete planning handoff |

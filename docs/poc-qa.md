@@ -1,26 +1,22 @@
-# PoC QA — journey checklist & verification
+# QA log — journey checklist & verification
 
-Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-16
+Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-17
 
-**Date:** 2026-07-08 · **Verdict: PoC complete.** Every poc-spec §1 criterion is
-implemented, and all of them are enforced by automated gates that run headless.
-(Phase 2 amended subclass UX — see checklist row 7 and Phase 2 section below.)
+Ship summary (newest first): [`CHANGELOG.md`](./CHANGELOG.md).
+
+**PoC (2026-07-08) complete.** Every poc-spec §1 criterion is implemented and
+enforced by automated gates. Later Alpha sections below amend the baseline
+(Phase 2+ subclass UX, mid dungeons, CDs, relics, loadout, etc.).
 
 ## How to run
 
 ```bash
 cd game
 npm install
-npm run dev      # → http://localhost:5173
+npm run verify        # preferred gate (typecheck, lint, test, build, smoke, journey)
+npm run verify:fast   # skip journey
+npm run dev           # → http://localhost:5173
 ```
-
-Verification gates (all must pass, all deterministic):
-
-| Command | What it proves |
-|---|---|
-| `npm run check` | typecheck (strict TS) + ESLint + all Vitest tests + production build |
-| `npm run smoke` | game boots in headless Chromium with zero console errors |
-| `node scripts/journey.mjs` | full player journey with real clicks/hotkeys, asserting on the save between stages (~5 min) |
 
 ## poc-spec §1 checklist
 
@@ -81,17 +77,17 @@ Scripted bots run the real engine deterministically:
 ## Architecture notes for the next slice
 
 - `game/src/combat/` — pure deterministic TS; see `game/src/combat/README.md`.
-- `game/src/tree/` + `data/spellTree.ts` — config-driven tree; see
+- `game/src/tree/` + `data/talentTree.ts` — config-driven tree; see
   `game/src/tree/AGENTS.md`. Combat loadouts via `loadoutFromSave`.
 - All numbers in `game/src/data/`, guarded by balance tests.
 - `game/src/data/README.md` + `npm run content -- validate|list|preview` —
   typed dungeon/mob/ability catalogs compiled into `EncounterDef`.
 - `scripts/journey.mjs` clicks by semantic name via `__healgame.locate` (see
-  `docs/semantic-targets-handoff.md`); interactive objects must `setName`.
+  [`semantic-targets.md`](./semantic-targets.md)); interactive objects must `setName`.
 
 ---
 
-# Phase 2 QA — combat feedback, tooltips, real spell tree (2026-07-09)
+# Phase 2 QA — combat feedback, tooltips, real talent tree (2026-07-09)
 
 Everything below was verified against the Phase 2 handoff's "Done means"
 list by the central agent, per chunk and again end-to-end after integration.
@@ -286,8 +282,7 @@ toggle at (946, 14). Full journey re-run green after integration.
 Combat now reads as a Darkest Dungeon–style side view: party on the left
 facing right, enemies on the right facing left, everyone bottom-aligned to
 one shared ground line. Presentation only — no engine, save, data, or
-balance changes (all balance gates byte-identical). Handoff:
-`side-view-layout-handoff.md` (historical).
+balance changes (all balance gates byte-identical).
 
 ## How to run (unchanged commands, from `game/`)
 
@@ -340,8 +335,8 @@ reopened). Full journey green after integration.
 # Combat juice + forsaken-path tempo QA (2026-07-11)
 
 Presentation juice, tree forsaken-path **Warped Tempo** (1.5× combat pace),
-and spell-bar chrome. Handoff: `combat-juice-handoff.md` (historical). No
-engine rule changes; balance gates byte-identical at 1× sim.
+and spell-bar chrome. No engine rule changes; balance gates byte-identical at
+1× sim.
 
 ## How to run (from `game/`)
 
@@ -402,20 +397,19 @@ Post-juice playtest. No new phase handoff; living numbers + hub copy.
 | Currency | PoC job |
 |---|---|
 | **XP** | Auto-unlock kit breadth at level thresholds (only Lv 2 → Zealous today) |
-| **Gold** | Buy spell-tree nodes (Deep Reserves, forsaken tempo, …) |
+| **Gold** | Buy talent-tree nodes (Deep Reserves, forsaken tempo, …) |
 | **Rubies** | Swear a subclass oath (scarce; first-clear only) |
 
 ## Gates
 
 `balance.test.ts` shape unchanged (no-heal wipe, naive wipe, full-kit clear,
-The Maw unwinnable). Retune values live in `constants.ts` / `spellTree.ts`.
+The Maw unwinnable). Retune values live in `constants.ts` / `talentTree.ts`.
 
 # Alpha 0.1 QA — mid dungeon, tree layer 2, cooldowns, relics (2026-07-13)
 
-Everything below was verified against `alpha-0.1-handoff.md`'s "Done means"
-list by the central agent — per chunk (`check` after every chunk) and again
-end-to-end after integration (chunk 9b: balance bots + `journey.mjs` +
-this section). Handoff status flips to historical.
+Everything below was verified against Alpha 0.1 done-means by the central
+agent — per chunk (`check` after every chunk) and again end-to-end after
+integration (chunk 9b: balance bots + `journey.mjs` + this section).
 
 ## How to run (unchanged commands, from `game/`)
 
@@ -589,10 +583,9 @@ coordinate table in `scripts/journey.mjs` is gone. Return clicks in combat are
 conditional on `locate('combatReturn')`. Maw gating asserts
 `locate('hubMaw') === null` before Iron Pass clear.
 
-Name inventory and design record: [`docs/semantic-targets-handoff.md`](semantic-targets-handoff.md)
-(`Status: historical`). CLAUDE.md hard rule retitled to **Interactive objects ↔
-journey.mjs**. `AGENTS.md` / `game/src/tree/AGENTS.md` no longer point at a
-coordinate table.
+Name inventory: [`semantic-targets.md`](./semantic-targets.md). CLAUDE.md hard
+rule: **Interactive objects ↔ journey.mjs**. Do not reintroduce a coordinate
+table.
 
 ## Alpha 0.1 extensions named beyond the original handoff table
 
@@ -637,8 +630,8 @@ for the Frenzied Liturgy cadence below:
 - Wave changes announce themselves without pausing simulation; victory/wipe
   results fade and reveal in stages while `combatReturn` exists immediately.
 - Hub currencies use one compact summary and unlocked dungeons share a bounded
-  row above Spell Tree and Restart, eliminating the two-dungeon collision.
-- Spell-tree nodes and spacing are more compact, with stronger title/header
+  row above Talent Tree and Restart, eliminating the two-dungeon collision.
+- Talent-tree nodes and spacing are more compact, with stronger title/header
   contrast; graph behavior, tooltips, scrolling, and purchases are unchanged.
 - Relic hover required no duplicate work: the merged shared run-mods bar
   already exposes oath and relic details on Hub, Combat, and Tree.
@@ -687,7 +680,7 @@ rules. XP is now the only currency-like progression value:
 - Every enemy kill grants **1 XP**, retained through wipes.
 - Level 2 remains at 10 XP. Later levels use cumulative thresholds of 30, 60,
   100, and so on (10/20/30/40… XP between levels).
-- Each level supplies one total spell-tree allocation. Tree nodes all cost one
+- Each level supplies one total talent-tree allocation. Tree nodes all cost one
   talent point; points are placements, not spendable loot. Level 6 therefore
   supports six owned ranks/nodes, with any remainder shown as unplaced.
 - Always-available spells may unlock directly at level milestones; currently
@@ -755,8 +748,6 @@ The Maw is Dungeon 6.
 
 Status: current · Last verified: 2026-07-15
 
-Planning bible (now historical): [`oathbound-depth-handoff.md`](./oathbound-depth-handoff.md).
-
 ## How to run
 
 ```bash
@@ -772,7 +763,7 @@ npm run content -- validate
 | # | Criterion | Status | Enforced by |
 |---|-----------|--------|-------------|
 | 1 | Level → max mana + combat mana regen; relics stack; no player HoTs | ✅ | `manaBonusesForLevel`, `loadoutFromSave`, `CombatEngineOptions.manaRegen`, progression/engine tests |
-| 2 | Hourglass SPELL_TREE (shared → oath → mid → Vowstrike → crown); pure-mana pads slimmed | ✅ | `spellTree.ts` + tests; Deep Reserves 3 ranks; Deep Well / Spendthrift cut |
+| 2 | Hourglass TALENT_TREE (shared → oath → mid → Vowstrike → crown); pure-mana pads slimmed | ✅ | `talentTree.ts` + tests; Deep Reserves 3 ranks; Deep Well / Spendthrift cut |
 | 3 | `vowstrike-virtue` / `vowstrike-vengeance` instant (`castMs: 0`); oath lightly colors aspect | ✅ | catalog + `engine.instant.test.ts`; `applyOathVowstrikeTwists` |
 | 4 | Placeholder glyphs on tree nodes + combat spell/CD buttons; hover full detail | ✅ | `ui/glyph.ts`, TreeScene, spellBar; tooltip tests |
 | 5 | Ash/mid shape preserved; Black Choir clearable with crown kits (≥3, Soul Toll ≥1); Maw unwinnable ± relic | ✅ | `balance.test.ts` + `npm run content -- balance --all` |
@@ -784,7 +775,8 @@ npm run content -- validate
 1. **Level mana (§D2):** `LEVEL_MANA` in `data/constants.ts`; helper in `data/levelMana.ts` (re-exported from `meta/progression`). +3 max mana per level above 1; regen +1/10s at L2, +1 rank every 3 levels. Engine merges loadout `manaRegen` with relic regen (sum amounts, min interval).
 2. **Instant cast:** `castMs === 0` completes inside `beginCast`; GCD still applies.
 3. **`healBonus` CD kind:** Wrath Ascendant 45s / 12s / +2 heal; stacks after synergy/missing/full/relic healing.
-4. **Save v6:** `healgame-save-v6`; purges v5/v1 keys; no migration.
+4. **Save v6 (at Alpha 0.2 ship):** `healgame-save-v6`; purges v5/v1 keys; no
+   migration. **Superseded by save v7** (Bonk + actionBar) — see section below.
 5. **Tree hourglass:** spots include `shared-mend-potency`, `shared-zealous-potency`, `vowstrike-*`, `wrath-ascendant`, `vowbound-crown`. Exclusive group `vowstrike-aspect`. Crown amp via `ampOwnedSpells`.
 6. **Oath×aspect twists:** Vigil+Virtue mana−1 Absolution; Vigil+Vengeance missing-health Reckoning; Zealot+Virtue Absolution→Zealous Mending synergy; Zealot+Vengeance Reckoning +1 heal.
 7. **Black Choir:** Dirge Sovereign `statOverrides.hp: 200` (was mob base 260) so crown kits clear under Soul Toll; gate flipped wipe→clear for all oath×aspect kits.
@@ -809,7 +801,7 @@ changes; presentation + hub/tree layout only.
 |---|-----------|--------|-------|
 | 1 | Basic heal feels juicier | ✅ | Soft camera shake, brighter green `+N` floats (~980ms), green ripple, simple particle dots |
 | 2 | Mana-spend aura on healer | ✅ | DBZ-style ellipses + orbiting sparks; intensity from mana spent in last 30s (`manaSpendTracker.ts`) |
-| 3 | Spell tree: round icon nodes | ✅ | Circles + glyph icon; rank pips; name/cost/desc on hover only |
+| 3 | Talent tree: round icon nodes | ✅ | Circles + glyph icon; rank pips; name/cost/desc on hover only |
 | 4 | Hub: vertical dungeon list + CURRENT | ✅ | Stacked wide buttons; `currentChallengeDungeon()` marks first unlocked uncleared |
 | 5 | No text spill on dungeon buttons | ✅ | Name left-aligned inside 440px button; CURRENT/cleared badge on the right |
 
@@ -817,5 +809,27 @@ changes; presentation + hub/tree layout only.
 
 1. **Heal shake** intentionally reopens the older juice-handoff "no heal shake" rule — playtest feedback wanted Nintendo-basic-action juice.
 2. **Mana aura** is presentation-only (base spell mana on `castStarted`); discounts / free charges are ignored for intensity.
-3. **Hub meta buttons** (Spell Tree / Spellbook) sit *above* the dungeon stack so a long unlock list cannot push them off the 540px canvas.
+3. **Hub meta buttons** (Talent Tree / Spellbook) sit *above* the dungeon stack so a long unlock list cannot push them off the 540px canvas.
 4. Journey still clicks `hubDungeon:<id>` / `treeNode:<spotId>` by name — layout changes do not require journey coordinate edits.
+
+---
+
+# Bonk starter + QWER loadout (save v7) (2026-07-16)
+
+Status: current · Last verified: 2026-07-17
+
+## What shipped
+
+1. **Bonk** — starter player damage spell (`SPELLS.bonk`): instant, 0 mana,
+   hits the front enemy (no ally target click). Tutorial places Bonk on Q and
+   Solemn Mend on W.
+2. **Loadout / Spellbook scene** — assign owned spells into QWER `actionBar`
+   slots (`LoadoutScene`; hub `hubLoadout`). Fight kit order follows non-empty
+   bar slots via `loadoutFromSave`.
+3. **Save v7** — `healgame-save-v7`; `SaveData.version: 7` adds `actionBar`.
+   `loadSave` purges v6/v5/v1 keys; no migration.
+
+## Acceptance
+
+Covered by save/loadout/talentTree tests and full `npm run verify` (journey uses
+named loadout + combat targets).

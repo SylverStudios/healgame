@@ -2,7 +2,7 @@
  * Hub: shows XP/level/talent progress, applies the combat result that just
  * ended, applies pending first-clear relic offers, and launches unlocked
  * dungeons from a vertical challenge list (current uncleared dungeon marked
- * CURRENT). Spell Tree / Spellbook sit above the dungeon stack. Run mods
+ * CURRENT). Talent Tree / Spellbook sit above the dungeon stack. Run mods
  * (oath + relics) live in the shared top-right RunModsBar. Temp art only —
  * panels + text buttons, dark palette, monospace.
  */
@@ -17,7 +17,7 @@ import {
   isDungeonUnlocked,
   type HubNotice,
 } from '../meta/progression';
-import { loadoutFromSave } from '../data/spellTree';
+import { loadoutFromSave } from '../data/talentTree';
 import { runModsFromSave } from '../data/runMods';
 import { levelForXp, SPELLS, xpForLevel } from '../data/constants';
 import { ORDERED_DUNGEONS, hubDungeonTargetName } from '../data/dungeons';
@@ -46,7 +46,13 @@ const FONT = 'monospace';
 const DUNGEON_BUTTON_WIDTH = 440;
 const DUNGEON_BUTTON_HEIGHT = 38;
 const DUNGEON_ROW_GAP = 6;
-const META_BUTTON_Y = 175;
+const NOTICE_START_Y = 146;
+const NOTICE_ROW_H = 34;
+const NOTICE_H = 28;
+const META_BUTTON_BASE_Y = 175;
+const META_BUTTON_H = 44;
+/** Gap between the bottom of the last notice and the top of the meta buttons. */
+const NOTICE_TO_META_GAP = 12;
 
 export class HubScene extends Phaser.Scene {
   private sceneData: HubSceneData = {};
@@ -81,7 +87,7 @@ export class HubScene extends Phaser.Scene {
 
     this.buildStats(save);
     this.buildNotices(notices);
-    this.buildButtons(save);
+    this.buildButtons(save, this.metaButtonsY(notices.length));
     new RunModsBar(this, runModsFromSave(save), { viewWidth: width });
   }
 
@@ -109,11 +115,10 @@ export class HubScene extends Phaser.Scene {
   }
 
   private buildNotices(notices: HubNotice[]): void {
-    const startY = 146;
     notices.forEach((notice, i) => {
-      const y = startY + i * 34;
+      const y = NOTICE_START_Y + i * NOTICE_ROW_H;
       this.add
-        .rectangle(this.scale.width / 2, y, 440, 28, NOTICE_BG_COLOR)
+        .rectangle(this.scale.width / 2, y, 440, NOTICE_H, NOTICE_BG_COLOR)
         .setStrokeStyle(1, BORDER_COLOR);
       this.add
         .text(this.scale.width / 2, y, notice.text, { fontFamily: FONT, fontSize: '14px', color: ACCENT_COLOR })
@@ -121,7 +126,15 @@ export class HubScene extends Phaser.Scene {
     });
   }
 
-  private buildButtons(save: SaveData): void {
+  /** Center Y for Talent Tree / Spellbook — cleared below any post-combat notices. */
+  private metaButtonsY(noticeCount: number): number {
+    if (noticeCount === 0) return META_BUTTON_BASE_Y;
+    const lastNoticeBottom =
+      NOTICE_START_Y + (noticeCount - 1) * NOTICE_ROW_H + NOTICE_H / 2;
+    return lastNoticeBottom + NOTICE_TO_META_GAP + META_BUTTON_H / 2;
+  }
+
+  private buildButtons(save: SaveData, metaButtonY: number): void {
     const { width, height } = this.scale;
     const centerX = width / 2;
     const unlockedDungeons = ORDERED_DUNGEONS.filter((dungeon) =>
@@ -130,15 +143,15 @@ export class HubScene extends Phaser.Scene {
     const challenge = currentChallengeDungeon(save);
 
     // Meta destinations stay above the dungeon stack so a long unlock list
-    // never pushes Spell Tree / Spellbook off the 540px canvas.
-    this.makeButton(centerX - 160, META_BUTTON_Y, 280, 44, 'Spell Tree', () => {
+    // never pushes Talent Tree / Spellbook off the 540px canvas.
+    this.makeButton(centerX - 160, metaButtonY, 280, META_BUTTON_H, 'Talent Tree', () => {
       this.scene.start(SceneKeys.Tree);
     }, 'hubTree');
-    this.makeButton(centerX + 160, META_BUTTON_Y, 280, 44, 'Spellbook', () => {
+    this.makeButton(centerX + 160, metaButtonY, 280, META_BUTTON_H, 'Spellbook', () => {
       this.scene.start(SceneKeys.Loadout);
     }, 'hubLoadout');
 
-    const dungeonStartY = META_BUTTON_Y + 52;
+    const dungeonStartY = metaButtonY + 52;
     unlockedDungeons.forEach((dungeon, visibleIndex) => {
       const y = dungeonStartY + visibleIndex * (DUNGEON_BUTTON_HEIGHT + DUNGEON_ROW_GAP);
       const isCurrent = challenge?.id === dungeon.id;

@@ -8,10 +8,11 @@
 
 import Phaser from 'phaser';
 import type { CooldownDef, CooldownState, SpellDef } from '../combat/types';
-import type { CombatMods } from '../data/spellTree';
+import type { CombatMods } from '../data/talentTree';
 import { actionHotkeyLabel } from './actionHotkeys';
 import { buildCooldownTooltipLines } from './cooldownTooltip';
-import { SpellTooltip, buildTooltipLines } from './spellTooltip';
+import { buildSpellCard } from './spellCard';
+import { SpellTooltip } from './spellTooltip';
 import { glyphChar } from './glyph';
 
 /** Alpha 0.2 §D8: compact width so up to 4 QWER columns fit on 960px.
@@ -318,7 +319,7 @@ export class SpellBar {
     const showTooltip = (spellId: string, buttonCenterX: number, buttonTopY: number): void => {
       const spell = spells.find((s) => s.id === spellId);
       if (!spell) return;
-      this.tooltip.show(buttonCenterX, buttonTopY, buildTooltipLines(spell, loadout));
+      this.tooltip.showCard(buttonCenterX, buttonTopY, buildSpellCard(spell, { loadout }));
     };
     const hideTooltip = (): void => this.tooltip.hide();
     const showCooldownTooltip = (cooldownId: string, buttonCenterX: number, buttonTopY: number): void => {

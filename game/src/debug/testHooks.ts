@@ -4,7 +4,7 @@
  * Ships in the production build on purpose (journey drives vite preview);
  * it is read-only lookup, invisible to players.
  *
- * See docs/semantic-targets-handoff.md.
+ * See docs/semantic-targets.md.
  */
 
 import Phaser from 'phaser';

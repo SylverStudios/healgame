@@ -1,9 +1,9 @@
 /**
  * Alpha 0.2 §D2 — level-derived combat mana pool + regen.
  *
- * Isolated from meta/progression.ts so spellTree.ts can import it without
+ * Isolated from meta/progression.ts so talentTree.ts can import it without
  * creating a circular dependency (progression imports loadoutFromSave from
- * spellTree). progression.ts re-exports both the type and function from here
+ * talentTree). progression.ts re-exports both the type and function from here
  * for backward compatibility.
  */
 

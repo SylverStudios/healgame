@@ -15,7 +15,7 @@ describe('buildCooldownTooltipLines', () => {
   it('describes a charge-based cooldown without inventing a timed duration', () => {
     expect(buildCooldownTooltipLines(STILL_WATERS).map((line) => line.text)).toEqual([
       'Still Waters',
-      'Next completed heal costs no mana.',
+      'Next heal cast costs no mana (consumed when the cast starts).',
       'Duration: Until next heal',
       'Cooldown: 60s',
     ]);

@@ -4,7 +4,7 @@
  */
 import { CombatEngine } from './engine';
 import { SPELLS } from '../data/constants';
-import { loadoutFromSave, type CombatMods } from '../data/spellTree';
+import { loadoutFromSave, type CombatMods } from '../data/talentTree';
 import type { SaveData } from '../save/save';
 import type { CombatEngineOptions, EncounterDef, RelicDef, SpellDef, Unit } from './types';
 

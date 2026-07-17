@@ -1,11 +1,11 @@
 # Healgame — Game Design Document (v0.4)
 
-Status: current · Authority: long-term design only (poc-spec wins on PoC) · Last verified: 2026-07-12
+Status: current · Authority: long-term design only (poc-spec wins on PoC) · Last verified: 2026-07-17
 
 **PoC implementation details live in [`poc-spec.md`](./poc-spec.md)** — that file wins on PoC conflicts.  
 **Working title:** healgame  
 **Date:** 2026-07-08  
-**Related:** [`poc-spec.md`](./poc-spec.md) · [`research/master-healer-kale.md`](./research/master-healer-kale.md) · [`research/design-direction.md`](./research/design-direction.md)
+**Related:** [`poc-spec.md`](./poc-spec.md) · [`CHANGELOG.md`](./CHANGELOG.md) · [`research/master-healer-kale.md`](./research/master-healer-kale.md) · [`research/design-direction.md`](./research/design-direction.md)
 
 ---
 
@@ -190,7 +190,7 @@ Mercenaries are **competent but autonomous** — dangerous people with bad habit
 | Currency | Earn | Spend | Role |
 |----------|------|-------|------|
 | **XP / levels** | Per enemy (incl. wipes) | Auto-unlock skills on level-up | Breadth of kit |
-| **Gold** | Fixed amount per enemy | Spell tree nodes; (later) hub buffs, merc paths | Steady growth |
+| **Gold** | Fixed amount per enemy | Talent tree nodes; (later) hub buffs, merc paths | Steady growth |
 | **Rubies** | **1 per dungeon first completion** | Subclass splits / keystones; contested unlocks | Scarce choice |
 
 Rubies remain the **primary limiting resource**. Replay cleared dungeons for gold + XP only.

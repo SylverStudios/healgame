@@ -47,6 +47,8 @@ export interface SpellDef {
   castBuff?: SpellCastBuff;
   /** Alpha 0.2 §D8 — placeholder glyph key/character for tree + spell bar. */
   glyph?: string;
+  /** Short when-to-use / flavor for slot-card tooltips; ignored by the engine. */
+  description?: string;
 }
 
 /**

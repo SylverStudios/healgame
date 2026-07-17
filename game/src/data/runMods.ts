@@ -5,7 +5,7 @@
  */
 
 import type { SubclassId } from '../save/save';
-import { SPELL_TREE, type SpellTreeContent } from './spellTree';
+import { TALENT_TREE, type TalentTreeContent } from './talentTree';
 import { relicsById } from './relics';
 
 export type RunModKind = 'oath' | 'relic';
@@ -23,10 +23,10 @@ const OATH_NODE_ID: Record<SubclassId, string> = {
   zealot: 'zealot-oath',
 };
 
-function treeContent(nodeId: string): SpellTreeContent | undefined {
-  const node = SPELL_TREE.nodes.find((n) => n.id === nodeId);
+function treeContent(nodeId: string): TalentTreeContent | undefined {
+  const node = TALENT_TREE.nodes.find((n) => n.id === nodeId);
   if (!node) return undefined;
-  return node.content as SpellTreeContent;
+  return node.content as TalentTreeContent;
 }
 
 /** Oath shown as a relic-like slot once the player has sworn a subclass. */
