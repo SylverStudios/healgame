@@ -5,8 +5,10 @@ import {
   runBuildBot,
   VIGIL_EFFICIENCY_LOADOUT,
   VIGIL_LOADOUT,
+  VIGIL_MID_TREE_LOADOUT,
   VIGIL_VENGEANCE_LOADOUT,
   ZEALOT_LOADOUT,
+  ZEALOT_MID_TREE_LOADOUT,
   ZEALOT_VENGEANCE_LOADOUT,
   type BotRunOptions,
 } from './balanceBot';
@@ -32,6 +34,7 @@ import { RELICS } from '../data/relics';
  *   9. Maxed crown kits clear Cinder Vault; Emberfall lands ≥1.
  *  10. Maxed crown kits clear Verdant Rift; Needle Gaze focus lands ≥1.
  *  11. Black Choir is clearable with all four oath×aspect crown kits; Soul Toll burns ≥1.
+ *  12. Black Choir wipes oath-path kits that lack Vowstrike / Wrath / crown (tree-depth).
  */
 
 describe('Ash Gate difficulty shape (poc-spec §4.1)', () => {
@@ -176,6 +179,11 @@ describe('Black Choir is clearable with crown kits (Dungeon 5, oathbound-depth �
     expect(
       vigilVirtue.manaBurns + vigilVengeance.manaBurns + zealotVirtue.manaBurns + zealotVengeance.manaBurns,
     ).toBeGreaterThanOrEqual(1);
+  });
+
+  it('wipes oath-path kits that stop before Vowstrike / Wrath / crown — later clears want the tree', () => {
+    expect(runBuildBot(BLACK_CHOIR, VIGIL_MID_TREE_LOADOUT, 'disciplined').status).toBe('wipe');
+    expect(runBuildBot(BLACK_CHOIR, ZEALOT_MID_TREE_LOADOUT, 'disciplined').status).toBe('wipe');
   });
 });
 

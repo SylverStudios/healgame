@@ -20,6 +20,7 @@ import { RunModsBar } from '../ui/runModsBar';
 import { buildSpellCard } from '../ui/spellCard';
 import { SpellTooltip, type TooltipLine } from '../ui/spellTooltip';
 import { glyphChar } from '../ui/glyph';
+import { costLabel, grantSpellEyebrow, spotMetaSuffix } from '../ui/treeSpotMeta';
 import { allocatedTalentPoints, availableTalentPoints } from '../meta/progression';
 import { levelForXp } from '../data/constants';
 import {
@@ -67,7 +68,7 @@ const NODE_SIZE = NODE_RADIUS * 2;
  *   125  deep-reserves
  *   235  vigil-oath / zealot-oath
  *   355  patient-vow/measured / fervent-chain/steady-hands
- *   480  graven-scale (vigil path only)
+ *   430  graven-scale (vigil dead-end spur, left of the vow→thrift line)
  *   600  thrift, still-waters / quick-breath, frenzied-liturgy  (layer 2)
  *   720  shared-mend-potency / shared-zealous-potency            (shared mid)
  *   840  vowstrike-virtue / vowstrike-vengeance                  (Vowstrike fork)
@@ -98,7 +99,8 @@ const TALENT_TREE_POSITIONS: Readonly<Record<string, SpotPosition>> = {
   'zealot-oath': { x: 700, y: 235 },
   'vigil-patient-vow': { x: 150, y: 355 },
   'vigil-measured-devotion': { x: 380, y: 355 },
-  'vigil-graven-scale': { x: 150, y: 480 },
+  // Dead-end spur off Patient Vow — left of the vow→thrift column so edges don't overlap.
+  'vigil-graven-scale': { x: 40, y: 430 },
   'zealot-fervent-chain': { x: 590, y: 355 },
   'zealot-steady-hands': { x: 820, y: 355 },
   // Layer 2 — output nodes compacted to y 600 (deep-well/spendthrift-grace cut in Alpha 0.2).
@@ -125,24 +127,17 @@ function asContent(raw: unknown): TalentTreeContent | null {
   return c as TalentTreeContent;
 }
 
-function costLabel(currency: string, amount: number): string {
-  if (currency === 'talent') return `${amount} point`;
-  return `${amount} ${currency}`;
-}
-
 function showingNode(spot: SpotView) {
   return spot.next ?? spot.owned[spot.owned.length - 1] ?? null;
 }
 
-function spotMetaSuffix(spot: SpotView): string {
-  const rank =
-    spot.chainLength > 1
-      ? ` (rank ${spot.owned.length}/${spot.chainLength})`
-      : spot.owned.length > 0
-        ? ' (owned)'
-        : '';
-  const cost = spot.next ? ` — ${costLabel(spot.next.cost.currency, spot.next.cost.amount)}` : '';
-  return `${rank}${cost}`;
+function spotMetaInput(spot: SpotView) {
+  const base = { chainLength: spot.chainLength, ownedCount: spot.owned.length };
+  if (!spot.next) return base;
+  return {
+    ...base,
+    nextCost: { currency: spot.next.cost.currency, amount: spot.next.cost.amount },
+  };
 }
 
 /** Non-spell talent nodes: name/meta + description as a simple line stack. */
@@ -151,19 +146,12 @@ function spotTalentLines(spot: SpotView): TooltipLine[] {
   if (!node) return [{ text: spot.id, color: TALENT_NAME_COLOR }];
   const content = asContent(node.content);
   const name = content?.name ?? node.id;
-  const lines: TooltipLine[] = [{ text: `${name}${spotMetaSuffix(spot)}`, color: TALENT_NAME_COLOR }];
+  const lines: TooltipLine[] = [
+    { text: `${name}${spotMetaSuffix(spotMetaInput(spot))}`, color: TALENT_NAME_COLOR },
+  ];
   const desc = content?.description ?? '';
   if (desc) lines.push({ text: desc, color: TALENT_DESC_COLOR });
   return lines;
-}
-
-/** Eyebrow above a grantSpell slot card (talent name when it differs, plus cost/owned). */
-function grantSpellEyebrow(spot: SpotView, talentName: string, spellName: string): string {
-  const meta = spotMetaSuffix(spot).trim();
-  if (talentName !== spellName) {
-    return meta ? `${talentName}${spotMetaSuffix(spot)}` : talentName;
-  }
-  return meta.length > 0 ? meta.replace(/^ — /, '') : 'Spell unlock';
 }
 
 export class TreeScene extends Phaser.Scene {
@@ -438,7 +426,7 @@ export class TreeScene extends Phaser.Scene {
         .setAlpha(alpha);
       extras.push(lockMark);
     } else if (purchasable && spot.next) {
-      // Tiny affordability tick — full cost string stays in the tooltip.
+      // Tiny affordability tick — rank capacity lives in the tooltip.
       const tick = this.add
         .circle(pos.x + NODE_RADIUS - 6, pos.y - NODE_RADIUS + 6, 4, ACCENT_HEX)
         .setStrokeStyle(1, BORDER_COLOR)
@@ -466,7 +454,7 @@ export class TreeScene extends Phaser.Scene {
       grantedSpell && content
         ? this.tooltip.fillCard(
             buildSpellCard(grantedSpell, {
-              eyebrow: grantSpellEyebrow(spot, content.name, grantedSpell.name),
+              eyebrow: grantSpellEyebrow(spotMetaInput(spot), content.name, grantedSpell.name),
               description: content.description,
             }),
           )

@@ -9,6 +9,7 @@
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { CombatEngine } from '../combat/engine';
+import { nextPartyTargetId } from '../combat/partyTarget';
 import type {
   CombatEvent,
   CombatState,
@@ -39,6 +40,7 @@ import { runModsFromSave } from '../data/runMods';
 import { RunModsBar } from '../ui/runModsBar';
 import { ACTION_HOTKEY_LETTERS, MAX_ACTION_HOTKEYS, actionHotkeySlot } from '../ui/actionHotkeys';
 import type { CombatMods } from '../data/talentTree';
+import { beginRun, finalizeRun, recordPress, type PressSource } from '../telemetry';
 
 /** Pinned contract: callers pass fully resolved CombatMods (from loadoutFromSave). */
 export interface CombatSceneData {
@@ -215,6 +217,7 @@ export class CombatScene extends Phaser.Scene {
     // the same save is reused below for the pace toggle (avoids a second
     // redundant loadSave() call).
     const save = loadSave();
+    beginRun(this.sceneData.encounterId, save);
 
     this.engine = new CombatEngine(encounter, spells, {
       bonusMaxMana: this.sceneData.loadout.bonusMaxMana,
@@ -242,13 +245,14 @@ export class CombatScene extends Phaser.Scene {
       SPELL_BAR_Y,
       spells,
       this.sceneData.loadout,
-      (spellId) => this.onSpellCast(spellId),
+      (spellId) => this.onSpellCast(spellId, 'click'),
       VIEW_WIDTH,
       this.sceneData.loadout.cooldowns,
-      (cooldownId) => this.onCooldownActivate(cooldownId),
+      (cooldownId) => this.onCooldownActivate(cooldownId, 'click'),
     );
     this.registerHotkeys(spells, this.sceneData.loadout.cooldowns);
     this.registerEscapeKey();
+    this.registerTabTargetKey();
 
     const available = this.sceneData.loadout.paceMultipliersTenths;
     this.combatPaceTenths = available.includes(save.combatPaceTenths) ? save.combatPaceTenths : 10;
@@ -440,12 +444,12 @@ export class CombatScene extends Phaser.Scene {
     const actions: Array<(() => void) | undefined> = new Array(MAX_ACTION_HOTKEYS);
     spells.forEach((spell, i) => {
       if (i < ACTION_HOTKEY_LETTERS.length) {
-        actions[i] = () => this.onSpellCast(spell.id);
+        actions[i] = () => this.onSpellCast(spell.id, 'key');
       }
     });
     cooldowns.forEach((cooldown, i) => {
       if (i < ACTION_HOTKEY_LETTERS.length) {
-        actions[ACTION_HOTKEY_LETTERS.length + i] = () => this.onCooldownActivate(cooldown.id);
+        actions[ACTION_HOTKEY_LETTERS.length + i] = () => this.onCooldownActivate(cooldown.id, 'key');
       }
     });
     for (const letter of ACTION_HOTKEY_LETTERS) {
@@ -468,6 +472,20 @@ export class CombatScene extends Phaser.Scene {
     });
   }
 
+  /** Tab cycles heal target: tank → dps1 → dps2 → healer → wrap (skips dead). */
+  private registerTabTargetKey(): void {
+    const keyboard = this.input.keyboard;
+    if (!keyboard) return;
+    keyboard.on('keydown-TAB', (event: KeyboardEvent) => {
+      event.preventDefault();
+      if (this.engine.state.status !== 'running') return;
+      const next = nextPartyTargetId(this.engine.state.party, this.engine.state.targetId);
+      if (next === null) return;
+      this.engine.setTarget(next);
+      this.syncView();
+    });
+  }
+
   // ---- input ----------------------------------------------------------------
 
   private onAllyClick(unitId: string): void {
@@ -476,16 +494,19 @@ export class CombatScene extends Phaser.Scene {
     this.syncView();
   }
 
-  private onSpellCast(spellId: string): void {
+  private onSpellCast(spellId: string, source: PressSource): void {
     if (this.engine.state.status !== 'running') return;
+    recordPress(spellId, source);
     this.engine.castSpell(spellId);
     this.syncView();
   }
 
   /** Cooldowns are off-GCD (Alpha 0.1 §D6) — no busy/target checks here; the engine itself
    *  silently ignores unknown ids and re-activation while still on cooldown. */
-  private onCooldownActivate(cooldownId: string): void {
+  private onCooldownActivate(cooldownId: string, source: PressSource): void {
     if (this.engine.state.status !== 'running') return;
+    // Count the press even when the CD is still ticking — balance cares about spam.
+    recordPress(cooldownId, source);
     const cooldown = this.engine.state.cooldowns.find((state) => state.id === cooldownId);
     if (!cooldown || cooldown.remainingCooldownMs > 0) return;
     this.engine.activateCooldown(cooldownId);
@@ -610,7 +631,10 @@ export class CombatScene extends Phaser.Scene {
           // so clear any lingering brand before the overlay.
           this.partySprites.forEach((sprite) => sprite.setBossFocused(false));
           this.focusCalloutText.setVisible(false).setText('');
-          if (isFinalStatus(event.status)) this.showResultOverlay(event.status);
+          if (isFinalStatus(event.status)) {
+            finalizeRun(event.status, this.elapsedMs);
+            this.showResultOverlay(event.status);
+          }
           break;
         default:
           break;

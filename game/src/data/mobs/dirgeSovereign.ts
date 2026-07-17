@@ -6,7 +6,7 @@ export const DIRGE_SOVEREIGN_MOB = {
   tags: ['boss'],
   hp: 320,
   autoDamage: 4,
-  swingIntervalMs: 2_800,
+  swingIntervalMs: 3_200,
   abilityIds: ['soul-toll'],
   visualKey: 'dirge-sovereign',
 } as const satisfies MobDef;

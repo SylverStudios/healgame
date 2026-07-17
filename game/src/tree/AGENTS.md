@@ -145,7 +145,7 @@ Row layout in `TALENT_TREE_POSITIONS` (y centers, 960px canvas):
 | 125 | `deep-reserves`                                                   |
 | 235 | `vigil-oath` (x 260) · `zealot-oath` (x 700)                     |
 | 355 | `vigil-patient-vow` (x 150) · `vigil-measured-devotion` (x 380) · `zealot-fervent-chain` (x 590) · `zealot-steady-hands` (x 820) |
-| 480 | `vigil-graven-scale` (x 150)                                      |
+| 430 | `vigil-graven-scale` (x 40) — dead-end spur left of vow→thrift   |
 | 600 | `vigil-thrift` (x 160) · `vigil-still-waters` (x 375) · `zealot-quick-breath` (x 585) · `zealot-frenzied-liturgy` (x 800) |
 | 720 | `shared-mend-potency` (x 320) · `shared-zealous-potency` (x 640) |
 | 840 | `vowstrike-virtue` (x 260) · `vowstrike-vengeance` (x 700)       |

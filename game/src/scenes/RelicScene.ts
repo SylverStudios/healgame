@@ -3,8 +3,8 @@
  * is pending. Choosing one appends a permanent stat relic, clears the offer,
  * persists, and returns to the Hub.
  * No skip button — the player must pick. Temp art only: rects + monospace
- * text, dark palette, matching Hub/Tree conventions. Card glyphs match the
- * shared RunModsBar icon language (colored circles).
+ * text, dark palette, matching Hub/Tree conventions. Card glyphs / name
+ * accents use role scales (grey defense, red offense, green healing).
  */
 
 import Phaser from 'phaser';
@@ -13,14 +13,13 @@ import { loadSave, saveGame } from '../save/save';
 import { relicsById } from '../data/relics';
 import type { RelicDef } from '../combat/types';
 import { drawRunModGlyph } from '../ui/runModsBar';
+import { relicGlyphColor, relicGlyphColorCss } from '../ui/relicColors';
 
 const BG_COLOR = 0x1a1210;
 const CARD_BG = 0x3a2a22;
 const CARD_BG_HOVER = 0x4a3a2e;
 const BORDER_COLOR = 0x0a0605;
-const HOVER_BORDER_COLOR = 0xf2c14e;
 const TEXT_COLOR = '#e8d8c8';
-const ACCENT_COLOR = '#f2c14e';
 const DIM_COLOR = '#a89888';
 const FONT = 'monospace';
 
@@ -65,6 +64,7 @@ export class RelicScene extends Phaser.Scene {
   }
 
   private buildCard(x: number, y: number, relic: RelicDef): void {
+    const accent = relicGlyphColor(relic);
     const bg = this.add
       .rectangle(x, y, CARD_WIDTH, CARD_HEIGHT, CARD_BG)
       .setStrokeStyle(2, BORDER_COLOR)
@@ -75,7 +75,7 @@ export class RelicScene extends Phaser.Scene {
       .text(x, y - CARD_HEIGHT / 2 + 28, relic.name, {
         fontFamily: FONT,
         fontSize: '18px',
-        color: ACCENT_COLOR,
+        color: relicGlyphColorCss(relic),
       })
       .setOrigin(0.5);
 
@@ -91,7 +91,7 @@ export class RelicScene extends Phaser.Scene {
       })
       .setOrigin(0.5, 0);
 
-    bg.on('pointerover', () => bg.setFillStyle(CARD_BG_HOVER).setStrokeStyle(2, HOVER_BORDER_COLOR));
+    bg.on('pointerover', () => bg.setFillStyle(CARD_BG_HOVER).setStrokeStyle(2, accent));
     bg.on('pointerout', () => bg.setFillStyle(CARD_BG).setStrokeStyle(2, BORDER_COLOR));
     bg.on('pointerdown', () => this.pick(relic));
   }

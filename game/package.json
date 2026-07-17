@@ -9,10 +9,11 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src scripts/content.ts",
+    "lint": "eslint src scripts/content.ts scripts/telemetry.ts",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.scripts.json --noEmit",
     "smoke": "node scripts/smoke.mjs",
     "content": "tsx scripts/content.ts",
+    "telemetry": "tsx scripts/telemetry.ts",
     "check": "npm run typecheck && npm run lint && npm run test && vite build",
     "verify": "node scripts/verify.mjs",
     "verify:fast": "node scripts/verify.mjs --fast"

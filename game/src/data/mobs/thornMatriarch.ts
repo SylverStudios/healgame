@@ -5,7 +5,7 @@ export const THORN_MATRIARCH_MOB = {
   name: 'Thorn Matriarch',
   tags: ['boss'],
   hp: 250,
-  autoDamage: 3,
+  autoDamage: 4,
   swingIntervalMs: 3_300,
   abilityIds: ['needle-gaze'],
   visualKey: 'thorn-matriarch',
