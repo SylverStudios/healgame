@@ -1,5 +1,5 @@
 /**
- * Spell tree scene — renders any TreeConfig via view() + layoutSpots().
+ * Talent tree scene — renders any TreeConfig via view() + layoutSpots().
  * Purchases go through tree.update; state is bridged back into SaveData
  * (treeRanks) for persistence. Combat resolves via loadoutFromSave.
  */
@@ -8,14 +8,17 @@ import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { loadSave, placeOnActionBar, saveGame, type SaveData } from '../save/save';
 import {
-  SPELL_TREE,
+  TALENT_TREE,
   applyTreeStateToSave,
   ownedSpellsFromSave,
   treeStateFromLegacy,
-  type SpellTreeContent,
-} from '../data/spellTree';
+  type TalentTreeContent,
+} from '../data/talentTree';
 import { runModsFromSave } from '../data/runMods';
+import { spellById } from '../data/spells';
 import { RunModsBar } from '../ui/runModsBar';
+import { buildSpellCard } from '../ui/spellCard';
+import { SpellTooltip, type TooltipLine } from '../ui/spellTooltip';
 import { glyphChar } from '../ui/glyph';
 import { allocatedTalentPoints, availableTalentPoints } from '../meta/progression';
 import { levelForXp } from '../data/constants';
@@ -73,23 +76,21 @@ const NODE_SIZE = NODE_RADIUS * 2;
 const WORLD_HEIGHT = 1080;
 const WHEEL_SCROLL_SCALE = 0.5;
 
-const TOOLTIP_BG = 0x241a15;
-const TOOLTIP_BORDER = 0x0a0605;
-const TOOLTIP_PADDING = 8;
 const TOOLTIP_GAP = 8;
-const TOOLTIP_MAX_WIDTH = 280;
 const TOOLTIP_DEPTH = 300;
 const HUD_DEPTH = 200;
+const TALENT_NAME_COLOR = '#e8d8c8';
+const TALENT_DESC_COLOR = '#a89888';
 
 /**
- * Presentation overrides for the live SPELL_TREE (node placement).
+ * Presentation overrides for the live TALENT_TREE (node placement).
  * Any other config falls through to layoutSpots auto-placement.
  * Journey clicks nodes by `treeNode:<spotId>` name, not by these coords.
  *
  * Pure-mana nodes vigil-deep-well and zealot-spendthrift-grace were removed
  * in Alpha 0.2; their entries are omitted here.
  */
-const SPELL_TREE_POSITIONS: Readonly<Record<string, SpotPosition>> = {
+const TALENT_TREE_POSITIONS: Readonly<Record<string, SpotPosition>> = {
   // Shared early
   'deep-reserves': { x: 480, y: 125 },
   // Oath wedge
@@ -117,11 +118,11 @@ const SPELL_TREE_POSITIONS: Readonly<Record<string, SpotPosition>> = {
   'vowbound-crown': { x: 600, y: 960 },
 };
 
-function asContent(raw: unknown): SpellTreeContent | null {
+function asContent(raw: unknown): TalentTreeContent | null {
   if (!raw || typeof raw !== 'object') return null;
-  const c = raw as Partial<SpellTreeContent>;
+  const c = raw as Partial<TalentTreeContent>;
   if (typeof c.name !== 'string' || typeof c.description !== 'string' || !c.effect) return null;
-  return c as SpellTreeContent;
+  return c as TalentTreeContent;
 }
 
 function costLabel(currency: string, amount: number): string {
@@ -133,20 +134,36 @@ function showingNode(spot: SpotView) {
   return spot.next ?? spot.owned[spot.owned.length - 1] ?? null;
 }
 
-function spotDescription(spot: SpotView): string {
-  const node = showingNode(spot);
-  if (!node) return spot.id;
-  const content = asContent(node.content);
-  const name = content?.name ?? node.id;
+function spotMetaSuffix(spot: SpotView): string {
   const rank =
     spot.chainLength > 1
-      ? `  (rank ${spot.owned.length}/${spot.chainLength})`
+      ? ` (rank ${spot.owned.length}/${spot.chainLength})`
       : spot.owned.length > 0
-        ? '  (owned)'
+        ? ' (owned)'
         : '';
-  const cost = spot.next ? `  —  ${costLabel(spot.next.cost.currency, spot.next.cost.amount)}` : '';
+  const cost = spot.next ? ` — ${costLabel(spot.next.cost.currency, spot.next.cost.amount)}` : '';
+  return `${rank}${cost}`;
+}
+
+/** Non-spell talent nodes: name/meta + description as a simple line stack. */
+function spotTalentLines(spot: SpotView): TooltipLine[] {
+  const node = showingNode(spot);
+  if (!node) return [{ text: spot.id, color: TALENT_NAME_COLOR }];
+  const content = asContent(node.content);
+  const name = content?.name ?? node.id;
+  const lines: TooltipLine[] = [{ text: `${name}${spotMetaSuffix(spot)}`, color: TALENT_NAME_COLOR }];
   const desc = content?.description ?? '';
-  return `${name}${rank}${cost}\n${desc}`;
+  if (desc) lines.push({ text: desc, color: TALENT_DESC_COLOR });
+  return lines;
+}
+
+/** Eyebrow above a grantSpell slot card (talent name when it differs, plus cost/owned). */
+function grantSpellEyebrow(spot: SpotView, talentName: string, spellName: string): string {
+  const meta = spotMetaSuffix(spot).trim();
+  if (talentName !== spellName) {
+    return meta ? `${talentName}${spotMetaSuffix(spot)}` : talentName;
+  }
+  return meta.length > 0 ? meta.replace(/^ — /, '') : 'Spell unlock';
 }
 
 export class TreeScene extends Phaser.Scene {
@@ -158,9 +175,7 @@ export class TreeScene extends Phaser.Scene {
   private statusText!: Phaser.GameObjects.Text;
   private feedbackText!: Phaser.GameObjects.Text;
   private nodesContainer!: Phaser.GameObjects.Container;
-  private tooltipContainer!: Phaser.GameObjects.Container;
-  private tooltipBg!: Phaser.GameObjects.Rectangle;
-  private tooltipText!: Phaser.GameObjects.Text;
+  private tooltip!: SpellTooltip;
   /** In-memory only: exclusive-group spot armed for confirm click. */
   private armedSpotId: string | null = null;
   private feedback = '';
@@ -212,7 +227,7 @@ export class TreeScene extends Phaser.Scene {
       .setDepth(HUD_DEPTH)
       .setScrollFactor(0);
     this.add
-      .text(width / 2, 28, 'SPELL TREE', {
+      .text(width / 2, 28, 'TALENT TREE', {
         fontFamily: FONT,
         fontSize: '27px',
         fontStyle: 'bold',
@@ -258,21 +273,11 @@ export class TreeScene extends Phaser.Scene {
 
     this.nodesContainer = this.add.container(0, 0);
 
-    this.tooltipBg = this.add
-      .rectangle(0, 0, 10, 10, TOOLTIP_BG)
-      .setOrigin(0, 0)
-      .setStrokeStyle(1, TOOLTIP_BORDER);
-    this.tooltipText = this.add.text(TOOLTIP_PADDING, TOOLTIP_PADDING, '', {
-      fontFamily: FONT,
-      fontSize: '12px',
-      color: TEXT_COLOR,
-      align: 'left',
-      wordWrap: { width: TOOLTIP_MAX_WIDTH - TOOLTIP_PADDING * 2 },
+    this.tooltip = new SpellTooltip(this, {
+      screenWidth: width,
+      depth: TOOLTIP_DEPTH,
+      scrollFactor: 1,
     });
-    this.tooltipContainer = this.add
-      .container(0, 0, [this.tooltipBg, this.tooltipText])
-      .setDepth(TOOLTIP_DEPTH)
-      .setVisible(false);
 
     this.buildBackButton(120, 504);
     this.buildOathLockIcon();
@@ -304,7 +309,7 @@ export class TreeScene extends Phaser.Scene {
 
   private armMessage(): string {
     if (this.armedSpotId === null) return '';
-    const treeView = view(SPELL_TREE, this.treeState);
+    const treeView = view(TALENT_TREE, this.treeState);
     const spot = treeView.spots.find((s) => s.id === this.armedSpotId);
     const content = spot?.next ? asContent(spot.next.content) : null;
     const name = content?.name ?? this.armedSpotId;
@@ -314,7 +319,7 @@ export class TreeScene extends Phaser.Scene {
   private render(): void {
     this.hideTooltip();
     this.nodesContainer.removeAll(true);
-    const treeView = view(SPELL_TREE, this.treeState);
+    const treeView = view(TALENT_TREE, this.treeState);
     const available = treeView.wallet['talent'] ?? 0;
     this.headerText.setText(
       `Level ${levelForXp(this.save.xp)}   •   ${available} unplaced   •   ${allocatedTalentPoints(this.save)} placed`,
@@ -324,7 +329,7 @@ export class TreeScene extends Phaser.Scene {
 
     const positions = layoutSpots(treeView, {
       width: this.scale.width,
-      overrides: SPELL_TREE_POSITIONS,
+      overrides: TALENT_TREE_POSITIONS,
     });
 
     this.renderEdges(treeView, positions);
@@ -446,36 +451,46 @@ export class TreeScene extends Phaser.Scene {
 
   /**
    * Shows the node-anchored tooltip above the node; flips below if that would
-   * clip the canvas top. `pos` is world-space (tooltipContainer scrolls with
-   * the tree, scrollFactor 1 default) but the above/below flip decision needs
-   * screen-space, so it's computed relative to the camera's current scrollY.
+   * clip the canvas top. `pos` is world-space (tooltip scrolls with the tree)
+   * but the above/below flip decision needs screen-space, so it's computed
+   * relative to the camera's current scrollY.
+   * grantSpell nodes use the same slot-card layout as combat spell tooltips.
    */
   private showTooltip(spot: SpotView, pos: SpotPosition): void {
-    this.tooltipText.setText(spotDescription(spot));
-    const panelWidth = this.tooltipText.width + TOOLTIP_PADDING * 2;
-    const panelHeight = this.tooltipText.height + TOOLTIP_PADDING * 2;
-    this.tooltipBg.setSize(panelWidth, panelHeight);
+    const node = showingNode(spot);
+    const content = node ? asContent(node.content) : null;
+    const grantedSpell =
+      content?.effect.kind === 'grantSpell' ? spellById(content.effect.spellId) : undefined;
+
+    const size =
+      grantedSpell && content
+        ? this.tooltip.fillCard(
+            buildSpellCard(grantedSpell, {
+              eyebrow: grantSpellEyebrow(spot, content.name, grantedSpell.name),
+              description: content.description,
+            }),
+          )
+        : this.tooltip.fillLines(spotTalentLines(spot));
 
     const canvasWidth = this.scale.width;
     const canvasHeight = this.scale.height;
     const scrollY = this.cameras.main.scrollY;
     const screenY = pos.y - scrollY;
 
-    const x = Phaser.Math.Clamp(pos.x - panelWidth / 2, 0, Math.max(0, canvasWidth - panelWidth));
+    const x = Phaser.Math.Clamp(pos.x - size.width / 2, 0, Math.max(0, canvasWidth - size.width));
 
-    const aboveScreen = screenY - NODE_SIZE / 2 - TOOLTIP_GAP - panelHeight;
+    const aboveScreen = screenY - NODE_SIZE / 2 - TOOLTIP_GAP - size.height;
     const screenY2 =
       aboveScreen >= 0
         ? aboveScreen
-        : Phaser.Math.Clamp(screenY + NODE_SIZE / 2 + TOOLTIP_GAP, 0, canvasHeight - panelHeight);
+        : Phaser.Math.Clamp(screenY + NODE_SIZE / 2 + TOOLTIP_GAP, 0, canvasHeight - size.height);
     const y = screenY2 + scrollY;
 
-    this.tooltipContainer.setPosition(x, y);
-    this.tooltipContainer.setVisible(true);
+    this.tooltip.place(x, y);
   }
 
   private hideTooltip(): void {
-    this.tooltipContainer.setVisible(false);
+    this.tooltip.hide();
   }
 
   private onSpotClicked(spot: SpotView): void {
@@ -518,7 +533,7 @@ export class TreeScene extends Phaser.Scene {
 
   private tryPurchase(spotId: string): void {
     const before = new Set(ownedSpellsFromSave(this.save).map((s) => s.id));
-    const result = update(SPELL_TREE, this.treeState, { type: 'purchase', spotId });
+    const result = update(TALENT_TREE, this.treeState, { type: 'purchase', spotId });
     if (result.ok) {
       this.treeState = result.state;
       applyTreeStateToSave(this.save, this.treeState);

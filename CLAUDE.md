@@ -50,8 +50,8 @@ game/src/
   tree/     config-driven skill-tree service (opaque state, update/view).
             Agent contract: tree/AGENTS.md
   data/     ALL gameplay numbers as data: constants, spells, typed enemy
-            abilities/mobs/dungeons compiled into encounters, spellTree.ts
-            (live SPELL_TREE + loadoutFromSave). Authoring: data/README.md
+            abilities/mobs/dungeons compiled into encounters, talentTree.ts
+            (live TALENT_TREE + loadoutFromSave). Authoring: data/README.md
             tree.ts = legacy TREE_NODES (deprecated; tests only)
   meta/     pure progression (rewards, buildLoadout alias, dungeon unlock).
             purchaseNode is deprecated — TreeScene uses tree.update

@@ -7,7 +7,7 @@
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { loadSave, saveGame } from '../save/save';
-import { loadoutFromSave } from '../data/spellTree';
+import { loadoutFromSave } from '../data/talentTree';
 import { ASH_GATE } from '../data/encounters';
 import { SPELLS } from '../data/constants';
 import type { CombatSceneData } from './CombatScene';

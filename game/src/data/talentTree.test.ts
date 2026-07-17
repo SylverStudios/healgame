@@ -1,5 +1,5 @@
 /**
- * SPELL_TREE config integrity + combat resolve parity with buildLoadout.
+ * TALENT_TREE config integrity + combat resolve parity with buildLoadout.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -8,7 +8,7 @@ import { newSaveData, type SaveData } from '../save/save';
 import { SPELLS, LEVEL_MANA } from './constants';
 import { STILL_WATERS, FRENZIED_LITURGY, WRATH_ASCENDANT } from './cooldowns';
 import {
-  SPELL_TREE,
+  TALENT_TREE,
   combatModsFromTree,
   legacyRanksFromOwned,
   loadoutFromSave,
@@ -16,8 +16,8 @@ import {
   resolveCombatMods,
   treeStateFromLegacy,
   type CombatMods,
-  type SpellTreeContent,
-} from './spellTree';
+  type TalentTreeContent,
+} from './talentTree';
 import { create, ownedContents, ownedOf, update, validateConfig, view, walletOf } from '../tree';
 
 function save(overrides: Partial<SaveData> = {}): SaveData {
@@ -25,13 +25,13 @@ function save(overrides: Partial<SaveData> = {}): SaveData {
   return { ...newSaveData(), actionBar: ['', '', '', ''], ...overrides };
 }
 
-describe('SPELL_TREE config', () => {
+describe('TALENT_TREE config', () => {
   it('validates', () => {
-    expect(validateConfig(SPELL_TREE)).toBeNull();
+    expect(validateConfig(TALENT_TREE)).toBeNull();
   });
 
   it('has the expected spots (catalogue)', () => {
-    expect(SPELL_TREE.spots.map((s) => s.id)).toEqual([
+    expect(TALENT_TREE.spots.map((s) => s.id)).toEqual([
       'deep-reserves',
       'vigil-oath',
       'zealot-oath',
@@ -54,82 +54,82 @@ describe('SPELL_TREE config', () => {
   });
 
   it('retires zealot-desperate-zeal — absent from the live tree (Alpha 0.1 §D4)', () => {
-    expect(SPELL_TREE.spots.map((s) => s.id)).not.toContain('zealot-desperate-zeal');
-    expect(SPELL_TREE.nodes.map((n) => n.id)).not.toContain('zealot-desperate-zeal');
+    expect(TALENT_TREE.spots.map((s) => s.id)).not.toContain('zealot-desperate-zeal');
+    expect(TALENT_TREE.nodes.map((n) => n.id)).not.toContain('zealot-desperate-zeal');
   });
 
   it('retires vigil-deep-well and zealot-spendthrift-grace (Alpha 0.2)', () => {
-    expect(SPELL_TREE.spots.map((s) => s.id)).not.toContain('vigil-deep-well');
-    expect(SPELL_TREE.spots.map((s) => s.id)).not.toContain('zealot-spendthrift-grace');
-    expect(SPELL_TREE.nodes.map((n) => n.id)).not.toContain('vigil-deep-well');
-    expect(SPELL_TREE.nodes.map((n) => n.id)).not.toContain('zealot-spendthrift-grace');
+    expect(TALENT_TREE.spots.map((s) => s.id)).not.toContain('vigil-deep-well');
+    expect(TALENT_TREE.spots.map((s) => s.id)).not.toContain('zealot-spendthrift-grace');
+    expect(TALENT_TREE.nodes.map((n) => n.id)).not.toContain('vigil-deep-well');
+    expect(TALENT_TREE.nodes.map((n) => n.id)).not.toContain('zealot-spendthrift-grace');
   });
 
   it('models multi-rank nodes as chains', () => {
-    expect(SPELL_TREE.spots.find((s) => s.id === 'deep-reserves')?.chain).toHaveLength(3);
-    expect(SPELL_TREE.spots.find((s) => s.id === 'vigil-patient-vow')?.chain).toHaveLength(3);
-    expect(SPELL_TREE.spots.find((s) => s.id === 'zealot-fervent-chain')?.chain).toHaveLength(3);
+    expect(TALENT_TREE.spots.find((s) => s.id === 'deep-reserves')?.chain).toHaveLength(3);
+    expect(TALENT_TREE.spots.find((s) => s.id === 'vigil-patient-vow')?.chain).toHaveLength(3);
+    expect(TALENT_TREE.spots.find((s) => s.id === 'zealot-fervent-chain')?.chain).toHaveLength(3);
   });
 
   it('deep-reserves max ranks is 3 (Alpha 0.2 — was 5)', () => {
-    const chain = SPELL_TREE.spots.find((s) => s.id === 'deep-reserves')?.chain ?? [];
+    const chain = TALENT_TREE.spots.find((s) => s.id === 'deep-reserves')?.chain ?? [];
     expect(chain).toEqual(['deep-reserves-1', 'deep-reserves-2', 'deep-reserves-3']);
   });
 
   it('costs one talent point for every live node', () => {
-    for (const node of SPELL_TREE.nodes) {
+    for (const node of TALENT_TREE.nodes) {
       expect(node.cost).toEqual({ currency: 'talent', amount: 1 });
     }
   });
 
   it('locks the rival oath via exclusiveGroup', () => {
-    let state = create(SPELL_TREE, { talent: 3 });
-    const root = update(SPELL_TREE, state, { type: 'purchase', spotId: 'deep-reserves' });
+    let state = create(TALENT_TREE, { talent: 3 });
+    const root = update(TALENT_TREE, state, { type: 'purchase', spotId: 'deep-reserves' });
     expect(root.ok).toBe(true);
     if (!root.ok) return;
     state = root.state;
 
-    const vigil = update(SPELL_TREE, state, { type: 'purchase', spotId: 'vigil-oath' });
+    const vigil = update(TALENT_TREE, state, { type: 'purchase', spotId: 'vigil-oath' });
     expect(vigil.ok).toBe(true);
     if (!vigil.ok) return;
     state = vigil.state;
 
-    const zealotSpotPurchase = update(SPELL_TREE, state, { type: 'purchase', spotId: 'zealot-oath' });
+    const zealotSpotPurchase = update(TALENT_TREE, state, { type: 'purchase', spotId: 'zealot-oath' });
     expect(zealotSpotPurchase.ok).toBe(true);
     if (!zealotSpotPurchase.ok) return;
     expect(ownedOf(zealotSpotPurchase.state)).not.toContain('zealot-oath');
     expect(ownedOf(zealotSpotPurchase.state)).toContain('warped-tempo-via-zealot');
 
-    const zealotView = view(SPELL_TREE, zealotSpotPurchase.state).spots.find((s) => s.id === 'zealot-oath');
+    const zealotView = view(TALENT_TREE, zealotSpotPurchase.state).spots.find((s) => s.id === 'zealot-oath');
     expect(zealotView?.next?.id).toBe('zealot-oath');
     expect(zealotView?.status).toBe('exclusive-locked');
   });
 
   it('offers forsaken-path tempo on the rival spot after swearing an oath', () => {
-    let state = create(SPELL_TREE, { talent: 3 });
-    const root = update(SPELL_TREE, state, { type: 'purchase', spotId: 'deep-reserves' });
+    let state = create(TALENT_TREE, { talent: 3 });
+    const root = update(TALENT_TREE, state, { type: 'purchase', spotId: 'deep-reserves' });
     expect(root.ok).toBe(true);
     if (!root.ok) return;
     state = root.state;
 
-    const vigil = update(SPELL_TREE, state, { type: 'purchase', spotId: 'vigil-oath' });
+    const vigil = update(TALENT_TREE, state, { type: 'purchase', spotId: 'vigil-oath' });
     expect(vigil.ok).toBe(true);
     if (!vigil.ok) return;
     state = vigil.state;
 
-    const zealotSpot = view(SPELL_TREE, state).spots.find((s) => s.id === 'zealot-oath');
+    const zealotSpot = view(TALENT_TREE, state).spots.find((s) => s.id === 'zealot-oath');
     expect(zealotSpot?.next?.id).toBe('warped-tempo-via-zealot');
 
-    const tempo = update(SPELL_TREE, state, { type: 'purchase', spotId: 'zealot-oath' });
+    const tempo = update(TALENT_TREE, state, { type: 'purchase', spotId: 'zealot-oath' });
     expect(tempo.ok).toBe(true);
     if (!tempo.ok) return;
     state = tempo.state;
 
-    const vigilSpot = view(SPELL_TREE, state).spots.find((s) => s.id === 'vigil-oath');
+    const vigilSpot = view(TALENT_TREE, state).spots.find((s) => s.id === 'vigil-oath');
     expect(vigilSpot?.next?.id).toBe('warped-tempo-via-vigil');
     expect(vigilSpot?.status).toBe('locked');
 
-    const rivalTempo = update(SPELL_TREE, state, { type: 'purchase', spotId: 'vigil-oath' });
+    const rivalTempo = update(TALENT_TREE, state, { type: 'purchase', spotId: 'vigil-oath' });
     expect(rivalTempo.ok).toBe(false);
     if (rivalTempo.ok) return;
     expect(rivalTempo.reason).toBe('requirements-unmet');
@@ -137,12 +137,12 @@ describe('SPELL_TREE config', () => {
 
   it('makes Patient Vow and Measured Devotion mutually exclusive', () => {
     let state = treeStateFromLegacy({ 'deep-reserves': 1, 'vigil-oath': 1 }, 2);
-    const power = update(SPELL_TREE, state, { type: 'purchase', spotId: 'vigil-patient-vow' });
+    const power = update(TALENT_TREE, state, { type: 'purchase', spotId: 'vigil-patient-vow' });
     expect(power.ok).toBe(true);
     if (!power.ok) return;
     state = power.state;
 
-    const efficiency = update(SPELL_TREE, state, {
+    const efficiency = update(TALENT_TREE, state, {
       type: 'purchase',
       spotId: 'vigil-measured-devotion',
     });
@@ -168,7 +168,7 @@ describe('SPELL_TREE config', () => {
 
 describe('resolveCombatMods', () => {
   it('sums bonusMaxMana across owned rank contents', () => {
-    const contents: SpellTreeContent[] = [
+    const contents: TalentTreeContent[] = [
       {
         name: 'Deep Reserves',
         description: '',
@@ -331,7 +331,7 @@ describe('tree layer 2 (Alpha 0.1 §D5 — output nodes only after Alpha 0.2 tri
 
   it('locks Vigil output layer without any owned branch node', () => {
     const state = treeStateFromLegacy({ 'deep-reserves': 1, 'vigil-oath': 1 }, 3);
-    const spots = view(SPELL_TREE, state).spots;
+    const spots = view(TALENT_TREE, state).spots;
     for (const id of VIGIL_OUTPUT_SPOTS) {
       expect(spots.find((s) => s.id === id)?.status).toBe('locked');
     }
@@ -342,7 +342,7 @@ describe('tree layer 2 (Alpha 0.1 §D5 — output nodes only after Alpha 0.2 tri
       { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-patient-vow': 1 },
       3,
     );
-    const spots = view(SPELL_TREE, state).spots;
+    const spots = view(TALENT_TREE, state).spots;
     for (const id of VIGIL_OUTPUT_SPOTS) {
       expect(spots.find((s) => s.id === id)?.status).toBe('affordable');
     }
@@ -353,7 +353,7 @@ describe('tree layer 2 (Alpha 0.1 §D5 — output nodes only after Alpha 0.2 tri
       { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-measured-devotion': 1 },
       3,
     );
-    const spots = view(SPELL_TREE, state).spots;
+    const spots = view(TALENT_TREE, state).spots;
     for (const id of VIGIL_OUTPUT_SPOTS) {
       expect(spots.find((s) => s.id === id)?.status).toBe('affordable');
     }
@@ -361,7 +361,7 @@ describe('tree layer 2 (Alpha 0.1 §D5 — output nodes only after Alpha 0.2 tri
 
   it('locks Zealot output layer without any owned branch node', () => {
     const state = treeStateFromLegacy({ 'deep-reserves': 1, 'zealot-oath': 1 }, 3);
-    const spots = view(SPELL_TREE, state).spots;
+    const spots = view(TALENT_TREE, state).spots;
     for (const id of ZEALOT_OUTPUT_SPOTS) {
       expect(spots.find((s) => s.id === id)?.status).toBe('locked');
     }
@@ -372,7 +372,7 @@ describe('tree layer 2 (Alpha 0.1 §D5 — output nodes only after Alpha 0.2 tri
       { 'deep-reserves': 1, 'zealot-oath': 1, 'zealot-fervent-chain': 1 },
       3,
     );
-    const spots = view(SPELL_TREE, state).spots;
+    const spots = view(TALENT_TREE, state).spots;
     for (const id of ZEALOT_OUTPUT_SPOTS) {
       expect(spots.find((s) => s.id === id)?.status).toBe('affordable');
     }
@@ -383,7 +383,7 @@ describe('tree layer 2 (Alpha 0.1 §D5 — output nodes only after Alpha 0.2 tri
       { 'deep-reserves': 1, 'zealot-oath': 1, 'zealot-steady-hands': 1 },
       3,
     );
-    const spots = view(SPELL_TREE, state).spots;
+    const spots = view(TALENT_TREE, state).spots;
     for (const id of ZEALOT_OUTPUT_SPOTS) {
       expect(spots.find((s) => s.id === id)?.status).toBe('affordable');
     }
@@ -547,53 +547,76 @@ describe('tree layer 2 (Alpha 0.1 §D5 — output nodes only after Alpha 0.2 tri
 describe('shared mid (Alpha 0.2)', () => {
   const SHARED_MID_SPOTS = ['shared-mend-potency', 'shared-zealous-potency'];
 
-  it('locks shared mid nodes without any oath follow-up', () => {
-    const state = treeStateFromLegacy({ 'deep-reserves': 1, 'vigil-oath': 1 }, 5);
-    const spots = view(SPELL_TREE, state).spots;
+  it('locks shared mid nodes without any layer-2 output', () => {
+    const state = treeStateFromLegacy(
+      { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-patient-vow': 1 },
+      5,
+    );
+    const spots = view(TALENT_TREE, state).spots;
     for (const id of SHARED_MID_SPOTS) {
       expect(spots.find((s) => s.id === id)?.status).toBe('locked');
     }
   });
 
-  it('unlocks shared mid via vigil-patient-vow rank 1', () => {
+  it('unlocks shared mid via vigil-thrift', () => {
     const state = treeStateFromLegacy(
-      { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-patient-vow': 1 },
+      {
+        'deep-reserves': 1,
+        'vigil-oath': 1,
+        'vigil-patient-vow': 1,
+        'vigil-thrift': 1,
+      },
       5,
     );
-    const spots = view(SPELL_TREE, state).spots;
+    const spots = view(TALENT_TREE, state).spots;
     for (const id of SHARED_MID_SPOTS) {
       expect(spots.find((s) => s.id === id)?.status).toBe('affordable');
     }
   });
 
-  it('unlocks shared mid via vigil-measured-devotion', () => {
+  it('unlocks shared mid via vigil-still-waters', () => {
     const state = treeStateFromLegacy(
-      { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-measured-devotion': 1 },
+      {
+        'deep-reserves': 1,
+        'vigil-oath': 1,
+        'vigil-measured-devotion': 1,
+        'vigil-still-waters': 1,
+      },
       5,
     );
-    const spots = view(SPELL_TREE, state).spots;
+    const spots = view(TALENT_TREE, state).spots;
     for (const id of SHARED_MID_SPOTS) {
       expect(spots.find((s) => s.id === id)?.status).toBe('affordable');
     }
   });
 
-  it('unlocks shared mid via zealot-fervent-chain rank 1', () => {
+  it('unlocks shared mid via zealot-quick-breath', () => {
     const state = treeStateFromLegacy(
-      { 'deep-reserves': 1, 'zealot-oath': 1, 'zealot-fervent-chain': 1 },
+      {
+        'deep-reserves': 1,
+        'zealot-oath': 1,
+        'zealot-fervent-chain': 1,
+        'zealot-quick-breath': 1,
+      },
       5,
     );
-    const spots = view(SPELL_TREE, state).spots;
+    const spots = view(TALENT_TREE, state).spots;
     for (const id of SHARED_MID_SPOTS) {
       expect(spots.find((s) => s.id === id)?.status).toBe('affordable');
     }
   });
 
-  it('unlocks shared mid via zealot-steady-hands', () => {
+  it('unlocks shared mid via zealot-frenzied-liturgy', () => {
     const state = treeStateFromLegacy(
-      { 'deep-reserves': 1, 'zealot-oath': 1, 'zealot-steady-hands': 1 },
+      {
+        'deep-reserves': 1,
+        'zealot-oath': 1,
+        'zealot-steady-hands': 1,
+        'zealot-frenzied-liturgy': 1,
+      },
       5,
     );
-    const spots = view(SPELL_TREE, state).spots;
+    const spots = view(TALENT_TREE, state).spots;
     for (const id of SHARED_MID_SPOTS) {
       expect(spots.find((s) => s.id === id)?.status).toBe('affordable');
     }
@@ -601,7 +624,13 @@ describe('shared mid (Alpha 0.2)', () => {
 
   it('shared-mend-potency adds +1 heal to Solemn Mend', () => {
     const state = treeStateFromLegacy(
-      { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-patient-vow': 1, 'shared-mend-potency': 1 },
+      {
+        'deep-reserves': 1,
+        'vigil-oath': 1,
+        'vigil-patient-vow': 1,
+        'vigil-thrift': 1,
+        'shared-mend-potency': 1,
+      },
       0,
     );
     const mods = combatModsFromTree(state, [SPELLS.solemnMend.id]);
@@ -611,7 +640,13 @@ describe('shared mid (Alpha 0.2)', () => {
 
   it('shared-zealous-potency adds +1 heal to Zealous Mending', () => {
     const state = treeStateFromLegacy(
-      { 'deep-reserves': 1, 'zealot-oath': 1, 'zealot-steady-hands': 1, 'shared-zealous-potency': 1 },
+      {
+        'deep-reserves': 1,
+        'zealot-oath': 1,
+        'zealot-steady-hands': 1,
+        'zealot-quick-breath': 1,
+        'shared-zealous-potency': 1,
+      },
       0,
     );
     const mods = combatModsFromTree(state, [SPELLS.zealousMending.id]);
@@ -626,7 +661,7 @@ describe('vowstrike fork (Alpha 0.2)', () => {
       { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-patient-vow': 1 },
       5,
     );
-    const spots = view(SPELL_TREE, state).spots;
+    const spots = view(TALENT_TREE, state).spots;
     expect(spots.find((s) => s.id === 'vowstrike-virtue')?.status).toBe('locked');
     expect(spots.find((s) => s.id === 'vowstrike-vengeance')?.status).toBe('locked');
   });
@@ -636,7 +671,7 @@ describe('vowstrike fork (Alpha 0.2)', () => {
       { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-patient-vow': 1, 'shared-mend-potency': 1 },
       5,
     );
-    const spots = view(SPELL_TREE, state).spots;
+    const spots = view(TALENT_TREE, state).spots;
     expect(spots.find((s) => s.id === 'vowstrike-virtue')?.status).toBe('affordable');
     expect(spots.find((s) => s.id === 'vowstrike-vengeance')?.status).toBe('affordable');
   });
@@ -646,7 +681,7 @@ describe('vowstrike fork (Alpha 0.2)', () => {
       { 'deep-reserves': 1, 'zealot-oath': 1, 'zealot-steady-hands': 1, 'shared-zealous-potency': 1 },
       5,
     );
-    const spots = view(SPELL_TREE, state).spots;
+    const spots = view(TALENT_TREE, state).spots;
     expect(spots.find((s) => s.id === 'vowstrike-virtue')?.status).toBe('affordable');
     expect(spots.find((s) => s.id === 'vowstrike-vengeance')?.status).toBe('affordable');
   });
@@ -661,12 +696,12 @@ describe('vowstrike fork (Alpha 0.2)', () => {
       },
       2,
     );
-    const virtue = update(SPELL_TREE, state, { type: 'purchase', spotId: 'vowstrike-virtue' });
+    const virtue = update(TALENT_TREE, state, { type: 'purchase', spotId: 'vowstrike-virtue' });
     expect(virtue.ok).toBe(true);
     if (!virtue.ok) return;
     state = virtue.state;
 
-    const vengeance = update(SPELL_TREE, state, {
+    const vengeance = update(TALENT_TREE, state, {
       type: 'purchase',
       spotId: 'vowstrike-vengeance',
     });
@@ -717,7 +752,7 @@ describe('shared crown (Alpha 0.2)', () => {
       },
       5,
     );
-    const spots = view(SPELL_TREE, state).spots;
+    const spots = view(TALENT_TREE, state).spots;
     expect(spots.find((s) => s.id === 'wrath-ascendant')?.status).toBe('locked');
     expect(spots.find((s) => s.id === 'vowbound-crown')?.status).toBe('locked');
   });
@@ -733,7 +768,7 @@ describe('shared crown (Alpha 0.2)', () => {
       },
       5,
     );
-    const spots = view(SPELL_TREE, state).spots;
+    const spots = view(TALENT_TREE, state).spots;
     expect(spots.find((s) => s.id === 'wrath-ascendant')?.status).toBe('affordable');
     expect(spots.find((s) => s.id === 'vowbound-crown')?.status).toBe('affordable');
   });
@@ -749,7 +784,7 @@ describe('shared crown (Alpha 0.2)', () => {
       },
       5,
     );
-    const spots = view(SPELL_TREE, state).spots;
+    const spots = view(TALENT_TREE, state).spots;
     expect(spots.find((s) => s.id === 'wrath-ascendant')?.status).toBe('affordable');
     expect(spots.find((s) => s.id === 'vowbound-crown')?.status).toBe('affordable');
   });
@@ -813,7 +848,7 @@ describe('oath × vowstrike twists (Alpha 0.2 §D5)', () => {
     const oathSpellId = oath === 'vigil' ? SPELLS.solemnVigil.id : SPELLS.zealousFlare.id;
     const aspectSpellId =
       aspect === 'virtue' ? SPELLS.vowstrikeVirtue.id : SPELLS.vowstrikeVengeance.id;
-    const contents: SpellTreeContent[] = [
+    const contents: TalentTreeContent[] = [
       {
         name: oath === 'vigil' ? 'Path of the Vigil' : 'Path of the Zealot',
         description: '',
@@ -866,7 +901,7 @@ describe('oath × vowstrike twists (Alpha 0.2 §D5)', () => {
   });
 
   it('no twist when aspect is absent', () => {
-    const contents: SpellTreeContent[] = [
+    const contents: TalentTreeContent[] = [
       {
         name: 'Path of the Vigil',
         description: '',
@@ -880,7 +915,7 @@ describe('oath × vowstrike twists (Alpha 0.2 §D5)', () => {
   });
 
   it('no twist when oath is absent', () => {
-    const contents: SpellTreeContent[] = [
+    const contents: TalentTreeContent[] = [
       {
         name: 'Vowstrike: Absolution',
         description: '',
@@ -893,7 +928,7 @@ describe('oath × vowstrike twists (Alpha 0.2 §D5)', () => {
   });
 
   it('Vigil × Vengeance stacks damageDelta from ampOwnedSpells and the oath twist', () => {
-    const contents: SpellTreeContent[] = [
+    const contents: TalentTreeContent[] = [
       {
         name: 'Vowbound Crown',
         description: '',
@@ -1074,7 +1109,7 @@ describe('parity with buildLoadout', () => {
       { 'deep-reserves': 2, 'zealot-oath': 1, 'zealot-steady-hands': 1 },
       0,
     );
-    const contents = ownedContents<SpellTreeContent>(SPELL_TREE, state);
+    const contents = ownedContents<TalentTreeContent>(TALENT_TREE, state);
     expect(contents.map((c) => c.effect.kind)).toEqual([
       'bonusMaxMana',
       'bonusMaxMana',

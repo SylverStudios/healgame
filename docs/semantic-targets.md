@@ -17,7 +17,7 @@ by name.
 |---|---|---|
 | `tutorialLearn` | learn-button rect | `TutorialScene.ts` |
 | `hubDungeon:<id>` (e.g. `hubDungeon:ash-gate`) | dungeon button rects | `HubScene.ts` via `hubDungeonTargetName` |
-| `hubTree` | Spell Tree button | `HubScene.ts` |
+| `hubTree` | Talent Tree button | `HubScene.ts` |
 | `hubLoadout` | Spellbook button | `HubScene.ts` |
 | `hubRestart` | restart text label | `HubScene.ts` |
 | `loadoutSlot:<i>` | action-bar slot rect | `LoadoutScene.ts` |

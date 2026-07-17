@@ -190,7 +190,7 @@ Mercenaries are **competent but autonomous** — dangerous people with bad habit
 | Currency | Earn | Spend | Role |
 |----------|------|-------|------|
 | **XP / levels** | Per enemy (incl. wipes) | Auto-unlock skills on level-up | Breadth of kit |
-| **Gold** | Fixed amount per enemy | Spell tree nodes; (later) hub buffs, merc paths | Steady growth |
+| **Gold** | Fixed amount per enemy | Talent tree nodes; (later) hub buffs, merc paths | Steady growth |
 | **Rubies** | **1 per dungeon first completion** | Subclass splits / keystones; contested unlocks | Scarce choice |
 
 Rubies remain the **primary limiting resource**. Replay cleared dungeons for gold + XP only.

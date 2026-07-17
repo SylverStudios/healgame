@@ -20,7 +20,7 @@ Living specs and active phase handoffs take precedence. This file is **not** a
 - Alternative: retain Oaths, but make choosing an Oath one step in a broader
   evolution path.
 - Before committing, compare how each option affects build identity, timing,
-  player choice, and the existing spell tree.
+  player choice, and the existing talent tree.
 - Bonuses land too fast — introduce power more slowly.
 - Tree felt linear after the first real choice; more meaningful forks.
 - Class / multi-tree system later; make the current tree fun first.
@@ -37,7 +37,7 @@ Living specs and active phase handoffs take precedence. This file is **not** a
 - Supporting overlapping pulls would require a readable way to display and
   distinguish many mobs on screen at once.
 - Better wave / success / failure transitions; consider dropping the landing
-  splash and starting on the spell tree (or a diegetic hub walk).
+  splash and starting on the talent tree (or a diegetic hub walk).
 
 ## UX / presentation
 
@@ -46,7 +46,7 @@ Living specs and active phase handoffs take precedence. This file is **not** a
 - Tunnel Vision: top-of-screen callout + clearer target-style icon.
 - Frenzied Liturgy: recovery lockout after the buff expires so it cannot be
   chained forever.
-- Spell tree readability (icons + hover already partly shipped; keep iterating).
+- Talent tree readability (icons + hover already partly shipped; keep iterating).
 
 ## Release process
 

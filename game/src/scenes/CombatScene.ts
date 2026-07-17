@@ -38,7 +38,7 @@ import { relicsById } from '../data/relics';
 import { runModsFromSave } from '../data/runMods';
 import { RunModsBar } from '../ui/runModsBar';
 import { ACTION_HOTKEY_LETTERS, MAX_ACTION_HOTKEYS, actionHotkeySlot } from '../ui/actionHotkeys';
-import type { CombatMods } from '../data/spellTree';
+import type { CombatMods } from '../data/talentTree';
 
 /** Pinned contract: callers pass fully resolved CombatMods (from loadoutFromSave). */
 export interface CombatSceneData {

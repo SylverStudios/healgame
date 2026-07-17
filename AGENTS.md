@@ -2,6 +2,7 @@
 
 Status: current · Authority: doc conventions for all agents · Last verified: 2026-07-17
 
+
 How we keep docs trustworthy. Operating rules for the game itself live in
 [`CLAUDE.md`](CLAUDE.md). Module contracts live next to code (e.g.
 [`game/src/tree/AGENTS.md`](game/src/tree/AGENTS.md),
@@ -76,7 +77,7 @@ agents should prefer `verify`.
 ## Doc hygiene
 
 - **No duplicate source of truth.** Tunable numbers live in `game/src/data/`
-  (tree: `spellTree.ts`). Docs describe intent and point at files.
+  (tree: `talentTree.ts`). Docs describe intent and point at files.
 - **Implemented contracts → file refs.** Do not paste long TypeScript that
   already exists in the repo; link the file instead.
 - **Definition of done (doc touch):**

@@ -59,7 +59,7 @@ Newest first. Numbers and rule detail live in `game/src/data/` and
 ## 2026-07-09 — Phase 2
 
 - Combat feedback (lunge/floats), spell tooltips.
-- Node-graph spell tree; in-tree Vigil/Zealot oaths (SubclassScene removed).
+- Node-graph talent tree; in-tree Vigil/Zealot oaths (SubclassScene removed).
 - Kenney Tiny Dungeon unit tiles.
 
 ## 2026-07-08 — PoC (Phase 1)

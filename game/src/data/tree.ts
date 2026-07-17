@@ -1,7 +1,7 @@
 /**
  * Legacy TREE_NODES — **deprecated for live UI/combat**.
  *
- * Live config: `data/spellTree.ts` (`SPELL_TREE`). Service: `src/tree/`
+ * Live config: `data/talentTree.ts` (`TALENT_TREE`). Service: `src/tree/`
  * (see `tree/AGENTS.md`). Kept only for historical data-shape tests. Do not
  * extend for new features.
  */

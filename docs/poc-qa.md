@@ -77,7 +77,7 @@ Scripted bots run the real engine deterministically:
 ## Architecture notes for the next slice
 
 - `game/src/combat/` — pure deterministic TS; see `game/src/combat/README.md`.
-- `game/src/tree/` + `data/spellTree.ts` — config-driven tree; see
+- `game/src/tree/` + `data/talentTree.ts` — config-driven tree; see
   `game/src/tree/AGENTS.md`. Combat loadouts via `loadoutFromSave`.
 - All numbers in `game/src/data/`, guarded by balance tests.
 - `game/src/data/README.md` + `npm run content -- validate|list|preview` —
@@ -87,7 +87,7 @@ Scripted bots run the real engine deterministically:
 
 ---
 
-# Phase 2 QA — combat feedback, tooltips, real spell tree (2026-07-09)
+# Phase 2 QA — combat feedback, tooltips, real talent tree (2026-07-09)
 
 Everything below was verified against the Phase 2 handoff's "Done means"
 list by the central agent, per chunk and again end-to-end after integration.
@@ -397,13 +397,13 @@ Post-juice playtest. No new phase handoff; living numbers + hub copy.
 | Currency | PoC job |
 |---|---|
 | **XP** | Auto-unlock kit breadth at level thresholds (only Lv 2 → Zealous today) |
-| **Gold** | Buy spell-tree nodes (Deep Reserves, forsaken tempo, …) |
+| **Gold** | Buy talent-tree nodes (Deep Reserves, forsaken tempo, …) |
 | **Rubies** | Swear a subclass oath (scarce; first-clear only) |
 
 ## Gates
 
 `balance.test.ts` shape unchanged (no-heal wipe, naive wipe, full-kit clear,
-The Maw unwinnable). Retune values live in `constants.ts` / `spellTree.ts`.
+The Maw unwinnable). Retune values live in `constants.ts` / `talentTree.ts`.
 
 # Alpha 0.1 QA — mid dungeon, tree layer 2, cooldowns, relics (2026-07-13)
 
@@ -630,8 +630,8 @@ for the Frenzied Liturgy cadence below:
 - Wave changes announce themselves without pausing simulation; victory/wipe
   results fade and reveal in stages while `combatReturn` exists immediately.
 - Hub currencies use one compact summary and unlocked dungeons share a bounded
-  row above Spell Tree and Restart, eliminating the two-dungeon collision.
-- Spell-tree nodes and spacing are more compact, with stronger title/header
+  row above Talent Tree and Restart, eliminating the two-dungeon collision.
+- Talent-tree nodes and spacing are more compact, with stronger title/header
   contrast; graph behavior, tooltips, scrolling, and purchases are unchanged.
 - Relic hover required no duplicate work: the merged shared run-mods bar
   already exposes oath and relic details on Hub, Combat, and Tree.
@@ -680,7 +680,7 @@ rules. XP is now the only currency-like progression value:
 - Every enemy kill grants **1 XP**, retained through wipes.
 - Level 2 remains at 10 XP. Later levels use cumulative thresholds of 30, 60,
   100, and so on (10/20/30/40… XP between levels).
-- Each level supplies one total spell-tree allocation. Tree nodes all cost one
+- Each level supplies one total talent-tree allocation. Tree nodes all cost one
   talent point; points are placements, not spendable loot. Level 6 therefore
   supports six owned ranks/nodes, with any remainder shown as unplaced.
 - Always-available spells may unlock directly at level milestones; currently
@@ -763,7 +763,7 @@ npm run content -- validate
 | # | Criterion | Status | Enforced by |
 |---|-----------|--------|-------------|
 | 1 | Level → max mana + combat mana regen; relics stack; no player HoTs | ✅ | `manaBonusesForLevel`, `loadoutFromSave`, `CombatEngineOptions.manaRegen`, progression/engine tests |
-| 2 | Hourglass SPELL_TREE (shared → oath → mid → Vowstrike → crown); pure-mana pads slimmed | ✅ | `spellTree.ts` + tests; Deep Reserves 3 ranks; Deep Well / Spendthrift cut |
+| 2 | Hourglass TALENT_TREE (shared → oath → mid → Vowstrike → crown); pure-mana pads slimmed | ✅ | `talentTree.ts` + tests; Deep Reserves 3 ranks; Deep Well / Spendthrift cut |
 | 3 | `vowstrike-virtue` / `vowstrike-vengeance` instant (`castMs: 0`); oath lightly colors aspect | ✅ | catalog + `engine.instant.test.ts`; `applyOathVowstrikeTwists` |
 | 4 | Placeholder glyphs on tree nodes + combat spell/CD buttons; hover full detail | ✅ | `ui/glyph.ts`, TreeScene, spellBar; tooltip tests |
 | 5 | Ash/mid shape preserved; Black Choir clearable with crown kits (≥3, Soul Toll ≥1); Maw unwinnable ± relic | ✅ | `balance.test.ts` + `npm run content -- balance --all` |
@@ -801,7 +801,7 @@ changes; presentation + hub/tree layout only.
 |---|-----------|--------|-------|
 | 1 | Basic heal feels juicier | ✅ | Soft camera shake, brighter green `+N` floats (~980ms), green ripple, simple particle dots |
 | 2 | Mana-spend aura on healer | ✅ | DBZ-style ellipses + orbiting sparks; intensity from mana spent in last 30s (`manaSpendTracker.ts`) |
-| 3 | Spell tree: round icon nodes | ✅ | Circles + glyph icon; rank pips; name/cost/desc on hover only |
+| 3 | Talent tree: round icon nodes | ✅ | Circles + glyph icon; rank pips; name/cost/desc on hover only |
 | 4 | Hub: vertical dungeon list + CURRENT | ✅ | Stacked wide buttons; `currentChallengeDungeon()` marks first unlocked uncleared |
 | 5 | No text spill on dungeon buttons | ✅ | Name left-aligned inside 440px button; CURRENT/cleared badge on the right |
 
@@ -809,7 +809,7 @@ changes; presentation + hub/tree layout only.
 
 1. **Heal shake** intentionally reopens the older juice-handoff "no heal shake" rule — playtest feedback wanted Nintendo-basic-action juice.
 2. **Mana aura** is presentation-only (base spell mana on `castStarted`); discounts / free charges are ignored for intensity.
-3. **Hub meta buttons** (Spell Tree / Spellbook) sit *above* the dungeon stack so a long unlock list cannot push them off the 540px canvas.
+3. **Hub meta buttons** (Talent Tree / Spellbook) sit *above* the dungeon stack so a long unlock list cannot push them off the 540px canvas.
 4. Journey still clicks `hubDungeon:<id>` / `treeNode:<spotId>` by name — layout changes do not require journey coordinate edits.
 
 ---
@@ -831,5 +831,5 @@ Status: current · Last verified: 2026-07-17
 
 ## Acceptance
 
-Covered by save/loadout/spellTree tests and full `npm run verify` (journey uses
+Covered by save/loadout/talentTree tests and full `npm run verify` (journey uses
 named loadout + combat targets).

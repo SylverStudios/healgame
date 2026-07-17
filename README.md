@@ -57,6 +57,6 @@ Doc conventions + authority: [`AGENTS.md`](AGENTS.md). Operating rules:
 ## In one breath
 
 Oathbound only · tutorial Bonk + Solemn Mend · expected wipe · XP levels + talent
-tree · ruby oath in the spell tree (rival LOCKED, visible) · Ash Gate → Iron
+tree · ruby oath in the talent tree (rival LOCKED, visible) · Ash Gate → Iron
 Pass → mid dungeons → Black Choir → unwinnable Maw · major CDs + relics + QWER
 loadout · single local save · restart only
