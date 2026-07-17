@@ -1,9 +1,10 @@
 # Idea backlog
 
-Status: planning · Authority: none — uncommitted ideas for future exploration · Last verified: 2026-07-14
+Status: current · Authority: none — uncommitted ideas for future exploration · Last verified: 2026-07-17
 
 These are prompts to revisit, not approved scope or implementation requirements.
-Living specs and active phase handoffs take precedence.
+Living specs and active phase handoffs take precedence. This file is **not** a
+`Status: planning` handoff.
 
 ## Art direction
 
@@ -20,6 +21,10 @@ Living specs and active phase handoffs take precedence.
   evolution path.
 - Before committing, compare how each option affects build identity, timing,
   player choice, and the existing spell tree.
+- Bonuses land too fast — introduce power more slowly.
+- Tree felt linear after the first real choice; more meaningful forks.
+- Class / multi-tree system later; make the current tree fun first.
+- Need a system that improves DPS meaningfully.
 
 ## Dungeon structure and combat
 
@@ -31,6 +36,17 @@ Living specs and active phase handoffs take precedence.
   fight, trading speed for the danger of overlapping encounters.
 - Supporting overlapping pulls would require a readable way to display and
   distinguish many mobs on screen at once.
+- Better wave / success / failure transitions; consider dropping the landing
+  splash and starting on the spell tree (or a diegetic hub walk).
+
+## UX / presentation
+
+- Relic hover affordance (clearer than icon alone).
+- Cooldown buttons: hover detail + keybind parity with spells.
+- Tunnel Vision: top-of-screen callout + clearer target-style icon.
+- Frenzied Liturgy: recovery lockout after the buff expires so it cannot be
+  chained forever.
+- Spell tree readability (icons + hover already partly shipped; keep iterating).
 
 ## Release process
 

@@ -1,11 +1,11 @@
 # Healgame — Game Design Document (v0.4)
 
-Status: current · Authority: long-term design only (poc-spec wins on PoC) · Last verified: 2026-07-12
+Status: current · Authority: long-term design only (poc-spec wins on PoC) · Last verified: 2026-07-17
 
 **PoC implementation details live in [`poc-spec.md`](./poc-spec.md)** — that file wins on PoC conflicts.  
 **Working title:** healgame  
 **Date:** 2026-07-08  
-**Related:** [`poc-spec.md`](./poc-spec.md) · [`research/master-healer-kale.md`](./research/master-healer-kale.md) · [`research/design-direction.md`](./research/design-direction.md)
+**Related:** [`poc-spec.md`](./poc-spec.md) · [`CHANGELOG.md`](./CHANGELOG.md) · [`research/master-healer-kale.md`](./research/master-healer-kale.md) · [`research/design-direction.md`](./research/design-direction.md)
 
 ---
 

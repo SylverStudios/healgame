@@ -1,28 +1,17 @@
-# Semantic click targets — handoff
+# Semantic click targets
 
-Status: historical — shipped 2026-07-13 (see poc-qa.md Semantic click targets
-section) · Authority: none — archive · Last verified: 2026-07-15
+Status: current · Authority: interactive object name inventory for journey · Last verified: 2026-07-17
 
-Note: `hubRelicIcon` was superseded by `runMod:<id>` when the shared run-mods
-top bar shipped (oath + cumulative relics, Hub/Combat/Tree).
+Every interactive game object a journey stage may aim at carries a stable
+Phaser `GameObject.setName(...)`. Journey resolves via
+`window.__healgame.locate(name)` / `list()` in
+[`game/src/debug/testHooks.ts`](../game/src/debug/testHooks.ts) — no hard-coded
+layout coordinates in [`game/scripts/journey.mjs`](../game/scripts/journey.mjs).
 
-**Audience:** historical — the setName / `__healgame.locate` / journey-by-name
-change is live. Kept here as the design record and name inventory.
+Adding a new clickable/hoverable control means naming it here and clicking it
+by name.
 
-**Baseline:** side-view layout branch (PR #3) merged. The `UI` coordinate
-table at the top of `game/scripts/journey.mjs` previously duplicated scene
-layout constants; every layout change broke it. This phase deleted that
-coupling.
-
-## Mission (done)
-
-Every interactive game object has a stable semantic name via Phaser's
-`GameObject.setName()`. `window.__healgame.locate(name)` / `list()` live in
-[`game/src/debug/testHooks.ts`](../game/src/debug/testHooks.ts) (installed from
-`main.ts`). [`game/scripts/journey.mjs`](../game/scripts/journey.mjs) clicks
-and hovers by name — no hard-coded layout coordinates.
-
-## Shipped name table
+## Name table
 
 | Name | Object | Where |
 |---|---|---|
@@ -45,7 +34,7 @@ and hovers by name — no hard-coded layout coordinates.
 | `combatLogToggle` | log header text | `combatLog.ts` |
 | `relicCard:<relicId>` | RelicScene card bg | `RelicScene.ts` |
 
-## Hook API (shipped)
+## Hook API
 
 ```ts
 window.__healgame.locate(name): { x: number; y: number } | null
@@ -56,9 +45,3 @@ window.__healgame.list(): string[]
 matches `obj.name` when `visible !== false`, and converts `getBounds()` center
 to canvas px accounting for camera scroll × scrollFactor (TreeScene HUD uses
 `scrollFactor` 0).
-
-## Out of scope (still)
-
-- Party-target hotkeys as player UX (spell and cooldown number keys now ship)
-- ScaleManager-aware mapping for arbitrary viewports
-- DOM/a11y overlay, Playwright locators, screenshot diffing

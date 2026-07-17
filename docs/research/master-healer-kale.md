@@ -1,5 +1,7 @@
 # Master Healer Kale — Research Notes
 
+Status: historical · Authority: none — inspiration research · Last verified: 2026-07-17
+
 **Full title:** *Master Healer Kale with useless party*  
 **Developer:** Evrac Studio (Evrac, Indonesia)  
 **Released:** July 2–3, 2026 (Steam)  

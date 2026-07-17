@@ -1,7 +1,9 @@
 # Pixel-Art Pipeline Research (Phase 2, Chunk R)
 
-**Status:** research only. No game code touched, no sprites wired in — that's
-a future art slice. This doc is the deliverable.
+Status: historical · Authority: none — research only · Last verified: 2026-07-17
+
+Era snapshot from before Kenney Tiny Dungeon shipped. Live unit art:
+[`../unit-art.md`](../unit-art.md).
 
 ## Question and constraints
 
