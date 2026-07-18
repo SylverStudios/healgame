@@ -38,8 +38,11 @@ out overrides. `balance` runs the shared disciplined bots from
 before pinning gates.
 
 Dungeon reward data contains only `xpPerEnemy`. Every kill pays that XP even
-when the party later wipes. First-clear relic offers are meta-progression, not
-encounter currency, and are assembled from `data/relics.ts`.
+when the party later wipes. Rates scale by dungeon tier (Ash Gate 1, Iron
+Pass / Cinder Vault 2, Verdant Rift / Black Choir 3, The Maw 4) so grinding
+later content keeps pace with the level curve. First-clear relic offers are
+meta-progression, not encounter currency, and are assembled from
+`data/relics.ts`.
 
 ## Integration checklist
 

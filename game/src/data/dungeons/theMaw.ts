@@ -6,7 +6,7 @@ export const THE_MAW_DUNGEON = {
   order: 6,
   unlock: { kind: 'dungeonClear', dungeonId: 'black-choir' },
   rewards: {
-    xpPerEnemy: 1,
+    xpPerEnemy: 4,
   },
   visualKey: 'the-maw',
   waves: [

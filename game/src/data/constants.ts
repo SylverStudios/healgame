@@ -138,7 +138,11 @@ export const SPELLS = {
 export const ACTION_BAR_SLOTS = 4;
 
 export const REWARDS = {
-  /** Every defeated enemy advances the account, including kills in a wipe. */
+  /**
+   * Fallback XP per kill when an encounter omits `xpPerEnemy`.
+   * Live dungeons set their own rate (Ash Gate 1 → Iron Pass/Cinder 2 →
+   * Verdant/Choir 3 → Maw 4) so later content funds the rising level curve.
+   */
   xpPerEnemy: 1,
 } as const;
 
