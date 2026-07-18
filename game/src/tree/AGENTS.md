@@ -216,28 +216,16 @@ Retained output/tempo nodes require `mode: 'any'` on either branch follow-up:
 - Vigil: thrift, still-waters (gate: patient-vow-1 OR measured-devotion)
 - Zealot: quick-breath, frenzied-liturgy (gate: fervent-chain-1 OR steady-hands)
 
-**TreeScene now scrolls.** `WORLD_HEIGHT = 1080`; max scroll = 1080 − 540 = 540.
-All rows including the crown (y ≈ 960) are reachable at maximum scroll.
-HUD chrome is pinned via `setScrollFactor(0)`. Journey reaches deep nodes by
-wheeling to scroll and clicking by name (`treeNode:<spotId>`).
-
-Row layout in `TALENT_TREE_POSITIONS` (y centers, 960px canvas) — **chunk C
-left this pixel table exactly as Alpha 0.2 shipped it**; it doesn't yet read
-from `SpotDef.grid` at all. Chunk D owns rebuilding this into a real
-lattice layout driven by the new grid coordinates (and the edge-state /
-glyph APIs above); until then the live tree still *renders* like Alpha 0.2
-even though the underlying config now carries lattice data:
-
-| y   | spots                                                             |
-|-----|-------------------------------------------------------------------|
-| 125 | `deep-reserves`                                                   |
-| 235 | `vigil-oath` (x 260) · `zealot-oath` (x 700)                     |
-| 355 | `vigil-patient-vow` (x 150) · `vigil-measured-devotion` (x 380) · `zealot-fervent-chain` (x 590) · `zealot-steady-hands` (x 820) |
-| 430 | `vigil-graven-scale` (x 40) — dead-end spur left of vow→thrift   |
-| 600 | `vigil-thrift` (x 160) · `vigil-still-waters` (x 375) · `zealot-quick-breath` (x 585) · `zealot-frenzied-liturgy` (x 800) |
-| 720 | `shared-mend-potency` (x 320) · `shared-zealous-potency` (x 640) |
-| 840 | `vowstrike-virtue` (x 260) · `vowstrike-vengeance` (x 700)       |
-| 960 | `wrath-ascendant` (x 360) · `vowbound-crown` (x 600)             |
+**TreeScene no longer scrolls (v0.3 chunk D).** The lattice (cols 0-6,
+rows -1..4) fits the fixed 960×540 canvas: pixel positions come from
+`layoutFromGrid(SpotDef.grid, spacing)` in `tree/layout.ts`
+(GRID_LEFT 90, GRID_COL_WIDTH 130, GRID_TOP 176, GRID_ROW_HEIGHT 70 — see
+`TreeScene.ts`). The old `TALENT_TREE_POSITIONS` pixel table and the
+wheel-scroll world are deleted. Edges render from `TreeView.edges` with four
+states (traversed bright · available dim amber · inactive faint ·
+locked dark-red broken X); crowns carry `Lv N` tags; a small BUILD glyph
+preview (drawn via `ui/buildGlyph.ts`) sits in the top-left HUD. Journey
+still clicks nodes purely by name (`treeNode:<spotId>`), no scrolling.
 
 ## Gates
 

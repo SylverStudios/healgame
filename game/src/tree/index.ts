@@ -29,7 +29,7 @@ export type {
   UpdateResult,
 } from './types';
 
-export type { LayoutOptions, SpotPosition } from './layout';
+export type { GridPosition, GridSpacing, LayoutOptions, SpotPosition } from './layout';
 
 export type { BuildGlyph } from './glyph';
 
@@ -47,6 +47,6 @@ export {
   withWallet,
 } from './tree';
 
-export { layoutSpots } from './layout';
+export { layoutFromGrid, layoutSpots } from './layout';
 
 export { buildGlyphFromTree } from './glyph';

@@ -18,9 +18,10 @@
  *   B  seeded post-first-clear save → tree graph: buy Deep Reserves ranks,
  *      arm + swear the Vigil oath in-tree (talent placed, Zealot locked), buy a
  *      follow-up node → hub shows the oath
- *   B3 Alpha 0.2 hourglass: sworn Vigil + Patient Vow → scroll → Still Waters,
- *      shared mid (mend potency), Virtue Vowstrike, Wrath Ascendant + crown;
- *      second seed proves Steady Hands still purchasable on Zealot path
+ *   B3 v0.3 lattice (fits the fixed canvas, no scroll): sworn Vigil + Patient
+ *      Vow → Still Waters, shared mid (mend potency), Virtue Vowstrike, Wrath
+ *      Ascendant crown (level-gated); second seed proves Steady Hands still
+ *      purchasable on Zealot path
  *   B2 combat with the Vigil kit → hover the Solemn Vigil button → tooltip
  *      screenshot (modifier lines from the tree) + mid-fight feedback shot
  *   C  Maw gating (§D1): Ash-Gate-only save → Maw absent; Ash Gate + Iron
@@ -362,10 +363,11 @@ try {
   check((await locate(page, 'runMod:vigil-oath')) !== null, 'hub run-mods bar shows sworn oath');
   await shot(page, 'hub-with-oath');
 
-  // ---- Stage B3: Alpha 0.2 hourglass (shared mid → Vowstrike → crown) --------
-  console.log('Stage B3: scroll hourglass → Still Waters → shared mid → Vowstrike → crown');
+  // ---- Stage B3: v0.3 lattice (shared mid → Vowstrike → level-gated crown) ---
+  console.log('Stage B3: lattice → Still Waters → shared mid → Vowstrike → crown');
   // Level 12 (xp 660) → 12 talent points; seed spends 3, leaving room for the
-  // branch CD + shared mid + aspect + Wings + crown amp.
+  // branch CD + shared mid + aspect + Wings + crown amp. Level 12 also clears
+  // both crowns' minLevel gates (wrath-ascendant 10, vowbound-crown 12).
   await seedSave(
     page,
     baseSave({
@@ -378,12 +380,10 @@ try {
   await clickNamed(page, 'hubTree');
   await page.waitForTimeout(600);
 
-  // WORLD_HEIGHT 1080 → max scroll 540. Wheel past the clamp, then locate()
-  // converts scrolled world positions to screen px for named clicks.
+  // Whole lattice fits the fixed 960×540 canvas (chunk D) — no scroll needed
+  // to reach the crown row.
   await hoverNamed(page, 'treeBack');
-  await page.mouse.wheel(0, 2000);
-  await page.waitForTimeout(400);
-  await shot(page, 'tree-hourglass-scrolled');
+  await shot(page, 'tree-lattice-vigil-branch');
 
   await clickNamed(page, 'treeNode:vigil-still-waters');
   await page.waitForTimeout(400);

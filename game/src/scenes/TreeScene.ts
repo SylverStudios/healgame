@@ -1,5 +1,5 @@
 /**
- * Talent tree scene — renders any TreeConfig via view() + layoutSpots().
+ * Talent tree scene — renders any TreeConfig via view() + layoutFromGrid().
  * Purchases go through tree.update; state is bridged back into SaveData
  * (treeRanks) for persistence. Combat resolves via loadoutFromSave.
  */
@@ -20,15 +20,21 @@ import { RunModsBar } from '../ui/runModsBar';
 import { buildSpellCard } from '../ui/spellCard';
 import { SpellTooltip, type TooltipLine } from '../ui/spellTooltip';
 import { glyphChar } from '../ui/glyph';
+import { drawBuildGlyph } from '../ui/buildGlyph';
 import { costLabel, grantSpellEyebrow, spotMetaSuffix } from '../ui/treeSpotMeta';
 import { allocatedTalentPoints, availableTalentPoints } from '../meta/progression';
 import { levelForXp } from '../data/constants';
 import {
-  layoutSpots,
+  buildGlyphFromTree,
+  layoutFromGrid,
   update,
   view,
+  type EdgeState,
+  type GridPosition,
+  type SpotDef,
   type SpotPosition,
   type SpotView,
+  type TreeEdge,
   type TreeState,
   type TreeView,
 } from '../tree';
@@ -41,41 +47,46 @@ const BORDER_COLOR = 0x0a0605;
 const BUTTON_COLOR = 0x3a2a22;
 const ACCENT_HEX = 0xf2c14e;
 const ARM_HEX = 0xe05a4e;
-const EDGE_OWNED = 0x7ad67a;
-const EDGE_AVAILABLE = 0xf2c14e;
-const EDGE_LOCKED = 0x3a2a22;
+
+/**
+ * v0.3 lattice edge palette — four visually distinct states (handoff §Done-6,
+ * "Lattice tree" locked choice): traversed is the bright "lit path", locked
+ * is a clearly dead branch (dark red + a broken line / X), available and
+ * inactive fall between at decreasing intensity.
+ */
+const EDGE_TRAVERSED = 0xfff2df;
+const EDGE_AVAILABLE = 0xc79a52;
+const EDGE_INACTIVE = 0x4a3a30;
+const EDGE_LOCKED = 0x8a2a20;
 
 const TEXT_COLOR = '#e8d8c8';
 const DIM_COLOR = '#a89888';
 const ACCENT_COLOR = '#f2c14e';
 const OWNED_COLOR = '#7ad67a';
+/** Rank-pip filled color (hex, matches OWNED_COLOR string above). */
+const OWNED_COLOR_HEX = 0x7ad67a;
 const DANGER_COLOR = '#e05a4e';
 const FONT = 'monospace';
 
-const NODE_RADIUS = 28;
+const NODE_RADIUS = 20;
 /** Hit/tooltip extent — matches the circular node diameter. */
 const NODE_SIZE = NODE_RADIUS * 2;
 
 /**
- * Alpha 0.2 §D8 hourglass tree: rows extend to y≈960 (crown), past the
- * 960×540 base canvas. World height is 1080; max scroll = 1080 − 540 = 540.
- * World content (nodes/edges) pans under a screen-fixed HUD (title/wallet/
- * status/back button via `setScrollFactor(0)`), driven by mouse wheel.
- * Journey reaches deep nodes by wheeling the canvas then clicking by name
- * (`treeNode:<spotId>`) — no coordinate tables needed.
+ * v0.3 lattice layout (chunk D): every spot's pixel position is a linear
+ * transform of its authored `SpotDef.grid` (col = progression depth,
+ * row = lane; see `data/talentTree.ts`). Cols 0..6, rows -1..4 — chosen so
+ * the whole lattice fits on the fixed 960×540 canvas with no scrolling
+ * (the Alpha 0.2 hourglass's `WORLD_HEIGHT` scroll world is gone; journey
+ * no longer wheels to reach deep nodes — see scripts/journey.mjs Stage B3).
  *
- * Row layout (y centers):
- *   125  deep-reserves
- *   235  vigil-oath / zealot-oath
- *   355  patient-vow/measured / fervent-chain/steady-hands
- *   430  graven-scale (vigil dead-end spur, left of the vow→thrift line)
- *   600  thrift, still-waters / quick-breath, frenzied-liturgy  (layer 2)
- *   720  shared-mend-potency / shared-zealous-potency            (shared mid)
- *   840  vowstrike-virtue / vowstrike-vengeance                  (Vowstrike fork)
- *   960  wrath-ascendant / vowbound-crown                        (crown)
+ * Spacing constants below are the only place row/col pixel gaps are tuned;
+ * `layoutFromGrid` (tree/layout.ts) is the pure col/row → x/y transform.
  */
-const WORLD_HEIGHT = 1080;
-const WHEEL_SCROLL_SCALE = 0.5;
+const GRID_LEFT = 90; // pixel x for grid col 0
+const GRID_COL_WIDTH = 130;
+const GRID_TOP = 176; // pixel y for grid row 0
+const GRID_ROW_HEIGHT = 70;
 
 const TOOLTIP_GAP = 8;
 const TOOLTIP_DEPTH = 300;
@@ -83,42 +94,37 @@ const HUD_DEPTH = 200;
 const TALENT_NAME_COLOR = '#e8d8c8';
 const TALENT_DESC_COLOR = '#a89888';
 
-/**
- * Presentation overrides for the live TALENT_TREE (node placement).
- * Any other config falls through to layoutSpots auto-placement.
- * Journey clicks nodes by `treeNode:<spotId>` name, not by these coords.
- *
- * Pure-mana nodes vigil-deep-well and zealot-spendthrift-grace were removed
- * in Alpha 0.2; their entries are omitted here.
- */
-const TALENT_TREE_POSITIONS: Readonly<Record<string, SpotPosition>> = {
-  // Shared early
-  'deep-reserves': { x: 480, y: 125 },
-  // Oath wedge
-  'vigil-oath': { x: 260, y: 235 },
-  'zealot-oath': { x: 700, y: 235 },
-  'vigil-patient-vow': { x: 150, y: 355 },
-  'vigil-measured-devotion': { x: 380, y: 355 },
-  // Dead-end spur off Patient Vow — left of the vow→thrift column so edges don't overlap.
-  'vigil-graven-scale': { x: 40, y: 430 },
-  'zealot-fervent-chain': { x: 590, y: 355 },
-  'zealot-steady-hands': { x: 820, y: 355 },
-  // Layer 2 — output nodes compacted to y 600 (deep-well/spendthrift-grace cut in Alpha 0.2).
-  // Four nodes spread across the 960px canvas with ~20px gaps between node edges.
-  'vigil-thrift': { x: 160, y: 600 },
-  'vigil-still-waters': { x: 375, y: 600 },
-  'zealot-quick-breath': { x: 585, y: 600 },
-  'zealot-frenzied-liturgy': { x: 800, y: 600 },
-  // Shared mid (Alpha 0.2 §D1)
-  'shared-mend-potency': { x: 320, y: 720 },
-  'shared-zealous-potency': { x: 640, y: 720 },
-  // Vowstrike fork (Alpha 0.2 §D4) — exclusiveGroup: vowstrike-aspect
-  'vowstrike-virtue': { x: 260, y: 840 },
-  'vowstrike-vengeance': { x: 700, y: 840 },
-  // Shared crown (Alpha 0.2 §D6)
-  'wrath-ascendant': { x: 360, y: 960 },
-  'vowbound-crown': { x: 600, y: 960 },
-};
+/** Small corner "build glyph" preview (visible ahead of chunk E's run summary). */
+const GLYPH_PREVIEW_X = 75;
+const GLYPH_PREVIEW_Y = 96;
+const GLYPH_PREVIEW_W = 100;
+const GLYPH_PREVIEW_H = 60;
+const GLYPH_PREVIEW_CELL = 8;
+
+/** Bottom edge-state legend (handoff §Done-6: branch locks obvious at a glance). */
+const LEGEND_Y = 508;
+const LEGEND_SWATCH_LEN = 18;
+const EDGE_LEGEND: { state: EdgeState; label: string }[] = [
+  { state: 'traversed', label: 'Lit path' },
+  { state: 'available', label: 'Open' },
+  { state: 'inactive', label: 'Unreached' },
+  { state: 'locked', label: 'Locked' },
+];
+
+/** Build a static spotId → grid map once from the authoritative config. */
+const SPOT_GRID: Readonly<Record<string, GridPosition>> = Object.fromEntries(
+  TALENT_TREE.spots
+    .filter((spot): spot is SpotDef & { grid: GridPosition } => spot.grid !== undefined)
+    .map((spot) => [spot.id, spot.grid]),
+);
+
+/** Fixed pixel positions for the live tree — grid-driven, no hand-tuned table. */
+const TREE_POSITIONS: ReadonlyMap<string, SpotPosition> = layoutFromGrid(SPOT_GRID, {
+  left: GRID_LEFT,
+  top: GRID_TOP,
+  colWidth: GRID_COL_WIDTH,
+  rowHeight: GRID_ROW_HEIGHT,
+});
 
 function asContent(raw: unknown): TalentTreeContent | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -151,6 +157,9 @@ function spotTalentLines(spot: SpotView): TooltipLine[] {
   ];
   const desc = content?.description ?? '';
   if (desc) lines.push({ text: desc, color: TALENT_DESC_COLOR });
+  if (spot.next?.minLevel !== undefined) {
+    lines.push({ text: `Requires level ${spot.next.minLevel}`, color: DANGER_COLOR });
+  }
   return lines;
 }
 
@@ -163,6 +172,7 @@ export class TreeScene extends Phaser.Scene {
   private statusText!: Phaser.GameObjects.Text;
   private feedbackText!: Phaser.GameObjects.Text;
   private nodesContainer!: Phaser.GameObjects.Container;
+  private glyphPreviewContainer!: Phaser.GameObjects.Container;
   private tooltip!: SpellTooltip;
   /** In-memory only: exclusive-group spot armed for confirm click. */
   private armedSpotId: string | null = null;
@@ -182,110 +192,115 @@ export class TreeScene extends Phaser.Scene {
 
     const { width, height } = this.scale;
 
-    // Tree content (nodes/edges) lives in a world taller than the viewport
-    // (layer 2 sits below the fold); the camera scrolls over it via wheel.
-    // The bg catch-rect below scrolls with the world (default scrollFactor 1)
-    // so pointerdown-to-disarm still fires anywhere in the scrolled view.
-    this.cameras.main.setBounds(0, 0, width, WORLD_HEIGHT);
-    this.input.on(
-      'wheel',
-      (
-        _pointer: Phaser.Input.Pointer,
-        _objects: unknown,
-        _dx: number,
-        dy: number,
-      ) => {
-        const maxScroll = Math.max(0, WORLD_HEIGHT - height);
-        this.cameras.main.scrollY = Phaser.Math.Clamp(
-          this.cameras.main.scrollY + dy * WHEEL_SCROLL_SCALE,
-          0,
-          maxScroll,
-        );
-      },
-    );
-
+    // v0.3 lattice fits the fixed 960×540 canvas — no scroll world needed
+    // (Alpha 0.2's hourglass required scrolling to reach the crown row).
     this.add
-      .rectangle(width / 2, WORLD_HEIGHT / 2, width, WORLD_HEIGHT, BG_COLOR)
+      .rectangle(width / 2, height / 2, width, height, BG_COLOR)
       .setInteractive()
       .on('pointerdown', () => this.disarmAndRerenderIfNeeded());
 
     this.add
-      .rectangle(width / 2, 39, 290, 58, 0x241a15, 0.96)
+      .rectangle(width / 2, 40, 340, 76, 0x241a15, 0.96)
       .setStrokeStyle(1, BORDER_COLOR)
-      .setDepth(HUD_DEPTH)
-      .setScrollFactor(0);
+      .setDepth(HUD_DEPTH);
     this.add
-      .text(width / 2, 28, 'TALENT TREE', {
+      .text(width / 2, 14, 'TALENT TREE', {
         fontFamily: FONT,
-        fontSize: '27px',
+        fontSize: '20px',
         fontStyle: 'bold',
         color: '#fff2df',
         stroke: '#0a0605',
         strokeThickness: 3,
       })
       .setOrigin(0.5)
-      .setDepth(HUD_DEPTH)
-      .setScrollFactor(0);
+      .setDepth(HUD_DEPTH);
     this.headerText = this.add
-      .text(width / 2, 58, '', { fontFamily: FONT, fontSize: '13px', color: ACCENT_COLOR })
+      .text(width / 2, 36, '', { fontFamily: FONT, fontSize: '12px', color: ACCENT_COLOR })
       .setOrigin(0.5)
-      .setDepth(HUD_DEPTH)
-      .setScrollFactor(0);
+      .setDepth(HUD_DEPTH);
 
-    // Oath/relic strip stays pinned with the HUD (scrollFactor 0) so players can
-    // re-read their run mods while browsing the tree.
+    // Oath/relic strip stays pinned with the HUD so players can re-read their
+    // run mods while browsing the tree.
     this.syncRunModsBar();
 
     this.statusText = this.add
-      .text(width / 2, 470, '', {
+      .text(width / 2, 52, '', {
         fontFamily: FONT,
-        fontSize: '12px',
+        fontSize: '11px',
         color: TEXT_COLOR,
         align: 'center',
-        wordWrap: { width: 860 },
+        wordWrap: { width: 700 },
       })
-      .setOrigin(0.5, 1)
-      .setDepth(HUD_DEPTH)
-      .setScrollFactor(0);
+      .setOrigin(0.5, 0)
+      .setDepth(HUD_DEPTH);
 
     this.feedbackText = this.add
-      .text(width / 2, 488, '', {
+      .text(width / 2, 66, '', {
         fontFamily: FONT,
-        fontSize: '12px',
+        fontSize: '11px',
         color: DANGER_COLOR,
         align: 'center',
       })
       .setOrigin(0.5, 0)
-      .setDepth(HUD_DEPTH)
-      .setScrollFactor(0);
+      .setDepth(HUD_DEPTH);
 
     this.nodesContainer = this.add.container(0, 0);
+    this.glyphPreviewContainer = this.add.container(0, 0).setDepth(HUD_DEPTH);
 
-    this.tooltip = new SpellTooltip(this, {
-      screenWidth: width,
-      depth: TOOLTIP_DEPTH,
-      scrollFactor: 1,
-    });
+    this.tooltip = new SpellTooltip(this, { screenWidth: width, depth: TOOLTIP_DEPTH });
 
-    this.buildBackButton(120, 504);
-    this.buildOathLockIcon();
+    this.buildBackButton(75, 26);
+    this.buildGlyphPreviewChrome();
+    this.buildEdgeLegend();
     this.render();
   }
 
-  /** Simple lock glyph between the Vigil and Zealot oath nodes (handoff §Q). */
-  private buildOathLockIcon(): void {
-    const x = 480;
-    const y = 235;
-    const shackle = this.add
-      .rectangle(x, y - 7, 12, 9, BG_COLOR)
-      .setStrokeStyle(2, 0x8a7868)
-      .setDepth(1);
-    const body = this.add
-      .rectangle(x, y + 3, 14, 12, 0x8a7868)
+  /** Static labels/frame for the build-glyph corner preview — drawn once. */
+  private buildGlyphPreviewChrome(): void {
+    this.add
+      .text(GLYPH_PREVIEW_X, 60, 'BUILD', {
+        fontFamily: FONT,
+        fontSize: '10px',
+        color: DIM_COLOR,
+      })
+      .setOrigin(0.5)
+      .setDepth(HUD_DEPTH);
+    this.add
+      .rectangle(GLYPH_PREVIEW_X, GLYPH_PREVIEW_Y, GLYPH_PREVIEW_W, GLYPH_PREVIEW_H, 0x241a15, 0.9)
       .setStrokeStyle(1, BORDER_COLOR)
-      .setDepth(1);
-    shackle.disableInteractive();
-    body.disableInteractive();
+      .setDepth(HUD_DEPTH);
+  }
+
+  /** Static bottom legend mapping edge color/style to meaning — drawn once. */
+  private buildEdgeLegend(): void {
+    const graphics = this.add.graphics().setDepth(HUD_DEPTH);
+    let x = 200;
+    for (const entry of EDGE_LEGEND) {
+      const color =
+        entry.state === 'traversed'
+          ? EDGE_TRAVERSED
+          : entry.state === 'available'
+            ? EDGE_AVAILABLE
+            : entry.state === 'locked'
+              ? EDGE_LOCKED
+              : EDGE_INACTIVE;
+      const width = entry.state === 'traversed' ? 4 : entry.state === 'locked' ? 2 : entry.state === 'available' ? 2 : 1;
+      graphics.lineStyle(width, color, 1);
+      graphics.lineBetween(x, LEGEND_Y, x + LEGEND_SWATCH_LEN, LEGEND_Y);
+      if (entry.state === 'locked') {
+        graphics.lineBetween(x + 5, LEGEND_Y - 4, x + 13, LEGEND_Y + 4);
+        graphics.lineBetween(x + 5, LEGEND_Y + 4, x + 13, LEGEND_Y - 4);
+      }
+      const label = this.add
+        .text(x + LEGEND_SWATCH_LEN + 6, LEGEND_Y, entry.label, {
+          fontFamily: FONT,
+          fontSize: '10px',
+          color: DIM_COLOR,
+        })
+        .setOrigin(0, 0.5)
+        .setDepth(HUD_DEPTH);
+      x += LEGEND_SWATCH_LEN + 10 + label.width + 24;
+    }
   }
 
   private disarmAndRerenderIfNeeded(): void {
@@ -315,37 +330,87 @@ export class TreeScene extends Phaser.Scene {
     this.statusText.setText(this.armMessage());
     this.feedbackText.setText(this.feedback);
 
-    const positions = layoutSpots(treeView, {
-      width: this.scale.width,
-      overrides: TALENT_TREE_POSITIONS,
-    });
-
-    this.renderEdges(treeView, positions);
+    this.renderEdges(treeView);
 
     for (const spot of treeView.spots) {
-      const pos = positions.get(spot.id);
+      const pos = TREE_POSITIONS.get(spot.id);
       if (!pos) continue;
       this.renderSpotBox(spot, pos);
     }
+
+    this.renderGlyphPreview(treeView);
   }
 
-  private renderEdges(treeView: TreeView, positions: Map<string, SpotPosition>): void {
+  /** Edge color/weight/decoration by `EdgeState` — see EDGE_* constants. Traversed
+   *  (the lit path) draws last so it stays visible over crossing dim/locked lines. */
+  private renderEdges(treeView: TreeView): void {
     const graphics = this.add.graphics();
     this.nodesContainer.add(graphics);
-    const byId = new Map(treeView.spots.map((s) => [s.id, s]));
 
-    for (const edge of treeView.edges) {
-      const fromPos = positions.get(edge.fromSpotId);
-      const toPos = positions.get(edge.toSpotId);
-      if (!fromPos || !toPos) continue;
-      const from = byId.get(edge.fromSpotId);
-      const to = byId.get(edge.toSpotId);
-      const fromOwned = (from?.owned.length ?? 0) > 0;
-      const toOwned = (to?.owned.length ?? 0) > 0;
-      const color = toOwned && fromOwned ? EDGE_OWNED : fromOwned ? EDGE_AVAILABLE : EDGE_LOCKED;
-      graphics.lineStyle(2, color, 1);
-      graphics.lineBetween(fromPos.x, fromPos.y, toPos.x, toPos.y);
+    const drawOrder: EdgeState[] = ['inactive', 'available', 'locked', 'traversed'];
+    for (const state of drawOrder) {
+      for (const edge of treeView.edges) {
+        if (edge.state !== state) continue;
+        const fromPos = TREE_POSITIONS.get(edge.fromSpotId);
+        const toPos = TREE_POSITIONS.get(edge.toSpotId);
+        if (!fromPos || !toPos) continue;
+        this.drawEdge(graphics, edge, fromPos, toPos);
+      }
     }
+  }
+
+  private drawEdge(
+    graphics: Phaser.GameObjects.Graphics,
+    edge: TreeEdge,
+    fromPos: SpotPosition,
+    toPos: SpotPosition,
+  ): void {
+    switch (edge.state) {
+      case 'traversed':
+        graphics.lineStyle(4, EDGE_TRAVERSED, 1);
+        graphics.lineBetween(fromPos.x, fromPos.y, toPos.x, toPos.y);
+        return;
+      case 'available':
+        graphics.lineStyle(2, EDGE_AVAILABLE, 0.7);
+        graphics.lineBetween(fromPos.x, fromPos.y, toPos.x, toPos.y);
+        return;
+      case 'inactive':
+        graphics.lineStyle(1, EDGE_INACTIVE, 0.45);
+        graphics.lineBetween(fromPos.x, fromPos.y, toPos.x, toPos.y);
+        return;
+      case 'locked':
+        this.drawLockedEdge(graphics, fromPos, toPos);
+        return;
+    }
+  }
+
+  /** Locked/destroyed edge: dark red, with a visible break + X at the midpoint
+   *  so a dead branch reads as "clearly dead" rather than merely dim. */
+  private drawLockedEdge(
+    graphics: Phaser.GameObjects.Graphics,
+    fromPos: SpotPosition,
+    toPos: SpotPosition,
+  ): void {
+    const midX = (fromPos.x + toPos.x) / 2;
+    const midY = (fromPos.y + toPos.y) / 2;
+    const dx = toPos.x - fromPos.x;
+    const dy = toPos.y - fromPos.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+    const gap = 10;
+    const nearX = midX - ux * gap;
+    const nearY = midY - uy * gap;
+    const farX = midX + ux * gap;
+    const farY = midY + uy * gap;
+
+    graphics.lineStyle(2, EDGE_LOCKED, 0.85);
+    graphics.lineBetween(fromPos.x, fromPos.y, nearX, nearY);
+    graphics.lineBetween(farX, farY, toPos.x, toPos.y);
+
+    graphics.lineStyle(2, EDGE_LOCKED, 1);
+    graphics.lineBetween(midX - 6, midY - 6, midX + 6, midY + 6);
+    graphics.lineBetween(midX - 6, midY + 6, midX + 6, midY - 6);
   }
 
   private renderSpotBox(spot: SpotView, pos: SpotPosition): void {
@@ -360,6 +425,7 @@ export class TreeScene extends Phaser.Scene {
 
     if (spot.status === 'exclusive-locked') {
       bgColor = NODE_BG_LOCKED;
+      borderColor = EDGE_LOCKED;
       alpha = 0.5;
     } else if (isArmed) {
       bgColor = NODE_BG_AFFORDABLE;
@@ -390,9 +456,9 @@ export class TreeScene extends Phaser.Scene {
     const content = node ? asContent(node.content) : null;
     const glyph = content ? glyphChar(content) : glyphChar({ id: node?.id ?? spot.id });
     const glyphText = this.add
-      .text(pos.x, pos.y - (spot.chainLength > 1 ? 3 : 0), glyph, {
+      .text(pos.x, pos.y - (spot.chainLength > 1 ? 2 : 0), glyph, {
         fontFamily: FONT,
-        fontSize: '22px',
+        fontSize: '18px',
         fontStyle: 'bold',
         color: glyphColor,
         stroke: '#0a0605',
@@ -405,21 +471,21 @@ export class TreeScene extends Phaser.Scene {
 
     // Rank pips for multi-rank spots (replaces on-node cost/rank text).
     if (spot.chainLength > 1) {
-      const pipY = pos.y + NODE_RADIUS - 10;
-      const totalW = (spot.chainLength - 1) * 8;
+      const pipY = pos.y + NODE_RADIUS - 8;
+      const totalW = (spot.chainLength - 1) * 7;
       for (let i = 0; i < spot.chainLength; i++) {
         const filled = i < spot.owned.length;
         const pip = this.add
-          .circle(pos.x - totalW / 2 + i * 8, pipY, 3, filled ? EDGE_OWNED : 0x5a4a3a)
+          .circle(pos.x - totalW / 2 + i * 7, pipY, 3, filled ? OWNED_COLOR_HEX : 0x5a4a3a)
           .setStrokeStyle(1, BORDER_COLOR)
           .setAlpha(alpha);
         extras.push(pip);
       }
     } else if (spot.status === 'exclusive-locked') {
       const lockMark = this.add
-        .text(pos.x, pos.y + 14, '×', {
+        .text(pos.x, pos.y + 11, '×', {
           fontFamily: FONT,
-          fontSize: '12px',
+          fontSize: '11px',
           color: DANGER_COLOR,
         })
         .setOrigin(0.5)
@@ -428,20 +494,46 @@ export class TreeScene extends Phaser.Scene {
     } else if (purchasable && spot.next) {
       // Tiny affordability tick — rank capacity lives in the tooltip.
       const tick = this.add
-        .circle(pos.x + NODE_RADIUS - 6, pos.y - NODE_RADIUS + 6, 4, ACCENT_HEX)
+        .circle(pos.x + NODE_RADIUS - 5, pos.y - NODE_RADIUS + 5, 4, ACCENT_HEX)
         .setStrokeStyle(1, BORDER_COLOR)
         .setAlpha(alpha);
       extras.push(tick);
     }
 
+    // Level-gated crowns (§Done-8): show the requirement until it's met, in
+    // addition to reading `locked`/`unaffordable` like any other gate.
+    if (spot.next?.minLevel !== undefined && spot.status !== 'complete') {
+      const levelLocked = levelForXp(this.save.xp) < spot.next.minLevel;
+      const tag = this.add
+        .text(pos.x, pos.y + NODE_RADIUS + 9, `Lv ${spot.next.minLevel}`, {
+          fontFamily: FONT,
+          fontSize: '10px',
+          color: levelLocked ? DANGER_COLOR : DIM_COLOR,
+        })
+        .setOrigin(0.5)
+        .setAlpha(alpha);
+      extras.push(tag);
+    }
+
     this.nodesContainer.add(extras);
   }
 
+  /** Redraws the "lit path" build-glyph preview from currently owned nodes. */
+  private renderGlyphPreview(treeView: TreeView): void {
+    this.glyphPreviewContainer.removeAll(true);
+    const glyph = buildGlyphFromTree(TALENT_TREE, new Set(treeView.ownedNodeIds));
+    const drawn = drawBuildGlyph(this, glyph, {
+      x: GLYPH_PREVIEW_X,
+      y: GLYPH_PREVIEW_Y,
+      cell: GLYPH_PREVIEW_CELL,
+      color: EDGE_TRAVERSED,
+    });
+    this.glyphPreviewContainer.add(drawn);
+  }
+
   /**
-   * Shows the node-anchored tooltip above the node; flips below if that would
-   * clip the canvas top. `pos` is world-space (tooltip scrolls with the tree)
-   * but the above/below flip decision needs screen-space, so it's computed
-   * relative to the camera's current scrollY.
+   * Shows the node-anchored tooltip above the node (screen space — the
+   * lattice no longer scrolls, so no camera offset math is needed).
    * grantSpell nodes use the same slot-card layout as combat spell tooltips.
    */
   private showTooltip(spot: SpotView, pos: SpotPosition): void {
@@ -462,17 +554,14 @@ export class TreeScene extends Phaser.Scene {
 
     const canvasWidth = this.scale.width;
     const canvasHeight = this.scale.height;
-    const scrollY = this.cameras.main.scrollY;
-    const screenY = pos.y - scrollY;
 
     const x = Phaser.Math.Clamp(pos.x - size.width / 2, 0, Math.max(0, canvasWidth - size.width));
 
-    const aboveScreen = screenY - NODE_SIZE / 2 - TOOLTIP_GAP - size.height;
-    const screenY2 =
-      aboveScreen >= 0
-        ? aboveScreen
-        : Phaser.Math.Clamp(screenY + NODE_SIZE / 2 + TOOLTIP_GAP, 0, canvasHeight - size.height);
-    const y = screenY2 + scrollY;
+    const above = pos.y - NODE_SIZE / 2 - TOOLTIP_GAP - size.height;
+    const y =
+      above >= 0
+        ? above
+        : Phaser.Math.Clamp(pos.y + NODE_SIZE / 2 + TOOLTIP_GAP, 0, canvasHeight - size.height);
 
     this.tooltip.place(x, y);
   }
@@ -510,6 +599,8 @@ export class TreeScene extends Phaser.Scene {
       this.feedback = 'Path locked by your oath';
     } else if (spot.status === 'unaffordable' && spot.next) {
       this.feedback = `Need ${costLabel(spot.next.cost.currency, spot.next.cost.amount)}`;
+    } else if (spot.status === 'locked' && spot.next?.minLevel !== undefined) {
+      this.feedback = `Requires level ${spot.next.minLevel}`;
     } else if (spot.status === 'locked') {
       this.feedback = 'Prerequisites not met';
     } else {
@@ -545,24 +636,21 @@ export class TreeScene extends Phaser.Scene {
     this.runModsBar?.destroy();
     this.runModsBar = new RunModsBar(this, runModsFromSave(this.save), {
       viewWidth: this.scale.width,
-      scrollFactor: 0,
       depth: 250,
     });
   }
 
   private buildBackButton(x: number, y: number): void {
     const rect = this.add
-      .rectangle(x, y, 160, 44, BUTTON_COLOR)
+      .rectangle(x, y, 100, 34, BUTTON_COLOR)
       .setStrokeStyle(2, BORDER_COLOR)
       .setInteractive({ useHandCursor: true })
       .setDepth(HUD_DEPTH)
-      .setScrollFactor(0)
       .setName('treeBack');
     this.add
-      .text(x, y, 'Back', { fontFamily: FONT, fontSize: '16px', color: TEXT_COLOR })
+      .text(x, y, 'Back', { fontFamily: FONT, fontSize: '14px', color: TEXT_COLOR })
       .setOrigin(0.5)
-      .setDepth(HUD_DEPTH)
-      .setScrollFactor(0);
+      .setDepth(HUD_DEPTH);
     rect.on('pointerdown', () => this.scene.start(SceneKeys.Hub));
   }
 }
