@@ -7,6 +7,14 @@ Newest first. Numbers and rule detail live in `game/src/data/` and
 
 ---
 
+## 2026-07-17 — Feedback opens Gmail in-browser + Netlify deploy CI
+
+- Hub **✨ Send Aaron feedback** opens Gmail compose in a new tab (was
+  `mailto:`, which launched the OS mail app). Telemetry JSON still copied to
+  clipboard.
+- Production deploy: GitHub Action on push to `main` (`deploy.yml`) using
+  `NETLIFY_AUTH_TOKEN` + `NETLIFY_SITE_ID` secrets.
+
 ## 2026-07-17 — Playtest telemetry + feedback mailto
 
 - Local balance log (`healgame-telemetry-v1`): per-dungeon runs with level,

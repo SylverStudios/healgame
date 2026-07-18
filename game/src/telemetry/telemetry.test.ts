@@ -157,15 +157,15 @@ describe('summary + mailto', () => {
     expect(glance).toContain('vigil-oath');
   });
 
-  it('builds a mailto href with feedback subject and write space', () => {
+  it('builds a Gmail compose href with feedback subject and write space', () => {
     const log = newTelemetryLog();
     log.runs = [sampleRun()];
     const href = mailtoHref(log, true);
-    expect(href.startsWith('mailto:')).toBe(true);
-    expect(href).toContain('subject=healgame%20feedback');
+    expect(href.startsWith('https://mail.google.com/mail/?')).toBe(true);
+    expect(href).toContain('su=healgame+feedback');
     expect(href).toContain('body=');
     expect(href).toContain(encodeURIComponent('(type your feedback here)'));
-    expect(href).toContain('mailto:sylverstudiosdev@gmail.com?');
+    expect(href).toContain('to=sylverstudiosdev%40gmail.com');
   });
 
   it('parseTelemetryJson accepts a valid export and rejects junk', () => {

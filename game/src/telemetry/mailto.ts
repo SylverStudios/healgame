@@ -1,7 +1,7 @@
 /**
- * Build mailto: URLs for playtest export. Full JSON is copied to the clipboard
- * when available; the email body leaves room for feedback, then a summary plus
- * the JSON when it fits under typical mailto length limits.
+ * Build Gmail compose URLs for playtest export. Full JSON is copied to the
+ * clipboard when available; the email body leaves room for feedback, then a
+ * summary plus the JSON when it fits under typical URL length limits.
  */
 
 import { PLAYTEST_EMAIL } from './config';
@@ -9,7 +9,7 @@ import { loadTelemetry } from './store';
 import { formatTelemetryJson, formatTelemetrySummary } from './summary';
 import type { TelemetryLog } from './types';
 
-/** Stay under common browser mailto URI limits after encodeURIComponent. */
+/** Stay under common browser URL limits after encodeURIComponent. */
 const MAX_MAILTO_BODY_CHARS = 1200;
 
 export interface MailtoResult {
@@ -54,14 +54,22 @@ function buildBody(log: TelemetryLog, copied: boolean): string {
   return body.slice(0, MAX_MAILTO_BODY_CHARS);
 }
 
+/** Gmail web compose URL (opens in-browser; avoids the OS mail client). */
 export function mailtoHref(log: TelemetryLog, copied: boolean): string {
   const subject = 'healgame feedback';
   const body = buildBody(log, copied);
-  return `mailto:${PLAYTEST_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const params = new URLSearchParams({
+    view: 'cm',
+    fs: '1',
+    to: PLAYTEST_EMAIL,
+    su: subject,
+    body,
+  });
+  return `https://mail.google.com/mail/?${params.toString()}`;
 }
 
 /**
- * Copy full telemetry JSON and open the player's mail client with a feedback
+ * Copy full telemetry JSON and open Gmail compose in a new tab with a feedback
  * template (blank for writing + telemetry snapshot).
  */
 export async function sendPlaytestMail(): Promise<MailtoResult> {
@@ -75,10 +83,18 @@ export async function sendPlaytestMail(): Promise<MailtoResult> {
 
   const log = loadTelemetry();
   const json = formatTelemetryJson(log);
+
+  // Open on the click gesture before awaiting clipboard — otherwise browsers
+  // treat window.open as a blocked popup.
+  const draft =
+    typeof window !== 'undefined' ? window.open('about:blank', '_blank') : null;
+
   const copied = await copyText(json);
   const href = mailtoHref(log, copied);
 
-  if (typeof window !== 'undefined') {
+  if (draft) {
+    draft.location.replace(href);
+  } else if (typeof window !== 'undefined') {
     window.location.href = href;
   }
 
