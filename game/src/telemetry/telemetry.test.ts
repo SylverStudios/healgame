@@ -164,7 +164,8 @@ describe('summary + mailto', () => {
     expect(href.startsWith('https://mail.google.com/mail/?')).toBe(true);
     expect(href).toContain('su=healgame+feedback');
     expect(href).toContain('body=');
-    expect(href).toContain(encodeURIComponent('(type your feedback here)'));
+    // URLSearchParams uses + for spaces (and %28/%29 for parens).
+    expect(href).toContain('%28type+your+feedback+here%29');
     expect(href).toContain('to=sylverstudiosdev%40gmail.com');
   });
 
