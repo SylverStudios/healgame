@@ -82,11 +82,14 @@ describe('auto-attack cadence', () => {
     // reduce the tank's effective survival by starting it near death via repeated advances.
     const encounter = makeTestEncounter({ waves: [{ enemies: [{ name: 'Tanky', hp: 1_000_000, count: 1 }] }] });
     const engine = new CombatEngine(encounter, TEST_SPELLS);
-    // 60s = 20 trash swings @ 1 dmg = exactly kills the 20-hp tank.
+    // 60s = 20 trash swings @ 1 dmg = exactly downs the 20-hp tank (coyote window opens at 60s).
     engine.advance(60_000);
-    expect(engine.state.party.find((u) => u.id === 'tank')!.alive).toBe(false);
+    const tankAt60 = engine.state.party.find((u) => u.id === 'tank')!;
+    expect(tankAt60.alive).toBe(true);
+    expect(tankAt60.dying).toBe(true);
 
-    const events = engine.advance(3000); // next trash swing should now target a living DPS
+    const events = engine.advance(3000); // window expires unsaved at 60.25s; next swing targets a DPS
+    expect(engine.state.party.find((u) => u.id === 'tank')!.alive).toBe(false);
     const hit = damages(events).find((d) => d.sourceId.startsWith('w0-'));
     expect(hit).toBeDefined();
     expect(['dps1', 'dps2']).toContain(hit!.targetId);

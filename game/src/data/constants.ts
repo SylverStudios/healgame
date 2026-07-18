@@ -5,6 +5,15 @@
 
 export const GCD_MS = 1000;
 
+/**
+ * v0.3 §Coyote (locked micro-choice) — grace window after a party member takes
+ * lethal damage. They enter a `dying` state (still a valid heal target, not
+ * yet dead) for this long; a heal that COMPLETES within the window saves
+ * them. Enemies/boss never get this — trash/boss death stays instant. See
+ * combat/README.md "Dying state".
+ */
+export const COYOTE_MS = 250;
+
 export const PARTY = {
   tankMaxHp: 20,
   dpsMaxHp: 10,

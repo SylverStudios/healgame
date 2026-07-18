@@ -329,12 +329,15 @@ export function runBot(
         focusTargetId != null
           ? state.party.find((u) => u.id === focusTargetId && u.alive && u.hp * 2 <= u.maxHp)
           : undefined;
-      const target: Unit | undefined = tankCriticalUnit ?? focusUnit ?? injured[0];
+      // v0.3 §Coyote: a downed (dying) ally is savable for a short grace window — top priority,
+      // above every other emergency signal, since a lost tick here can mean a permanent death.
+      const dyingAlly = state.party.find((u) => u.dying);
+      const target: Unit | undefined = dyingAlly ?? tankCriticalUnit ?? focusUnit ?? injured[0];
       const enemiesAlive = state.enemies.some((e) => e.alive);
 
       if (target) {
         const missing = target.maxHp - target.hp;
-        const emergency = target === tankCriticalUnit || target === focusUnit;
+        const emergency = target === dyingAlly || target === tankCriticalUnit || target === focusUnit;
 
         // Determine the intended next heal (used for CD activation decisions).
         // Must mirror the heal priority in the `if (free)` block below.

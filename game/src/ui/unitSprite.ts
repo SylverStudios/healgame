@@ -32,6 +32,8 @@ const MANA_FILL_COLOR = 0x3b82f6;
 const DEAD_TINT = 0x3a3a3a;
 const DEAD_ALPHA = 0.4;
 const DEAD_SCALE = 0.85;
+/** v0.3 §Coyote: downed-but-savable (dying) — urgent red, still fully targetable. */
+const DYING_TINT = 0xcc4433;
 
 const NAME_FONT = '11px monospace';
 const NAME_COLOR = '#d8c8b8';
@@ -265,7 +267,10 @@ export class UnitSprite {
     }
 
     if (unit.alive) {
-      this.body.clearTint();
+      // v0.3 §Coyote: a dying unit is downed but savable — death visuals (tint/shrink below)
+      // wait for true death (`alive` flipping), which the engine defers past the grace window.
+      if (unit.dying) this.body.setTint(DYING_TINT);
+      else this.body.clearTint();
       this.body.setAlpha(1);
       // setDisplaySize (not setScale) — the image is already scaled up from
       // its 16×16 source frame, so raw scale values would shrink it to tile size.

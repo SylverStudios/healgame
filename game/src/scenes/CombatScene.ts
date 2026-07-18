@@ -621,6 +621,17 @@ export class CombatScene extends Phaser.Scene {
           }
           break;
         }
+        // v0.3 §Coyote: downed / saved / true death. Sprite visuals follow engine state
+        // (dying tint, death tint only after the window) — these are just log lines.
+        case 'unitDying':
+          this.combatLog.push(`${this.formatTimestamp()} ${this.resolveUnitName(event.unitId)} is down — heal to save!`);
+          break;
+        case 'unitSaved':
+          this.combatLog.push(`${this.formatTimestamp()} ${this.resolveUnitName(event.unitId)} was saved!`);
+          break;
+        case 'unitDied':
+          this.combatLog.push(`${this.formatTimestamp()} ${this.resolveUnitName(event.unitId)} died`);
+          break;
         case 'waveStarted':
           this.rebuildEnemies(this.engine.state.enemies);
           this.showWaveBanner(event.waveIndex);

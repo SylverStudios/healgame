@@ -50,7 +50,7 @@ const shotsDir = (() => {
 mkdirSync(shotsDir, { recursive: true });
 
 const PORT = 4174;
-const SAVE_KEY = 'healgame-save-v7';
+const SAVE_KEY = 'healgame-save-v8';
 
 /** Resolve a semantic GameObject name via window.__healgame (src/debug/testHooks.ts). */
 const locate = (page, name) =>
@@ -135,7 +135,7 @@ async function seedSave(page, save) {
 
 function baseSave(overrides) {
   return {
-    version: 7,
+    version: 8,
     tutorialDone: true,
     xp: 0,
     unlockedSpells: ['bonk', 'solemn-mend'],
@@ -146,6 +146,8 @@ function baseSave(overrides) {
     combatPaceTenths: 10,
     relicIds: [],
     pendingRelicOffers: [],
+    musicVolumePct: 50,
+    recentRuns: [],
     ...overrides,
   };
 }
@@ -196,7 +198,7 @@ try {
   await clickNamed(page, 'tutorialLearn');
   await page.waitForTimeout(800);
   let save = await readSave(page);
-  check(save?.version === 7, 'new saves are written as v7');
+  check(save?.version === 8, 'new saves are written as v8');
   check(save?.tutorialDone === true, 'tutorial click sets tutorialDone');
   check(save?.unlockedSpells.includes('solemn-mend') === true, 'Solemn Mend unlocked via tutorial');
   check(save?.unlockedSpells.includes('bonk') === true, 'Bonk is unlocked from the start');
