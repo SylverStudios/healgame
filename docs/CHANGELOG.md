@@ -7,6 +7,21 @@ Newest first. Numbers and rule detail live in `game/src/data/` and
 
 ---
 
+## 2026-07-17 — Feedback opens Gmail in-browser
+
+- Hub **✨ Send Aaron feedback** opens Gmail compose in a new tab (was
+  `mailto:`, which launched the OS mail app). Telemetry JSON still copied to
+  clipboard.
+
+## 2026-07-17 — Iron Pass harder + tiered XP
+
+- Spire Lancer: HP 245→295; Tunnel Vision every 25s (was 30s). Level-3 kits
+  with DPS relics wipe or pyrrhic; level 4 + relic clears; maxed crowns still
+  clear (≥3 alive). Ash Gate / Gate Warden unchanged.
+- `xpPerEnemy` scales by dungeon: Ash Gate 1, Iron Pass / Cinder Vault 2,
+  Verdant Rift / Black Choir 3, The Maw 4 — so later kills fund the rising
+  level curve instead of flat 1 XP forever.
+
 ## 2026-07-17 — Playtest telemetry + feedback mailto
 
 - Local balance log (`healgame-telemetry-v1`): per-dungeon runs with level,

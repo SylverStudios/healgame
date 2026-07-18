@@ -6,7 +6,7 @@ export const TUNNEL_VISION = {
   kind: 'tunnelVision',
   telegraphMs: 3_000,
   firstCastAtMs: 8_000,
-  intervalMs: 30_000,
+  intervalMs: 25_000,
   channelMs: 10_000,
   tickMs: 1_000,
   damagePerTick: 2,

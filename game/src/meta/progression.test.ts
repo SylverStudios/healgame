@@ -290,7 +290,7 @@ describe('IRON_PASS data sanity', () => {
     if (!cast || cast.kind !== 'tunnelVision') throw new Error('Tunnel Vision must be a tunnelVision cast');
     expect(cast.telegraphMs).toBe(3000);
     expect(cast.firstCastAtMs).toBe(8000);
-    expect(cast.intervalMs).toBe(30_000);
+    expect(cast.intervalMs).toBe(25_000);
     expect(cast.channelMs).toBe(10_000);
     expect(cast.tickMs).toBe(1000);
     expect(cast.damagePerTick).toBe(2);

@@ -677,7 +677,8 @@ Iron Pass; wipe earnings remain banked. The content schema exposes this as
 This amendment supersedes the PoC spec's gold/ruby economy and one-time relic
 rules. XP is now the only currency-like progression value:
 
-- Every enemy kill grants **1 XP**, retained through wipes.
+- Every enemy kill grants XP (originally **1** flat; later amended to tiered
+  `xpPerEnemy` — see **Iron Pass retune + tiered XP**), retained through wipes.
 - Level 2 remains at 10 XP. Later levels use cumulative thresholds of 30, 60,
   100, and so on (10/20/30/40… XP between levels).
 - Each level supplies one total talent-tree allocation. Tree nodes all cost one
@@ -891,6 +892,43 @@ Status: current · Last verified: 2026-07-17
 3. **Tab** cycles combat heal targets in engine order
    (`tank → dps1 → dps2 → healer`), skips dead, wraps. Click targeting
    unchanged. Digits 1–4 remain out of scope.
+
+---
+
+# Iron Pass retune + tiered XP (2026-07-17)
+
+Status: current · Last verified: 2026-07-17
+
+Playtest: Ash Gate grind felt right; Iron Pass first-cleared at level 3 with a
+DPS relic (Twin Fang / Warblood shorten the fight past a single Tunnel Vision).
+Also: flat 1 XP/kill cannot fund the triangular level curve without endless
+Ash-Gate grinding.
+
+## Spire Lancer (bot-tuned)
+
+| Value | Prior | Shipped | Why |
+|---|---|---|---|
+| `spire-lancer` hp | 245 | **295** | Forces a second Tunnel Vision even under DPS relics |
+| Tunnel Vision `intervalMs` | 30_000 | **25_000** | Extra focus pressure without breaking maxed-crown ≥3-survivor gates |
+| autoDamage | 3 | 3 (unchanged) | Bumping to 4 dropped Vigil / Measured crown below 3 survivors |
+
+Bot shape (disciplined): L3 Vigil + Twin Fang / Warblood → wipe or ≤2-survivor
+pyrrhic; L4 Vigil + same relic → victory ≥3; maxed Vigil / Measured / Zealot
+crowns → victory ≥3 (existing `balance.test.ts` gates).
+
+## Tiered `xpPerEnemy`
+
+| Dungeon | XP/kill | Full-clear XP |
+|---|---|---|
+| Ash Gate | 1 | 6 |
+| Iron Pass | 2 | 26 |
+| Cinder Vault | 2 | 26 |
+| Verdant Rift | 3 | 39 |
+| Black Choir | 3 | 27 |
+| The Maw | 4 | 12 |
+
+Level thresholds unchanged (L2@10, L3@30, L4@60…). Iron Pass attempts (including
+wipes) now bank XP fast enough to reach the level that clears it.
 
 ---
 

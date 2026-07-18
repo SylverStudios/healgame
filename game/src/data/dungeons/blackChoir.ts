@@ -11,7 +11,7 @@ export const BLACK_CHOIR_DUNGEON = {
   order: 5,
   unlock: { kind: 'dungeonClear', dungeonId: 'verdant-rift' },
   rewards: {
-    xpPerEnemy: 1,
+    xpPerEnemy: 3,
   },
   visualKey: 'black-choir',
   waves: [

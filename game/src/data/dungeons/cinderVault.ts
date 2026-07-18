@@ -7,7 +7,7 @@ export const CINDER_VAULT_DUNGEON = {
   order: 3,
   unlock: { kind: 'dungeonClear', dungeonId: 'iron-pass' },
   rewards: {
-    xpPerEnemy: 1,
+    xpPerEnemy: 2,
   },
   visualKey: 'cinder-vault',
   waves: [
