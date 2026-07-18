@@ -24,11 +24,11 @@ function storePayload(store: KeyValueStore, payload: Record<string, unknown>): v
 }
 
 describe('save', () => {
-  it('returns a fresh v7 save when nothing is stored', () => {
+  it('returns a fresh v8 save when nothing is stored', () => {
     const save = loadSave(memoryStore());
     expect(save).toEqual(newSaveData());
     expect(save).toEqual({
-      version: 7,
+      version: 8,
       tutorialDone: false,
       xp: 0,
       unlockedSpells: [SPELLS.bonk.id],
@@ -39,15 +39,17 @@ describe('save', () => {
       combatPaceTenths: 10,
       relicIds: [],
       pendingRelicOffers: [],
+      musicVolumePct: 50,
+      recentRuns: [],
     });
     expect(save).not.toHaveProperty('gold');
     expect(save).not.toHaveProperty('rubies');
   });
 
-  it('round-trips a full v7 save', () => {
+  it('round-trips a full v8 save', () => {
     const store = memoryStore();
     const data: SaveData = {
-      version: 7,
+      version: 8,
       tutorialDone: true,
       xp: 42,
       unlockedSpells: [SPELLS.bonk.id, 'solemn-mend', 'zealous-mending'],
@@ -58,6 +60,15 @@ describe('save', () => {
       combatPaceTenths: 15,
       relicIds: ['ember-ledger', 'triage-bell'],
       pendingRelicOffers: ['still-reservoir', 'vital-ember', 'bastion-plate'],
+      musicVolumePct: 30,
+      recentRuns: [
+        {
+          outcome: 'victory',
+          dungeonId: 'ash-gate',
+          xpGained: 12,
+          glyph: { id: 'g1', segments: [{ x1: 0, y1: 0, x2: 1, y2: 0 }] },
+        },
+      ],
     };
     saveGame(data, store);
     expect(loadSave(store)).toEqual(data);
@@ -68,10 +79,12 @@ describe('save', () => {
     store.setItem('healgame-save-v1', JSON.stringify({ version: 4, xp: 999 }));
     store.setItem('healgame-save-v5', JSON.stringify({ version: 5, xp: 999 }));
     store.setItem('healgame-save-v6', JSON.stringify({ version: 6, xp: 999 }));
+    store.setItem('healgame-save-v7', JSON.stringify({ version: 7, xp: 999 }));
     expect(loadSave(store)).toEqual(newSaveData());
     expect(store.getItem('healgame-save-v1')).toBeNull();
     expect(store.getItem('healgame-save-v5')).toBeNull();
     expect(store.getItem('healgame-save-v6')).toBeNull();
+    expect(store.getItem('healgame-save-v7')).toBeNull();
   });
 
   it('resetSave wipes everything (restart, no respec)', () => {
@@ -86,7 +99,7 @@ describe('save', () => {
 
   it('discards unrecognized payloads', () => {
     const store = memoryStore();
-    storePayload(store, { version: 7, xp: 'nope' });
+    storePayload(store, { version: 8, xp: 'nope' });
     expect(loadSave(store)).toEqual(newSaveData());
   });
 });

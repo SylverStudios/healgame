@@ -31,7 +31,7 @@ export interface BotRun {
  *  loadout keeps every unlocked/tree spell (full kit for balance bots). */
 export function makeBalanceSave(overrides: Partial<SaveData>): SaveData {
   return {
-    version: 7,
+    version: 8,
     tutorialDone: true,
     xp: 0,
     unlockedSpells: [],
@@ -42,6 +42,8 @@ export function makeBalanceSave(overrides: Partial<SaveData>): SaveData {
     combatPaceTenths: 10,
     relicIds: [],
     pendingRelicOffers: [],
+    musicVolumePct: 50,
+    recentRuns: [],
     ...overrides,
   };
 }
