@@ -8,6 +8,7 @@
 
 export type {
   ConfigError,
+  EdgeState,
   NodeContent,
   NodeCost,
   NodeDef,
@@ -19,6 +20,7 @@ export type {
   SpotView,
   TreeAction,
   TreeConfig,
+  TreeEdge,
   TreeSnapshot,
   TreeState,
   TreeView,
@@ -28,6 +30,8 @@ export type {
 } from './types';
 
 export type { LayoutOptions, SpotPosition } from './layout';
+
+export type { BuildGlyph } from './glyph';
 
 export {
   canPurchase,
@@ -44,3 +48,5 @@ export {
 } from './tree';
 
 export { layoutSpots } from './layout';
+
+export { buildGlyphFromTree } from './glyph';

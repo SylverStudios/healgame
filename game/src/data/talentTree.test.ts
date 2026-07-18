@@ -18,7 +18,17 @@ import {
   type CombatMods,
   type TalentTreeContent,
 } from './talentTree';
-import { create, ownedContents, ownedOf, update, validateConfig, view, walletOf } from '../tree';
+import {
+  buildGlyphFromTree,
+  create,
+  ownedContents,
+  ownedOf,
+  update,
+  validateConfig,
+  view,
+  walletOf,
+  type TreeState,
+} from '../tree';
 
 function save(overrides: Partial<SaveData> = {}): SaveData {
   // Empty actionBar → loadoutFromSave keeps all owned spells (bar not under test).
@@ -163,6 +173,195 @@ describe('TALENT_TREE config', () => {
       ['solemn-mend'],
     );
     expect(mods.paceMultipliersTenths).toEqual([10, 15]);
+  });
+});
+
+describe('v0.3 lattice — grid coordinates', () => {
+  it('every spot has integer grid coordinates', () => {
+    for (const spot of TALENT_TREE.spots) {
+      expect(spot.grid, `spot "${spot.id}" is missing grid coords`).toBeDefined();
+      expect(Number.isInteger(spot.grid!.col)).toBe(true);
+      expect(Number.isInteger(spot.grid!.row)).toBe(true);
+    }
+  });
+
+  it('no two spots share the same grid coordinates', () => {
+    const seen = new Map<string, string>();
+    for (const spot of TALENT_TREE.spots) {
+      const key = `${spot.grid!.col},${spot.grid!.row}`;
+      const dupe = seen.get(key);
+      expect(dupe, `"${spot.id}" collides with "${dupe}" at ${key}`).toBeUndefined();
+      seen.set(key, spot.id);
+    }
+  });
+
+  it('root sits at column 0 (the lattice corner)', () => {
+    expect(TALENT_TREE.spots.find((s) => s.id === 'deep-reserves')?.grid?.col).toBe(0);
+  });
+});
+
+describe('v0.3 lattice — each string is walkable end to end via update()', () => {
+  function buy(state: TreeState, spotId: string, level?: number): TreeState {
+    const action =
+      level === undefined
+        ? ({ type: 'purchase', spotId } as const)
+        : ({ type: 'purchase', spotId, level } as const);
+    const result = update(TALENT_TREE, state, action);
+    expect(result.ok, result.ok ? '' : `${spotId}: ${result.message}`).toBe(true);
+    if (!result.ok) throw new Error(result.message);
+    return result.state;
+  }
+
+  it('walks the full Vigil string to CROWN-V and CROWN-Z at level 12', () => {
+    let state = create(TALENT_TREE, { talent: 20 });
+    state = buy(state, 'deep-reserves');
+    state = buy(state, 'vigil-oath', 12);
+    state = buy(state, 'vigil-patient-vow', 12);
+    state = buy(state, 'vigil-thrift', 12);
+    state = buy(state, 'shared-mend-potency', 12);
+    state = buy(state, 'vowstrike-virtue', 12);
+    state = buy(state, 'wrath-ascendant', 12); // minLevel 10
+    state = buy(state, 'vowbound-crown', 12); // minLevel 12
+    expect(ownedOf(state)).toEqual(
+      expect.arrayContaining(['wrath-ascendant', 'vowbound-crown']),
+    );
+  });
+
+  it('walks the full Zealot string to both crowns at level 12', () => {
+    let state = create(TALENT_TREE, { talent: 20 });
+    state = buy(state, 'deep-reserves');
+    state = buy(state, 'zealot-oath', 12);
+    state = buy(state, 'zealot-fervent-chain', 12);
+    state = buy(state, 'zealot-quick-breath', 12);
+    state = buy(state, 'shared-zealous-potency', 12);
+    state = buy(state, 'vowstrike-vengeance', 12);
+    state = buy(state, 'wrath-ascendant', 12);
+    state = buy(state, 'vowbound-crown', 12);
+    expect(ownedOf(state)).toEqual(
+      expect.arrayContaining(['wrath-ascendant', 'vowbound-crown']),
+    );
+  });
+});
+
+describe('v0.3 lattice — oath exclusive lock as an edge state', () => {
+  it('destroys the rival oath edge (locked) while the consolation route stays offered', () => {
+    let state = create(TALENT_TREE, { talent: 3 });
+    state = (() => {
+      const r = update(TALENT_TREE, state, { type: 'purchase', spotId: 'deep-reserves' });
+      if (!r.ok) throw new Error(r.message);
+      return r.state;
+    })();
+    state = (() => {
+      const r = update(TALENT_TREE, state, { type: 'purchase', spotId: 'vigil-oath' });
+      if (!r.ok) throw new Error(r.message);
+      return r.state;
+    })();
+
+    const v = view(TALENT_TREE, state);
+    const rivalOathEdge = v.edges.find((e) => e.toSpotId === 'zealot-oath');
+    expect(rivalOathEdge?.state).toBe('locked');
+    const takenOathEdge = v.edges.find((e) => e.toSpotId === 'vigil-oath');
+    expect(takenOathEdge?.state).toBe('traversed');
+
+    // Consolation still purchasable on the destroyed spot (Alpha 0.2 §D
+    // contract, unchanged) — spot status reads 'affordable' for the
+    // forsaken-path reward even while the edge into its entry node is
+    // 'locked' (the edge reflects the destroyed primary route, not the
+    // consolation escape hatch).
+    const zealotSpot = v.spots.find((s) => s.id === 'zealot-oath');
+    expect(zealotSpot?.status).toBe('affordable');
+    expect(zealotSpot?.next?.id).toBe('warped-tempo-via-zealot');
+  });
+});
+
+describe('v0.3 lattice — crown level gates', () => {
+  const READY_FOR_CROWNS = {
+    'deep-reserves': 1,
+    'vigil-oath': 1,
+    'vigil-patient-vow': 1,
+    'shared-mend-potency': 1,
+    'vowstrike-virtue': 1,
+  };
+
+  it('wrath-ascendant (minLevel 10) rejects level 9, accepts level 10', () => {
+    const state = treeStateFromLegacy(READY_FOR_CROWNS, 5);
+    const tooLow = update(TALENT_TREE, state, {
+      type: 'purchase',
+      spotId: 'wrath-ascendant',
+      level: 9,
+    });
+    expect(tooLow.ok).toBe(false);
+    if (tooLow.ok) return;
+    expect(tooLow.reason).toBe('level-too-low');
+
+    const atBoundary = update(TALENT_TREE, state, {
+      type: 'purchase',
+      spotId: 'wrath-ascendant',
+      level: 10,
+    });
+    expect(atBoundary.ok).toBe(true);
+  });
+
+  it('vowbound-crown (minLevel 12) rejects level 11, accepts level 12', () => {
+    const state = treeStateFromLegacy(READY_FOR_CROWNS, 5);
+    const tooLow = update(TALENT_TREE, state, {
+      type: 'purchase',
+      spotId: 'vowbound-crown',
+      level: 11,
+    });
+    expect(tooLow.ok).toBe(false);
+    if (tooLow.ok) return;
+    expect(tooLow.reason).toBe('level-too-low');
+
+    const atBoundary = update(TALENT_TREE, state, {
+      type: 'purchase',
+      spotId: 'vowbound-crown',
+      level: 12,
+    });
+    expect(atBoundary.ok).toBe(true);
+  });
+
+  it('view() shows the crown as locked below the gate and affordable at/above it', () => {
+    const state = treeStateFromLegacy(READY_FOR_CROWNS, 5);
+    expect(view(TALENT_TREE, state, 9).spots.find((s) => s.id === 'wrath-ascendant')?.status).toBe(
+      'locked',
+    );
+    expect(
+      view(TALENT_TREE, state, 10).spots.find((s) => s.id === 'wrath-ascendant')?.status,
+    ).toBe('affordable');
+    // Omitted level = gate not enforced (matches existing view()-only status
+    // assertions elsewhere in this file that never pass a level).
+    expect(view(TALENT_TREE, state).spots.find((s) => s.id === 'wrath-ascendant')?.status).toBe(
+      'affordable',
+    );
+  });
+});
+
+describe('v0.3 lattice — buildGlyphFromTree on the live TALENT_TREE', () => {
+  it('is empty for a fresh (no nodes owned) state', () => {
+    const glyph = buildGlyphFromTree(TALENT_TREE, new Set());
+    expect(glyph.segments).toEqual([]);
+  });
+
+  it('draws one segment for deep-reserves-1 → vigil-oath once both are owned', () => {
+    const glyph = buildGlyphFromTree(TALENT_TREE, new Set(['deep-reserves-1', 'vigil-oath']));
+    const drGrid = TALENT_TREE.spots.find((s) => s.id === 'deep-reserves')!.grid!;
+    const oathGrid = TALENT_TREE.spots.find((s) => s.id === 'vigil-oath')!.grid!;
+    expect(glyph.segments).toEqual([
+      { x1: drGrid.col, y1: drGrid.row, x2: oathGrid.col, y2: oathGrid.row },
+    ]);
+  });
+
+  it('is deterministic and its id changes between a Vigil build and a Zealot build', () => {
+    const vigilOwned = new Set(ownedIdsFromLegacyRanks({ 'deep-reserves': 1, 'vigil-oath': 1 }));
+    const zealotOwned = new Set(ownedIdsFromLegacyRanks({ 'deep-reserves': 1, 'zealot-oath': 1 }));
+
+    const a = buildGlyphFromTree(TALENT_TREE, vigilOwned);
+    const b = buildGlyphFromTree(TALENT_TREE, vigilOwned); // same set, fresh instance
+    expect(a).toEqual(b);
+
+    const c = buildGlyphFromTree(TALENT_TREE, zealotOwned);
+    expect(a.id).not.toBe(c.id);
   });
 });
 

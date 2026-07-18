@@ -44,6 +44,15 @@ export interface NodeDef {
    * skip to this node if requires are met. Used for forsaken-path rewards.
    */
   availableIfExclusiveLocked?: boolean;
+  /**
+   * v0.3 lattice: minimum player level required to purchase this node, in
+   * addition to `requires`/`exclusiveGroup`. Enforced by `update` (and
+   * reflected in `view`'s spot status as `locked`) only when the caller
+   * supplies a `level`; omitted level = gate not enforced (back-compat for
+   * callers that don't track level, e.g. most existing tests). Integer >= 1
+   * when present.
+   */
+  minLevel?: number;
 }
 
 /**
@@ -54,6 +63,14 @@ export interface NodeDef {
 export interface SpotDef {
   id: string;
   chain: string[];
+  /**
+   * v0.3 lattice: integer grid coordinates for this spot (column = progression
+   * depth, row = string/lane). Pure layout data — no pixels, no Phaser. Drives
+   * both `buildGlyphFromTree` segments and chunk D's tree layout. Optional so
+   * configs that don't care about a lattice glyph (tests, other trees) can
+   * omit it; `buildGlyphFromTree` silently skips edges missing grid data.
+   */
+  grid?: { col: number; row: number };
 }
 
 /** Entire tree definition — pure data, safe to author outside code. */
@@ -62,8 +79,12 @@ export interface TreeConfig {
   spots: SpotDef[];
 }
 
-/** Player action attempted against the tree. */
-export type TreeAction = { type: 'purchase'; spotId: string };
+/**
+ * Player action attempted against the tree. `level` (v0.3) is the player's
+ * current level, forwarded to `minLevel` gate checks; omit when the caller
+ * doesn't track level (gate then goes unenforced for that call).
+ */
+export type TreeAction = { type: 'purchase'; spotId: string; level?: number };
 
 export type RejectReason =
   | 'unknown-spot'
@@ -71,6 +92,7 @@ export type RejectReason =
   | 'requirements-unmet'
   | 'cannot-afford'
   | 'exclusive-locked'
+  | 'level-too-low'
   | 'invalid-config';
 
 export type UpdateOk = { ok: true; state: TreeState };
@@ -103,6 +125,8 @@ export interface NodeView {
   cost: NodeCost;
   /** Present when this node participates in mutual exclusion. */
   exclusiveGroup?: string;
+  /** Present when this node is level-gated (v0.3 lattice crowns). */
+  minLevel?: number;
 }
 
 export interface SpotView {
@@ -121,12 +145,42 @@ export interface SpotView {
   parentSpotIds: string[];
 }
 
+/**
+ * v0.3 lattice: rendering state of a config-derived edge, from the current
+ * player's point of view (owned nodes + wallet + level).
+ *
+ * - `traversed`   — both the edge's source and destination spots have at
+ *                    least one owned node (the edge has been walked; light
+ *                    it brightly).
+ * - `available`   — the source spot is owned but the destination is not, and
+ *                    the destination is not exclusive-locked (a legitimate
+ *                    next step, though it may still be `unaffordable` or
+ *                    `locked` behind a level/other-prereq gate at the spot
+ *                    level — the edge itself is still "reachable").
+ * - `locked`      — the edge's destination node (the spot's first chain
+ *                    entry, the one whose `requires` produced this edge) is
+ *                    permanently exclusive-locked by a rival pick (the oath
+ *                    lock destroying the rival string's entry). This holds
+ *                    even after a forsaken-path consolation on that same
+ *                    spot is purchased — the entry route itself stays
+ *                    destroyed.
+ * - `inactive`    — the source spot is not yet owned; this route has not
+ *                    been reached at all.
+ */
+export type EdgeState = 'traversed' | 'available' | 'locked' | 'inactive';
+
+export interface TreeEdge {
+  fromSpotId: string;
+  toSpotId: string;
+  state: EdgeState;
+}
+
 export interface TreeView {
   spots: SpotView[];
   wallet: Readonly<Record<string, number>>;
   ownedNodeIds: readonly string[];
-  /** Config-derived edges for rendering (fromSpot → toSpot). */
-  edges: readonly { fromSpotId: string; toSpotId: string }[];
+  /** Config-derived edges for rendering (fromSpot → toSpot), with lattice state. */
+  edges: readonly TreeEdge[];
 }
 
 /** Persistable slice of tree state (owned nodes + wallet). */

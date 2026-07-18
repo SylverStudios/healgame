@@ -297,7 +297,7 @@ export class TreeScene extends Phaser.Scene {
 
   private armMessage(): string {
     if (this.armedSpotId === null) return '';
-    const treeView = view(TALENT_TREE, this.treeState);
+    const treeView = view(TALENT_TREE, this.treeState, levelForXp(this.save.xp));
     const spot = treeView.spots.find((s) => s.id === this.armedSpotId);
     const content = spot?.next ? asContent(spot.next.content) : null;
     const name = content?.name ?? this.armedSpotId;
@@ -307,7 +307,7 @@ export class TreeScene extends Phaser.Scene {
   private render(): void {
     this.hideTooltip();
     this.nodesContainer.removeAll(true);
-    const treeView = view(TALENT_TREE, this.treeState);
+    const treeView = view(TALENT_TREE, this.treeState, levelForXp(this.save.xp));
     const available = treeView.wallet['talent'] ?? 0;
     this.headerText.setText(
       `Level ${levelForXp(this.save.xp)}   •   ${available} unplaced   •   ${allocatedTalentPoints(this.save)} placed`,
@@ -521,7 +521,11 @@ export class TreeScene extends Phaser.Scene {
 
   private tryPurchase(spotId: string): void {
     const before = new Set(ownedSpellsFromSave(this.save).map((s) => s.id));
-    const result = update(TALENT_TREE, this.treeState, { type: 'purchase', spotId });
+    const result = update(TALENT_TREE, this.treeState, {
+      type: 'purchase',
+      spotId,
+      level: levelForXp(this.save.xp),
+    });
     if (result.ok) {
       this.treeState = result.state;
       applyTreeStateToSave(this.save, this.treeState);

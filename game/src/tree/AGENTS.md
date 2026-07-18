@@ -1,6 +1,6 @@
 # Skill tree — agent notes
 
-Status: current · Authority: skill-tree service + live TALENT_TREE wiring · Last verified: 2026-07-17
+Status: current · Authority: skill-tree service + live TALENT_TREE wiring · Last verified: 2026-07-18
 
 Config-driven tree service (`game/src/tree/`) plus the live talent-tree data and
 combat resolve (`game/src/data/talentTree.ts`). Phaser stays out of this folder.
@@ -62,29 +62,112 @@ extend it.
    into `CombatMods.cooldowns` (deduped by id; unknown id ignored, same as an
    unknown `grantSpell` id).
 
-## Tree topology — Alpha 0.2 hourglass (§D1)
+## Tree topology — v0.3 lattice (retires the Alpha 0.2 hourglass)
+
+Same node ids, same `requires`/`exclusiveGroup` graph as Alpha 0.2 (see
+`docs/v0.3-handoff.md` → "Lattice tree" for why the graph shape didn't need
+to change: the existing oath fork → shared mid → Vowstrike fork → dual-crown
+shape already *is* a lattice of overlapping chains once redrawn on a grid —
+the "hourglass" was a description of the old pixel layout, not the graph).
+v0.3 adds: integer `{ col, row }` grid coordinates per spot (`SpotDef.grid`,
+data only — no pixels), `minLevel` gates on the two crowns, and a pure
+`buildGlyphFromTree` reduction. Root is column 0 (the lattice's single
+corner); rows fan out from it:
 
 ```
-[Shared early]   deep-reserves ×3 (was 5; ids deep-reserves-1..3)
-       │
-  Vigil │ Zealot  exclusiveGroup: subclass
-       │
-[Oath wedge]     branch follow-ups; pure-mana nodes cut (deep-well / spendthrift-grace)
-       │
-[Shared mid]     shared-mend-potency / shared-zealous-potency
-                 requires: { mode: 'any', nodes: [vigil-thrift, vigil-still-waters,
-                                                  zealot-quick-breath, zealot-frenzied-liturgy] }
-                 (gated on layer-2 so specialization forks do not fan out to mid)
-       │
- Virtue │ Vengeance  exclusiveGroup: vowstrike-aspect
-       │
-[Crown]          wrath-ascendant / vowbound-crown
-                 requires: { mode: 'any', nodes: [vowstrike-virtue, vowstrike-vengeance] }
+row0 (Vigil spine):    vigil-oath ── vigil-patient-vow ── vigil-thrift ──────────────┐
+                             │             │                                          │
+row1 (Vigil lane):           vigil-measured-devotion   vigil-still-waters ─┐          │
+                                                          (graven-scale     │          │
+                                                           spur: row -1)    ├─ shared-mend-potency ─┐
+row2 (Shared spine):   deep-reserves (ROOT, col0)                          │                        ├─ vowstrike-virtue ─┐
+                             │             │                               │                        │                    │
+row3 (Zealot lane):          zealot-steady-hands   zealot-frenzied-liturgy─┘          ┌─ shared-zealous-potency ─┤       ├─ CROWN-V (wrath-ascendant, minLevel 10)
+                             │             │                                          │                          │       │
+row4 (Zealot spine):   zealot-oath ── zealot-fervent-chain ── zealot-quick-breath ────┘                  vowstrike-vengeance ┴─ CROWN-Z (vowbound-crown, minLevel 12)
 ```
+
+(Not to scale — see `TALENT_TREE.spots[].grid` in `data/talentTree.ts` for
+the authoritative `{ col, row }` per spot; `vigil-graven-scale` sits at
+`{ col: 3, row: -1 }`, a genuine dead-end spur above the Vigil spine.) Both
+crowns stay reachable from *either* oath via the shared Vowstrike fork —
+unchanged from Alpha 0.2 and required by the pinned journey sequence (buy
+Wrath Ascendant *and* Vowbound Crown from one Vigil-only seed).
+
+**Oath exclusive lock**: `vigil-oath` and `zealot-oath` share
+`exclusiveGroup: 'subclass'`. Owning one permanently locks the other's entry
+node. The rival spot still offers a forsaken-path consolation
+(`warped-tempo-via-vigil` / `warped-tempo-via-zealot`,
+`availableIfExclusiveLocked: true`) — its own `spot.status` reads
+`affordable` for that reward even while the structural edge into the primary
+(locked) node reads `locked` in `TreeView.edges` (see "Edge states" below).
 
 **Removed in Alpha 0.2**: `vigil-deep-well` and `zealot-spendthrift-grace` (pure-mana pads).
 Legacy saves that held these nodes simply drop them on load (unknown ids not emitted by
 `ownedIdsFromLegacyRanks`).
+
+### Level gates (`minLevel`, v0.3)
+
+The **one** sanctioned new primitive: `NodeDef.minLevel?: number` (positive
+integer; validated by `validateConfig`). Enforced only when the caller
+supplies a level:
+
+- `update(config, state, { type: 'purchase', spotId, level })` — rejects with
+  `reason: 'level-too-low'` when `level < node.minLevel`. Omitting `level`
+  entirely (not `level: undefined` — `exactOptionalPropertyTypes` forbids
+  that) does **not** enforce the gate (back-compat: most existing tests and
+  configs never pass level).
+- `view(config, state, level?)` — same bypass-when-omitted rule; a
+  level-gated `next` node folds into the existing `'locked'` `SpotStatus`
+  (no new status was added — `NodeView.minLevel` is exposed so UI can tell
+  "prereqs unmet" from "level too low" and word the tooltip accordingly).
+
+Live values: `wrath-ascendant` → `minLevel: 10`; `vowbound-crown` →
+`minLevel: 12` (ascending per the handoff; picked so the journey's B3 seed at
+`xp: 660` → level 12 clears both). `TreeScene` passes
+`levelForXp(save.xp)` into every `view`/`update` call.
+
+### Edge states (`TreeView.edges[].state`, v0.3)
+
+`TreeView.edges` now carries an `EdgeState` per config-derived edge —
+`'traversed' | 'available' | 'locked' | 'inactive'` — for chunk D to draw
+bright/dim/destroyed/greyed edges without re-deriving ownership logic:
+
+| State | Meaning |
+|---|---|
+| `traversed` | Both the edge's source and destination spots have an owned node. |
+| `locked` | The edge's destination **node** (the spot's first chain entry — the one whose `requires` produced this edge) is exclusive-locked by a rival pick. Checked at the node level, not spot `status`, so it stays `locked` even after a forsaken-path consolation on that same spot is bought. |
+| `available` | Source spot owned, destination not, and not `locked` — a reachable next step. |
+| `inactive` | Source spot not owned yet — this route hasn't been reached. |
+
+`locked` is checked before `traversed`/`available` (see `edgeState` in
+`tree.ts`).
+
+### Build glyph (`buildGlyphFromTree`, v0.3 → chunk D/E)
+
+`tree/glyph.ts` exports the pinned contract:
+
+```ts
+export type BuildGlyph = {
+  id: string; // stable hash (FNV-1a) of the sorted owned edge-key set
+  segments: ReadonlyArray<{ x1: number; y1: number; x2: number; y2: number }>;
+};
+export function buildGlyphFromTree(config: TreeConfig, ownedNodeIds: ReadonlySet<string>): BuildGlyph;
+```
+
+Pure, no Phaser/Date/Math.random. An edge counts as owned/traversed when (a)
+it exists in the lattice — the destination spot's first chain node
+`requires` the specific source node — and (b) **both** the specific source
+node and the destination's first chain node are in `ownedNodeIds` (node-level,
+same reasoning as the `locked` edge state above: a spot owned only via a
+forsaken-path consolation doesn't count as having traversed its primary
+entry route). Segments use each spot's `grid` coords directly as `x`/`y` (no
+pixel scale — chunk D applies its own). Config traversal order is fixed
+(iterates `config.spots` then each node's `requires.nodes` in declared
+order), so the result is deterministic regardless of `ownedNodeIds`'s
+(unordered) `Set` insertion order. Spots without `grid` are silently skipped
+(defensive default for configs — including test fixtures — that don't
+populate coordinates).
 
 ## New effect kinds (Alpha 0.2 §D5/D6)
 
@@ -127,7 +210,7 @@ detects aspect via owned spell ids in mods, then applies:
 | Zealot × Virtue    | `synergy` trigger vowstrike-virtue→zealous-mending +1 |
 | Zealot × Vengeance | vowstrike-vengeance `damage +1`                            |
 
-## Tree layer 2 (Alpha 0.1 §D5, trimmed in Alpha 0.2)
+## Tree layer 2 (Alpha 0.1 §D5, trimmed in Alpha 0.2, unchanged in v0.3)
 
 Retained output/tempo nodes require `mode: 'any'` on either branch follow-up:
 - Vigil: thrift, still-waters (gate: patient-vow-1 OR measured-devotion)
@@ -138,7 +221,12 @@ All rows including the crown (y ≈ 960) are reachable at maximum scroll.
 HUD chrome is pinned via `setScrollFactor(0)`. Journey reaches deep nodes by
 wheeling to scroll and clicking by name (`treeNode:<spotId>`).
 
-Row layout in `TALENT_TREE_POSITIONS` (y centers, 960px canvas):
+Row layout in `TALENT_TREE_POSITIONS` (y centers, 960px canvas) — **chunk C
+left this pixel table exactly as Alpha 0.2 shipped it**; it doesn't yet read
+from `SpotDef.grid` at all. Chunk D owns rebuilding this into a real
+lattice layout driven by the new grid coordinates (and the edge-state /
+glyph APIs above); until then the live tree still *renders* like Alpha 0.2
+even though the underlying config now carries lattice data:
 
 | y   | spots                                                             |
 |-----|-------------------------------------------------------------------|
