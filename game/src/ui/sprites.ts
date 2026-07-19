@@ -1,8 +1,8 @@
 /**
  * Unit art: Kenney "Tiny Dungeon" (CC0, kenney.nl) — 16×16 tiles shipped as
  * the packed 12×11 tilesheet in public/assets (license copy alongside), plus
- * a dual-path for PixelLab / custom stills (tank + ash-husk) and the ragged
- * healer sheet. Frame index for Kenney = row * 12 + col.
+ * a dual-path for PixelLab / custom stills (party mercs + ash-husk) and the
+ * ragged healer sheet. Frame index for Kenney = row * 12 + col.
  *
  * This is presentation-only mapping (which tile/texture draws which unit);
  * gameplay numbers stay in src/data per the numbers-are-data rule.
@@ -23,6 +23,80 @@ export const ASH_HUSK_TEXTURE_URL = 'assets/units/ash-husk/west.png';
 /** PixelLab Starter Tank still — combat-facing east (party faces right). */
 export const TANK_TEXTURE_KEY = 'unit-tank';
 export const TANK_TEXTURE_URL = 'assets/units/tank/east.png';
+
+/** PixelLab starter melee DPS — combat-facing east. */
+export const DPS1_TEXTURE_KEY = 'unit-dps1';
+export const DPS1_TEXTURE_URL = 'assets/units/dps1/east.png';
+
+/** PixelLab starter ranger DPS — combat-facing east. */
+export const DPS2_TEXTURE_KEY = 'unit-dps2';
+export const DPS2_TEXTURE_URL = 'assets/units/dps2/east.png';
+
+/** Texture keys for PixelLab stills (authored facing; UnitSprite skips flipX). */
+export type CustomUnitTextureKey =
+  | typeof ASH_HUSK_TEXTURE_KEY
+  | typeof TANK_TEXTURE_KEY
+  | typeof DPS1_TEXTURE_KEY
+  | typeof DPS2_TEXTURE_KEY;
+
+/**
+ * One-shot attack strip for a PixelLab merc. Frames are separate PNGs loaded as
+ * individual textures; BootScene registers the Phaser anim from these keys.
+ */
+export interface UnitAttackAnimDef {
+  /** Party unit id this strip belongs to. */
+  unitId: 'tank' | 'dps1' | 'dps2';
+  animKey: string;
+  /** Rest still shown when not attacking. */
+  restTextureKey: CustomUnitTextureKey;
+  frameCount: number;
+  frameKey: (index: number) => string;
+  frameUrl: (index: number) => string;
+}
+
+function attackFrameKey(slug: string, index: number): string {
+  return `unit-${slug}-attack-${index}`;
+}
+
+function attackFrameUrl(slug: string, facing: 'east' | 'west', index: number): string {
+  return `assets/units/${slug}/attack-${facing}/${index}.png`;
+}
+
+/** Tank / DPS1 / DPS2 east attack strips (7 frames: rest + 6 generated). */
+export const UNIT_ATTACK_ANIMS: readonly UnitAttackAnimDef[] = [
+  {
+    unitId: 'tank',
+    animKey: 'unit-tank-attack',
+    restTextureKey: TANK_TEXTURE_KEY,
+    frameCount: 7,
+    frameKey: (i) => attackFrameKey('tank', i),
+    frameUrl: (i) => attackFrameUrl('tank', 'east', i),
+  },
+  {
+    unitId: 'dps1',
+    animKey: 'unit-dps1-attack',
+    restTextureKey: DPS1_TEXTURE_KEY,
+    frameCount: 7,
+    frameKey: (i) => attackFrameKey('dps1', i),
+    frameUrl: (i) => attackFrameUrl('dps1', 'east', i),
+  },
+  {
+    unitId: 'dps2',
+    animKey: 'unit-dps2-attack',
+    restTextureKey: DPS2_TEXTURE_KEY,
+    frameCount: 7,
+    frameKey: (i) => attackFrameKey('dps2', i),
+    frameUrl: (i) => attackFrameUrl('dps2', 'east', i),
+  },
+] as const;
+
+/** Playback rate for PixelLab attack strips (~10fps reads as a clear swing). */
+export const UNIT_ATTACK_FRAME_RATE = 10;
+
+/** Phaser anim key for a party merc's attack strip, if one is wired. */
+export function attackAnimKeyForUnit(unit: Pick<Unit, 'id'>): string | undefined {
+  return UNIT_ATTACK_ANIMS.find((def) => def.unitId === unit.id)?.animKey;
+}
 
 /**
  * v0.3 chunk F: user-provided ragged-healer sheet renders the party healer
@@ -97,7 +171,7 @@ const MOB_VISUAL_FRAMES = {
  */
 export type UnitPresentation =
   | { kind: 'kenney'; frame: number }
-  | { kind: 'texture'; key: typeof ASH_HUSK_TEXTURE_KEY | typeof TANK_TEXTURE_KEY };
+  | { kind: 'texture'; key: CustomUnitTextureKey };
 
 /** Supported tile frame for an authored mob visual key. */
 export function frameForMobVisualKey(visualKey: string): number | undefined {
@@ -110,8 +184,8 @@ export function frameForMobVisualKey(visualKey: string): number | undefined {
  * Kenney tile frame for a combat unit. Catalog mobs resolve through stable
  * mobId and MobDef.visualKey; generated runtime ids never select enemy
  * presentation. Prefer `presentationForUnit` when wiring UnitSprite — custom
- * textures (tank / ash-husk) still report their legacy Kenney frame here for
- * catalog coverage tests.
+ * textures still report their legacy Kenney frame here for catalog coverage
+ * tests.
  */
 export function frameForUnit(unit: Pick<Unit, 'id' | 'role' | 'mobId'>): number {
   if (unit.role === 'boss' || unit.role === 'enemy') {
@@ -127,15 +201,21 @@ export function frameForUnit(unit: Pick<Unit, 'id' | 'role' | 'mobId'>): number 
 }
 
 /**
- * Presentation choice for a combat unit. Tank + ash-husk use PixelLab stills;
- * the healer sheet is wired separately in CombatScene (cast frames). Everyone
- * else stays on Kenney.
+ * Presentation choice for a combat unit. Party mercs (tank/dps) + ash-husk use
+ * PixelLab stills; the healer sheet is wired separately in CombatScene (cast
+ * frames). Remaining trash/bosses stay on Kenney.
  */
 export function presentationForUnit(
   unit: Pick<Unit, 'id' | 'role' | 'mobId'>,
 ): UnitPresentation {
   if (unit.id === 'tank') {
     return { kind: 'texture', key: TANK_TEXTURE_KEY };
+  }
+  if (unit.id === 'dps1') {
+    return { kind: 'texture', key: DPS1_TEXTURE_KEY };
+  }
+  if (unit.id === 'dps2') {
+    return { kind: 'texture', key: DPS2_TEXTURE_KEY };
   }
   if (unit.role === 'enemy' || unit.role === 'boss') {
     const mob =

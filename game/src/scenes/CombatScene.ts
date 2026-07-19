@@ -23,6 +23,7 @@ import { GCD_MS } from '../data/constants';
 import { Bar } from '../ui/bar';
 import { UnitSprite } from '../ui/unitSprite';
 import {
+  attackAnimKeyForUnit,
   HEALER_CAST_FRAMES,
   HEALER_IDLE_FRAME,
   HEALER_SHEET_TEXTURE_KEY,
@@ -91,15 +92,24 @@ const GROUND_LINE_MARGIN = 40;
  *  (handoff §B). Presentation-only — index into this array, never reorder the engine's. */
 const PARTY_VISUAL_ORDER = ['healer', 'dps2', 'dps1', 'tank'];
 
-// Display sizes: custom stills (PixelLab tank/husk + ragged healer) keep the
-// padded-canvas baseline; Kenney portraits are smaller so their filled 16×16
-// tiles match that visual weight. Kenney sizes stay multiples of 16.
-const PARTY_CUSTOM_WIDTH = 64;
-const PARTY_CUSTOM_HEIGHT = 64;
+// Display sizes: PixelLab canvases are ~92px with heavy padding around a ~40px
+// figure, so they display larger than Kenney's filled 16×16 tiles. The ragged
+// healer sheet matches the same party display size so the line reads as one
+// roster. Kenney sizes stay multiples of 16.
+const PARTY_CUSTOM_WIDTH = 112;
+const PARTY_CUSTOM_HEIGHT = 112;
 const PARTY_KENNEY_WIDTH = 48;
 const PARTY_KENNEY_HEIGHT = 48;
-const TRASH_CUSTOM_WIDTH = 48;
-const TRASH_CUSTOM_HEIGHT = 48;
+const TRASH_CUSTOM_WIDTH = 72;
+const TRASH_CUSTOM_HEIGHT = 72;
+/**
+ * Padded canvases leave empty pixels under painted feet. Shift the body down
+ * by that fraction of display height so feet meet GROUND_Y.
+ * - PixelLab stills: ~23px pad on a ~92px canvas
+ * - Ragged healer sheet: ~17px pad on a 64px frame (same idle/cast baseline)
+ */
+const PIXELLAB_FOOT_PAD_RATIO = 23 / 92;
+const HEALER_FOOT_PAD_RATIO = 17 / 64;
 const TRASH_KENNEY_WIDTH = 32;
 const TRASH_KENNEY_HEIGHT = 32;
 const BOSS_UNIT_WIDTH = 80;
@@ -178,8 +188,10 @@ const HUD_FONT = 'monospace';
 // speaker's home Y minus enough clearance to clear its always-on overlay stack (HP bar +
 // number line, plus the mana bar + number line for the healer) — showSpeechBubble adds its
 // own small gap above that anchor for the tail.
-const BANTER_HEALER_Y_OFFSET = 72;
-const BANTER_TANK_Y_OFFSET = 46;
+/** Clears the shared party display height + healer mana bar stack above GROUND_Y. */
+const BANTER_HEALER_Y_OFFSET = 100;
+/** Clears the taller PixelLab tank body + HP bar stack above GROUND_Y. */
+const BANTER_TANK_Y_OFFSET = 80;
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -190,8 +202,9 @@ function slotX(index: number, count: number, left: number, right: number): numbe
 }
 
 /** Home Y for a unit of `height` so its bottom edge (feet) sits on GROUND_Y — units have
- *  different heights (party 64 / trash 48 / boss 112), so their container centers (which is
- *  what x/y position) differ even though they all read as standing on one ground line. */
+ *  different heights (party custom 112 / trash 72 / Kenney smaller), so their container
+ *  centers (which is what x/y position) differ even though they all read as standing on
+ *  one ground line. */
 function groundAnchorY(height: number): number {
   return GROUND_Y - height / 2;
 }
@@ -404,14 +417,20 @@ export class CombatScene extends Phaser.Scene {
         PARTY_SLOT_LEFT,
         PARTY_SLOT_RIGHT,
       );
-      // Healer: ragged sheet + cast poses. Tank: PixelLab still (fixed facing).
-      // DPS: Kenney tiles at the smaller Kenney display size.
+      // Healer: ragged sheet + cast poses. Tank/DPS: PixelLab stills + attack strips
+      // (fixed facing). All custom party bodies share one display size.
       const isHealer = unit.role === 'healer';
       const presentation = presentationForUnit(unit);
       const isCustom = isHealer || presentation.kind === 'texture';
       const width = isCustom ? PARTY_CUSTOM_WIDTH : PARTY_KENNEY_WIDTH;
       const height = isCustom ? PARTY_CUSTOM_HEIGHT : PARTY_KENNEY_HEIGHT;
       const y = groundAnchorY(height);
+      const attackAnimKey = attackAnimKeyForUnit(unit);
+      const bodyOffsetY = isHealer
+        ? Math.round(height * HEALER_FOOT_PAD_RATIO)
+        : presentation.kind === 'texture'
+          ? Math.round(height * PIXELLAB_FOOT_PAD_RATIO)
+          : 0;
       const sprite = new UnitSprite(unit, {
         scene: this,
         x,
@@ -422,10 +441,16 @@ export class CombatScene extends Phaser.Scene {
           ? {
               frame: HEALER_IDLE_FRAME,
               bodyTextureKey: HEALER_SHEET_TEXTURE_KEY,
+              bodyOffsetY,
               casterAnim: { idleFrame: HEALER_IDLE_FRAME, castFrames: HEALER_CAST_FRAMES },
             }
           : presentation.kind === 'texture'
-            ? { bodyTextureKey: presentation.key, fixedFacing: true }
+            ? {
+                bodyTextureKey: presentation.key,
+                fixedFacing: true,
+                bodyOffsetY,
+                ...(attackAnimKey === undefined ? {} : { attackAnimKey }),
+              }
             : { frame: presentation.frame }),
         showMana: isHealer,
         clickable: true,
@@ -458,6 +483,8 @@ export class CombatScene extends Phaser.Scene {
           ? TRASH_CUSTOM_HEIGHT
           : TRASH_KENNEY_HEIGHT;
       const y = groundAnchorY(height);
+      const bodyOffsetY =
+        presentation.kind === 'texture' ? Math.round(height * PIXELLAB_FOOT_PAD_RATIO) : 0;
       const sprite = new UnitSprite(unit, {
         scene: this,
         x,
@@ -465,7 +492,7 @@ export class CombatScene extends Phaser.Scene {
         width,
         height,
         ...(presentation.kind === 'texture'
-          ? { bodyTextureKey: presentation.key, fixedFacing: true }
+          ? { bodyTextureKey: presentation.key, fixedFacing: true, bodyOffsetY }
           : { frame: presentation.frame }),
         showMana: false,
         clickable: false,
