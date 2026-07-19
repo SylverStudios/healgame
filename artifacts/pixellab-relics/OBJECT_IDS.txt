@@ -1,0 +1,13 @@
+# hand-fe-v2 — authored at 32×32, exported 64 nearest
+# Style: FE General metal (blue-grey steel, white specular, gold trim, crimson plate)
+# Replaces PixelLab review pack for readability
+ember-ledger|hand-fe-v2|(32,32)
+triage-bell|hand-fe-v2|(32,32)
+still-reservoir|hand-fe-v2|(32,32)
+vital-ember|hand-fe-v2|(32,32)
+bastion-plate|hand-fe-v2|(32,32)
+iron-ward|hand-fe-v2|(32,32)
+twin-fang|hand-fe-v2|(32,32)
+quicksteel|hand-fe-v2|(32,32)
+warblood-gem|hand-fe-v2|(32,32)
+vanguard-sigil|hand-fe-v2|(32,32)

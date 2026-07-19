@@ -2,9 +2,9 @@
  * First-clear relic pick: Hub routes here whenever a stable three-card offer
  * is pending. Choosing one appends a permanent stat relic, clears the offer,
  * persists, and returns to the Hub.
- * No skip button — the player must pick. Temp art only: rects + monospace
- * text, dark palette, matching Hub/Tree conventions. Card glyphs / name
- * accents use role scales (grey defense, red offense, green healing).
+ * No skip button — the player must pick. Cards use PixelLab relic icons +
+ * monospace text; name accents keep role scales (grey defense, red offense,
+ * green healing).
  */
 
 import Phaser from 'phaser';
@@ -28,7 +28,8 @@ const CARD_HEIGHT = 320;
 const CARD_GAP = 60;
 const CARD_LEFT = 60;
 const DESC_WRAP_WIDTH = CARD_WIDTH - 32;
-const GLYPH_RADIUS = 18;
+/** Half-size of the relic icon on the pick card (64→64 display = native). */
+const GLYPH_RADIUS = 32;
 
 export class RelicScene extends Phaser.Scene {
   constructor() {

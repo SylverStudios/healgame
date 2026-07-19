@@ -52,6 +52,49 @@ export interface UnitAttackAnimDef {
   frameCount: number;
   frameKey: (index: number) => string;
   frameUrl: (index: number) => string;
+  /**
+   * Per-frame hold times (ms). Length must equal `frameCount`. Entries ≤0 are
+   * omitted from the Phaser anim (frame 0 is the rest still — skip it).
+   */
+  frameDurationsMs: readonly number[];
+}
+
+/**
+ * FE-style exposure sheet for the 7-frame PixelLab merc strips.
+ *
+ * Equal-duration GIFs read floaty; Fire Emblem holds anticipation / contact
+ * and flashes smears (typically 1–2 display frames) — see
+ * https://lost-worlds.neocities.org/blog/2024/10/20/fire-emblem-animation/
+ *
+ * Roles at ~60Hz: 0 rest (skipped), 1 antic hold, 2–3 snappy in-betweens /
+ * smear, 4 contact hold, 5–6 recovery before UnitSprite restores the rest still.
+ */
+export const MERC_ATTACK_FRAME_DURATIONS_MS: readonly number[] = [
+  0, // 0 rest still (identical to east.png) — omit
+  150, // 1 anticipation (~9 frames)
+  33, // 2 approach (~2)
+  33, // 3 smear / snap (~2)
+  183, // 4 contact (~11)
+  50, // 5 follow-through (~3)
+  67, // 6 settle (~4)
+] as const;
+
+/** Phaser anim frame entries with FE holds (skips duration ≤ 0). */
+export function attackAnimFrames(
+  def: UnitAttackAnimDef,
+): ReadonlyArray<{ key: string; duration: number }> {
+  if (def.frameDurationsMs.length !== def.frameCount) {
+    throw new Error(
+      `attack anim ${def.animKey}: frameDurationsMs length ${def.frameDurationsMs.length} !== frameCount ${def.frameCount}`,
+    );
+  }
+  const frames: { key: string; duration: number }[] = [];
+  for (let i = 0; i < def.frameCount; i++) {
+    const duration = def.frameDurationsMs[i]!;
+    if (duration <= 0) continue;
+    frames.push({ key: def.frameKey(i), duration });
+  }
+  return frames;
 }
 
 function attackFrameKey(slug: string, index: number): string {
@@ -71,6 +114,7 @@ export const UNIT_ATTACK_ANIMS: readonly UnitAttackAnimDef[] = [
     frameCount: 7,
     frameKey: (i) => attackFrameKey('tank', i),
     frameUrl: (i) => attackFrameUrl('tank', 'east', i),
+    frameDurationsMs: MERC_ATTACK_FRAME_DURATIONS_MS,
   },
   {
     unitId: 'dps1',
@@ -79,6 +123,7 @@ export const UNIT_ATTACK_ANIMS: readonly UnitAttackAnimDef[] = [
     frameCount: 7,
     frameKey: (i) => attackFrameKey('dps1', i),
     frameUrl: (i) => attackFrameUrl('dps1', 'east', i),
+    frameDurationsMs: MERC_ATTACK_FRAME_DURATIONS_MS,
   },
   {
     unitId: 'dps2',
@@ -87,11 +132,9 @@ export const UNIT_ATTACK_ANIMS: readonly UnitAttackAnimDef[] = [
     frameCount: 7,
     frameKey: (i) => attackFrameKey('dps2', i),
     frameUrl: (i) => attackFrameUrl('dps2', 'east', i),
+    frameDurationsMs: MERC_ATTACK_FRAME_DURATIONS_MS,
   },
 ] as const;
-
-/** Playback rate for PixelLab attack strips (~10fps reads as a clear swing). */
-export const UNIT_ATTACK_FRAME_RATE = 10;
 
 /** Phaser anim key for a party merc's attack strip, if one is wired. */
 export function attackAnimKeyForUnit(unit: Pick<Unit, 'id'>): string | undefined {

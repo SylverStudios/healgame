@@ -17,11 +17,12 @@ import {
   TANK_TEXTURE_KEY,
   TANK_TEXTURE_URL,
   UNIT_ATTACK_ANIMS,
-  UNIT_ATTACK_FRAME_RATE,
+  attackAnimFrames,
   UNIT_FRAME_SIZE,
   UNIT_TEXTURE_KEY,
   UNIT_TEXTURE_URL,
 } from '../ui/sprites';
+import { RELIC_TEXTURE_IDS, relicTextureKey, relicTextureUrl } from '../ui/relicSprites';
 import { initMusic, MUSIC_ASSET_KEY, MUSIC_URL } from '../ui/music';
 
 export class BootScene extends Phaser.Scene {
@@ -49,6 +50,10 @@ export class BootScene extends Phaser.Scene {
     this.load.image(DPS1_TEXTURE_KEY, DPS1_TEXTURE_URL);
     this.load.image(DPS2_TEXTURE_KEY, DPS2_TEXTURE_URL);
     this.load.image(ASH_HUSK_TEXTURE_KEY, ASH_HUSK_TEXTURE_URL);
+    // PixelLab relic icons (64×64) — run-mod bar + RelicScene cards.
+    for (const id of RELIC_TEXTURE_IDS) {
+      this.load.image(relicTextureKey(id), relicTextureUrl(id));
+    }
     // Attack strips: one texture key per frame (not packed into Kenney).
     for (const def of UNIT_ATTACK_ANIMS) {
       for (let i = 0; i < def.frameCount; i++) {
@@ -74,10 +79,10 @@ export class BootScene extends Phaser.Scene {
   private registerUnitAttackAnims(): void {
     for (const def of UNIT_ATTACK_ANIMS) {
       if (this.anims.exists(def.animKey)) continue;
+      // Per-frame `duration` (FE exposure sheet) — not a uniform frameRate.
       this.anims.create({
         key: def.animKey,
-        frames: Array.from({ length: def.frameCount }, (_, i) => ({ key: def.frameKey(i) })),
-        frameRate: UNIT_ATTACK_FRAME_RATE,
+        frames: [...attackAnimFrames(def)],
         repeat: 0,
       });
     }

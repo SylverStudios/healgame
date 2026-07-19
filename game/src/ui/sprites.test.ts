@@ -3,13 +3,16 @@ import type { UnitRole } from '../combat/types';
 import { MOBS } from '../data/mobs';
 import {
   ASH_HUSK_TEXTURE_KEY,
+  attackAnimFrames,
   attackAnimKeyForUnit,
   DPS1_TEXTURE_KEY,
   DPS2_TEXTURE_KEY,
   frameForMobVisualKey,
   frameForUnit,
+  MERC_ATTACK_FRAME_DURATIONS_MS,
   presentationForUnit,
   TANK_TEXTURE_KEY,
+  UNIT_ATTACK_ANIMS,
 } from './sprites';
 
 function catalogUnit(id: string, role: UnitRole, mobId?: string) {
@@ -67,6 +70,32 @@ describe('presentationForUnit', () => {
     expect(attackAnimKeyForUnit(catalogUnit('dps1', 'dps'))).toBe('unit-dps1-attack');
     expect(attackAnimKeyForUnit(catalogUnit('dps2', 'dps'))).toBe('unit-dps2-attack');
     expect(attackAnimKeyForUnit(catalogUnit('healer', 'healer'))).toBeUndefined();
+  });
+});
+
+describe('merc attack exposure sheet', () => {
+  it('skips the rest duplicate and holds contact longer than smear frames', () => {
+    // FE timing: smears flash (1–2 @60Hz ≈ 16–33ms), contact holds (8+ ≈ 133ms+).
+    expect(MERC_ATTACK_FRAME_DURATIONS_MS[0]).toBe(0);
+    const smearMs = MERC_ATTACK_FRAME_DURATIONS_MS[3]!;
+    const contactMs = MERC_ATTACK_FRAME_DURATIONS_MS[4]!;
+    const anticMs = MERC_ATTACK_FRAME_DURATIONS_MS[1]!;
+    expect(smearMs).toBeLessThanOrEqual(50);
+    expect(contactMs).toBeGreaterThanOrEqual(133);
+    expect(anticMs).toBeGreaterThanOrEqual(100);
+    expect(contactMs).toBeGreaterThan(smearMs);
+  });
+
+  it('builds Phaser frames from the exposure sheet for every merc strip', () => {
+    for (const def of UNIT_ATTACK_ANIMS) {
+      const frames = attackAnimFrames(def);
+      expect(frames.length).toBe(6); // rest frame omitted
+      expect(frames[0]!.key).toBe(def.frameKey(1));
+      expect(frames.every((f) => f.duration > 0)).toBe(true);
+      const totalMs = frames.reduce((sum, f) => sum + f.duration, 0);
+      expect(totalMs).toBeGreaterThan(400);
+      expect(totalMs).toBeLessThan(800);
+    }
   });
 });
 
