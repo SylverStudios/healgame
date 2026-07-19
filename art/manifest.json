@@ -71,12 +71,12 @@
       "slug": "tank",
       "archetype": "ally",
       "facing": "east",
-      "nativeSize": 92,
-      "canvas": "padded-legacy",
-      "status": "legacy",
-      "pixellabCharacterId": "806703ff-4ea0-4eb5-b04f-7823fa62897a",
+      "nativeSize": 32,
+      "canvas": "tight",
+      "status": "live",
+      "pixellabCharacterId": "db6404f6-e6d5-4e5b-9c0a-27cf435b44b9",
       "assetsDir": "game/public/assets/units/tank",
-      "sourceDir": "artifacts/pixellab-starter-tank",
+      "sourceDir": "art/source/tank",
       "strips": {
         "idle-still": {
           "file": "east.png",
@@ -85,10 +85,18 @@
         "attack": {
           "dir": "attack-east",
           "frames": 7,
-          "durations": "MERC_ATTACK_FRAME_DURATIONS_MS"
+          "status": "live",
+          "durations": "TANK_ATTACK_FRAME_DURATIONS_MS",
+          "note": "east shove one-shot; keep_first_frame rest + 6 gen"
+        },
+        "hurt": {
+          "dir": "hurt-east",
+          "frames": 5,
+          "status": "live",
+          "durations": "TANK_HURT_FRAME_DURATIONS_MS",
+          "note": "east hurt one-shot; keep_first_frame rest + 4 gen"
         }
-      },
-      "replacePlan": "regen tight 32x32 with idle still + attack + hurt"
+      }
     },
     {
       "slug": "dps1",
