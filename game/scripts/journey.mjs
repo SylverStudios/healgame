@@ -45,6 +45,7 @@
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
+import { freePort } from './lib/freePort.mjs';
 
 const args = process.argv.slice(2);
 const shotsDir = (() => {
@@ -53,7 +54,7 @@ const shotsDir = (() => {
 })();
 mkdirSync(shotsDir, { recursive: true });
 
-const PORT = 4174;
+const PORT = await freePort();
 const SAVE_KEY = 'healgame-save-v8';
 
 /** Resolve a semantic GameObject name via window.__healgame (src/debug/testHooks.ts). */
