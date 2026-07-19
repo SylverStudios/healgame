@@ -4,6 +4,10 @@ import { loadSave } from '../save/save';
 import {
   ASH_HUSK_TEXTURE_KEY,
   ASH_HUSK_TEXTURE_URL,
+  DPS1_TEXTURE_KEY,
+  DPS1_TEXTURE_URL,
+  DPS2_TEXTURE_KEY,
+  DPS2_TEXTURE_URL,
   HEALER_SHEET_FRAME_SIZE,
   HEALER_SHEET_TEXTURE_KEY,
   HEALER_SHEET_URL,
@@ -12,6 +16,8 @@ import {
   HEAL_VFX_URL,
   TANK_TEXTURE_KEY,
   TANK_TEXTURE_URL,
+  UNIT_ATTACK_ANIMS,
+  UNIT_ATTACK_FRAME_RATE,
   UNIT_FRAME_SIZE,
   UNIT_TEXTURE_KEY,
   UNIT_TEXTURE_URL,
@@ -38,20 +44,42 @@ export class BootScene extends Phaser.Scene {
       frameWidth: HEAL_VFX_FRAME_SIZE,
       frameHeight: HEAL_VFX_FRAME_SIZE,
     });
-    // PixelLab stills (tank east / ash-husk west) — single images, not Kenney frames.
+    // PixelLab stills — single images, authored facing (no flipX at draw time).
     this.load.image(TANK_TEXTURE_KEY, TANK_TEXTURE_URL);
+    this.load.image(DPS1_TEXTURE_KEY, DPS1_TEXTURE_URL);
+    this.load.image(DPS2_TEXTURE_KEY, DPS2_TEXTURE_URL);
     this.load.image(ASH_HUSK_TEXTURE_KEY, ASH_HUSK_TEXTURE_URL);
+    // Attack strips: one texture key per frame (not packed into Kenney).
+    for (const def of UNIT_ATTACK_ANIMS) {
+      for (let i = 0; i < def.frameCount; i++) {
+        this.load.image(def.frameKey(i), def.frameUrl(i));
+      }
+    }
     // Looped background music (see ui/music.ts MUSIC_URL).
     this.load.audio(MUSIC_ASSET_KEY, MUSIC_URL);
   }
 
   create(): void {
+    this.registerUnitAttackAnims();
     const save = loadSave();
     initMusic(this.game, save.musicVolumePct);
     if (save.tutorialDone) {
       this.scene.start(SceneKeys.Hub);
     } else {
       this.scene.start(SceneKeys.Tutorial);
+    }
+  }
+
+  /** One-shot attack anims for PixelLab mercs — shared via the game AnimationManager. */
+  private registerUnitAttackAnims(): void {
+    for (const def of UNIT_ATTACK_ANIMS) {
+      if (this.anims.exists(def.animKey)) continue;
+      this.anims.create({
+        key: def.animKey,
+        frames: Array.from({ length: def.frameCount }, (_, i) => ({ key: def.frameKey(i) })),
+        frameRate: UNIT_ATTACK_FRAME_RATE,
+        repeat: 0,
+      });
     }
   }
 }

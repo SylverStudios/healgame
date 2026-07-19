@@ -37,6 +37,11 @@ const MANA_BAR_GAP = 4;
 const HP_TEXT_GAP = 2;
 /** Room reserved for the HP number line so the mana bar stacks above it. */
 const HP_TEXT_HEIGHT = 14;
+/**
+ * Cap meter width so neighboring party bars stay readable. Party slot centers
+ * are ~100px apart at the current layout; body display can be wider (112).
+ */
+const METER_MAX_WIDTH = 72;
 
 const HP_FILL_COLOR = 0x4caf50;
 const MANA_FILL_COLOR = 0x3b82f6;
@@ -159,13 +164,20 @@ export interface UnitSpriteConfig {
   /** Tile/frame index into `bodyTextureKey` — see ui/sprites.ts frameForUnit().
    *  Omit (or pass 0) for single-image custom textures that have no frame index. */
   frame?: number;
-  /** Texture key for the body image; defaults to the shared Kenney sheet (UNIT_TEXTURE_KEY)
-   *  when omitted. Custom stills (PixelLab tank / ash-husk) and the ragged healer sheet
+  /** Texture key for the body sprite; defaults to the shared Kenney sheet (UNIT_TEXTURE_KEY)
+   *  when omitted. Custom stills (PixelLab mercs / ash-husk) and the ragged healer sheet
    *  pass their own keys. */
   bodyTextureKey?: string;
   /** When true, the texture is already authored facing the correct combat direction
-   *  (tank east / husk west) — do not apply the Kenney side flipX. */
+   *  (party east / husk west) — do not apply the Kenney side flipX. */
   fixedFacing?: boolean;
+  /** Phaser anim key for a one-shot PixelLab attack strip (registered in BootScene). */
+  attackAnimKey?: string;
+  /**
+   * Extra body Y in container space. PixelLab canvases pad ~25% below the painted
+   * feet — shift the sprite down so feet meet the ground line after setDisplaySize.
+   */
+  bodyOffsetY?: number;
   /** v0.3 chunk F: healer-only cast-pose animation. `frame` above must equal `idleFrame`. */
   casterAnim?: { idleFrame: number; castFrames: readonly number[] };
   showMana: boolean;
@@ -187,9 +199,19 @@ export class UnitSprite {
   private readonly homeY: number;
   private readonly width: number;
   private readonly height: number;
+  /** HP/mana bar width — capped below body width so party meters don't overlap. */
+  private readonly meterWidth: number;
 
   private readonly container: Phaser.GameObjects.Container;
-  private readonly body: Phaser.GameObjects.Image;
+  /** Sprite (not Image) so PixelLab attack strips can `play()` multi-texture anims. */
+  private readonly body: Phaser.GameObjects.Sprite;
+  /** Rest texture shown when an attack anim is not playing. */
+  private readonly restTextureKey: string;
+  /** Rest sheet frame for Kenney / healer; undefined for single-image stills. */
+  private readonly restFrame: number | undefined;
+  private readonly attackAnimKey: string | null;
+  /** Resting local Y for the body (PixelLab foot-pad offset); telegraph raise adds on top. */
+  private readonly bodyRestY: number;
   private readonly nameText: Phaser.GameObjects.Text;
   private readonly hpBar: Bar;
   private readonly hpText: Phaser.GameObjects.Text;
@@ -234,6 +256,7 @@ export class UnitSprite {
     this.homeY = y;
     this.width = width;
     this.height = height;
+    this.meterWidth = Math.min(width, METER_MAX_WIDTH);
     this.casterAnim = config.casterAnim ?? null;
 
     this.container = scene.add.container(x, y);
@@ -241,13 +264,24 @@ export class UnitSprite {
     // All children below use coordinates LOCAL to the container (relative to
     // the unit's home position, i.e. as if x=y=0).
     const textureKey = config.bodyTextureKey ?? UNIT_TEXTURE_KEY;
-    const bodyImage =
+    this.restTextureKey = textureKey;
+    this.restFrame = config.frame;
+    this.attackAnimKey = config.attackAnimKey ?? null;
+    this.bodyRestY = config.bodyOffsetY ?? 0;
+    const bodySprite =
       config.frame === undefined
-        ? scene.add.image(0, 0, textureKey)
-        : scene.add.image(0, 0, textureKey, config.frame);
-    this.body = bodyImage
+        ? scene.add.sprite(0, this.bodyRestY, textureKey)
+        : scene.add.sprite(0, this.bodyRestY, textureKey, config.frame);
+    this.body = bodySprite
       .setDisplaySize(width, height)
       .setFlipX(!config.fixedFacing && facing === 'left');
+    // Attack strips swap textures each frame — keep display size pinned.
+    this.body.on(Phaser.Animations.Events.ANIMATION_UPDATE, () => {
+      if (!this.squashActive) this.body.setDisplaySize(this.width, this.height);
+    });
+    this.body.on(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      this.restoreRestPose();
+    });
     if (clickable) {
       // Hit area is the full frame bounds (including transparent pixels) —
       // same clickable box the old rect gave, so journey.mjs targets hold.
@@ -259,18 +293,17 @@ export class UnitSprite {
     }
     this.container.add(this.body);
 
-    // Name stays centered on the body: units now sit side-by-side on the ground
-    // line with room between slots, and the front-facing Tiny Dungeon portraits
-    // read fine with text overlaid (unchanged from the pre–side-view layout).
+    // Name stays centered on the body (including PixelLab foot-pad offset).
     this.nameText = scene.add
-      .text(0, 0, unit.name, { fontFamily: NAME_FONT, color: NAME_COLOR })
+      .text(0, this.bodyRestY, unit.name, { fontFamily: NAME_FONT, color: NAME_COLOR })
       .setStroke('#0a0605', 3)
       .setOrigin(0.5)
       .setDepth(1);
     this.container.add(this.nameText);
 
     const hpY = -height / 2 - HP_BAR_OFFSET_Y;
-    this.hpBar = new Bar(scene, -width / 2, hpY, width, HP_BAR_HEIGHT, HP_FILL_COLOR);
+    const meterHalf = this.meterWidth / 2;
+    this.hpBar = new Bar(scene, -meterHalf, hpY, this.meterWidth, HP_BAR_HEIGHT, HP_FILL_COLOR);
     this.hpBar.addToContainer(this.container);
     this.hpText = scene.add
       .text(0, hpY - HP_BAR_HEIGHT / 2 - HP_TEXT_GAP, '', { fontFamily: HP_FONT, color: HP_COLOR })
@@ -279,7 +312,7 @@ export class UnitSprite {
 
     if (showMana) {
       const manaY = hpY - HP_BAR_HEIGHT / 2 - HP_TEXT_HEIGHT - MANA_BAR_GAP - MANA_BAR_HEIGHT / 2;
-      this.manaBar = new Bar(scene, -width / 2, manaY, width, MANA_BAR_HEIGHT, MANA_FILL_COLOR);
+      this.manaBar = new Bar(scene, -meterHalf, manaY, this.meterWidth, MANA_BAR_HEIGHT, MANA_FILL_COLOR);
       this.manaBar.addToContainer(this.container);
       this.manaText = scene.add
         .text(0, manaY - MANA_BAR_HEIGHT / 2 - HP_TEXT_GAP, '', { fontFamily: HP_FONT, color: '#a8c8f0' })
@@ -331,8 +364,9 @@ export class UnitSprite {
     this.container.add(this.bossFocusMarker);
 
     const feetY = y + height / 2;
+    const haloWidth = Math.max(HALO_WIDTH, Math.round(width * 0.85));
     this.targetHalo = scene.add
-      .ellipse(x, feetY + 4, HALO_WIDTH, HALO_HEIGHT, HALO_FILL_COLOR, HALO_FILL_ALPHA)
+      .ellipse(x, feetY + 4, haloWidth, HALO_HEIGHT, HALO_FILL_COLOR, HALO_FILL_ALPHA)
       .setStrokeStyle(1, HALO_STROKE_COLOR)
       .setDepth(HALO_DEPTH)
       .setVisible(false);
@@ -372,6 +406,7 @@ export class UnitSprite {
       this.stopTelegraph();
       this.stopCastCycle();
       this.stopFlourishTimer();
+      this.stopAttackAnim();
       this.scene.tweens.killTweensOf(this.body);
       this.squashActive = false;
       this.body.setTint(DEAD_TINT);
@@ -459,6 +494,7 @@ export class UnitSprite {
     this.scene.tweens.killTweensOf(this.body);
     this.container.x = this.homeX;
     this.body.setDisplaySize(this.width, this.height);
+    this.playAttack();
     this.scene.tweens.add({
       targets: this.container,
       x: this.homeX + direction * SHOVE_DISTANCE,
@@ -499,6 +535,7 @@ export class UnitSprite {
     this.pendingJabTimer?.remove(false);
     this.pendingJabTimer = null;
     this.container.x = this.homeX;
+    this.playAttack();
     const singleJab = (onDone: () => void = () => {}) => {
       this.scene.tweens.add({
         targets: this.container,
@@ -571,6 +608,35 @@ export class UnitSprite {
         obj.destroy();
       },
     });
+  }
+
+  /**
+   * Play the PixelLab attack strip if one is wired for this unit. Rest pose is
+   * restored on ANIMATION_COMPLETE (see constructor). Safe no-op for Kenney /
+   * healer bodies. Restarting mid-swing replaces the in-flight strip so rapid
+   * autos never stack listeners.
+   */
+  playAttack(): void {
+    if (!this.attackAnimKey || !this.alive) return;
+    // Restart if already mid-swing so rapid autos replace the strip instead of
+    // being ignored (Phaser's ignoreIfPlaying=true would skip the new play).
+    this.body.play(this.attackAnimKey, false);
+    this.body.setDisplaySize(this.width, this.height);
+  }
+
+  private restoreRestPose(): void {
+    if (this.restFrame === undefined) {
+      this.body.setTexture(this.restTextureKey);
+    } else {
+      this.body.setTexture(this.restTextureKey, this.restFrame);
+    }
+    if (!this.squashActive) this.body.setDisplaySize(this.width, this.height);
+  }
+
+  private stopAttackAnim(): void {
+    if (!this.attackAnimKey) return;
+    this.body.stop();
+    this.restoreRestPose();
   }
 
   /** Brief ember flash when the healer begins a cast (handoff §N). */
@@ -709,7 +775,7 @@ export class UnitSprite {
         break;
       }
       case 'raise': {
-        this.body.setY(-t * TELEGRAPH_RAISE_PX);
+        this.body.setY(this.bodyRestY - t * TELEGRAPH_RAISE_PX);
         this.body.setTint(interpolateColor(0xffffff, TELEGRAPH_RAISE_COLOR, t));
         break;
       }
@@ -727,7 +793,7 @@ export class UnitSprite {
     this.telegraphTween = null;
     if (!this.telegraphActive) return;
     this.telegraphActive = false;
-    this.body.setY(0);
+    this.body.setY(this.bodyRestY);
     this.body.clearTint();
     this.body.setDisplaySize(this.width, this.height);
   }
@@ -739,7 +805,7 @@ export class UnitSprite {
     if (!this.manaBar || this.manaBarY === null) return;
     const worldY = this.homeY + this.manaBarY;
     const overlay = this.scene.add
-      .rectangle(this.homeX, worldY, this.width, MANA_BAR_HEIGHT, MANA_PULSE_COLOR, MANA_PULSE_ALPHA)
+      .rectangle(this.homeX, worldY, this.meterWidth, MANA_BAR_HEIGHT, MANA_PULSE_COLOR, MANA_PULSE_ALPHA)
       .setDepth(12);
     this.scene.tweens.add({
       targets: overlay,
@@ -765,6 +831,7 @@ export class UnitSprite {
     this.scene.tweens.killTweensOf(this.container);
     this.scene.tweens.killTweensOf(this.bossFocusMarker);
     this.scene.tweens.killTweensOf(this.body);
+    this.body.stop();
     this.telegraphTween?.remove();
     this.telegraphTween = null;
     this.castCycleTimer?.remove(false);
