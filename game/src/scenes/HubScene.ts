@@ -9,7 +9,7 @@
 
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
-import { loadSave, resetSave, saveGame, type SaveData } from '../save/save';
+import { loadSave, pushRecentRun, resetSave, saveGame, type SaveData } from '../save/save';
 import {
   applyCombatResult,
   availableTalentPoints,
@@ -22,6 +22,8 @@ import { runModsFromSave } from '../data/runMods';
 import { levelForXp, SPELLS, xpForLevel } from '../data/constants';
 import { ORDERED_DUNGEONS, hubDungeonTargetName } from '../data/dungeons';
 import { RunModsBar } from '../ui/runModsBar';
+import { buildRunSummary, runRecordFromSummary } from '../ui/runSummary';
+import { drawBuildGlyph } from '../ui/buildGlyph';
 import type { CombatResult, CombatSceneData } from './CombatScene';
 import type { DungeonDef } from '../data/content/types';
 import { loadTelemetry, recordReset, sendPlaytestMail } from '../telemetry';
@@ -84,7 +86,14 @@ export class HubScene extends Phaser.Scene {
     const save = loadSave();
     let notices: HubNotice[] = [];
     if (this.sceneData.combatResult) {
-      notices = applyCombatResult(save, this.sceneData.combatResult);
+      const result = this.sceneData.combatResult;
+      notices = applyCombatResult(save, result);
+      // Same place XP is already banked (applyCombatResult above) — persist the
+      // run exactly once. Rebuilt from the same pure buildRunSummary() CombatScene
+      // used for its panel + save.treeRanks (unchanged since combat ended), so the
+      // stored glyph matches the one the player just saw (v0.3 chunk E).
+      const summary = buildRunSummary({ status: result.status, xp: result.xp, treeRanks: save.treeRanks });
+      pushRecentRun(save, runRecordFromSummary(summary, result.encounterId));
       saveGame(save);
     }
 
@@ -98,7 +107,27 @@ export class HubScene extends Phaser.Scene {
     this.buildStats(save);
     this.buildNotices(notices);
     this.buildButtons(save, this.metaButtonsY(notices.length));
+    this.buildLastRunGlyph(save);
     new RunModsBar(this, runModsFromSave(save), { viewWidth: width });
+  }
+
+  /**
+   * Optional cheap Hub hook (v0.3 chunk E, minimum deliverable is the combat
+   * summary panel — this is the "nice to have"): one small glyph + "+N xp"
+   * line for the most recent run, top-left corner (mirrors RunModsBar's
+   * top-right placement). Non-interactive — no multi-run browser.
+   */
+  private buildLastRunGlyph(save: SaveData): void {
+    const last = save.recentRuns[0];
+    if (!last) return;
+
+    const x = 46;
+    const y = 26;
+    drawBuildGlyph(this, last.glyph, { x, y, cell: 6, color: 0xfff2df }).setDepth(5);
+    const outcomeColor = last.outcome === 'victory' ? ACCENT_COLOR : DANGER_COLOR;
+    this.add
+      .text(x, y + 22, `+${last.xpGained} xp`, { fontFamily: FONT, fontSize: '11px', color: outcomeColor })
+      .setOrigin(0.5, 0);
   }
 
   private buildStats(save: SaveData): void {

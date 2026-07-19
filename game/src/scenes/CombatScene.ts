@@ -34,13 +34,15 @@ import {
   showHealRipple,
 } from '../ui/combatFx';
 import { PaceToggle } from '../ui/paceToggle';
-import { loadSave, saveGame } from '../save/save';
+import { loadSave, saveGame, type SaveData } from '../save/save';
 import { relicsById } from '../data/relics';
 import { runModsFromSave } from '../data/runMods';
 import { RunModsBar } from '../ui/runModsBar';
 import { ACTION_HOTKEY_LETTERS, MAX_ACTION_HOTKEYS, actionHotkeySlot } from '../ui/actionHotkeys';
 import type { CombatMods } from '../data/talentTree';
 import { beginRun, finalizeRun, recordPress, type PressSource } from '../telemetry';
+import { buildRunSummary } from '../ui/runSummary';
+import { drawBuildGlyph } from '../ui/buildGlyph';
 
 /** Pinned contract: callers pass fully resolved CombatMods (from loadoutFromSave). */
 export interface CombatSceneData {
@@ -125,8 +127,27 @@ const TOAST_FADE_MS = 1500;
 
 const OVERLAY_DEPTH = 1000;
 const OVERLAY_ALPHA = 0.85;
-const OVERLAY_FADE_MS = 250;
-const RESULT_REVEAL_MS = 220;
+const OVERLAY_FADE_MS = 300;
+
+// Wipe/victory run summary panel (locked: docs/v0.3-handoff.md "Wipe / victory
+// summary") — short slide-in transition (~0.5-1.0s total) over the dimmed-but-
+// visible party, then outcome + XP + build glyph reveal in sequence, Return
+// last (~1s in, safely inside journey's 2s poll cadence).
+const PANEL_WIDTH = 420;
+const PANEL_HEIGHT = 260;
+const PANEL_SLIDE_OFFSET = 50;
+const PANEL_SLIDE_DELAY_MS = 120;
+const PANEL_SLIDE_MS = 500;
+const TITLE_DELAY_MS = 520;
+const TITLE_REVEAL_MS = 220;
+const XP_DELAY_MS = 660;
+const XP_REVEAL_MS = 220;
+const GLYPH_DELAY_MS = 780;
+const GLYPH_REVEAL_MS = 240;
+const GLYPH_CELL = 20;
+const GLYPH_COLOR = 0xfff2df;
+const RETURN_DELAY_MS = 940;
+const RETURN_REVEAL_MS = 220;
 
 const HUD_FONT = 'monospace';
 
@@ -190,6 +211,9 @@ export class CombatScene extends Phaser.Scene {
   private lastFrameDtMs = 16;
 
   private resultShown = false;
+  /** Loaded once in create(); reused at result time for treeRanks (build glyph) — save.treeRanks
+   *  cannot change mid-combat, so no need to reload. */
+  private save!: SaveData;
 
   constructor() {
     super(SceneKeys.Combat);
@@ -217,6 +241,7 @@ export class CombatScene extends Phaser.Scene {
     // the same save is reused below for the pace toggle (avoids a second
     // redundant loadSave() call).
     const save = loadSave();
+    this.save = save;
     beginRun(this.sceneData.encounterId, save);
 
     this.engine = new CombatEngine(encounter, spells, {
@@ -788,42 +813,99 @@ export class CombatScene extends Phaser.Scene {
 
   // ---- end of combat -------------------------------------------------------------
 
+  /**
+   * Wipe/victory result flow: a short slide-in transition into a run summary
+   * panel (outcome, XP gained this run, build glyph of the lit tree path),
+   * replacing the old instant overlay. Persists the run exactly once via
+   * pushRecentRun/saveGame in HubScene (same place the run's XP is already
+   * banked into save.xp) — CombatScene only *shows* the summary; see
+   * HubScene.create() for the persisted RunRecord, built from the same pure
+   * buildRunSummary() so the stored glyph matches the one shown here.
+   */
   private showResultOverlay(status: 'victory' | 'wipe'): void {
     if (this.resultShown) return;
     this.resultShown = true;
 
     const { xp } = this.engine.rewards;
+    const summary = buildRunSummary({ status, xp, treeRanks: this.save.treeRanks });
     const centerX = VIEW_WIDTH / 2;
     const centerY = VIEW_HEIGHT / 2;
+
+    // ---- transition started ----
+    // Party sprites are still on screen underneath everything added below
+    // (only alpha-dimmed by the backdrop, never hidden/destroyed) — this is
+    // the hook point for chunk G's wipe/victory speech bubble, which should
+    // attach to the tank/healer sprite here, before the panel visually
+    // covers them.
 
     const backdrop = this.add
       .rectangle(centerX, centerY, VIEW_WIDTH, VIEW_HEIGHT, 0x000000)
       .setDepth(OVERLAY_DEPTH)
       .setInteractive()
       .setAlpha(0);
+    this.tweens.add({ targets: backdrop, alpha: OVERLAY_ALPHA, duration: OVERLAY_FADE_MS });
 
-    const title = status === 'victory' ? 'VICTORY' : 'YOU WIPED';
-    const titleColor = status === 'victory' ? '#f2c14e' : '#e05a4e';
-    const titleText = this.add
-      .text(centerX, centerY - 60, title, { fontFamily: HUD_FONT, fontSize: '36px', color: titleColor })
-      .setOrigin(0.5)
+    const panel = this.add
+      .rectangle(centerX, centerY - PANEL_SLIDE_OFFSET, PANEL_WIDTH, PANEL_HEIGHT, 0x241a15, 0.96)
+      .setStrokeStyle(2, 0x8a7868)
       .setDepth(OVERLAY_DEPTH + 1)
       .setAlpha(0);
+    this.tweens.add({
+      targets: panel,
+      y: centerY,
+      alpha: 1,
+      delay: PANEL_SLIDE_DELAY_MS,
+      duration: PANEL_SLIDE_MS,
+      ease: 'Quad.easeOut',
+    });
 
-    const rewardsText = this.add
-      .text(centerX, centerY - 10, `XP +${xp}`, {
+    const titleColor = status === 'victory' ? '#f2c14e' : '#e05a4e';
+    const titleText = this.add
+      .text(centerX, centerY - 80, summary.outcomeLabel, {
+        fontFamily: HUD_FONT,
+        fontSize: '36px',
+        color: titleColor,
+      })
+      .setOrigin(0.5)
+      .setDepth(OVERLAY_DEPTH + 2)
+      .setAlpha(0);
+    this.tweens.add({ targets: titleText, alpha: 1, delay: TITLE_DELAY_MS, duration: TITLE_REVEAL_MS });
+
+    const xpText = this.add
+      .text(centerX, centerY - 28, `XP +${summary.xpGained}`, {
         fontFamily: HUD_FONT,
         fontSize: '18px',
         color: '#e8d8c8',
       })
       .setOrigin(0.5)
-      .setDepth(OVERLAY_DEPTH + 1)
+      .setDepth(OVERLAY_DEPTH + 2)
       .setAlpha(0);
+    this.tweens.add({ targets: xpText, alpha: 1, delay: XP_DELAY_MS, duration: XP_REVEAL_MS });
+
+    const glyphLabel = this.add
+      .text(centerX, centerY + 8, 'BUILD', { fontFamily: HUD_FONT, fontSize: '11px', color: '#a89888' })
+      .setOrigin(0.5)
+      .setDepth(OVERLAY_DEPTH + 2)
+      .setAlpha(0);
+    const glyphContainer = drawBuildGlyph(this, summary.glyph, {
+      x: centerX,
+      y: centerY + 55,
+      cell: GLYPH_CELL,
+      color: GLYPH_COLOR,
+    })
+      .setDepth(OVERLAY_DEPTH + 2)
+      .setAlpha(0);
+    this.tweens.add({
+      targets: [glyphLabel, glyphContainer],
+      alpha: 1,
+      delay: GLYPH_DELAY_MS,
+      duration: GLYPH_REVEAL_MS,
+    });
 
     const returnButton = this.add
-      .rectangle(centerX, centerY + 60, 180, 44, 0x3a2a22)
+      .rectangle(centerX, centerY + 105, 180, 40, 0x3a2a22)
       .setStrokeStyle(1, 0x0a0605)
-      .setDepth(OVERLAY_DEPTH + 1)
+      .setDepth(OVERLAY_DEPTH + 2)
       .setInteractive({ useHandCursor: true })
       .setName('combatReturn')
       .setAlpha(0)
@@ -833,31 +915,18 @@ export class CombatScene extends Phaser.Scene {
       });
 
     const returnText = this.add
-      .text(centerX, centerY + 60, 'Return', { fontFamily: HUD_FONT, fontSize: '16px', color: '#e8d8c8' })
+      .text(centerX, centerY + 105, 'Return', { fontFamily: HUD_FONT, fontSize: '16px', color: '#e8d8c8' })
       .setOrigin(0.5)
-      .setDepth(OVERLAY_DEPTH + 2)
+      .setDepth(OVERLAY_DEPTH + 3)
       .setAlpha(0);
 
     // All result objects (especially combatReturn) exist immediately; only
     // their presentation is staged, so semantic journey lookup remains stable.
-    this.tweens.add({ targets: backdrop, alpha: OVERLAY_ALPHA, duration: OVERLAY_FADE_MS });
-    this.tweens.add({
-      targets: titleText,
-      alpha: 1,
-      delay: 100,
-      duration: RESULT_REVEAL_MS,
-    });
-    this.tweens.add({
-      targets: rewardsText,
-      alpha: 1,
-      delay: 220,
-      duration: RESULT_REVEAL_MS,
-    });
     this.tweens.add({
       targets: [returnButton, returnText],
       alpha: 1,
-      delay: 340,
-      duration: RESULT_REVEAL_MS,
+      delay: RETURN_DELAY_MS,
+      duration: RETURN_REVEAL_MS,
     });
   }
 }

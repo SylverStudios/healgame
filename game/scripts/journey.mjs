@@ -157,10 +157,17 @@ function baseSave(overrides) {
  * Naive combat loop: target the tank, then every 2s cast Solemn Mend (by
  * semantic name so Bonk-on-Q loadouts still heal) and click Return when the
  * result overlay exists. Ends when `until(save)` first holds.
+ *
+ * `resultShotName`, if given: the first time combatReturn is located (the
+ * result object exists immediately, alpha-staged — see CombatScene), wait
+ * for the wipe/victory transition + summary panel (outcome, XP, build glyph;
+ * v0.3 chunk E, ~0.5-1.0s transition + staggered reveals, Return last around
+ * ~1s) to fully settle before screenshotting, then click through as usual.
  */
-async function playCombat(page, until, timeoutMs = 180_000) {
+async function playCombat(page, until, timeoutMs = 180_000, resultShotName) {
   await clickNamed(page, 'combatAlly:tank');
   const start = Date.now();
+  let resultShot = false;
   while (Date.now() - start < timeoutMs) {
     if (await locate(page, 'combatSpell:solemn-mend')) {
       await clickNamed(page, 'combatSpell:solemn-mend');
@@ -168,6 +175,11 @@ async function playCombat(page, until, timeoutMs = 180_000) {
       await page.keyboard.press('q');
     }
     if (await locate(page, 'combatReturn')) {
+      if (resultShotName && !resultShot) {
+        resultShot = true;
+        await page.waitForTimeout(1300);
+        await shot(page, resultShotName);
+      }
       await clickNamed(page, 'combatReturn');
     }
     await page.waitForTimeout(2000);
@@ -209,9 +221,15 @@ try {
   await page.waitForTimeout(3500); // let autos land so lunge/'*' feedback is in frame
   await shot(page, 'ash-gate-first-run-feedback');
 
-  save = await playCombat(page, (s) => s.xp > 0);
+  save = await playCombat(page, (s) => s.xp > 0, 180_000, 'combat-wipe-summary');
   check(save.xp > 0, `first run banked kill XP through the wipe (xp=${save.xp})`);
   check(save.clearedDungeons.length === 0, 'Ash Gate not marked cleared by a wipe');
+  check(
+    save.recentRuns.length === 1 && save.recentRuns[0].outcome === 'wipe',
+    'wipe pushed exactly one RunRecord onto recentRuns',
+  );
+  check(save.recentRuns[0].dungeonId === 'ash-gate', 'RunRecord records the dungeon id');
+  check(save.recentRuns[0].xpGained === save.xp, 'RunRecord xpGained matches the banked run XP (no prior runs)');
   await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(800);
   await shot(page, 'hub-after-first-wipe');
@@ -474,8 +492,19 @@ try {
   await page.mouse.move(480, 270); // off the button (viewport center; not a layout target)
   await page.waitForTimeout(4000); // let autos land for feedback frame
   await shot(page, 'combat-feedback-midfight');
-  save = await playCombat(page, (s) => s.xp > 12);
+  // xp banks per kill DURING the fight, so gate on the RunRecord too — it's only
+  // pushed by HubScene.create() after Return, i.e. once the run truly ended.
+  save = await playCombat(
+    page,
+    (s) => s.xp > 12 && s.recentRuns.length > 0,
+    180_000,
+    'combat-result-summary-lit-glyph',
+  );
   check(save.xp > 12, 'Vigil-kit run banked XP');
+  check(
+    save.recentRuns[0]?.glyph.segments.length > 0,
+    "Vigil-kit run's RunRecord glyph reflects the owned oath→patient-vow→still-waters path",
+  );
   await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(800);
 
