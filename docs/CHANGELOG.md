@@ -1,11 +1,22 @@
 # Changelog — healgame
 
-Status: current · Authority: shipped-history summary (details in poc-qa) · Last verified: 2026-07-18
+Status: current · Authority: shipped-history summary (details in poc-qa) · Last verified: 2026-07-19
 
 Newest first. Numbers and rule detail live in `game/src/data/` and
 [`poc-qa.md`](./poc-qa.md) — this file is the short ship log.
 
 ---
+
+## 2026-07-19 — Post-v0.3 playtest: harder mid bosses, stock music, unit art
+
+- **Mid/late bosses harder**: Spire Lancer HP 340 + denser Tunnel Vision;
+  Ember / Matriarch / Dirge HP bumps; Ash Gate left alone.
+- **XP curb**: Iron Pass / Cinder Vault back to 1 XP/kill; Verdant / Choir 2;
+  Maw 3 — stops the mid-ladder double-level snowball.
+- **Music**: replaced the piercing placeholder loop with a soft stock ambient
+  (`stock-ambient-loop.wav`).
+- **Unit art**: PixelLab tank + ash-husk stills wired via dual-path
+  presentation; Kenney units rescaled down so padded custom art matches.
 
 ## 2026-07-18 — v0.3 "Presence, Lattice, Grace"
 

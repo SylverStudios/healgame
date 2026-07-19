@@ -22,7 +22,7 @@ import { runModsFromSave } from '../data/runMods';
 import { levelForXp, SPELLS, xpForLevel } from '../data/constants';
 import { ORDERED_DUNGEONS, hubDungeonTargetName } from '../data/dungeons';
 import { RunModsBar } from '../ui/runModsBar';
-import { buildRunSummary, runRecordFromSummary } from '../ui/runSummary';
+import { buildRunSummary, hasBuildGlyph, runRecordFromSummary } from '../ui/runSummary';
 import { drawBuildGlyph } from '../ui/buildGlyph';
 import type { CombatResult, CombatSceneData } from './CombatScene';
 import type { DungeonDef } from '../data/content/types';
@@ -126,11 +126,17 @@ export class HubScene extends Phaser.Scene {
 
     const x = 46;
     const y = 26;
-    drawBuildGlyph(this, last.glyph, { x, y, cell: 6, color: 0xfff2df }).setDepth(5);
     const outcomeColor = last.outcome === 'victory' ? ACCENT_COLOR : DANGER_COLOR;
-    this.add
-      .text(x, y + 22, `+${last.xpGained} xp`, { fontFamily: FONT, fontSize: '11px', color: outcomeColor })
-      .setOrigin(0.5, 0);
+    if (hasBuildGlyph(last.glyph)) {
+      drawBuildGlyph(this, last.glyph, { x, y, cell: 6, color: 0xfff2df }).setDepth(5);
+      this.add
+        .text(x, y + 22, `+${last.xpGained} xp`, { fontFamily: FONT, fontSize: '11px', color: outcomeColor })
+        .setOrigin(0.5, 0);
+    } else {
+      this.add
+        .text(x, y, `+${last.xpGained} xp`, { fontFamily: FONT, fontSize: '11px', color: outcomeColor })
+        .setOrigin(0.5, 0);
+    }
   }
 
   private buildStats(save: SaveData): void {

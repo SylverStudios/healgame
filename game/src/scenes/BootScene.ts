@@ -2,12 +2,16 @@ import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { loadSave } from '../save/save';
 import {
+  ASH_HUSK_TEXTURE_KEY,
+  ASH_HUSK_TEXTURE_URL,
   HEALER_SHEET_FRAME_SIZE,
   HEALER_SHEET_TEXTURE_KEY,
   HEALER_SHEET_URL,
   HEAL_VFX_FRAME_SIZE,
   HEAL_VFX_TEXTURE_KEY,
   HEAL_VFX_URL,
+  TANK_TEXTURE_KEY,
+  TANK_TEXTURE_URL,
   UNIT_FRAME_SIZE,
   UNIT_TEXTURE_KEY,
   UNIT_TEXTURE_URL,
@@ -34,7 +38,10 @@ export class BootScene extends Phaser.Scene {
       frameWidth: HEAL_VFX_FRAME_SIZE,
       frameHeight: HEAL_VFX_FRAME_SIZE,
     });
-    // v0.3 chunk H: looped background music (placeholder asset; see ui/music.ts).
+    // PixelLab stills (tank east / ash-husk west) — single images, not Kenney frames.
+    this.load.image(TANK_TEXTURE_KEY, TANK_TEXTURE_URL);
+    this.load.image(ASH_HUSK_TEXTURE_KEY, ASH_HUSK_TEXTURE_URL);
+    // Looped background music (see ui/music.ts MUSIC_URL).
     this.load.audio(MUSIC_ASSET_KEY, MUSIC_URL);
   }
 

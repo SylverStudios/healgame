@@ -243,6 +243,12 @@ export interface CombatState {
   bossCast: BossCastState | null;
   targetId: string | null;
   gcdRemainingMs: number;
+  /**
+   * Spell id waiting behind the current cast/GCD busy window (one-slot queue).
+   * Null when nothing is queued. Target is re-validated when the queue fires —
+   * UI only needs the spell id for a "next:" label.
+   */
+  queuedSpellId: string | null;
   waveIndex: number;
   status: CombatStatus;
   /** Spell ids that currently have at least one armed synergy buffing them. */

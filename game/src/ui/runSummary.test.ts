@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { buildRunSummary, runRecordFromSummary } from './runSummary';
+import { buildRunSummary, hasBuildGlyph, runRecordFromSummary } from './runSummary';
 import { buildGlyphFromTree } from '../tree';
 import { ownedIdsFromLegacyRanks, TALENT_TREE } from '../data/talentTree';
 
 describe('buildRunSummary', () => {
-  it('labels victory and wipe outcomes', () => {
+  it('labels victory; wipe has no title text (outcome is already obvious)', () => {
     expect(buildRunSummary({ status: 'victory', xp: 5, treeRanks: {} }).outcomeLabel).toBe('VICTORY');
-    expect(buildRunSummary({ status: 'wipe', xp: 5, treeRanks: {} }).outcomeLabel).toBe('WIPED');
+    expect(buildRunSummary({ status: 'wipe', xp: 5, treeRanks: {} }).outcomeLabel).toBeNull();
   });
 
   it('carries xpGained through unchanged', () => {
@@ -18,11 +18,13 @@ describe('buildRunSummary', () => {
     const summary = buildRunSummary({ status: 'victory', xp: 1, treeRanks });
     const expected = buildGlyphFromTree(TALENT_TREE, new Set(ownedIdsFromLegacyRanks(treeRanks)));
     expect(summary.glyph).toEqual(expected);
+    expect(hasBuildGlyph(summary.glyph)).toBe(true);
   });
 
-  it('produces an empty-segment glyph for an empty tree', () => {
+  it('produces an empty-segment glyph for an empty tree (nothing to draw)', () => {
     const summary = buildRunSummary({ status: 'wipe', xp: 0, treeRanks: {} });
     expect(summary.glyph.segments).toEqual([]);
+    expect(hasBuildGlyph(summary.glyph)).toBe(false);
   });
 
   it('is deterministic: same treeRanks input always yields the same glyph id', () => {

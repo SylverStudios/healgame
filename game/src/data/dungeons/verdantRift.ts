@@ -10,7 +10,7 @@ export const VERDANT_RIFT_DUNGEON = {
   order: 4,
   unlock: { kind: 'dungeonClear', dungeonId: 'cinder-vault' },
   rewards: {
-    xpPerEnemy: 3,
+    xpPerEnemy: 2,
   },
   visualKey: 'verdant-rift',
   waves: [

@@ -23,10 +23,10 @@ import { GCD_MS } from '../data/constants';
 import { Bar } from '../ui/bar';
 import { UnitSprite } from '../ui/unitSprite';
 import {
-  frameForUnit,
   HEALER_CAST_FRAMES,
   HEALER_IDLE_FRAME,
   HEALER_SHEET_TEXTURE_KEY,
+  presentationForUnit,
 } from '../ui/sprites';
 import { SpellBar } from '../ui/spellBar';
 import { CombatLog } from '../ui/combatLog';
@@ -46,7 +46,7 @@ import { RunModsBar } from '../ui/runModsBar';
 import { ACTION_HOTKEY_LETTERS, MAX_ACTION_HOTKEYS, actionHotkeySlot } from '../ui/actionHotkeys';
 import type { CombatMods } from '../data/talentTree';
 import { beginRun, finalizeRun, recordPress, type PressSource } from '../telemetry';
-import { buildRunSummary } from '../ui/runSummary';
+import { buildRunSummary, hasBuildGlyph } from '../ui/runSummary';
 import { drawBuildGlyph } from '../ui/buildGlyph';
 import { detectCloseCall, pickBanterLine, type BanterSpeaker, type BanterTrigger } from '../data/banter';
 import { showSpeechBubble } from '../ui/speechBubble';
@@ -91,14 +91,19 @@ const GROUND_LINE_MARGIN = 40;
  *  (handoff §B). Presentation-only — index into this array, never reorder the engine's. */
 const PARTY_VISUAL_ORDER = ['healer', 'dps2', 'dps1', 'tank'];
 
-// Unit sizes are multiples of the 16px tile so pixels scale evenly
-// (party 4×, trash 3×, boss 7× — see docs/research/pixel-art-pipeline.md).
-const PARTY_UNIT_WIDTH = 64;
-const PARTY_UNIT_HEIGHT = 64;
-const TRASH_UNIT_WIDTH = 48;
-const TRASH_UNIT_HEIGHT = 48;
-const BOSS_UNIT_WIDTH = 112;
-const BOSS_UNIT_HEIGHT = 112;
+// Display sizes: custom stills (PixelLab tank/husk + ragged healer) keep the
+// padded-canvas baseline; Kenney portraits are smaller so their filled 16×16
+// tiles match that visual weight. Kenney sizes stay multiples of 16.
+const PARTY_CUSTOM_WIDTH = 64;
+const PARTY_CUSTOM_HEIGHT = 64;
+const PARTY_KENNEY_WIDTH = 48;
+const PARTY_KENNEY_HEIGHT = 48;
+const TRASH_CUSTOM_WIDTH = 48;
+const TRASH_CUSTOM_HEIGHT = 48;
+const TRASH_KENNEY_WIDTH = 32;
+const TRASH_KENNEY_HEIGHT = 32;
+const BOSS_UNIT_WIDTH = 80;
+const BOSS_UNIT_HEIGHT = 80;
 
 const WAVE_TEXT_Y = 20;
 const REWARDS_X = 14;
@@ -112,11 +117,15 @@ const WAVE_BANNER_FADE_MS = 350;
 
 const PLAYER_CAST_BAR_WIDTH = 320;
 const PLAYER_CAST_BAR_HEIGHT = 20;
-const PLAYER_CAST_BAR_Y = 448;
+/** Above the Shift+QWER CD row (buttons top ~420 when SPELL_BAR_Y=508) so keycaps don't overlap. */
+const PLAYER_CAST_BAR_Y = 392;
 const PLAYER_CAST_FILL_COLOR = 0xf2c14e;
 const GCD_BAR_HEIGHT = 4;
 const GCD_BAR_GAP = 3;
 const GCD_FILL_COLOR = 0x8a7868;
+/** One-line "next: …" under the GCD sliver when a spell is queued. */
+const QUEUED_SPELL_GAP = 10;
+const QUEUED_SPELL_COLOR = '#a89888';
 
 // v0.3 chunk F "Boss telegraphs": the named cast bar is demoted — an unlabeled
 // sliver near the boss sprite (its own wind-up/glow cue is the primary teach;
@@ -132,8 +141,8 @@ const SPELL_BAR_Y = 508;
 const PACE_TOGGLE_X = 20;
 const PACE_TOGGLE_Y = VIEW_HEIGHT - 8;
 
-/** Cast-cancel toast (handoff §D UI row): short-lived line near the player cast bar. */
-const TOAST_Y = 420;
+/** Cast-cancel toast (handoff §D UI row): short-lived line just above the player cast bar. */
+const TOAST_Y = 368;
 const TOAST_FONT = 'monospace';
 const TOAST_FONT_SIZE = '14px';
 const TOAST_COLOR = '#e8d8c8';
@@ -205,6 +214,7 @@ export class CombatScene extends Phaser.Scene {
   private playerCastBar!: Bar;
   private playerCastLabel!: Phaser.GameObjects.Text;
   private gcdBar!: Bar;
+  private queuedSpellLabel!: Phaser.GameObjects.Text;
   /** Demoted per v0.3 chunk F: unlabeled sliver near the boss, not a named top bar. */
   private bossCastBar!: Bar;
   /** Data-driven wind-up cue for the current encounter's boss ability, resolved once in create(). */
@@ -383,7 +393,6 @@ export class CombatScene extends Phaser.Scene {
 
   private buildPartySprites(): void {
     const party = this.engine.state.party;
-    const y = groundAnchorY(PARTY_UNIT_HEIGHT);
     party.forEach((unit) => {
       this.unitNames.set(unit.id, unit.name);
       // Presentation-only slot: visual order (healer·dps2·dps1·tank) is looked up by unit
@@ -395,22 +404,29 @@ export class CombatScene extends Phaser.Scene {
         PARTY_SLOT_LEFT,
         PARTY_SLOT_RIGHT,
       );
-      // v0.3 chunk F: the healer renders from the ragged-healer sheet instead of the shared
-      // Kenney tile (the one named temp-art exception — CLAUDE.md), with cast-pose frames
-      // wired up so castStarted/castFinished can animate it. Every other party unit is
-      // unaffected — frameForUnit()/UNIT_TEXTURE_KEY still drives tank/dps1/dps2.
+      // Healer: ragged sheet + cast poses. Tank: PixelLab still (fixed facing).
+      // DPS: Kenney tiles at the smaller Kenney display size.
       const isHealer = unit.role === 'healer';
+      const presentation = presentationForUnit(unit);
+      const isCustom = isHealer || presentation.kind === 'texture';
+      const width = isCustom ? PARTY_CUSTOM_WIDTH : PARTY_KENNEY_WIDTH;
+      const height = isCustom ? PARTY_CUSTOM_HEIGHT : PARTY_KENNEY_HEIGHT;
+      const y = groundAnchorY(height);
       const sprite = new UnitSprite(unit, {
         scene: this,
         x,
         y,
-        width: PARTY_UNIT_WIDTH,
-        height: PARTY_UNIT_HEIGHT,
-        frame: isHealer ? HEALER_IDLE_FRAME : frameForUnit(unit),
-        ...(isHealer ? { bodyTextureKey: HEALER_SHEET_TEXTURE_KEY } : {}),
+        width,
+        height,
         ...(isHealer
-          ? { casterAnim: { idleFrame: HEALER_IDLE_FRAME, castFrames: HEALER_CAST_FRAMES } }
-          : {}),
+          ? {
+              frame: HEALER_IDLE_FRAME,
+              bodyTextureKey: HEALER_SHEET_TEXTURE_KEY,
+              casterAnim: { idleFrame: HEALER_IDLE_FRAME, castFrames: HEALER_CAST_FRAMES },
+            }
+          : presentation.kind === 'texture'
+            ? { bodyTextureKey: presentation.key, fixedFacing: true }
+            : { frame: presentation.frame }),
         showMana: isHealer,
         clickable: true,
         onClick: (id) => this.onAllyClick(id),
@@ -426,20 +442,31 @@ export class CombatScene extends Phaser.Scene {
     this.enemySprites.clear();
 
     const isBoss = enemies.length === 1 && enemies[0]?.role === 'boss';
-    const width = isBoss ? BOSS_UNIT_WIDTH : TRASH_UNIT_WIDTH;
-    const height = isBoss ? BOSS_UNIT_HEIGHT : TRASH_UNIT_HEIGHT;
-    const y = groundAnchorY(height);
 
     enemies.forEach((unit, i) => {
       this.unitNames.set(unit.id, unit.name);
       const x = slotX(i, enemies.length, ENEMY_SLOT_LEFT, ENEMY_SLOT_RIGHT);
+      const presentation = presentationForUnit(unit);
+      const width = isBoss
+        ? BOSS_UNIT_WIDTH
+        : presentation.kind === 'texture'
+          ? TRASH_CUSTOM_WIDTH
+          : TRASH_KENNEY_WIDTH;
+      const height = isBoss
+        ? BOSS_UNIT_HEIGHT
+        : presentation.kind === 'texture'
+          ? TRASH_CUSTOM_HEIGHT
+          : TRASH_KENNEY_HEIGHT;
+      const y = groundAnchorY(height);
       const sprite = new UnitSprite(unit, {
         scene: this,
         x,
         y,
         width,
         height,
-        frame: frameForUnit(unit),
+        ...(presentation.kind === 'texture'
+          ? { bodyTextureKey: presentation.key, fixedFacing: true }
+          : { frame: presentation.frame }),
         showMana: false,
         clickable: false,
         facing: 'left',
@@ -499,6 +526,16 @@ export class CombatScene extends Phaser.Scene {
     const gcdY = PLAYER_CAST_BAR_Y + PLAYER_CAST_BAR_HEIGHT / 2 + GCD_BAR_GAP + GCD_BAR_HEIGHT / 2;
     this.gcdBar = new Bar(this, playerBarX, gcdY, PLAYER_CAST_BAR_WIDTH, GCD_BAR_HEIGHT, GCD_FILL_COLOR);
     this.gcdBar.setVisible(false);
+
+    const queuedY = gcdY + GCD_BAR_HEIGHT / 2 + QUEUED_SPELL_GAP;
+    this.queuedSpellLabel = this.add
+      .text(centerX, queuedY, '', {
+        fontFamily: HUD_FONT,
+        fontSize: '12px',
+        color: QUEUED_SPELL_COLOR,
+      })
+      .setOrigin(0.5)
+      .setVisible(false);
 
     // v0.3 chunk F: unlabeled sliver, repositioned above the boss sprite each frame in
     // syncBossCastBar() — initial position here is a placeholder, overwritten before it
@@ -909,6 +946,13 @@ export class CombatScene extends Phaser.Scene {
     } else {
       this.gcdBar.setVisible(false);
     }
+
+    if (state.queuedSpellId) {
+      const queued = this.sceneData.loadout.spells.find((s) => s.id === state.queuedSpellId);
+      this.queuedSpellLabel.setText(`next: ${queued?.name ?? state.queuedSpellId}`).setVisible(true);
+    } else {
+      this.queuedSpellLabel.setVisible(false);
+    }
   }
 
   /** v0.3 chunk F: unlabeled sliver tracks the boss sprite's position (always the sole enemy
@@ -1006,17 +1050,18 @@ export class CombatScene extends Phaser.Scene {
       ease: 'Quad.easeOut',
     });
 
-    const titleColor = status === 'victory' ? '#f2c14e' : '#e05a4e';
-    const titleText = this.add
-      .text(centerX, centerY - 80, summary.outcomeLabel, {
-        fontFamily: HUD_FONT,
-        fontSize: '36px',
-        color: titleColor,
-      })
-      .setOrigin(0.5)
-      .setDepth(OVERLAY_DEPTH + 2)
-      .setAlpha(0);
-    this.tweens.add({ targets: titleText, alpha: 1, delay: TITLE_DELAY_MS, duration: TITLE_REVEAL_MS });
+    if (summary.outcomeLabel !== null) {
+      const titleText = this.add
+        .text(centerX, centerY - 80, summary.outcomeLabel, {
+          fontFamily: HUD_FONT,
+          fontSize: '36px',
+          color: '#f2c14e',
+        })
+        .setOrigin(0.5)
+        .setDepth(OVERLAY_DEPTH + 2)
+        .setAlpha(0);
+      this.tweens.add({ targets: titleText, alpha: 1, delay: TITLE_DELAY_MS, duration: TITLE_REVEAL_MS });
+    }
 
     const xpText = this.add
       .text(centerX, centerY - 28, `XP +${summary.xpGained}`, {
@@ -1029,25 +1074,27 @@ export class CombatScene extends Phaser.Scene {
       .setAlpha(0);
     this.tweens.add({ targets: xpText, alpha: 1, delay: XP_DELAY_MS, duration: XP_REVEAL_MS });
 
-    const glyphLabel = this.add
-      .text(centerX, centerY + 8, 'BUILD', { fontFamily: HUD_FONT, fontSize: '11px', color: '#a89888' })
-      .setOrigin(0.5)
-      .setDepth(OVERLAY_DEPTH + 2)
-      .setAlpha(0);
-    const glyphContainer = drawBuildGlyph(this, summary.glyph, {
-      x: centerX,
-      y: centerY + 55,
-      cell: GLYPH_CELL,
-      color: GLYPH_COLOR,
-    })
-      .setDepth(OVERLAY_DEPTH + 2)
-      .setAlpha(0);
-    this.tweens.add({
-      targets: [glyphLabel, glyphContainer],
-      alpha: 1,
-      delay: GLYPH_DELAY_MS,
-      duration: GLYPH_REVEAL_MS,
-    });
+    if (hasBuildGlyph(summary.glyph)) {
+      const glyphLabel = this.add
+        .text(centerX, centerY + 8, 'BUILD', { fontFamily: HUD_FONT, fontSize: '11px', color: '#a89888' })
+        .setOrigin(0.5)
+        .setDepth(OVERLAY_DEPTH + 2)
+        .setAlpha(0);
+      const glyphContainer = drawBuildGlyph(this, summary.glyph, {
+        x: centerX,
+        y: centerY + 55,
+        cell: GLYPH_CELL,
+        color: GLYPH_COLOR,
+      })
+        .setDepth(OVERLAY_DEPTH + 2)
+        .setAlpha(0);
+      this.tweens.add({
+        targets: [glyphLabel, glyphContainer],
+        alpha: 1,
+        delay: GLYPH_DELAY_MS,
+        duration: GLYPH_REVEAL_MS,
+      });
+    }
 
     const returnButton = this.add
       .rectangle(centerX, centerY + 105, 180, 40, 0x3a2a22)

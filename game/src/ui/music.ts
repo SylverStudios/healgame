@@ -4,9 +4,8 @@
  * in docs/v0.3-handoff.md).
  *
  * Asset path/extension lives in exactly ONE constant (MUSIC_URL) so swapping
- * the placeholder loop for the real supervirus track (or an .ogg/.mp3) is a
- * one-line change — nothing else in this file or its callers references the
- * extension.
+ * the stock ambient loop for another track (or an .ogg/.mp3) is a one-line
+ * change — nothing else in this file or its callers references the extension.
  *
  * `initMusic` takes the Phaser.Game reference once (called from BootScene,
  * which already loads the asset in preload() and reads SaveData first).
@@ -28,7 +27,7 @@ const SOUND_UNLOCKED_EVENT = 'unlocked';
 
 export const MUSIC_ASSET_KEY = 'bg-music';
 /** Single source of truth for the audio file path — see file header. */
-export const MUSIC_URL = 'assets/audio/supervirus-background.wav';
+export const MUSIC_URL = 'assets/audio/stock-ambient-loop.wav';
 
 let activeGame: Phaser.Game | null = null;
 let activeSound: Phaser.Sound.BaseSound | null = null;

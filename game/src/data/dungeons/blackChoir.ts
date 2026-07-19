@@ -11,13 +11,13 @@ export const BLACK_CHOIR_DUNGEON = {
   order: 5,
   unlock: { kind: 'dungeonClear', dungeonId: 'verdant-rift' },
   rewards: {
-    xpPerEnemy: 3,
+    xpPerEnemy: 2,
   },
   visualKey: 'black-choir',
   waves: [
     { enemies: [{ mobId: 'choir-shade', count: 2 }] },
     { enemies: [{ mobId: 'choir-shade', count: 3 }] },
     { enemies: [{ mobId: 'choir-shade', count: 3, statOverrides: { hp: 14 } }] },
-    { enemies: [{ mobId: 'dirge-sovereign', count: 1, statOverrides: { hp: 225 } }] },
+    { enemies: [{ mobId: 'dirge-sovereign', count: 1, statOverrides: { hp: 245 } }] },
   ],
 } as const satisfies DungeonDef;
