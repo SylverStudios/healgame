@@ -7,15 +7,23 @@ Combat units render from two presentation paths (see `game/src/ui/sprites.ts`
 
 1. **Kenney Tiny Dungeon** (default) — 16×16 tiles from the packed sheet
 2. **Custom textures** — PixelLab party mercs / ash-husk stills (+ attack
-   strips), or the ragged-healer spritesheet (cast poses)
+   strips), or the 32×32 armored-paladin healer sheet (cast poses)
 
-Relic pick / run-mod icons use PixelLab 64×64 stills (`ui/relicSprites.ts`).
+**Target density:** party characters and trash aim for **native 32×32** (chunky
+SNES/GBA read). Bosses can share that pixel density at a larger canvas later.
+Legacy PixelLab mercs are still ~92×92 padded canvases until replaced.
+
+Relic pick / run-mod icons use hand-authored 32×32 stills (`ui/relicSprites.ts`).
 Everything else in the game stays temp art per CLAUDE.md.
 
 ## Where things are
 
 - `game/public/assets/tiny-dungeon.png` — Kenney packed tilesheet (12 cols ×
   11 rows, 16px tiles, no spacing) + license copy alongside.
+- `game/public/assets/units/healer/` — armored-paladin healer (`east.png`,
+  `sheet.png` = idle + charge + cast-action, `charge-east/`, `cast-east/`).
+  Source: `art/source/armored-paladin/`. Charge loops while channeling;
+  cast-action plays once on release (FE exposure timings in `sprites.ts`).
 - `game/public/assets/units/tank/` — PixelLab starter tank (`east.png` +
   `attack-east/0–6.png`). Authoring cache: `artifacts/pixellab-starter-tank/`.
 - `game/public/assets/units/dps1/` — PixelLab melee DPS (`east.png` +
@@ -28,7 +36,8 @@ Everything else in the game stays temp art per CLAUDE.md.
   (32×32 native, 64×64 nearest in game; General-sheet metal language). Cache:
   `artifacts/pixellab-relics/hand-fe-v2/`. Keys via `ui/relicSprites.ts`;
   BootScene preloads; `drawRunModGlyph` / RelicScene (HUD 32px, cards 64px).
-- `game/public/assets/ragged-healer-sheet.png` — healer cast sheet (v0.3).
+- `game/public/assets/ragged-healer-sheet.png` — historical 64×64 healer sheet
+  (superseded; kept for reference). Live healer uses `units/healer/`.
 - `game/src/ui/sprites.ts` — combat unit art choices (`presentationForUnit`,
   `frameForUnit`, texture keys/URLs, attack anim defs). Presentation-only;
   never gameplay data.
@@ -54,14 +63,16 @@ Everything else in the game stays temp art per CLAUDE.md.
   [Unpacking Fire Emblem's animations](https://lost-worlds.neocities.org/blog/2024/10/20/fire-emblem-animation/).
   `UnitSprite.playAttack()` runs on tank shove / DPS jab, then restores the
   rest still.
-- **Healer sheet**: still a CombatScene special case (idle + cast frames);
-  not selected by `presentationForUnit`.
+- **Healer sheet**: CombatScene special case — charge loop on `castStarted`
+  (channeled), cast-action strip on `finishCast` / instant `playCastRelease`;
+  cancel returns to idle. Not selected by `presentationForUnit`. Texture key
+  `unit-healer`, 32×32 frames, authored facing (no flipX).
 - `pixelArt: true` in `main.ts` gives nearest-neighbor filtering game-wide.
-- Display sizes (`CombatScene.ts`): custom party (PixelLab mercs + healer
-  sheet) **112**, Kenney party **48**; PixelLab trash **72**, Kenney trash
-  **32**; bosses **80** (Kenney today). Padded canvases (PixelLab + healer
-  sheet) use `bodyOffsetY` so painted feet meet `GROUND_Y`. HP/mana meters
-  are capped at 72px wide so neighboring party bars don't overlap.
+- Display sizes (`CombatScene.ts`): PixelLab mercs **112**, healer 32×32 at
+  **64** (2×), Kenney party **48**; PixelLab trash **72**, Kenney trash
+  **32**; bosses **80** (Kenney today). Padded canvases use `bodyOffsetY` so
+  painted feet meet `GROUND_Y`. HP/mana meters are capped at 72px wide so
+  neighboring party bars don't overlap.
 - Death state = dark tint + alpha + shrink (`update()` in unitSprite.ts).
 
 ## Current casting
@@ -71,7 +82,7 @@ Everything else in the game stays temp art per CLAUDE.md.
 | tank | custom still + attack | `unit-tank` + `unit-tank-attack` |
 | dps1 | custom still + attack | `unit-dps1` + `unit-dps1-attack` |
 | dps2 | custom still + attack | `unit-dps2` + `unit-dps2-attack` |
-| healer | ragged sheet | cast/idle frames |
+| healer | 32×32 armored-paladin sheet | `unit-healer` idle + charge loop + cast-action |
 | ash-husk | custom still | `unit-ash-husk` (west.png) |
 | other trash | Kenney | ghost 121 |
 | Gate Warden / Ember / Matriarch | Kenney | brute 109 |

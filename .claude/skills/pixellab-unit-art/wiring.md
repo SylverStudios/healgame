@@ -23,15 +23,16 @@ PixelLab ids (regenerate via MCP if missing locally):
 
 | Role | Display |
 |---|---|
-| Custom party (PixelLab mercs + healer) | 112×112 |
+| PixelLab mercs (legacy padded ~92px) | 112×112 |
+| Healer (native 32×32 armored-paladin) | 64×64 |
 | Kenney party | 48×48 |
 | PixelLab trash | 72×72 |
 | Kenney trash | 32×32 |
 | Boss | 80×80 |
 
-Native canvases are larger than the painted figure (heavy padding). Scale with
-`setDisplaySize` and `pixelArt: true` (nearest neighbor) so feet read on the
-ground line.
+Scale with `setDisplaySize` and `pixelArt: true` (nearest neighbor). Legacy
+PixelLab canvases are padded; 32×32 healer frames are tight — use the smaller
+`HEALER_FOOT_PAD_RATIO` so feet meet the ground line.
 
 ## Static + attack contract (shipped)
 
@@ -44,8 +45,23 @@ ground line.
 5. On tank shove / DPS jab, `playAttack()` runs the strip, then restores the
    rest still.
 
+## Healer charge / cast-action (shipped)
+
+1. Sheet layout: `[idle][charge…][cast-action…]` at
+   `assets/units/healer/sheet.png` (also split folders `charge-east/`,
+   `cast-east/`).
+2. Exposure sheets in `sprites.ts`: `HEALER_CHARGE_FRAME_DURATIONS_MS` (loop),
+   `HEALER_CAST_FRAME_DURATIONS_MS` (one-shot) — FE holds, not equal GIF times.
+3. `CombatScene`: channel → `setCasting(true)` (charge loop); near end →
+   `beginEarlyCastRelease()` (lead = `HEALER_CAST_RELEASE_LEAD_MS` so flash
+   meets heal); finish → `finishCast()` (no-op if early release already
+   playing); instant → `playCastRelease()`; cancel → `setCasting(false)`.
+4. Queued next cast must **not** clip release: `setCasting(true)` while
+   release is active sets `pendingCharge` and starts charge only after the
+   cast-action strip completes.
+
 Touch: `BootScene.ts`, `sprites.ts` (+ tests), `unitSprite.ts`,
-`CombatScene.ts` (sizes + `attackAnimKey`), `docs/unit-art.md`.
+`CombatScene.ts` (sizes + `attackAnimKey` / healer casterAnim), `docs/unit-art.md`.
 
 ## Verify
 

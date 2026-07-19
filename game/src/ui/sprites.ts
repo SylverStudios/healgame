@@ -1,8 +1,8 @@
 /**
  * Unit art: Kenney "Tiny Dungeon" (CC0, kenney.nl) — 16×16 tiles shipped as
  * the packed 12×11 tilesheet in public/assets (license copy alongside), plus
- * a dual-path for PixelLab / custom stills (party mercs + ash-husk) and the
- * ragged healer sheet. Frame index for Kenney = row * 12 + col.
+ * custom stills (party mercs + ash-husk) and the 32×32 armored-paladin
+ * healer sheet. Frame index for Kenney = row * 12 + col.
  *
  * This is presentation-only mapping (which tile/texture draws which unit);
  * gameplay numbers stay in src/data per the numbers-are-data rule.
@@ -142,33 +142,62 @@ export function attackAnimKeyForUnit(unit: Pick<Unit, 'id'>): string | undefined
 }
 
 /**
- * v0.3 chunk F: user-provided ragged-healer sheet renders the party healer
- * specifically — the one named temp-art exception (CLAUDE.md "Temp art only,
- * one exception"). 896×256 = 14 cols × 4 rows of 64×64 frames; row order
- * (visually inspected) is down / right / up / left. The party stands on the
- * left facing right (side-view-layout-handoff §A), so row 1 (facing right,
- * confirmed by its cast pose holding golden light in the forward/right hand)
- * is the row used. The sheet's last 3 columns are golden-light cast poses.
+ * Party healer: native 32×32 armored-paladin sheet (one row).
+ * Source: `art/source/armored-paladin/`. Facing authored three-quarter right —
+ * CombatScene sets `fixedFacing` (no flipX).
+ *
+ * Layout: [0 idle][1–5 charge loop][6–12 cast-action release].
+ * Charge = hand-glow build (charge-sheet.png cells 1–5). Cast-action = orb →
+ * flash → recover (cast-action GIF frames 1–7 @ 32×32). Playback uses FE-style
+ * exposure sheets — not equal frame times (see pixellab-unit-art skill).
  */
-export const HEALER_SHEET_TEXTURE_KEY = 'ragged-healer';
-export const HEALER_SHEET_URL = 'assets/ragged-healer-sheet.png';
-export const HEALER_SHEET_FRAME_SIZE = 64;
-export const HEALER_SHEET_COLS = 14;
-const HEALER_FACING_ROW = 1;
-const HEALER_CAST_COL_START = 11;
-const HEALER_CAST_COL_COUNT = 3;
-
-function healerFrame(col: number): number {
-  return HEALER_FACING_ROW * HEALER_SHEET_COLS + col;
-}
+export const HEALER_SHEET_TEXTURE_KEY = 'unit-healer';
+export const HEALER_SHEET_URL = 'assets/units/healer/sheet.png';
+export const HEALER_SHEET_FRAME_SIZE = 32;
+export const HEALER_SHEET_COLS = 13;
 
 /** Neutral standing pose used whenever the healer is not casting. */
-export const HEALER_IDLE_FRAME = healerFrame(0);
-/** Golden-light cast pose frames, played in order while the healer casts. */
-export const HEALER_CAST_FRAMES: readonly number[] = Array.from(
-  { length: HEALER_CAST_COL_COUNT },
-  (_, i) => healerFrame(HEALER_CAST_COL_START + i),
-);
+export const HEALER_IDLE_FRAME = 0;
+
+/** Charge loop while a cast channels (sheet frames 1–5). */
+export const HEALER_CHARGE_FRAMES: readonly number[] = [1, 2, 3, 4, 5];
+/**
+ * Per-frame holds (ms) for the charge loop — dwell on the peak glow (index 3)
+ * so the build-up reads heavier than the in-betweens.
+ */
+export const HEALER_CHARGE_FRAME_DURATIONS_MS: readonly number[] = [
+  100, // prep arms
+  117, // glow on
+  117, // glow grow
+  167, // peak charge hold (antic)
+  117, // settle before loop
+] as const;
+
+/** One-shot cast-action release (sheet frames 6–12). */
+export const HEALER_CAST_FRAMES: readonly number[] = [6, 7, 8, 9, 10, 11, 12];
+/**
+ * FE-style exposure for the cast release: antic / orb build, flash smear,
+ * contact hold with arms out, then recovery. Equal GIF timing reads floaty.
+ * Ref: https://lost-worlds.neocities.org/blog/2024/10/20/fire-emblem-animation/
+ */
+export const HEALER_CAST_FRAME_DURATIONS_MS: readonly number[] = [
+  100, // wind-up
+  83, // orb gather
+  133, // orb peak (antic before snap)
+  33, // flash smear (~2 @60Hz)
+  167, // contact / arms-out hold
+  67, // follow-through
+  83, // settle toward idle
+] as const;
+
+/**
+ * Start the cast-action this many ms before `castFinished` so the flash/contact
+ * lands near the heal resolve. Sum of holds through the flash frame (index 3).
+ */
+export const HEALER_CAST_RELEASE_LEAD_MS: number = HEALER_CAST_FRAME_DURATIONS_MS.slice(
+  0,
+  4,
+).reduce((sum, ms) => sum + ms, 0);
 
 /** One-shot green sparkle burst played over a heal target (192×32 = 6 frames of 32×32). */
 export const HEAL_VFX_TEXTURE_KEY = 'heal-vfx';
@@ -245,8 +274,8 @@ export function frameForUnit(unit: Pick<Unit, 'id' | 'role' | 'mobId'>): number 
 
 /**
  * Presentation choice for a combat unit. Party mercs (tank/dps) + ash-husk use
- * PixelLab stills; the healer sheet is wired separately in CombatScene (cast
- * frames). Remaining trash/bosses stay on Kenney.
+ * PixelLab stills; the 32×32 healer sheet is wired separately in CombatScene
+ * (cast frames). Remaining trash/bosses stay on Kenney.
  */
 export function presentationForUnit(
   unit: Pick<Unit, 'id' | 'role' | 'mobId'>,
