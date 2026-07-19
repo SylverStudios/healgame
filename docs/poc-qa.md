@@ -1,6 +1,6 @@
 # QA log — journey checklist & verification
 
-Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-17
+Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-19
 
 Ship summary (newest first): [`CHANGELOG.md`](./CHANGELOG.md).
 
@@ -897,38 +897,46 @@ Status: current · Last verified: 2026-07-17
 
 # Iron Pass retune + tiered XP (2026-07-17)
 
-Status: current · Last verified: 2026-07-17
+Status: historical · Last verified: 2026-07-17
 
-Playtest: Ash Gate grind felt right; Iron Pass first-cleared at level 3 with a
-DPS relic (Twin Fang / Warblood shorten the fight past a single Tunnel Vision).
-Also: flat 1 XP/kill cannot fund the triangular level curve without endless
-Ash-Gate grinding.
+Superseded by **Post-v0.3 mid-boss + XP curb (2026-07-19)** below. Kept as
+the prior playtest note.
 
-## Spire Lancer (bot-tuned)
+---
 
-| Value | Prior | Shipped | Why |
-|---|---|---|---|
-| `spire-lancer` hp | 245 | **295** | Forces a second Tunnel Vision even under DPS relics |
-| Tunnel Vision `intervalMs` | 30_000 | **25_000** | Extra focus pressure without breaking maxed-crown ≥3-survivor gates |
-| autoDamage | 3 | 3 (unchanged) | Bumping to 4 dropped Vigil / Measured crown below 3 survivors |
+# Post-v0.3 mid-boss + XP curb (2026-07-19)
 
-Bot shape (disciplined): L3 Vigil + Twin Fang / Warblood → wipe or ≤2-survivor
-pyrrhic; L4 Vigil + same relic → victory ≥3; maxed Vigil / Measured / Zealot
-crowns → victory ≥3 (existing `balance.test.ts` gates).
+Status: current · Last verified: 2026-07-19
 
-## Tiered `xpPerEnemy`
+Playtest after v0.3: Ash Gate still felt right; Iron Pass / Cinder Vault were
+too soft (L3 one-shot), and mid-ladder XP double-leveled into the next boss.
+
+## Boss pressure (bot-tuned; Ash Gate unchanged)
+
+| Boss | Key bumps |
+|---|---|
+| Spire Lancer | HP 295→**340**; Tunnel Vision first 7s / every **20s** / channel **11s** |
+| Ember Colossus | HP 240→**260** (Emberfall cadence unchanged — longer fight = more DoTs) |
+| Thorn Matriarch | HP 250→**290**; Needle Gaze first 4.5s / every **20s** / channel **9s** |
+| Dirge Sovereign | dungeon HP 225→**245** |
+
+Maxed crown kits must still clear mid content ≥3 alive; The Maw stays
+unwinnable (`balance.test.ts`). The bigger lever for the mid-ladder snowball
+is the XP curb below.
+
+## Tiered `xpPerEnemy` (curbed)
 
 | Dungeon | XP/kill | Full-clear XP |
 |---|---|---|
 | Ash Gate | 1 | 6 |
-| Iron Pass | 2 | 26 |
-| Cinder Vault | 2 | 26 |
-| Verdant Rift | 3 | 39 |
-| Black Choir | 3 | 27 |
-| The Maw | 4 | 12 |
+| Iron Pass | 1 | 13 |
+| Cinder Vault | 1 | 13 |
+| Verdant Rift | 2 | 26 |
+| Black Choir | 2 | 18 |
+| The Maw | 3 | 9 |
 
-Level thresholds unchanged (L2@10, L3@30, L4@60…). Iron Pass attempts (including
-wipes) now bank XP fast enough to reach the level that clears it.
+Level thresholds unchanged (L2@10, L3@30, L4@60…). Cumulative after CV ≈ 32
+(L3), not a double-level leap into Verdant.
 
 ---
 
@@ -995,9 +1003,9 @@ Decided micro-choices shipped this phase (full detail: module docs +
    int 0..100 default 50, `recentRuns`. Music singleton (`ui/music.ts`):
    0 ⇒ stop+destroy (no muted stream); autoplay defers to Phaser's
    first-gesture unlock; asset path in one constant
-   (`assets/audio/supervirus-background.wav`, placeholder generated loop
-   until the real track lands). Settings scene: `hubSettings` /
-   `settingsVolumeSlider` / `settingsBack` journey names.
+   (`assets/audio/stock-ambient-loop.wav`, soft stock ambient). Settings
+   scene: `hubSettings` / `settingsVolumeSlider` / `settingsBack` journey
+   names.
 8. **Balance bot** — disciplined bot upgraded (OOM-panic Still Waters,
    anticipatory Frenzied Liturgy, pressure-windowed Wrath Ascendant, focus
    stabilization, coyote-save queuing, `overhealTotal` telemetry). All 28

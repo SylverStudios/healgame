@@ -59,7 +59,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
   {
     id: 'iron-pass',
     name: 'Iron Pass',
-    xpPerEnemy: 2,
+    xpPerEnemy: 1,
     waves: [
       {
         enemies: [
@@ -113,16 +113,16 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
     boss: {
       id: 'spire-lancer',
       name: 'Spire Lancer',
-      hp: 295,
+      hp: 340,
       autoDamage: 3,
       swingIntervalMs: 3500,
       cast: {
         kind: 'tunnelVision',
         name: 'Tunnel Vision',
         telegraphMs: 3000,
-        firstCastAtMs: 8000,
-        intervalMs: 25_000,
-        channelMs: 10_000,
+        firstCastAtMs: 7000,
+        intervalMs: 20_000,
+        channelMs: 11_000,
         tickMs: 1000,
         damagePerTick: 2,
       },
@@ -131,7 +131,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
   {
     id: 'the-maw',
     name: 'The Maw',
-    xpPerEnemy: 4,
+    xpPerEnemy: 3,
     waves: [
       {
         enemies: [
@@ -223,7 +223,7 @@ describe('live dungeon content', () => {
       [
         'Dungeon 6: The Maw [the-maw]',
         'Unlock: clear black-choir',
-        'Rewards: XP 4/enemy, relic offer on first clear',
+        'Rewards: XP 3/enemy, relic offer on first clear',
         'Visual: the-maw',
         'Wave 1:',
         '  2x Ash Husk [ash-husk] — HP 6, auto 2/3000ms, boss no, overrides hp=6',

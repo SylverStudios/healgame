@@ -1,7 +1,6 @@
 # Audio assets
 
-`supervirus-background.wav` — **placeholder** background loop (32s, seamless).
-Procedurally generated sine-pad ambient authored for this repo; public domain,
-no third-party samples. It stands in for the real "Supervirus background
-score" (friend-shared track) until that file is delivered; the real track
-replaces this file at the same basename (`supervirus-background.*`).
+`stock-ambient-loop.wav` — soft ambient stock loop (~32s, crossfaded) used as
+the default background music. Public-domain procedural ambient (no third-party
+samples). Swap the file and/or update `MUSIC_URL` in `game/src/ui/music.ts` to
+change the track; BootScene loads whatever that constant points at.

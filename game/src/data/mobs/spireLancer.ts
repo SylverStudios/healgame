@@ -4,7 +4,7 @@ export const SPIRE_LANCER_MOB = {
   id: 'spire-lancer',
   name: 'Spire Lancer',
   tags: ['boss'],
-  hp: 295,
+  hp: 340,
   autoDamage: 3,
   swingIntervalMs: 3_500,
   abilityIds: ['tunnel-vision'],

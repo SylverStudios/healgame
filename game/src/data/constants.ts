@@ -149,8 +149,9 @@ export const ACTION_BAR_SLOTS = 4;
 export const REWARDS = {
   /**
    * Fallback XP per kill when an encounter omits `xpPerEnemy`.
-   * Live dungeons set their own rate (Ash Gate 1 → Iron Pass/Cinder 2 →
-   * Verdant/Choir 3 → Maw 4) so later content funds the rising level curve.
+   * Live dungeons set their own rate (Ash Gate / Iron Pass / Cinder 1 →
+   * Verdant/Choir 2 → Maw 3) so mid clears don't double-level before the
+   * next boss.
    */
   xpPerEnemy: 1,
 } as const;

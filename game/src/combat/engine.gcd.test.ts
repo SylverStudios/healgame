@@ -46,7 +46,9 @@ describe('GCD / cast busy timing', () => {
     engine.setTarget('tank');
     engine.castSpell(TEST_SOLEMN_MEND.id); // busy for 2000ms
     engine.castSpell(TEST_ZEALOUS_MENDING.id); // queued
+    expect(engine.state.queuedSpellId).toBe(TEST_ZEALOUS_MENDING.id);
     engine.castSpell(TEST_SOLEMN_MEND.id); // replaces queue with solemn mend again
+    expect(engine.state.queuedSpellId).toBe(TEST_SOLEMN_MEND.id);
 
     const events = engine.advance(2000);
     const started = casts(events);
@@ -54,6 +56,7 @@ describe('GCD / cast busy timing', () => {
     // one firing once busy ends — it must be the replacement (solemn mend), not zealous mending.
     expect(started).toHaveLength(2);
     expect(started[1]!.cast.spellId).toBe(TEST_SOLEMN_MEND.id);
+    expect(engine.state.queuedSpellId).toBeNull();
   });
 
   it('an illegal command while busy is dropped without clobbering an existing queue', () => {

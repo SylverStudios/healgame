@@ -26,7 +26,7 @@ engine.setTarget(unitId): void        // click-to-target an ally; ignored if unk
 engine.castSpell(spellId): void       // starts, queues, or is silently dropped — see below
 engine.cancelCast(): void             // cancel active cast (+ any queue) and refund reserved mana — see below
 engine.activateCooldown(cooldownId): void // off-GCD; see "Cooldowns" below
-engine.state: Readonly<CombatState>
+engine.state: Readonly<CombatState>    // includes queuedSpellId when a one-slot queue is armed
 engine.rewards: { xp }                // accrued per kill, immediately, even on a later wipe
 ```
 

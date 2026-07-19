@@ -1,10 +1,11 @@
 /**
  * Unit art: Kenney "Tiny Dungeon" (CC0, kenney.nl) — 16×16 tiles shipped as
- * the packed 12×11 tilesheet in public/assets (license copy alongside).
- * Frame index = row * 12 + col, identical to Kenney's tile_XXXX numbering.
+ * the packed 12×11 tilesheet in public/assets (license copy alongside), plus
+ * a dual-path for PixelLab / custom stills (tank + ash-husk) and the ragged
+ * healer sheet. Frame index for Kenney = row * 12 + col.
  *
- * This is presentation-only mapping (which tile draws which unit); gameplay
- * numbers stay in src/data per the numbers-are-data rule.
+ * This is presentation-only mapping (which tile/texture draws which unit);
+ * gameplay numbers stay in src/data per the numbers-are-data rule.
  */
 
 import type { Unit } from '../combat/types';
@@ -14,6 +15,14 @@ import { MOB_REGISTRY } from '../data/mobs';
 export const UNIT_TEXTURE_KEY = 'tiny-dungeon';
 export const UNIT_TEXTURE_URL = 'assets/tiny-dungeon.png';
 export const UNIT_FRAME_SIZE = 16;
+
+/** PixelLab Ash Husk still — combat-facing west (enemies face left). */
+export const ASH_HUSK_TEXTURE_KEY = 'unit-ash-husk';
+export const ASH_HUSK_TEXTURE_URL = 'assets/units/ash-husk/west.png';
+
+/** PixelLab Starter Tank still — combat-facing east (party faces right). */
+export const TANK_TEXTURE_KEY = 'unit-tank';
+export const TANK_TEXTURE_URL = 'assets/units/tank/east.png';
 
 /**
  * v0.3 chunk F: user-provided ragged-healer sheet renders the party healer
@@ -81,6 +90,15 @@ const MOB_VISUAL_FRAMES = {
   'thorn-matriarch': FRAME.brute,
 } as const satisfies Readonly<Record<MobVisualKey, number>>;
 
+/**
+ * Dual-path unit presentation:
+ * - `kenney` — frame into the Tiny Dungeon sheet; CombatScene may flipX by side
+ * - `texture` — single custom still (already correct facing; do not flipX)
+ */
+export type UnitPresentation =
+  | { kind: 'kenney'; frame: number }
+  | { kind: 'texture'; key: typeof ASH_HUSK_TEXTURE_KEY | typeof TANK_TEXTURE_KEY };
+
 /** Supported tile frame for an authored mob visual key. */
 export function frameForMobVisualKey(visualKey: string): number | undefined {
   return Object.prototype.hasOwnProperty.call(MOB_VISUAL_FRAMES, visualKey)
@@ -89,8 +107,11 @@ export function frameForMobVisualKey(visualKey: string): number | undefined {
 }
 
 /**
- * Tile frame for a combat unit. Catalog mobs resolve through stable mobId and
- * MobDef.visualKey; generated runtime ids never select enemy presentation.
+ * Kenney tile frame for a combat unit. Catalog mobs resolve through stable
+ * mobId and MobDef.visualKey; generated runtime ids never select enemy
+ * presentation. Prefer `presentationForUnit` when wiring UnitSprite — custom
+ * textures (tank / ash-husk) still report their legacy Kenney frame here for
+ * catalog coverage tests.
  */
 export function frameForUnit(unit: Pick<Unit, 'id' | 'role' | 'mobId'>): number {
   if (unit.role === 'boss' || unit.role === 'enemy') {
@@ -103,4 +124,27 @@ export function frameForUnit(unit: Pick<Unit, 'id' | 'role' | 'mobId'>): number 
     return unit.role === 'boss' ? FRAME.demon : FRAME.ghost;
   }
   return PARTY_FRAMES[unit.id] ?? FRAME.fighter;
+}
+
+/**
+ * Presentation choice for a combat unit. Tank + ash-husk use PixelLab stills;
+ * the healer sheet is wired separately in CombatScene (cast frames). Everyone
+ * else stays on Kenney.
+ */
+export function presentationForUnit(
+  unit: Pick<Unit, 'id' | 'role' | 'mobId'>,
+): UnitPresentation {
+  if (unit.id === 'tank') {
+    return { kind: 'texture', key: TANK_TEXTURE_KEY };
+  }
+  if (unit.role === 'enemy' || unit.role === 'boss') {
+    const mob =
+      unit.mobId !== undefined && Object.prototype.hasOwnProperty.call(MOB_REGISTRY, unit.mobId)
+        ? MOB_REGISTRY[unit.mobId]
+        : undefined;
+    if (mob?.visualKey === 'ash-husk') {
+      return { kind: 'texture', key: ASH_HUSK_TEXTURE_KEY };
+    }
+  }
+  return { kind: 'kenney', frame: frameForUnit(unit) };
 }

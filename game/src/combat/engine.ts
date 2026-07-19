@@ -362,6 +362,7 @@ export class CombatEngine {
       bossCast: this.bossCastState ? { ...this.bossCastState } : null,
       targetId: this.targetId,
       gcdRemainingMs: Math.max(0, this.gcdRemainingMs),
+      queuedSpellId: this.queuedCast?.spellId ?? null,
       waveIndex: this.waveIndex,
       status: this.status,
       armedBuffedSpellIds: [...new Set(this.synergies.filter((s) => s.armed).map((s) => s.buffedSpellId))],

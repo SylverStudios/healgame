@@ -156,11 +156,16 @@ export interface UnitSpriteConfig {
   y: number;
   width: number;
   height: number;
-  /** Tile/frame index into `bodyTextureKey` — see ui/sprites.ts frameForUnit(). */
-  frame: number;
+  /** Tile/frame index into `bodyTextureKey` — see ui/sprites.ts frameForUnit().
+   *  Omit (or pass 0) for single-image custom textures that have no frame index. */
+  frame?: number;
   /** Texture key for the body image; defaults to the shared Kenney sheet (UNIT_TEXTURE_KEY)
-   *  when omitted. v0.3 chunk F: the party healer renders from a different sheet instead. */
+   *  when omitted. Custom stills (PixelLab tank / ash-husk) and the ragged healer sheet
+   *  pass their own keys. */
   bodyTextureKey?: string;
+  /** When true, the texture is already authored facing the correct combat direction
+   *  (tank east / husk west) — do not apply the Kenney side flipX. */
+  fixedFacing?: boolean;
   /** v0.3 chunk F: healer-only cast-pose animation. `frame` above must equal `idleFrame`. */
   casterAnim?: { idleFrame: number; castFrames: readonly number[] };
   showMana: boolean;
@@ -168,7 +173,8 @@ export interface UnitSpriteConfig {
   onClick?: (unitId: string) => void;
   /** Side-view facing line (side-view-layout-handoff §A): party faces right, enemies face
    *  left. Kenney Tiny Dungeon tiles are front-facing portraits (no true native direction),
-   *  so this is a stopgap flipX applied per side, not a correction of an inherent facing. */
+   *  so this is a stopgap flipX applied per side, not a correction of an inherent facing.
+   *  Ignored when `fixedFacing` is set. */
   facing: 'left' | 'right';
 }
 
@@ -221,7 +227,7 @@ export class UnitSprite {
   private squashActive = false;
 
   constructor(unit: Unit, config: UnitSpriteConfig) {
-    const { scene, x, y, width, height, frame, showMana, clickable, onClick, facing } = config;
+    const { scene, x, y, width, height, showMana, clickable, onClick, facing } = config;
     this.id = unit.id;
     this.scene = scene;
     this.homeX = x;
@@ -234,10 +240,14 @@ export class UnitSprite {
 
     // All children below use coordinates LOCAL to the container (relative to
     // the unit's home position, i.e. as if x=y=0).
-    this.body = scene.add
-      .image(0, 0, config.bodyTextureKey ?? UNIT_TEXTURE_KEY, frame)
+    const textureKey = config.bodyTextureKey ?? UNIT_TEXTURE_KEY;
+    const bodyImage =
+      config.frame === undefined
+        ? scene.add.image(0, 0, textureKey)
+        : scene.add.image(0, 0, textureKey, config.frame);
+    this.body = bodyImage
       .setDisplaySize(width, height)
-      .setFlipX(facing === 'left');
+      .setFlipX(!config.fixedFacing && facing === 'left');
     if (clickable) {
       // Hit area is the full frame bounds (including transparent pixels) —
       // same clickable box the old rect gave, so journey.mjs targets hold.
