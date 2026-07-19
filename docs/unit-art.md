@@ -1,6 +1,6 @@
 # Unit art — Kenney Tiny Dungeon + custom stills
 
-Status: current · Authority: combat unit tile mapping · Last verified: 2026-07-19
+Status: current · Authority: combat unit tile mapping + relic icons · Last verified: 2026-07-19
 
 Combat units render from two presentation paths (see `game/src/ui/sprites.ts`
 `presentationForUnit`):
@@ -9,6 +9,7 @@ Combat units render from two presentation paths (see `game/src/ui/sprites.ts`
 2. **Custom textures** — PixelLab party mercs / ash-husk stills (+ attack
    strips), or the ragged-healer spritesheet (cast poses)
 
+Relic pick / run-mod icons use PixelLab 64×64 stills (`ui/relicSprites.ts`).
 Everything else in the game stays temp art per CLAUDE.md.
 
 ## Where things are
@@ -23,10 +24,14 @@ Everything else in the game stays temp art per CLAUDE.md.
   `attack-east/0–6.png`). Authoring cache: `artifacts/pixellab-starter-dps2/`.
 - `game/public/assets/units/ash-husk/` — PixelLab ash husk (`west.png` +
   idle frames for a later pass). Authoring cache: `artifacts/pixellab-ash-husk/`.
+- `game/public/assets/relics/<id>.png` — hand-authored FE GBA inventory icons
+  (32×32 native, 64×64 nearest in game; General-sheet metal language). Cache:
+  `artifacts/pixellab-relics/hand-fe-v2/`. Keys via `ui/relicSprites.ts`;
+  BootScene preloads; `drawRunModGlyph` / RelicScene (HUD 32px, cards 64px).
 - `game/public/assets/ragged-healer-sheet.png` — healer cast sheet (v0.3).
-- `game/src/ui/sprites.ts` — the ONLY place art choices live
-  (`presentationForUnit`, `frameForUnit`, texture keys/URLs, attack anim
-  defs). Presentation-only; never gameplay data.
+- `game/src/ui/sprites.ts` — combat unit art choices (`presentationForUnit`,
+  `frameForUnit`, texture keys/URLs, attack anim defs). Presentation-only;
+  never gameplay data.
 - `kenney_tiny-dungeon/` at repo root — the full source pack, **untracked**
   (gitignored). Browse `Preview.png` or `Tiles/tile_XXXX.png` to pick new
   tiles. If it's missing, re-download "Tiny Dungeon 1.0" from kenney.nl.
@@ -42,8 +47,13 @@ Everything else in the game stays temp art per CLAUDE.md.
   authored into the PNG (party east, husk west).
 - **Attack strips**: BootScene loads `attack-east/0–6.png` per merc and
   registers Phaser anims (`unit-tank-attack`, `unit-dps1-attack`,
-  `unit-dps2-attack`). `UnitSprite.playAttack()` runs on tank shove / DPS
-  jab, then restores the rest still.
+  `unit-dps2-attack`) with an FE-style **exposure sheet**
+  (`MERC_ATTACK_FRAME_DURATIONS_MS` in `sprites.ts`) — not equal frame
+  durations. Rest duplicate (frame 0) is skipped; anticipation + contact
+  hold longer; smear / in-betweens flash (~2 display frames). Timing model:
+  [Unpacking Fire Emblem's animations](https://lost-worlds.neocities.org/blog/2024/10/20/fire-emblem-animation/).
+  `UnitSprite.playAttack()` runs on tank shove / DPS jab, then restores the
+  rest still.
 - **Healer sheet**: still a CombatScene special case (idle + cast frames);
   not selected by `presentationForUnit`.
 - `pixelArt: true` in `main.ts` gives nearest-neighbor filtering game-wide.

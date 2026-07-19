@@ -1,6 +1,6 @@
 # Idea backlog
 
-Status: current · Authority: none — uncommitted ideas for future exploration · Last verified: 2026-07-17
+Status: current · Authority: none — uncommitted ideas for future exploration · Last verified: 2026-07-19
 
 These are prompts to revisit, not approved scope or implementation requirements.
 Living specs and active phase handoffs take precedence. This file is **not** a
@@ -9,7 +9,10 @@ Living specs and active phase handoffs take precedence. This file is **not** a
 ## Art direction
 
 - Explore *Fire Emblem: The Sacred Stones*–style pixel art and combat
-  animations as a visual reference.
+  animations as a visual reference. (Partial: merc attack strips use an
+  FE-style exposure sheet — see `MERC_ATTACK_FRAME_DURATIONS_MS` /
+  [lost-worlds writeup](https://lost-worlds.neocities.org/blog/2024/10/20/fire-emblem-animation/).
+  Still open: authored smear drawings, healer cast holds, enemy anims.)
 - Keep *The Last Spell* in the reference set, especially for its darker,
   apocalyptic tone.
 

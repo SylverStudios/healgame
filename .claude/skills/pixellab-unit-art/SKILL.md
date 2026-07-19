@@ -117,6 +117,9 @@ anims until the user explicitly approves the quoted cost.
 - Matches metal tone; no soft/cute drift.
 - Combat-facing silhouette clear; feet roughly grounded in the canvas.
 - Attack: clear windup → hit → recover; frame 0 usable as rest.
+- Prefer a readable **contact silhouette** (held long in-game) and at least
+  one stretchy **smear** candidate — playback uses an FE-style exposure sheet
+  (`MERC_ATTACK_FRAME_DURATIONS_MS` in `ui/sprites.ts`), not equal frame times.
 - If wrong: `delete_animation` / `delete_character` and regenerate — do not
   “fix” with code.
 

@@ -1,15 +1,16 @@
 /**
  * Slay-the-Spire-style top bar: sworn oath + relic icons with hover tooltips.
- * Temp art only — colored circle (relic) or diamond (oath) glyphs, monospace
- * tooltip panel. Shared by Hub / Combat / Tree so the player can read effects
- * at any time.
+ * Oaths stay temp-art diamonds; relics use PixelLab 64×64 stills (colored
+ * circle fallback). Monospace tooltip panel. Shared by Hub / Combat / Tree.
  */
 
 import Phaser from 'phaser';
 import type { RunModDisplay, RunModKind } from '../data/runMods';
 import { relicGlyphColorById } from './relicColors';
+import { relicTextureKey } from './relicSprites';
 
-const ICON_RADIUS = 12;
+/** Half of the on-screen relic icon (64→32 display = 1:1 of the 32px art grid). */
+const ICON_RADIUS = 16;
 const ICON_GAP = 8;
 const ICON_BORDER = 0x0a0605;
 const MARGIN_LEFT = 30;
@@ -41,8 +42,8 @@ export interface RunModsBarOptions {
 }
 
 /**
- * Draws a temp-art glyph for a run mod. Exported so RelicScene cards can match
- * the top-bar icons.
+ * Draws a run-mod glyph. Relics prefer the PixelLab still; oaths stay diamonds.
+ * Exported so RelicScene cards match the top-bar icons.
  */
 export function drawRunModGlyph(
   scene: Phaser.Scene,
@@ -51,14 +52,19 @@ export function drawRunModGlyph(
   modId: string,
   kind: RunModKind,
   radius = ICON_RADIUS,
-): Phaser.GameObjects.Shape {
+): Phaser.GameObjects.GameObject {
   if (kind === 'oath') {
     const color = OATH_GLYPH_COLOR[modId] ?? 0xa89888;
-    // Diamond (rotated square) — reads distinct from relic circles.
+    // Diamond (rotated square) — reads distinct from relic icons.
     return scene.add
       .rectangle(x, y, radius * 1.6, radius * 1.6, color)
       .setAngle(45)
       .setStrokeStyle(2, ICON_BORDER);
+  }
+  const key = relicTextureKey(modId);
+  if (scene.textures.exists(key)) {
+    const size = Math.round(radius * 2);
+    return scene.add.image(x, y, key).setDisplaySize(size, size).setOrigin(0.5);
   }
   const color = relicGlyphColorById(modId);
   return scene.add.circle(x, y, radius, color).setStrokeStyle(2, ICON_BORDER);

@@ -78,11 +78,13 @@ game/src/
   immediately after any mutation. New logic gets colocated `*.test.ts`.
 - **Temp art only, few exceptions**: combat units render Kenney Tiny Dungeon
   16×16 tiles (CC0; sheet in `game/public/assets/`, unit→tile mapping in
-  `game/src/ui/sprites.ts`, `pixelArt: true`); the party healer + heal VFX
-  use the user-authored Aseprite sheets (`ragged-healer-sheet.png`,
-  `heal-vfx.png`), and background audio is a placeholder generated loop
-  (`assets/audio/`, see its README). Everything else stays rects, bars,
-  monospace text, dark palette (`#1a1210` bg) — reject polish creep.
+  `game/src/ui/sprites.ts`, `pixelArt: true`) plus PixelLab party/trash
+  stills; the party healer + heal VFX use the user-authored Aseprite sheets
+  (`ragged-healer-sheet.png`, `heal-vfx.png`); relic icons are PixelLab
+  64×64 stills (`assets/relics/`, `ui/relicSprites.ts`); and background
+  audio is a placeholder generated loop (`assets/audio/`, see its README).
+  Everything else stays rects, bars, monospace text, dark palette
+  (`#1a1210` bg) — reject polish creep.
 - **Scope discipline**: reject additions outside the active planning handoff
   (or, if none, outside what [`docs/CHANGELOG.md`](docs/CHANGELOG.md) and
   [`docs/poc-qa.md`](docs/poc-qa.md) already shipped). poc-spec §9 is the PoC
