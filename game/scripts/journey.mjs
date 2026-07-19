@@ -171,12 +171,22 @@ function baseSave(overrides) {
  * to grab a mid-cast frame (~700ms into Solemn Mend's 2000ms cast bar, v0.3
  * chunk F healer cast pose) and a heal-landed frame shortly after
  * completion (heal-vfx sparkle).
+ *
+ * `bubbleShotName`, if given: v0.3 chunk G fires the wipe/victory banter bubble at the very
+ * start of showResultOverlay(), depth-below the summary panel (so the panel stays readable
+ * once it's fully in) — the panel's own slide-in tween (~120-620ms) can end up covering the
+ * tank's on-screen slot well before this loop's normal 2000ms poll cadence would even notice
+ * combatReturn exists. While a bubble shot is still pending, the loop tightens its poll to
+ * 100ms (reverting to the normal cadence right after) so it catches combatReturn — and takes
+ * the shot — within ~100-250ms of the transition actually starting, comfortably inside the
+ * bubble's fade-in and well before the panel finishes covering that screen position.
  */
-async function playCombat(page, until, timeoutMs = 180_000, resultShotName, castShotNames) {
+async function playCombat(page, until, timeoutMs = 180_000, resultShotName, castShotNames, bubbleShotName) {
   await clickNamed(page, 'combatAlly:tank');
   const start = Date.now();
   let resultShot = false;
   let castShotDone = false;
+  let bubbleShot = false;
   while (Date.now() - start < timeoutMs) {
     if (await locate(page, 'combatSpell:solemn-mend')) {
       await clickNamed(page, 'combatSpell:solemn-mend');
@@ -191,6 +201,11 @@ async function playCombat(page, until, timeoutMs = 180_000, resultShotName, cast
       await page.keyboard.press('q');
     }
     if (await locate(page, 'combatReturn')) {
+      if (bubbleShotName && !bubbleShot) {
+        bubbleShot = true;
+        await page.waitForTimeout(150);
+        await shot(page, bubbleShotName);
+      }
       if (resultShotName && !resultShot) {
         resultShot = true;
         await page.waitForTimeout(1300);
@@ -198,7 +213,8 @@ async function playCombat(page, until, timeoutMs = 180_000, resultShotName, cast
       }
       await clickNamed(page, 'combatReturn');
     }
-    await page.waitForTimeout(2000);
+    const tickWaitMs = bubbleShotName && !bubbleShot ? 100 : 2000;
+    await page.waitForTimeout(tickWaitMs);
     const save = await readSave(page);
     if (save && until(save)) return save;
   }
@@ -237,10 +253,14 @@ try {
   await page.waitForTimeout(3500); // let autos land so lunge/'*' feedback is in frame
   await shot(page, 'ash-gate-first-run-feedback');
 
-  save = await playCombat(page, (s) => s.xp > 0, 180_000, 'combat-wipe-summary', {
-    castPose: 'combat-healer-cast-pose',
-    healLand: 'combat-heal-sparkle',
-  });
+  save = await playCombat(
+    page,
+    (s) => s.xp > 0,
+    180_000,
+    'combat-wipe-summary',
+    { castPose: 'combat-healer-cast-pose', healLand: 'combat-heal-sparkle' },
+    'combat-wipe-banter', // v0.3 chunk G: tank's wipe speech bubble, caught just as the transition starts
+  );
   check(save.xp > 0, `first run banked kill XP through the wipe (xp=${save.xp})`);
   check(save.clearedDungeons.length === 0, 'Ash Gate not marked cleared by a wipe');
   check(

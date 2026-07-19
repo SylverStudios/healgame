@@ -48,6 +48,8 @@ import type { CombatMods } from '../data/talentTree';
 import { beginRun, finalizeRun, recordPress, type PressSource } from '../telemetry';
 import { buildRunSummary } from '../ui/runSummary';
 import { drawBuildGlyph } from '../ui/buildGlyph';
+import { detectCloseCall, pickBanterLine, type BanterSpeaker, type BanterTrigger } from '../data/banter';
+import { showSpeechBubble } from '../ui/speechBubble';
 import { MOB_REGISTRY } from '../data/mobs';
 import { ENEMY_ABILITY_REGISTRY } from '../data/enemyAbilities';
 import type { BossTelegraphCue } from '../data/content/types';
@@ -163,6 +165,13 @@ const RETURN_REVEAL_MS = 220;
 
 const HUD_FONT = 'monospace';
 
+// v0.3 chunk G: party banter (docs/v0.3-handoff.md "Banter"). Bubble anchor Y is the
+// speaker's home Y minus enough clearance to clear its always-on overlay stack (HP bar +
+// number line, plus the mana bar + number line for the healer) — showSpeechBubble adds its
+// own small gap above that anchor for the tail.
+const BANTER_HEALER_Y_OFFSET = 72;
+const BANTER_TANK_Y_OFFSET = 46;
+
 // ---- helpers ----------------------------------------------------------------
 
 /** Evenly spread `count` units between `left` and `right`, single unit centered. */
@@ -228,6 +237,8 @@ export class CombatScene extends Phaser.Scene {
   private lastHealerMana: number | null = null;
 
   private resultShown = false;
+  /** v0.3 chunk G: once-per-combat latch fed to data/banter's detectCloseCall. */
+  private closeCallFired = false;
   /** Loaded once in create(); reused at result time for treeRanks (build glyph) — save.treeRanks
    *  cannot change mid-combat, so no need to reload. */
   private save!: SaveData;
@@ -239,6 +250,7 @@ export class CombatScene extends Phaser.Scene {
   init(data: CombatSceneData): void {
     this.sceneData = data;
     this.resultShown = false;
+    this.closeCallFired = false;
     this.partySprites = new Map();
     this.enemySprites = new Map();
     this.unitNames = new Map();
@@ -813,6 +825,14 @@ export class CombatScene extends Phaser.Scene {
     for (const unit of state.enemies) this.enemySprites.get(unit.id)?.update(unit);
     for (const [id, sprite] of this.partySprites) sprite.setTargeted(id === state.targetId);
 
+    // v0.3 chunk G: close-call fires mid-combat, the instant any living ally's HP snapshot
+    // crosses the threshold (handoff "Close call") — only while still fighting, so it never
+    // races the wipe/victory bubble fired from showResultOverlay() below.
+    if (state.status === 'running' && detectCloseCall(state.party, this.closeCallFired)) {
+      this.closeCallFired = true;
+      this.fireBanterBubble('close-call', 'healer');
+    }
+
     this.syncPlayerCastBar(state);
     this.syncBossCastBar(state);
 
@@ -915,6 +935,31 @@ export class CombatScene extends Phaser.Scene {
   // ---- end of combat -------------------------------------------------------------
 
   /**
+   * v0.3 chunk G: shows one speech bubble above `speaker`'s sprite with a banter line for
+   * (trigger, speaker) — subclass comes from the already-loaded save (`this.save.subclass`),
+   * never read from tree/save internals here. No-op if the speaker's sprite is gone (never
+   * happens for tank/healer, who persist for the whole fight, but keeps this call site safe).
+   */
+  private fireBanterBubble(trigger: BanterTrigger, speaker: BanterSpeaker): void {
+    const sprite = this.partySprites.get(speaker);
+    if (!sprite) return;
+    const yOffset = speaker === 'healer' ? BANTER_HEALER_Y_OFFSET : BANTER_TANK_Y_OFFSET;
+    const line = pickBanterLine({
+      trigger,
+      speaker,
+      subclass: this.save.subclass,
+      rng: Math.random,
+    });
+    showSpeechBubble(this, {
+      x: sprite.getHomeX(),
+      y: sprite.getHomeY() - yOffset,
+      text: line,
+      viewWidth: VIEW_WIDTH,
+      viewHeight: VIEW_HEIGHT,
+    });
+  }
+
+  /**
    * Wipe/victory result flow: a short slide-in transition into a run summary
    * panel (outcome, XP gained this run, build glyph of the lit tree path),
    * replacing the old instant overlay. Persists the run exactly once via
@@ -934,10 +979,11 @@ export class CombatScene extends Phaser.Scene {
 
     // ---- transition started ----
     // Party sprites are still on screen underneath everything added below
-    // (only alpha-dimmed by the backdrop, never hidden/destroyed) — this is
-    // the hook point for chunk G's wipe/victory speech bubble, which should
-    // attach to the tank/healer sprite here, before the panel visually
-    // covers them.
+    // (only alpha-dimmed by the backdrop, never hidden/destroyed) — chunk G's wipe/victory
+    // speech bubble fires right here, before the panel's backdrop/slide-in tweens begin, so
+    // it's on screen and already fading in while sprites are still fully visible (locked
+    // triggers: wipe → tank, victory → healer — see docs/v0.3-handoff.md "Banter").
+    this.fireBanterBubble(status === 'wipe' ? 'wipe' : 'victory', status === 'wipe' ? 'tank' : 'healer');
 
     const backdrop = this.add
       .rectangle(centerX, centerY, VIEW_WIDTH, VIEW_HEIGHT, 0x000000)
