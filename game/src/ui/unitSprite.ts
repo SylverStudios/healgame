@@ -160,6 +160,8 @@ export interface UnitSpriteConfig {
   fixedFacing?: boolean;
   /** Phaser anim key for a one-shot PixelLab attack strip (registered in BootScene). */
   attackAnimKey?: string;
+  /** Phaser anim key for a one-shot hurt reaction strip (registered in BootScene). */
+  hurtAnimKey?: string;
   /**
    * Healer-only (chunk 1B): continuous breathing loop (Phaser anim, `repeat: -1`)
    * played whenever not charging/casting/zapping. Restored after any one-shot
@@ -216,6 +218,8 @@ export class UnitSprite {
   /** Rest sheet frame for Kenney / healer; undefined for single-image stills. */
   private readonly restFrame: number | undefined;
   private readonly attackAnimKey: string | null;
+  /** One-shot hurt reaction strip key; null for units without one (see `hurtAnimKey` config). */
+  private readonly hurtAnimKey: string | null;
   /** Healer-only continuous idle loop key; null for every other unit (see `idleAnimKey` config). */
   private readonly idleAnimKey: string | null;
   /** Healer-only Bonk zap strip key; null for every other unit. */
@@ -272,6 +276,7 @@ export class UnitSprite {
     this.restTextureKey = textureKey;
     this.restFrame = config.frame;
     this.attackAnimKey = config.attackAnimKey ?? null;
+    this.hurtAnimKey = config.hurtAnimKey ?? null;
     this.idleAnimKey = config.idleAnimKey ?? null;
     this.zapAnimKey = config.zapAnimKey ?? null;
     this.bodyRestY = config.bodyOffsetY ?? 0;
@@ -561,6 +566,18 @@ export class UnitSprite {
     // Restart if already mid-swing so rapid autos replace the strip instead of
     // being ignored (Phaser's ignoreIfPlaying=true would skip the new play).
     this.body.play(this.attackAnimKey, false);
+    this.body.setDisplaySize(this.width, this.height);
+  }
+
+  /**
+   * Play the hurt reaction strip if one is wired for this unit. Rest pose is
+   * restored on ANIMATION_COMPLETE (see constructor). Safe no-op for units
+   * without one. Mirrors `playAttack()` — either call simply restarts
+   * whichever body anim was playing, so no explicit priority is needed.
+   */
+  playHurt(): void {
+    if (!this.hurtAnimKey || !this.alive) return;
+    this.body.play(this.hurtAnimKey, false);
     this.body.setDisplaySize(this.width, this.height);
   }
 

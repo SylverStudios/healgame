@@ -22,10 +22,15 @@ import {
   HEALER_ZAP_ANIM_KEY,
   HEALER_ZAP_FRAME_DURATIONS_MS,
   healerStripAnimFrames,
+  hurtAnimFrames,
+  hurtAnimKeyForUnit,
   MERC_ATTACK_FRAME_DURATIONS_MS,
   presentationForUnit,
+  TANK_ATTACK_FRAME_DURATIONS_MS,
+  TANK_HURT_FRAME_DURATIONS_MS,
   TANK_TEXTURE_KEY,
   UNIT_ATTACK_ANIMS,
+  UNIT_HURT_ANIMS,
   ZAP_VFX_FRAME_COUNT,
   ZAP_VFX_FRAME_DURATIONS_MS,
 } from './sprites';
@@ -86,6 +91,13 @@ describe('presentationForUnit', () => {
     expect(attackAnimKeyForUnit(catalogUnit('dps2', 'dps'))).toBe('unit-dps2-attack');
     expect(attackAnimKeyForUnit(catalogUnit('healer', 'healer'))).toBeUndefined();
   });
+
+  it('wires the hurt anim key for tank only', () => {
+    expect(hurtAnimKeyForUnit(catalogUnit('tank', 'tank'))).toBe('unit-tank-hurt');
+    expect(hurtAnimKeyForUnit(catalogUnit('dps1', 'dps'))).toBeUndefined();
+    expect(hurtAnimKeyForUnit(catalogUnit('dps2', 'dps'))).toBeUndefined();
+    expect(hurtAnimKeyForUnit(catalogUnit('healer', 'healer'))).toBeUndefined();
+  });
 });
 
 describe('merc attack exposure sheet', () => {
@@ -104,12 +116,44 @@ describe('merc attack exposure sheet', () => {
   it('builds Phaser frames from the exposure sheet for every merc strip', () => {
     for (const def of UNIT_ATTACK_ANIMS) {
       const frames = attackAnimFrames(def);
-      expect(frames.length).toBe(6); // rest frame omitted
-      expect(frames[0]!.key).toBe(def.frameKey(1));
+      // Frame count omitted from the anim = however many durations are ≤0 (the shared
+      // rest-duplicate convention) — tank keeps its rest hold, so nothing is skipped.
+      const expectedLength = def.frameDurationsMs.filter((ms) => ms > 0).length;
+      expect(frames.length).toBe(expectedLength);
       expect(frames.every((f) => f.duration > 0)).toBe(true);
-      const totalMs = frames.reduce((sum, f) => sum + f.duration, 0);
-      expect(totalMs).toBeGreaterThan(400);
-      expect(totalMs).toBeLessThan(800);
+    }
+  });
+
+  it('gives the tank its own faster 7-frame exposure sheet, not the shared merc one', () => {
+    const tankDef = UNIT_ATTACK_ANIMS.find((def) => def.unitId === 'tank')!;
+    expect(tankDef.frameDurationsMs).toBe(TANK_ATTACK_FRAME_DURATIONS_MS);
+    expect(tankDef.frameDurationsMs.length).toBe(tankDef.frameCount);
+    expect(tankDef.frameCount).toBe(7);
+    expect(new Set(TANK_ATTACK_FRAME_DURATIONS_MS).size).toBeGreaterThan(1);
+  });
+
+  it('keeps dps1 / dps2 on the shared legacy merc exposure sheet', () => {
+    for (const def of UNIT_ATTACK_ANIMS.filter((d) => d.unitId !== 'tank')) {
+      expect(def.frameDurationsMs).toBe(MERC_ATTACK_FRAME_DURATIONS_MS);
+    }
+  });
+});
+
+describe('tank hurt exposure sheet', () => {
+  it('keeps the hurt strip length matched to its duration table (never equal times)', () => {
+    const def = UNIT_HURT_ANIMS.find((d) => d.unitId === 'tank')!;
+    expect(def.frameDurationsMs).toBe(TANK_HURT_FRAME_DURATIONS_MS);
+    expect(TANK_HURT_FRAME_DURATIONS_MS.length).toBe(def.frameCount);
+    expect(def.frameCount).toBe(5);
+    expect(new Set(TANK_HURT_FRAME_DURATIONS_MS).size).toBeGreaterThan(1);
+  });
+
+  it('builds Phaser frames from the hurt exposure sheet', () => {
+    for (const def of UNIT_HURT_ANIMS) {
+      const frames = hurtAnimFrames(def);
+      expect(frames.length).toBe(def.frameCount);
+      expect(frames.every((f) => f.duration > 0)).toBe(true);
+      expect(frames[0]!.key).toBe(def.frameKey(0));
     }
   });
 });

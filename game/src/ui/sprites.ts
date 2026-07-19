@@ -60,6 +60,24 @@ export interface UnitAttackAnimDef {
 }
 
 /**
+ * One-shot hurt reaction strip for a party merc. Same shape as
+ * `UnitAttackAnimDef` (separate per-frame PNGs, FE exposure sheet); kept as a
+ * distinct type because not every merc has a hurt strip yet.
+ */
+export interface UnitHurtAnimDef {
+  /** Party unit id this strip belongs to. */
+  unitId: 'tank';
+  animKey: string;
+  /** Rest still shown when not flinching. */
+  restTextureKey: CustomUnitTextureKey;
+  frameCount: number;
+  frameKey: (index: number) => string;
+  frameUrl: (index: number) => string;
+  /** Per-frame hold times (ms); length must equal `frameCount`. */
+  frameDurationsMs: readonly number[];
+}
+
+/**
  * FE-style exposure sheet for the 7-frame PixelLab merc strips.
  *
  * Equal-duration GIFs read floaty; Fire Emblem holds anticipation / contact
@@ -78,6 +96,21 @@ export const MERC_ATTACK_FRAME_DURATIONS_MS: readonly number[] = [
   50, // 5 follow-through (~3)
   67, // 6 settle (~4)
 ] as const;
+
+/**
+ * Tank's own exposure sheet for its tight 32×32 attack strip (installed
+ * separately from the legacy padded dps1/dps2 strips, which stay on
+ * `MERC_ATTACK_FRAME_DURATIONS_MS`). Same 7-frame shape, faster overall read.
+ */
+export const TANK_ATTACK_FRAME_DURATIONS_MS: readonly number[] = [
+  50, 100, 33, 167, 67, 83, 100,
+] as const;
+
+/**
+ * Tank's hurt reaction exposure sheet (5 frames): quick antic, snap into the
+ * flinch, held recoil, then recover back to rest.
+ */
+export const TANK_HURT_FRAME_DURATIONS_MS: readonly number[] = [50, 100, 150, 83, 100] as const;
 
 /** Shared shape for building Phaser anim frame lists from a per-frame exposure sheet. */
 interface FrameStripSource {
@@ -129,7 +162,7 @@ export const UNIT_ATTACK_ANIMS: readonly UnitAttackAnimDef[] = [
     frameCount: 7,
     frameKey: (i) => attackFrameKey('tank', i),
     frameUrl: (i) => attackFrameUrl('tank', 'east', i),
-    frameDurationsMs: MERC_ATTACK_FRAME_DURATIONS_MS,
+    frameDurationsMs: TANK_ATTACK_FRAME_DURATIONS_MS,
   },
   {
     unitId: 'dps1',
@@ -154,6 +187,39 @@ export const UNIT_ATTACK_ANIMS: readonly UnitAttackAnimDef[] = [
 /** Phaser anim key for a party merc's attack strip, if one is wired. */
 export function attackAnimKeyForUnit(unit: Pick<Unit, 'id'>): string | undefined {
   return UNIT_ATTACK_ANIMS.find((def) => def.unitId === unit.id)?.animKey;
+}
+
+function hurtFrameKey(slug: string, index: number): string {
+  return `unit-${slug}-hurt-${index}`;
+}
+
+function hurtFrameUrl(slug: string, facing: 'east' | 'west', index: number): string {
+  return `assets/units/${slug}/hurt-${facing}/${index}.png`;
+}
+
+/** Tank's east hurt strip (5 frames). Other mercs don't have one yet. */
+export const UNIT_HURT_ANIMS: readonly UnitHurtAnimDef[] = [
+  {
+    unitId: 'tank',
+    animKey: 'unit-tank-hurt',
+    restTextureKey: TANK_TEXTURE_KEY,
+    frameCount: 5,
+    frameKey: (i) => hurtFrameKey('tank', i),
+    frameUrl: (i) => hurtFrameUrl('tank', 'east', i),
+    frameDurationsMs: TANK_HURT_FRAME_DURATIONS_MS,
+  },
+] as const;
+
+/** Phaser anim key for a party merc's hurt reaction strip, if one is wired. */
+export function hurtAnimKeyForUnit(unit: Pick<Unit, 'id'>): string | undefined {
+  return UNIT_HURT_ANIMS.find((def) => def.unitId === unit.id)?.animKey;
+}
+
+/** Phaser anim frame entries with FE holds (skips duration ≤ 0). */
+export function hurtAnimFrames(
+  def: UnitHurtAnimDef,
+): ReadonlyArray<{ key: string; duration: number }> {
+  return buildStripFrames(def);
 }
 
 /**

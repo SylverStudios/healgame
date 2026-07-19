@@ -37,8 +37,11 @@ Everything else in the game stays temp art per CLAUDE.md.
   `charge-east/`, `cast-east/` unchanged. Source: `art/source/armored-paladin/`.
   Charge loops while channeling; cast-action plays once on release (FE
   exposure timings in `sprites.ts`).
-- `game/public/assets/units/tank/` — PixelLab starter tank (`east.png` +
-  `attack-east/0–6.png`). Authoring cache: `artifacts/pixellab-starter-tank/`.
+- `game/public/assets/units/tank/` — tight 32×32 tank (`east.png` +
+  `attack-east/0–6.png` + `hurt-east/0–4.png`). Displays at 64 with the
+  healer foot-pad ratio. Own exposure sheets: `TANK_ATTACK_FRAME_DURATIONS_MS`,
+  `TANK_HURT_FRAME_DURATIONS_MS` (`sprites.ts`). Authoring cache:
+  `artifacts/pixellab-tank-v2/` (frozen still also in `art/source/tank/`).
 - `game/public/assets/units/dps1/` — PixelLab melee DPS (`east.png` +
   `attack-east/0–6.png`). Authoring cache: `artifacts/pixellab-starter-dps1/`.
 - `game/public/assets/units/dps2/` — PixelLab ranger DPS (`east.png` +
@@ -69,13 +72,18 @@ Everything else in the game stays temp art per CLAUDE.md.
   authored into the PNG (party east, husk west).
 - **Attack strips**: BootScene loads `attack-east/0–6.png` per merc and
   registers Phaser anims (`unit-tank-attack`, `unit-dps1-attack`,
-  `unit-dps2-attack`) with an FE-style **exposure sheet**
-  (`MERC_ATTACK_FRAME_DURATIONS_MS` in `sprites.ts`) — not equal frame
-  durations. Rest duplicate (frame 0) is skipped; anticipation + contact
-  hold longer; smear / in-betweens flash (~2 display frames). Timing model:
+  `unit-dps2-attack`) with FE-style **exposure sheets** — not equal frame
+  durations. Legacy dps1/dps2 use `MERC_ATTACK_FRAME_DURATIONS_MS` (rest
+  duplicate frame 0 skipped). Tank has its own faster
+  `TANK_ATTACK_FRAME_DURATIONS_MS` (all 7 frames held). Timing model:
   [Unpacking Fire Emblem's animations](https://lost-worlds.neocities.org/blog/2024/10/20/fire-emblem-animation/).
   `UnitSprite.playAttack()` runs on tank shove / DPS jab, then restores the
   rest still.
+- **Hurt strips**: tank `hurt-east/0–4.png` is preloaded and Phaser-anim
+  registered the same way (`unit-tank-hurt`, `TANK_HURT_FRAME_DURATIONS_MS`
+  in `sprites.ts`, `UNIT_HURT_ANIMS` parallel to `UNIT_ATTACK_ANIMS`).
+  `UnitSprite.playHurt()` runs whenever a `damage` event lands on a unit with
+  a wired hurt strip (no-op otherwise), then restores the rest still.
 - **Healer sheet**: CombatScene special case — charge loop on `castStarted`
   (channeled), cast-action strip on `finishCast` / instant `playCastRelease`;
   cancel returns to idle. Not selected by `presentationForUnit`. Texture key
@@ -95,18 +103,18 @@ Everything else in the game stays temp art per CLAUDE.md.
   one-shot pale-gold impact played on the enemy target when Bonk's damage
   lands (`combatFx.showZapImpact`, mirrors `showHealSparkle`).
 - `pixelArt: true` in `main.ts` gives nearest-neighbor filtering game-wide.
-- Display sizes (`CombatScene.ts`): PixelLab mercs **112**, healer 32×32 at
-  **64** (2×), Kenney party **48**; PixelLab trash **72**, Kenney trash
-  **32**; bosses **80** (Kenney today). Padded canvases use `bodyOffsetY` so
-  painted feet meet `GROUND_Y`. HP/mana meters are capped at 72px wide so
-  neighboring party bars don't overlap.
+- Display sizes (`CombatScene.ts`): tight 32×32 party (healer, tank) at
+  **64** (2×); legacy padded mercs (dps1/dps2) **112**; Kenney party **48**;
+  PixelLab trash **72**, Kenney trash **32**; bosses **80** (Kenney today).
+  Padded canvases use `bodyOffsetY` so painted feet meet `GROUND_Y`. HP/mana
+  meters are capped at 72px wide so neighboring party bars don't overlap.
 - Death state = dark tint + alpha + shrink (`update()` in unitSprite.ts).
 
 ## Current casting
 
 | Unit | Path | Asset |
 |------|------|-------|
-| tank | custom still + attack | `unit-tank` + `unit-tank-attack` |
+| tank | tight 32 still + attack + hurt | `unit-tank` + `unit-tank-attack` + `unit-tank-hurt` |
 | dps1 | custom still + attack | `unit-dps1` + `unit-dps1-attack` |
 | dps2 | custom still + attack | `unit-dps2` + `unit-dps2-attack` |
 | healer | 32×32 armored-paladin sheet | `unit-healer` idle + charge loop + cast-action |

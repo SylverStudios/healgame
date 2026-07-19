@@ -33,6 +33,7 @@ import {
   HEALER_IDLE_FRAME,
   HEALER_SHEET_TEXTURE_KEY,
   HEALER_ZAP_ANIM_KEY,
+  hurtAnimKeyForUnit,
   presentationForUnit,
 } from '../ui/sprites';
 import { SpellBar } from '../ui/spellBar';
@@ -99,24 +100,18 @@ const GROUND_LINE_MARGIN = 40;
  *  (handoff §B). Presentation-only — index into this array, never reorder the engine's. */
 const PARTY_VISUAL_ORDER = ['healer', 'dps2', 'dps1', 'tank'];
 
-// Display sizes: PixelLab merc canvases are ~92px with heavy padding around a
-// ~40px figure. The armored-paladin healer is native 32×32 (tight canvas) and
-// displays at 2× for a chunky SNES read — mercs stay at 112 until they get
-// matching 32×32 art. Kenney sizes stay multiples of 16.
+// Display: legacy padded mercs 112; tight 32×32 (healer/tank) 64; Kenney 48.
 const PARTY_MERC_WIDTH = 112;
 const PARTY_MERC_HEIGHT = 112;
 const PARTY_HEALER_WIDTH = 64;
 const PARTY_HEALER_HEIGHT = 64;
+const PARTY_TIGHT_MERC_WIDTH = 64; // native×2; dps move here once regenerated
+const PARTY_TIGHT_MERC_HEIGHT = 64;
 const PARTY_KENNEY_WIDTH = 48;
 const PARTY_KENNEY_HEIGHT = 48;
 const TRASH_CUSTOM_WIDTH = 72;
 const TRASH_CUSTOM_HEIGHT = 72;
-/**
- * Padded canvases leave empty pixels under painted feet. Shift the body down
- * by that fraction of display height so feet meet GROUND_Y.
- * - PixelLab stills: ~23px pad on a ~92px canvas
- * - Armored-paladin healer: ~2px pad on a 32px frame
- */
+/** Foot pad as fraction of display height: legacy ~23/92, tight native ~2/32. */
 const PIXELLAB_FOOT_PAD_RATIO = 23 / 92;
 const HEALER_FOOT_PAD_RATIO = 2 / 32;
 const TRASH_KENNEY_WIDTH = 32;
@@ -426,26 +421,19 @@ export class CombatScene extends Phaser.Scene {
         PARTY_SLOT_LEFT,
         PARTY_SLOT_RIGHT,
       );
-      // Healer: 32×32 armored-paladin sheet + cast loop. Tank/DPS: PixelLab
-      // stills + attack strips (fixed facing). Healer displays smaller until
-      // mercs move to the same native density.
+      // Healer/tank: tight 32→64. DPS: legacy padded 112 until regenerated.
       const isHealer = unit.role === 'healer';
+      const isTightMerc = unit.id === 'tank';
       const presentation = presentationForUnit(unit);
-      const width = isHealer
-        ? PARTY_HEALER_WIDTH
-        : presentation.kind === 'texture'
-          ? PARTY_MERC_WIDTH
-          : PARTY_KENNEY_WIDTH;
-      const height = isHealer
-        ? PARTY_HEALER_HEIGHT
-        : presentation.kind === 'texture'
-          ? PARTY_MERC_HEIGHT
-          : PARTY_KENNEY_HEIGHT;
+      const isLegacyMerc = presentation.kind === 'texture' && !isTightMerc;
+      const width = isHealer ? PARTY_HEALER_WIDTH : isTightMerc ? PARTY_TIGHT_MERC_WIDTH : isLegacyMerc ? PARTY_MERC_WIDTH : PARTY_KENNEY_WIDTH;
+      const height = isHealer ? PARTY_HEALER_HEIGHT : isTightMerc ? PARTY_TIGHT_MERC_HEIGHT : isLegacyMerc ? PARTY_MERC_HEIGHT : PARTY_KENNEY_HEIGHT;
       const y = groundAnchorY(height);
       const attackAnimKey = attackAnimKeyForUnit(unit);
-      const bodyOffsetY = isHealer
+      const hurtAnimKey = hurtAnimKeyForUnit(unit);
+      const bodyOffsetY = isHealer || isTightMerc
         ? Math.round(height * HEALER_FOOT_PAD_RATIO)
-        : presentation.kind === 'texture'
+        : isLegacyMerc
           ? Math.round(height * PIXELLAB_FOOT_PAD_RATIO)
           : 0;
       const sprite = new UnitSprite(unit, {
@@ -476,6 +464,7 @@ export class CombatScene extends Phaser.Scene {
                 fixedFacing: true,
                 bodyOffsetY,
                 ...(attackAnimKey === undefined ? {} : { attackAnimKey }),
+                ...(hurtAnimKey === undefined ? {} : { hurtAnimKey }),
               }
             : { frame: presentation.frame }),
         showMana: isHealer,
@@ -707,6 +696,7 @@ export class CombatScene extends Phaser.Scene {
           const victim = this.findSprite(event.targetId);
           victim?.flashDamage();
           victim?.spawnDamageFloat(event.amount);
+          victim?.playHurt(); // no-op unless UNIT_HURT_ANIMS wires this unit
           // Guard: the attacker (and/or victim) may already be dead this tick — sprites persist
           // until the next rebuildEnemies(), so the lookup is safe, but the sprite may be absent
           // if it belongs to a roster already replaced by a same-tick waveStarted rebuild.

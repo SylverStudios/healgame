@@ -18,11 +18,13 @@ import {
   TANK_TEXTURE_KEY,
   TANK_TEXTURE_URL,
   UNIT_ATTACK_ANIMS,
+  UNIT_HURT_ANIMS,
   ZAP_VFX_FRAME_SIZE,
   ZAP_VFX_TEXTURE_KEY,
   ZAP_VFX_URL,
   attackAnimFrames,
   healerStripAnimFrames,
+  hurtAnimFrames,
   UNIT_FRAME_SIZE,
   UNIT_TEXTURE_KEY,
   UNIT_TEXTURE_URL,
@@ -77,12 +79,19 @@ export class BootScene extends Phaser.Scene {
         this.load.image(def.frameKey(i), def.frameUrl(i));
       }
     }
+    // Hurt reaction strips: same per-frame texture loading as attack strips.
+    for (const def of UNIT_HURT_ANIMS) {
+      for (let i = 0; i < def.frameCount; i++) {
+        this.load.image(def.frameKey(i), def.frameUrl(i));
+      }
+    }
     // Looped background music (see ui/music.ts MUSIC_URL).
     this.load.audio(MUSIC_ASSET_KEY, MUSIC_URL);
   }
 
   create(): void {
     this.registerUnitAttackAnims();
+    this.registerUnitHurtAnims();
     this.registerHealerStripAnims();
     const save = loadSave();
     initMusic(this.game, save.musicVolumePct);
@@ -101,6 +110,18 @@ export class BootScene extends Phaser.Scene {
       this.anims.create({
         key: def.animKey,
         frames: [...attackAnimFrames(def)],
+        repeat: 0,
+      });
+    }
+  }
+
+  /** One-shot hurt reaction anims for party mercs — mirrors registerUnitAttackAnims(). */
+  private registerUnitHurtAnims(): void {
+    for (const def of UNIT_HURT_ANIMS) {
+      if (this.anims.exists(def.animKey)) continue;
+      this.anims.create({
+        key: def.animKey,
+        frames: [...hurtAnimFrames(def)],
         repeat: 0,
       });
     }
