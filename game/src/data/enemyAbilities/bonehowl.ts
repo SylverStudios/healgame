@@ -9,4 +9,6 @@ export const BONEHOWL = {
   intervalMs: 12_000,
   partyDamage: 4,
   visualKey: 'bonehowl',
+  // v0.3 chunk F: the Gate Warden rears back to howl — 'raise' reads as the wind-up.
+  telegraph: 'raise',
 } as const satisfies EnemyAbilityDef;

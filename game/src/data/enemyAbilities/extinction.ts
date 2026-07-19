@@ -9,4 +9,6 @@ export const EXTINCTION = {
   intervalMs: 25_000,
   partyDamage: 10,
   visualKey: 'extinction',
+  // v0.3 chunk F: rhythmic build-up to the apocalyptic party hit.
+  telegraph: 'pulse',
 } as const satisfies EnemyAbilityDef;

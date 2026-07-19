@@ -12,4 +12,6 @@ export const EMBERFALL = {
   tickMs: 1_000,
   damagePerTick: 2,
   visualKey: 'emberfall',
+  // v0.3 chunk F: brightening embers reads naturally for a fire DoT wind-up.
+  telegraph: 'glow',
 } as const satisfies EnemyAbilityDef;

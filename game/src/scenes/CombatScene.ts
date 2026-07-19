@@ -22,7 +22,12 @@ import { getEncounterById } from '../data/encounters';
 import { GCD_MS } from '../data/constants';
 import { Bar } from '../ui/bar';
 import { UnitSprite } from '../ui/unitSprite';
-import { frameForUnit } from '../ui/sprites';
+import {
+  frameForUnit,
+  HEALER_CAST_FRAMES,
+  HEALER_IDLE_FRAME,
+  HEALER_SHEET_TEXTURE_KEY,
+} from '../ui/sprites';
 import { SpellBar } from '../ui/spellBar';
 import { CombatLog } from '../ui/combatLog';
 import {
@@ -31,7 +36,7 @@ import {
   shakeHealImpact,
   showCastBeam,
   showHealParticles,
-  showHealRipple,
+  showHealSparkle,
 } from '../ui/combatFx';
 import { PaceToggle } from '../ui/paceToggle';
 import { loadSave, saveGame, type SaveData } from '../save/save';
@@ -43,6 +48,9 @@ import type { CombatMods } from '../data/talentTree';
 import { beginRun, finalizeRun, recordPress, type PressSource } from '../telemetry';
 import { buildRunSummary } from '../ui/runSummary';
 import { drawBuildGlyph } from '../ui/buildGlyph';
+import { MOB_REGISTRY } from '../data/mobs';
+import { ENEMY_ABILITY_REGISTRY } from '../data/enemyAbilities';
+import type { BossTelegraphCue } from '../data/content/types';
 
 /** Pinned contract: callers pass fully resolved CombatMods (from loadoutFromSave). */
 export interface CombatSceneData {
@@ -108,9 +116,13 @@ const GCD_BAR_HEIGHT = 4;
 const GCD_BAR_GAP = 3;
 const GCD_FILL_COLOR = 0x8a7868;
 
-const BOSS_CAST_BAR_WIDTH = 340;
-const BOSS_CAST_BAR_HEIGHT = 20;
-const BOSS_CAST_BAR_Y = 54;
+// v0.3 chunk F "Boss telegraphs": the named cast bar is demoted — an unlabeled
+// sliver near the boss sprite (its own wind-up/glow cue is the primary teach;
+// the combat log still names the ability via the existing bossCastStarted line).
+const BOSS_CAST_BAR_WIDTH = 70;
+const BOSS_CAST_BAR_HEIGHT = 5;
+/** Gap between the boss sprite's top edge and the sliver's bottom edge. */
+const BOSS_CAST_BAR_GAP = 14;
 const BOSS_CAST_FILL_COLOR = 0xe05a4e;
 
 const SPELL_BAR_Y = 508;
@@ -184,8 +196,10 @@ export class CombatScene extends Phaser.Scene {
   private playerCastBar!: Bar;
   private playerCastLabel!: Phaser.GameObjects.Text;
   private gcdBar!: Bar;
+  /** Demoted per v0.3 chunk F: unlabeled sliver near the boss, not a named top bar. */
   private bossCastBar!: Bar;
-  private bossCastLabel!: Phaser.GameObjects.Text;
+  /** Data-driven wind-up cue for the current encounter's boss ability, resolved once in create(). */
+  private bossTelegraphCue: BossTelegraphCue = 'glow';
 
   private waveText!: Phaser.GameObjects.Text;
   private rewardsText!: Phaser.GameObjects.Text;
@@ -209,6 +223,9 @@ export class CombatScene extends Phaser.Scene {
   private manaAura: ManaSpendAura | null = null;
   /** Wall-clock delta of the last update() tick — drives aura pulse without pacing. */
   private lastFrameDtMs = 16;
+  /** v0.3 chunk F "Mana regen tick": healer mana at the end of the previous update() tick —
+   *  an upward jump with no castCancelled event this tick is a regen tick, not a cast refund. */
+  private lastHealerMana: number | null = null;
 
   private resultShown = false;
   /** Loaded once in create(); reused at result time for treeRanks (build glyph) — save.treeRanks
@@ -293,8 +310,21 @@ export class CombatScene extends Phaser.Scene {
     this.combatLog = new CombatLog(this, VIEW_WIDTH);
     this.buildToast();
     this.manaAura = new ManaSpendAura(this);
+    this.bossTelegraphCue = this.resolveBossTelegraphCue();
+    this.lastHealerMana = this.engine.state.party.find((u) => u.role === 'healer')?.mana ?? null;
 
     this.syncView();
+  }
+
+  /** Data-driven wind-up cue (handoff "Boss telegraphs") for this encounter's boss ability,
+   *  looked up from the same authoring catalogs the content pipeline compiled from — the
+   *  compiled EncounterDef/BossCastDef never carries this field (presentation-only, and the
+   *  engine stays untouched), so it's resolved here via the boss's stable mobId. */
+  private resolveBossTelegraphCue(): BossTelegraphCue {
+    const bossMob = MOB_REGISTRY[this.encounter.boss.id];
+    const abilityId = bossMob?.abilityIds[0];
+    const ability = abilityId !== undefined ? ENEMY_ABILITY_REGISTRY[abilityId] : undefined;
+    return ability?.telegraph ?? 'glow';
   }
 
   update(_time: number, delta: number): void {
@@ -302,8 +332,25 @@ export class CombatScene extends Phaser.Scene {
     const simDelta = Math.max(0, Math.floor((delta * this.combatPaceTenths) / 10));
     this.elapsedMs += simDelta;
     const events = this.engine.advance(simDelta);
+    this.handleManaRegenPulse(events);
     this.handleEvents(events);
     this.syncView();
+  }
+
+  /** v0.3 chunk F "Mana regen tick": any mana uptick this tick that isn't a castCancelled
+   *  refund is a regen tick — pulse the healer's mana bar + float a mote. No new engine event;
+   *  this just diffs `state.party` healer mana across ticks (handoff: "prefer listening to
+   *  existing mana changes over new systems"). */
+  private handleManaRegenPulse(events: CombatEvent[]): void {
+    const healerUnit = this.engine.state.party.find((u) => u.role === 'healer');
+    if (!healerUnit) return;
+    const prev = this.lastHealerMana;
+    const curr = healerUnit.mana;
+    const hasCancelRefund = events.some((e) => e.type === 'castCancelled');
+    if (prev !== null && curr > prev && !hasCancelRefund) {
+      this.partySprites.get('healer')?.pulseMana();
+    }
+    this.lastHealerMana = curr;
   }
 
   // ---- setup --------------------------------------------------------------
@@ -336,14 +383,23 @@ export class CombatScene extends Phaser.Scene {
         PARTY_SLOT_LEFT,
         PARTY_SLOT_RIGHT,
       );
+      // v0.3 chunk F: the healer renders from the ragged-healer sheet instead of the shared
+      // Kenney tile (the one named temp-art exception — CLAUDE.md), with cast-pose frames
+      // wired up so castStarted/castFinished can animate it. Every other party unit is
+      // unaffected — frameForUnit()/UNIT_TEXTURE_KEY still drives tank/dps1/dps2.
+      const isHealer = unit.role === 'healer';
       const sprite = new UnitSprite(unit, {
         scene: this,
         x,
         y,
         width: PARTY_UNIT_WIDTH,
         height: PARTY_UNIT_HEIGHT,
-        frame: frameForUnit(unit),
-        showMana: unit.role === 'healer',
+        frame: isHealer ? HEALER_IDLE_FRAME : frameForUnit(unit),
+        ...(isHealer ? { bodyTextureKey: HEALER_SHEET_TEXTURE_KEY } : {}),
+        ...(isHealer
+          ? { casterAnim: { idleFrame: HEALER_IDLE_FRAME, castFrames: HEALER_CAST_FRAMES } }
+          : {}),
+        showMana: isHealer,
         clickable: true,
         onClick: (id) => this.onAllyClick(id),
         facing: 'right',
@@ -432,20 +488,19 @@ export class CombatScene extends Phaser.Scene {
     this.gcdBar = new Bar(this, playerBarX, gcdY, PLAYER_CAST_BAR_WIDTH, GCD_BAR_HEIGHT, GCD_FILL_COLOR);
     this.gcdBar.setVisible(false);
 
-    const bossBarX = centerX - BOSS_CAST_BAR_WIDTH / 2;
+    // v0.3 chunk F: unlabeled sliver, repositioned above the boss sprite each frame in
+    // syncBossCastBar() — initial position here is a placeholder, overwritten before it
+    // is ever shown (bossCastBar only becomes visible once state.bossCast is non-null).
     this.bossCastBar = new Bar(
       this,
-      bossBarX,
-      BOSS_CAST_BAR_Y,
+      centerX - BOSS_CAST_BAR_WIDTH / 2,
+      BOSS_CAST_BAR_GAP,
       BOSS_CAST_BAR_WIDTH,
       BOSS_CAST_BAR_HEIGHT,
       BOSS_CAST_FILL_COLOR,
     );
+    this.bossCastBar.setDepth(46);
     this.bossCastBar.setVisible(false);
-    this.bossCastLabel = this.add
-      .text(centerX, BOSS_CAST_BAR_Y, '', { fontFamily: HUD_FONT, fontSize: '13px', color: '#1a1210' })
-      .setOrigin(0.5)
-      .setVisible(false);
   }
 
   /** Short-lived status line for castCancelled (handoff §D) — only toast source in the scene. */
@@ -551,7 +606,15 @@ export class CombatScene extends Phaser.Scene {
           // until the next rebuildEnemies(), so the lookup is safe, but the sprite may be absent
           // if it belongs to a roster already replaced by a same-tick waveStarted rebuild.
           const attacker = this.findSprite(event.sourceId);
-          if (attacker) attacker.lunge(victim?.getHomeX() ?? attacker.getHomeX());
+          if (attacker) {
+            const towardX = victim?.getHomeX() ?? attacker.getHomeX();
+            // v0.3 chunk F "Tank/DPS attack anims": role-tinted swing strength — tank shoves
+            // (bigger lunge + squash), dps double-jabs; enemies/boss/healer keep the shared lunge.
+            const attackerUnit = this.engine.state.party.find((u) => u.id === event.sourceId);
+            if (attackerUnit?.role === 'tank') attacker.lungeShove(towardX);
+            else if (attackerUnit?.role === 'dps') attacker.lungeJab(towardX);
+            else attacker.lunge(towardX);
+          }
           this.combatLog.push(
             `${this.formatTimestamp()} ${this.resolveUnitName(event.sourceId)} hits ${this.resolveUnitName(event.targetId)} -${event.amount}`,
           );
@@ -562,7 +625,10 @@ export class CombatScene extends Phaser.Scene {
           target?.flashHeal();
           target?.spawnHealFloat(event.amount);
           if (target) {
-            showHealRipple(this, target.getHomeX(), GROUND_Y);
+            // v0.3 chunk F "Heal target sparkle": heal-vfx.png replaces the ground ripple as
+            // the primary heal-land read — ripple + particles + sparkle all firing together
+            // read as noise, and the sparkle centers on the unit rather than the ground.
+            showHealSparkle(this, target.getHomeX(), target.getHomeY());
             showHealParticles(this, target.getHomeX(), target.getHomeY());
             shakeHealImpact(this);
           }
@@ -576,6 +642,16 @@ export class CombatScene extends Phaser.Scene {
           const healer = this.partySprites.get('healer');
           const castTarget = this.findSprite(event.cast.targetId);
           healer?.flashCast();
+          // v0.3 chunk F "Healer caster-side anim": any player cast (heals AND Bonk) plays the
+          // sheet's cast-pose frames. Instant casts (totalMs === 0, e.g. Bonk) complete inside
+          // the SAME advance() call — castFinished arrives this same tick, so a plain
+          // setCasting(true) would be invisible; playCastFlourish self-times instead and
+          // ignores the castFinished/castCancelled setCasting(false) below.
+          if (event.cast.totalMs === 0) {
+            healer?.playCastFlourish();
+          } else {
+            healer?.setCasting(true);
+          }
           if (healer && castTarget) {
             showCastBeam(
               this,
@@ -593,9 +669,24 @@ export class CombatScene extends Phaser.Scene {
           }
           break;
         }
-        case 'bossCastFinished':
-          shakeBossImpact(this);
+        case 'castFinished':
+          this.partySprites.get('healer')?.setCasting(false);
           break;
+        case 'bossCastStarted': {
+          // v0.3 chunk F "Boss telegraphs": wind-up/glow cue on the boss sprite for the
+          // bossCastStarted → bossCastFinished window (Tunnel Vision's telegraph phase too —
+          // its own crimson focus brand only starts later, at bossFocusStarted, so this never
+          // double-signals with it).
+          const bossUnit = this.engine.state.enemies.find((u) => u.role === 'boss');
+          if (bossUnit) this.findSprite(bossUnit.id)?.startTelegraph(this.bossTelegraphCue);
+          break;
+        }
+        case 'bossCastFinished': {
+          shakeBossImpact(this);
+          const bossUnit = this.engine.state.enemies.find((u) => u.role === 'boss');
+          if (bossUnit) this.findSprite(bossUnit.id)?.stopTelegraph();
+          break;
+        }
         case 'partyDoTStarted':
           this.focusCalloutText.setText(`${event.name.toUpperCase()} — PARTY BURN`).setVisible(true);
           this.combatLog.push(
@@ -636,6 +727,7 @@ export class CombatScene extends Phaser.Scene {
           this.combatLog.push(`${this.formatTimestamp()} ${event.name} activated!`);
           break;
         case 'castCancelled': {
+          this.partySprites.get('healer')?.setCasting(false);
           const spellName = this.resolveSpellName(event.spellId);
           if (event.reason === 'escape') {
             this.showToast('Cast cancelled');
@@ -799,15 +891,24 @@ export class CombatScene extends Phaser.Scene {
     }
   }
 
+  /** v0.3 chunk F: unlabeled sliver tracks the boss sprite's position (always the sole enemy
+   *  during a boss cast) instead of a fixed top-of-screen bar — the boss's own telegraph cue
+   *  (glow/raise/pulse) is the primary teach; the combat log still names the ability. */
   private syncBossCastBar(state: CombatState): void {
     const cast = state.bossCast;
     if (cast) {
+      const bossUnit = state.enemies.find((u) => u.role === 'boss');
+      const bossSprite = bossUnit ? this.findSprite(bossUnit.id) : undefined;
+      if (bossSprite) {
+        this.bossCastBar.setPosition(
+          bossSprite.getHomeX() - BOSS_CAST_BAR_WIDTH / 2,
+          bossSprite.getHomeY() - BOSS_UNIT_HEIGHT / 2 - BOSS_CAST_BAR_GAP,
+        );
+      }
       this.bossCastBar.setRatio(1 - cast.remainingMs / cast.totalMs);
       this.bossCastBar.setVisible(true);
-      this.bossCastLabel.setText(cast.name).setVisible(true);
     } else {
       this.bossCastBar.setVisible(false);
-      this.bossCastLabel.setVisible(false);
     }
   }
 

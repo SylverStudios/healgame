@@ -163,14 +163,30 @@ function baseSave(overrides) {
  * for the wipe/victory transition + summary panel (outcome, XP, build glyph;
  * v0.3 chunk E, ~0.5-1.0s transition + staggered reveals, Return last around
  * ~1s) to fully settle before screenshotting, then click through as usual.
+ *
+ * `castShotNames`, if given ({ castPose, healLand }): no pre-loop shot ever
+ * catches the healer casting — every earlier wait in this file has no spell
+ * click near it, so the healer is always idle at those frames. The very
+ * first Solemn Mend click this loop already makes is reused (no new click)
+ * to grab a mid-cast frame (~700ms into Solemn Mend's 2000ms cast bar, v0.3
+ * chunk F healer cast pose) and a heal-landed frame shortly after
+ * completion (heal-vfx sparkle).
  */
-async function playCombat(page, until, timeoutMs = 180_000, resultShotName) {
+async function playCombat(page, until, timeoutMs = 180_000, resultShotName, castShotNames) {
   await clickNamed(page, 'combatAlly:tank');
   const start = Date.now();
   let resultShot = false;
+  let castShotDone = false;
   while (Date.now() - start < timeoutMs) {
     if (await locate(page, 'combatSpell:solemn-mend')) {
       await clickNamed(page, 'combatSpell:solemn-mend');
+      if (castShotNames && !castShotDone) {
+        castShotDone = true;
+        await page.waitForTimeout(700);
+        await shot(page, castShotNames.castPose);
+        await page.waitForTimeout(1500);
+        await shot(page, castShotNames.healLand);
+      }
     } else {
       await page.keyboard.press('q');
     }
@@ -221,7 +237,10 @@ try {
   await page.waitForTimeout(3500); // let autos land so lunge/'*' feedback is in frame
   await shot(page, 'ash-gate-first-run-feedback');
 
-  save = await playCombat(page, (s) => s.xp > 0, 180_000, 'combat-wipe-summary');
+  save = await playCombat(page, (s) => s.xp > 0, 180_000, 'combat-wipe-summary', {
+    castPose: 'combat-healer-cast-pose',
+    healLand: 'combat-heal-sparkle',
+  });
   check(save.xp > 0, `first run banked kill XP through the wipe (xp=${save.xp})`);
   check(save.clearedDungeons.length === 0, 'Ash Gate not marked cleared by a wipe');
   check(

@@ -12,4 +12,6 @@ export const NEEDLE_GAZE = {
   tickMs: 1_000,
   damagePerTick: 2,
   visualKey: 'needle-gaze',
+  // v0.3 chunk F: distinct from Tunnel Vision's 'glow' — a narrowing gaze rising to fixate.
+  telegraph: 'raise',
 } as const satisfies EnemyAbilityDef;

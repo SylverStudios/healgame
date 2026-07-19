@@ -1,7 +1,17 @@
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { loadSave } from '../save/save';
-import { UNIT_FRAME_SIZE, UNIT_TEXTURE_KEY, UNIT_TEXTURE_URL } from '../ui/sprites';
+import {
+  HEALER_SHEET_FRAME_SIZE,
+  HEALER_SHEET_TEXTURE_KEY,
+  HEALER_SHEET_URL,
+  HEAL_VFX_FRAME_SIZE,
+  HEAL_VFX_TEXTURE_KEY,
+  HEAL_VFX_URL,
+  UNIT_FRAME_SIZE,
+  UNIT_TEXTURE_KEY,
+  UNIT_TEXTURE_URL,
+} from '../ui/sprites';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -13,6 +23,15 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet(UNIT_TEXTURE_KEY, UNIT_TEXTURE_URL, {
       frameWidth: UNIT_FRAME_SIZE,
       frameHeight: UNIT_FRAME_SIZE,
+    });
+    // v0.3 chunk F: healer caster sheet + heal-target sparkle (temp-art exception).
+    this.load.spritesheet(HEALER_SHEET_TEXTURE_KEY, HEALER_SHEET_URL, {
+      frameWidth: HEALER_SHEET_FRAME_SIZE,
+      frameHeight: HEALER_SHEET_FRAME_SIZE,
+    });
+    this.load.spritesheet(HEAL_VFX_TEXTURE_KEY, HEAL_VFX_URL, {
+      frameWidth: HEAL_VFX_FRAME_SIZE,
+      frameHeight: HEAL_VFX_FRAME_SIZE,
     });
   }
 
