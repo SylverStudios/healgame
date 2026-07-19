@@ -1,0 +1,6 @@
+#!/bin/sh
+# Fast local backstop for "never commit red": typecheck + lint (seconds).
+# The full gate (npm run verify) still runs in CI and before shipping.
+# Wired by game/package.json "prepare" (git config core.hooksPath .githooks).
+cd "$(git rev-parse --show-toplevel)/game" || exit 1
+npm run typecheck && npm run lint
