@@ -54,6 +54,9 @@ const NOTICE_ROW_H = 34;
 const NOTICE_H = 28;
 const META_BUTTON_BASE_Y = 175;
 const META_BUTTON_H = 44;
+/** v0.3 chunk H: small Settings button, right margin of the meta-button row. */
+const SETTINGS_BUTTON_W = 120;
+const SETTINGS_BUTTON_H = 34;
 /** Gap between the bottom of the last notice and the top of the meta buttons. */
 const NOTICE_TO_META_GAP = 12;
 
@@ -189,6 +192,13 @@ export class HubScene extends Phaser.Scene {
     this.makeButton(centerX + 160, metaButtonY, 280, META_BUTTON_H, 'Spellbook', () => {
       this.scene.start(SceneKeys.Loadout);
     }, 'hubLoadout');
+    // v0.3 chunk H: small Settings entry — sits in the unused margin to the
+    // right of the meta-button row (right edge of Spellbook is centerX+300,
+    // well clear of the canvas edge at 960) so it never competes with the
+    // dungeon stack or notice-count-dependent vertical layout above.
+    this.makeButton(width - 16 - SETTINGS_BUTTON_W / 2, metaButtonY, SETTINGS_BUTTON_W, SETTINGS_BUTTON_H, 'Settings', () => {
+      this.scene.start(SceneKeys.Settings);
+    }, 'hubSettings');
 
     const dungeonStartY = metaButtonY + 52;
     unlockedDungeons.forEach((dungeon, visibleIndex) => {

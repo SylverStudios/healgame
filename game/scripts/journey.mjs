@@ -26,6 +26,9 @@
  *      screenshot (modifier lines from the tree) + mid-fight feedback shot
  *   C  Maw gating (§D1): Ash-Gate-only save → Maw absent; Ash Gate + Iron
  *      Pass cleared → Maw present → enter → unwinnable sandbox → wipe → hub
+ *   Settings  v0.3 chunk H: hubSettings → SettingsScene (slider + Back
+ *      visible) → click slider center (~50%) → click track's left edge via a
+ *      relative offset from the located center (0%) → settingsBack → hub
  *
  * Ash Gate / Iron Pass victory itself is proven deterministically at engine
  * level (src/combat/balance.test.ts); stages B/B3/D2 seed the relevant save
@@ -573,6 +576,43 @@ try {
   await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(800);
   await shot(page, 'hub-after-maw');
+
+  // ---- Stage Settings: Hub → Settings volume slider → Back (v0.3 chunk H) ----
+  console.log('Stage Settings: hubSettings → drag/click volume slider → settingsBack');
+  await seedSave(page, baseSave({}));
+  save = await readSave(page);
+  check(save.musicVolumePct === 50, 'seeded save starts at the default 50% music volume');
+
+  await clickNamed(page, 'hubSettings');
+  await page.waitForTimeout(400);
+  check((await locate(page, 'settingsVolumeSlider')) !== null, 'Settings scene shows the volume slider track');
+  check((await locate(page, 'settingsBack')) !== null, 'Settings scene shows Back');
+  await shot(page, 'settings-scene');
+
+  // Clicking the track's located center sets ~50% (already the seeded value —
+  // this proves the click-to-set path itself, not just the seed).
+  await clickNamed(page, 'settingsVolumeSlider');
+  await page.waitForTimeout(300);
+  save = await readSave(page);
+  check(
+    Math.abs(save.musicVolumePct - 50) <= 5,
+    `clicking the slider center sets ~50% (musicVolumePct=${save.musicVolumePct})`,
+  );
+
+  // Half the track width is a relative offset from the *located* center, not
+  // a hard-coded layout coordinate — it must match SettingsScene.ts's
+  // TRACK_WIDTH/2 (400/2) so the click lands on the track's left edge (0%).
+  const SETTINGS_TRACK_HALF_WIDTH = 200;
+  const sliderPos = await locate(page, 'settingsVolumeSlider');
+  await page.mouse.click(sliderPos.x - SETTINGS_TRACK_HALF_WIDTH, sliderPos.y);
+  await page.waitForTimeout(300);
+  save = await readSave(page);
+  check(save.musicVolumePct === 0, `clicking the track's left edge sets musicVolumePct to 0 (got ${save.musicVolumePct})`);
+
+  await clickNamed(page, 'settingsBack');
+  await page.waitForTimeout(400);
+  check((await locate(page, 'hubSettings')) !== null, 'settingsBack returns to Hub (hubSettings visible again)');
+  await shot(page, 'hub-after-settings');
 } finally {
   await browser?.close();
   if (preview) {

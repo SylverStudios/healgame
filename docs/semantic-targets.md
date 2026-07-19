@@ -38,9 +38,9 @@ by name.
 | `combatPaceToggle` | pace control bg | `paceToggle.ts` |
 | `combatLogToggle` | log header text | `combatLog.ts` |
 | `relicCard:<relicId>` | RelicScene card bg | `RelicScene.ts` |
-| `hubSettings` | Settings button | `HubScene.ts` (v0.3 chunk H) |
-| `settingsVolumeSlider` | music volume slider track | `SettingsScene.ts` (v0.3 chunk H) |
-| `settingsBack` | back button | `SettingsScene.ts` (v0.3 chunk H) |
+| `hubSettings` | Settings button | `HubScene.ts` |
+| `settingsVolumeSlider` | music volume slider track | `SettingsScene.ts` |
+| `settingsBack` | back button | `SettingsScene.ts` |
 
 ## Hook API
 
