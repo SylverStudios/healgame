@@ -46,7 +46,7 @@ import { RunModsBar } from '../ui/runModsBar';
 import { ACTION_HOTKEY_LETTERS, MAX_ACTION_HOTKEYS, actionHotkeySlot } from '../ui/actionHotkeys';
 import type { CombatMods } from '../data/talentTree';
 import { beginRun, finalizeRun, recordPress, type PressSource } from '../telemetry';
-import { buildRunSummary } from '../ui/runSummary';
+import { buildRunSummary, hasBuildGlyph } from '../ui/runSummary';
 import { drawBuildGlyph } from '../ui/buildGlyph';
 import { detectCloseCall, pickBanterLine, type BanterSpeaker, type BanterTrigger } from '../data/banter';
 import { showSpeechBubble } from '../ui/speechBubble';
@@ -1050,17 +1050,18 @@ export class CombatScene extends Phaser.Scene {
       ease: 'Quad.easeOut',
     });
 
-    const titleColor = status === 'victory' ? '#f2c14e' : '#e05a4e';
-    const titleText = this.add
-      .text(centerX, centerY - 80, summary.outcomeLabel, {
-        fontFamily: HUD_FONT,
-        fontSize: '36px',
-        color: titleColor,
-      })
-      .setOrigin(0.5)
-      .setDepth(OVERLAY_DEPTH + 2)
-      .setAlpha(0);
-    this.tweens.add({ targets: titleText, alpha: 1, delay: TITLE_DELAY_MS, duration: TITLE_REVEAL_MS });
+    if (summary.outcomeLabel !== null) {
+      const titleText = this.add
+        .text(centerX, centerY - 80, summary.outcomeLabel, {
+          fontFamily: HUD_FONT,
+          fontSize: '36px',
+          color: '#f2c14e',
+        })
+        .setOrigin(0.5)
+        .setDepth(OVERLAY_DEPTH + 2)
+        .setAlpha(0);
+      this.tweens.add({ targets: titleText, alpha: 1, delay: TITLE_DELAY_MS, duration: TITLE_REVEAL_MS });
+    }
 
     const xpText = this.add
       .text(centerX, centerY - 28, `XP +${summary.xpGained}`, {
@@ -1073,25 +1074,27 @@ export class CombatScene extends Phaser.Scene {
       .setAlpha(0);
     this.tweens.add({ targets: xpText, alpha: 1, delay: XP_DELAY_MS, duration: XP_REVEAL_MS });
 
-    const glyphLabel = this.add
-      .text(centerX, centerY + 8, 'BUILD', { fontFamily: HUD_FONT, fontSize: '11px', color: '#a89888' })
-      .setOrigin(0.5)
-      .setDepth(OVERLAY_DEPTH + 2)
-      .setAlpha(0);
-    const glyphContainer = drawBuildGlyph(this, summary.glyph, {
-      x: centerX,
-      y: centerY + 55,
-      cell: GLYPH_CELL,
-      color: GLYPH_COLOR,
-    })
-      .setDepth(OVERLAY_DEPTH + 2)
-      .setAlpha(0);
-    this.tweens.add({
-      targets: [glyphLabel, glyphContainer],
-      alpha: 1,
-      delay: GLYPH_DELAY_MS,
-      duration: GLYPH_REVEAL_MS,
-    });
+    if (hasBuildGlyph(summary.glyph)) {
+      const glyphLabel = this.add
+        .text(centerX, centerY + 8, 'BUILD', { fontFamily: HUD_FONT, fontSize: '11px', color: '#a89888' })
+        .setOrigin(0.5)
+        .setDepth(OVERLAY_DEPTH + 2)
+        .setAlpha(0);
+      const glyphContainer = drawBuildGlyph(this, summary.glyph, {
+        x: centerX,
+        y: centerY + 55,
+        cell: GLYPH_CELL,
+        color: GLYPH_COLOR,
+      })
+        .setDepth(OVERLAY_DEPTH + 2)
+        .setAlpha(0);
+      this.tweens.add({
+        targets: [glyphLabel, glyphContainer],
+        alpha: 1,
+        delay: GLYPH_DELAY_MS,
+        duration: GLYPH_REVEAL_MS,
+      });
+    }
 
     const returnButton = this.add
       .rectangle(centerX, centerY + 105, 180, 40, 0x3a2a22)

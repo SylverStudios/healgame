@@ -15,11 +15,19 @@ import type { RunRecord, SavedGlyph } from '../save/save';
 
 export interface RunSummaryViewModel {
   outcome: 'victory' | 'wipe';
-  /** Display label for the panel title ('VICTORY' / 'WIPED'). */
-  outcomeLabel: string;
+  /**
+   * Display label for the panel title. Victory shows 'VICTORY'; wipe is null —
+   * the wipe outcome is already obvious from the transition, so no title text.
+   */
+  outcomeLabel: string | null;
   /** engine.rewards.xp at combat end — accrues per kill, survives wipes. */
   xpGained: number;
   glyph: BuildGlyph;
+}
+
+/** True when the lit path has at least one edge to draw (any owned tree progress). */
+export function hasBuildGlyph(glyph: Pick<BuildGlyph, 'segments'>): boolean {
+  return glyph.segments.length > 0;
 }
 
 /** Pure: assembles the outcome/xp/glyph shown on the wipe/victory panel. */
@@ -32,7 +40,7 @@ export function buildRunSummary(args: {
   const glyph = buildGlyphFromTree(TALENT_TREE, owned);
   return {
     outcome: args.status,
-    outcomeLabel: args.status === 'victory' ? 'VICTORY' : 'WIPED',
+    outcomeLabel: args.status === 'victory' ? 'VICTORY' : null,
     xpGained: args.xp,
     glyph,
   };
