@@ -37,6 +37,9 @@ and CI. Passing stages print one line; failures dump captured output. Individual
 stages (`npm run check`, `npm run smoke`, `node scripts/journey.mjs`) still
 exist but prefer `verify`.
 
+A pre-commit hook (`.githooks/`, wired by `npm install` via the `prepare`
+script) runs typecheck + lint as a fast local backstop; CI runs the full gate.
+
 **Definition of done for any change:** `npm run verify:fast` passes at minimum.
 If the change touches scenes, save shape, progression, or encounter/spell data,
 run full `npm run verify`. Never commit red.
@@ -67,7 +70,9 @@ game/src/
 
 - **Engine purity**: nothing under `src/combat/` or `src/data/` may import
   Phaser or read time/randomness. Simulation advances only via `advance(dtMs)`
-  and must stay deterministic (same inputs → same event log).
+  and must stay deterministic (same inputs → same event log). Lint-enforced:
+  `eslint.config.js` bans `phaser` imports and `Math.random` / `Date.now` /
+  `performance.now` under combat, data, tree, meta, and save.
 - **Numbers are data**: gameplay values go in `src/data/`, never inline in
   scenes or engine code. Integers only, roughly 1–10 scale where possible.
 - **Balance is pinned**: `src/combat/balance.test.ts` encodes the difficulty

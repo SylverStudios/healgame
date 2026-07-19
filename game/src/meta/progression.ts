@@ -32,6 +32,7 @@ export { manaBonusesForLevel } from '../data/levelMana';
 export function applyCombatResult(
   save: SaveData,
   result: CombatResult,
+  // eslint-disable-next-line no-restricted-properties -- the injection seam itself: callers/tests pass a deterministic fn
   random: () => number = Math.random,
 ): HubNotice[] {
   const notices: HubNotice[] = [];
