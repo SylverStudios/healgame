@@ -79,13 +79,21 @@ export const MERC_ATTACK_FRAME_DURATIONS_MS: readonly number[] = [
   67, // 6 settle (~4)
 ] as const;
 
-/** Phaser anim frame entries with FE holds (skips duration ≤ 0). */
-export function attackAnimFrames(
-  def: UnitAttackAnimDef,
+/** Shared shape for building Phaser anim frame lists from a per-frame exposure sheet. */
+interface FrameStripSource {
+  animKey: string;
+  frameCount: number;
+  frameKey: (index: number) => string;
+  frameDurationsMs: readonly number[];
+}
+
+/** Builds Phaser anim frame entries from an exposure sheet (skips duration ≤ 0). */
+function buildStripFrames(
+  def: FrameStripSource,
 ): ReadonlyArray<{ key: string; duration: number }> {
   if (def.frameDurationsMs.length !== def.frameCount) {
     throw new Error(
-      `attack anim ${def.animKey}: frameDurationsMs length ${def.frameDurationsMs.length} !== frameCount ${def.frameCount}`,
+      `strip anim ${def.animKey}: frameDurationsMs length ${def.frameDurationsMs.length} !== frameCount ${def.frameCount}`,
     );
   }
   const frames: { key: string; duration: number }[] = [];
@@ -95,6 +103,13 @@ export function attackAnimFrames(
     frames.push({ key: def.frameKey(i), duration });
   }
   return frames;
+}
+
+/** Phaser anim frame entries with FE holds (skips duration ≤ 0). */
+export function attackAnimFrames(
+  def: UnitAttackAnimDef,
+): ReadonlyArray<{ key: string; duration: number }> {
+  return buildStripFrames(def);
 }
 
 function attackFrameKey(slug: string, index: number): string {
@@ -199,11 +214,91 @@ export const HEALER_CAST_RELEASE_LEAD_MS: number = HEALER_CAST_FRAME_DURATIONS_M
   4,
 ).reduce((sum, ms) => sum + ms, 0);
 
+/**
+ * Healer south breathing loop (chunk 1B) — plays whenever the healer is not
+ * charging/casting/zapping. 5 frames, individual PNGs (not part of sheet.png).
+ */
+export const HEALER_IDLE_ANIM_KEY = 'unit-healer-idle';
+/** FE holds: settle → glow-ish rise → peak dwell → fall → settle. Not equal times. */
+export const HEALER_IDLE_FRAME_DURATIONS_MS: readonly number[] = [220, 180, 250, 180, 220] as const;
+
+/**
+ * Healer south Bonk zap strip (chunk 1B) — the ONLY spell that plays this;
+ * other instant casts keep the heal cast-action release. 7 frames, individual
+ * PNGs under `attack-south/`.
+ */
+export const HEALER_ZAP_ANIM_KEY = 'unit-healer-zap';
+/** FE exposure: quick antic, held spark (contact), snappy recovery. Not equal times. */
+export const HEALER_ZAP_FRAME_DURATIONS_MS: readonly number[] = [
+  50, 150, 267, 83, 167, 117, 100,
+] as const;
+
+function healerFrameKey(strip: 'idle' | 'zap', index: number): string {
+  return `unit-healer-${strip}-${index}`;
+}
+
+function healerFrameUrl(dir: string, index: number): string {
+  return `assets/units/healer/${dir}/${index}.png`;
+}
+
+/** Per-frame strip def for a healer body anim (idle loop or Bonk zap one-shot). */
+export interface HealerStripAnimDef {
+  animKey: string;
+  frameCount: number;
+  /** Registered with Phaser `repeat: -1` (loop) vs `repeat: 0` (one-shot). */
+  loop: boolean;
+  frameKey: (index: number) => string;
+  frameUrl: (index: number) => string;
+  frameDurationsMs: readonly number[];
+}
+
+export const HEALER_IDLE_ANIM: HealerStripAnimDef = {
+  animKey: HEALER_IDLE_ANIM_KEY,
+  frameCount: 5,
+  loop: true,
+  frameKey: (i) => healerFrameKey('idle', i),
+  frameUrl: (i) => healerFrameUrl('idle-south', i),
+  frameDurationsMs: HEALER_IDLE_FRAME_DURATIONS_MS,
+};
+
+export const HEALER_ZAP_ANIM: HealerStripAnimDef = {
+  animKey: HEALER_ZAP_ANIM_KEY,
+  frameCount: 7,
+  loop: false,
+  frameKey: (i) => healerFrameKey('zap', i),
+  frameUrl: (i) => healerFrameUrl('attack-south', i),
+  frameDurationsMs: HEALER_ZAP_FRAME_DURATIONS_MS,
+};
+
+/** BootScene preloads + registers both from this list (parallel to UNIT_ATTACK_ANIMS —
+ *  kept separate because these key off `unitId: 'healer'` with loop semantics the merc
+ *  strip type doesn't need). */
+export const HEALER_STRIP_ANIMS: readonly HealerStripAnimDef[] = [
+  HEALER_IDLE_ANIM,
+  HEALER_ZAP_ANIM,
+];
+
+/** Phaser anim frame entries for a healer strip (skips duration ≤ 0). */
+export function healerStripAnimFrames(
+  def: HealerStripAnimDef,
+): ReadonlyArray<{ key: string; duration: number }> {
+  return buildStripFrames(def);
+}
+
 /** One-shot green sparkle burst played over a heal target (192×32 = 6 frames of 32×32). */
 export const HEAL_VFX_TEXTURE_KEY = 'heal-vfx';
 export const HEAL_VFX_URL = 'assets/heal-vfx.png';
 export const HEAL_VFX_FRAME_SIZE = 32;
 export const HEAL_VFX_FRAME_COUNT = 6;
+
+/** One-shot pale-gold impact burst played on the enemy target when Bonk lands
+ *  (192×32 = 6 frames of 32×32), mirroring the heal sparkle wiring. */
+export const ZAP_VFX_TEXTURE_KEY = 'zap-vfx';
+export const ZAP_VFX_URL = 'assets/zap-vfx.png';
+export const ZAP_VFX_FRAME_SIZE = 32;
+export const ZAP_VFX_FRAME_COUNT = 6;
+/** Per-frame holds: quick pop, brief dwell on the flash, fade. Not equal times. */
+export const ZAP_VFX_FRAME_DURATIONS_MS: readonly number[] = [50, 67, 100, 83, 67, 50] as const;
 
 const FRAME = {
   wizard: 84, // purple robed caster — the player healer

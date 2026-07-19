@@ -14,10 +14,20 @@ import {
   HEALER_CAST_RELEASE_LEAD_MS,
   HEALER_CHARGE_FRAME_DURATIONS_MS,
   HEALER_CHARGE_FRAMES,
+  HEALER_IDLE_ANIM,
+  HEALER_IDLE_ANIM_KEY,
+  HEALER_IDLE_FRAME_DURATIONS_MS,
+  HEALER_STRIP_ANIMS,
+  HEALER_ZAP_ANIM,
+  HEALER_ZAP_ANIM_KEY,
+  HEALER_ZAP_FRAME_DURATIONS_MS,
+  healerStripAnimFrames,
   MERC_ATTACK_FRAME_DURATIONS_MS,
   presentationForUnit,
   TANK_TEXTURE_KEY,
   UNIT_ATTACK_ANIMS,
+  ZAP_VFX_FRAME_COUNT,
+  ZAP_VFX_FRAME_DURATIONS_MS,
 } from './sprites';
 
 function catalogUnit(id: string, role: UnitRole, mobId?: string) {
@@ -133,6 +143,56 @@ describe('healer charge / cast exposure sheets', () => {
     );
     expect(HEALER_CAST_RELEASE_LEAD_MS).toBeGreaterThan(200);
     expect(HEALER_CAST_RELEASE_LEAD_MS).toBeLessThan(500);
+  });
+});
+
+describe('healer idle / zap exposure sheets (chunk 1B)', () => {
+  it('keeps idle and zap strip lengths matched to their duration tables', () => {
+    expect(HEALER_IDLE_FRAME_DURATIONS_MS.length).toBe(HEALER_IDLE_ANIM.frameCount);
+    expect(HEALER_ZAP_FRAME_DURATIONS_MS.length).toBe(HEALER_ZAP_ANIM.frameCount);
+  });
+
+  it('never uses equal frame times (FE holds, not a uniform GIF cadence)', () => {
+    expect(new Set(HEALER_IDLE_FRAME_DURATIONS_MS).size).toBeGreaterThan(1);
+    expect(new Set(HEALER_ZAP_FRAME_DURATIONS_MS).size).toBeGreaterThan(1);
+    expect(new Set(ZAP_VFX_FRAME_DURATIONS_MS).size).toBeGreaterThan(1);
+  });
+
+  it('dwells on the idle loop peak longer than its settle frames', () => {
+    // Sheet: settle, rise, peak (dwell), fall, settle.
+    const peakMs = HEALER_IDLE_FRAME_DURATIONS_MS[2]!;
+    const riseMs = HEALER_IDLE_FRAME_DURATIONS_MS[1]!;
+    expect(peakMs).toBeGreaterThan(riseMs);
+  });
+
+  it('holds the zap spark longer than the antic and recovery frames', () => {
+    // Sheet: antic, spark-antic, spark hold (contact), snap, recover, settle, rest.
+    const sparkMs = HEALER_ZAP_FRAME_DURATIONS_MS[2]!;
+    const anticMs = HEALER_ZAP_FRAME_DURATIONS_MS[0]!;
+    expect(sparkMs).toBeGreaterThan(anticMs);
+    expect(sparkMs).toBeGreaterThanOrEqual(200);
+  });
+
+  it('registers idle as a loop and zap as a one-shot', () => {
+    expect(HEALER_IDLE_ANIM.loop).toBe(true);
+    expect(HEALER_ZAP_ANIM.loop).toBe(false);
+    expect(HEALER_STRIP_ANIMS.map((d) => d.animKey)).toEqual([
+      HEALER_IDLE_ANIM_KEY,
+      HEALER_ZAP_ANIM_KEY,
+    ]);
+  });
+
+  it('builds Phaser frames from each healer strip exposure sheet', () => {
+    for (const def of HEALER_STRIP_ANIMS) {
+      const frames = healerStripAnimFrames(def);
+      expect(frames.length).toBe(def.frameCount);
+      expect(frames.every((f) => f.duration > 0)).toBe(true);
+      expect(frames[0]!.key).toBe(def.frameKey(0));
+    }
+  });
+
+  it('keeps the zap impact VFX exposure sheet matched to its frame count', () => {
+    expect(ZAP_VFX_FRAME_DURATIONS_MS.length).toBe(ZAP_VFX_FRAME_COUNT);
   });
 });
 

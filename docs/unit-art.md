@@ -2,6 +2,10 @@
 
 Status: current · Authority: combat unit tile mapping + relic icons · Last verified: 2026-07-19
 
+Chunk 1B: healer combat facing is now **south** (camera), with a breathing
+idle loop and a Bonk-only zap strip — see "Current casting" and "Healer
+sheet" below.
+
 Style law (density, canvas tiers, palette, timing): [`art/STYLE.md`](../art/STYLE.md).
 Unit registry + audit: [`art/manifest.json`](../art/manifest.json) via
 `npm run art -- audit`. Generation workflow:
@@ -25,10 +29,14 @@ Everything else in the game stays temp art per CLAUDE.md.
 
 - `game/public/assets/tiny-dungeon.png` — Kenney packed tilesheet (12 cols ×
   11 rows, 16px tiles, no spacing) + license copy alongside.
-- `game/public/assets/units/healer/` — armored-paladin healer (`east.png`,
-  `sheet.png` = idle + charge + cast-action, `charge-east/`, `cast-east/`).
-  Source: `art/source/armored-paladin/`. Charge loops while channeling;
-  cast-action plays once on release (FE exposure timings in `sprites.ts`).
+- `game/public/assets/units/healer/` — armored-paladin healer. Combat still
+  is `south.png` (camera-facing still; `east.png` mirrors for preload compat).
+  `sheet.png` = idle + charge + cast-action (unchanged, still east charge/cast
+  frames — known facing mismatch, not fixed this chunk). `idle-south/0–4.png`
+  is the south breathing loop; `attack-south/0–6.png` is the Bonk zap strip.
+  `charge-east/`, `cast-east/` unchanged. Source: `art/source/armored-paladin/`.
+  Charge loops while channeling; cast-action plays once on release (FE
+  exposure timings in `sprites.ts`).
 - `game/public/assets/units/tank/` — PixelLab starter tank (`east.png` +
   `attack-east/0–6.png`). Authoring cache: `artifacts/pixellab-starter-tank/`.
 - `game/public/assets/units/dps1/` — PixelLab melee DPS (`east.png` +
@@ -72,6 +80,20 @@ Everything else in the game stays temp art per CLAUDE.md.
   (channeled), cast-action strip on `finishCast` / instant `playCastRelease`;
   cancel returns to idle. Not selected by `presentationForUnit`. Texture key
   `unit-healer`, 32×32 frames, authored facing (no flipX).
+- **Healer idle / Bonk zap** (chunk 1B): `unit-healer-idle` is a continuous
+  Phaser anim (`repeat: -1`, `idle-south/` frames, `HEALER_IDLE_FRAME_DURATIONS_MS`)
+  that plays whenever the healer isn't charging/casting — including between
+  and after casts. `unit-healer-zap` is a one-shot anim (`attack-south/`
+  frames, `HEALER_ZAP_FRAME_DURATIONS_MS`) that **only** Bonk's `castStarted`
+  plays (matched by `SPELLS.bonk.id`, not `totalMs === 0`, so other instant
+  casts keep the heal cast-action). Registered in `sprites.ts`
+  (`HEALER_STRIP_ANIMS`) parallel to `UNIT_ATTACK_ANIMS` — kept separate
+  because it needs loop vs one-shot semantics per strip. `UnitSprite` stops
+  the idle anim before any manual charge/cast frame stepping and resumes it
+  on `ANIMATION_COMPLETE` / cast end (see `playZap()` / `returnToIdle()`).
+  `zap-vfx` (`assets/zap-vfx.png`, `ZAP_VFX_FRAME_DURATIONS_MS`) is a
+  one-shot pale-gold impact played on the enemy target when Bonk's damage
+  lands (`combatFx.showZapImpact`, mirrors `showHealSparkle`).
 - `pixelArt: true` in `main.ts` gives nearest-neighbor filtering game-wide.
 - Display sizes (`CombatScene.ts`): PixelLab mercs **112**, healer 32×32 at
   **64** (2×), Kenney party **48**; PixelLab trash **72**, Kenney trash

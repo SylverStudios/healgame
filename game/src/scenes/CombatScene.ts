@@ -19,7 +19,7 @@ import type {
   Unit,
 } from '../combat/types';
 import { getEncounterById } from '../data/encounters';
-import { GCD_MS } from '../data/constants';
+import { GCD_MS, SPELLS } from '../data/constants';
 import { Bar } from '../ui/bar';
 import { UnitSprite } from '../ui/unitSprite';
 import {
@@ -29,8 +29,10 @@ import {
   HEALER_CAST_RELEASE_LEAD_MS,
   HEALER_CHARGE_FRAME_DURATIONS_MS,
   HEALER_CHARGE_FRAMES,
+  HEALER_IDLE_ANIM_KEY,
   HEALER_IDLE_FRAME,
   HEALER_SHEET_TEXTURE_KEY,
+  HEALER_ZAP_ANIM_KEY,
   presentationForUnit,
 } from '../ui/sprites';
 import { SpellBar } from '../ui/spellBar';
@@ -42,6 +44,7 @@ import {
   showCastBeam,
   showHealParticles,
   showHealSparkle,
+  showZapImpact,
 } from '../ui/combatFx';
 import { PaceToggle } from '../ui/paceToggle';
 import { loadSave, saveGame, type SaveData } from '../save/save';
@@ -457,6 +460,8 @@ export class CombatScene extends Phaser.Scene {
               bodyTextureKey: HEALER_SHEET_TEXTURE_KEY,
               bodyOffsetY,
               fixedFacing: true,
+              idleAnimKey: HEALER_IDLE_ANIM_KEY,
+              zapAnimKey: HEALER_ZAP_ANIM_KEY,
               casterAnim: {
                 idleFrame: HEALER_IDLE_FRAME,
                 chargeFrames: HEALER_CHARGE_FRAMES,
@@ -694,6 +699,8 @@ export class CombatScene extends Phaser.Scene {
   // ---- event feedback --------------------------------------------------------
 
   private handleEvents(events: CombatEvent[]): void {
+    // Bridges Bonk's same-tick castStarted → damage so the impact VFX knows to fire.
+    let pendingBonkImpact = false;
     for (const event of events) {
       switch (event.type) {
         case 'damage': {
@@ -714,6 +721,10 @@ export class CombatScene extends Phaser.Scene {
               const towardX = victim?.getHomeX() ?? attacker.getHomeX();
               attacker.lunge(towardX);
             }
+          }
+          if (pendingBonkImpact && victim) {
+            showZapImpact(this, victim.getHomeX(), victim.getHomeY());
+            pendingBonkImpact = false;
           }
           this.combatLog.push(
             `${this.formatTimestamp()} ${this.resolveUnitName(event.sourceId)} hits ${this.resolveUnitName(event.targetId)} -${event.amount}`,
@@ -743,11 +754,12 @@ export class CombatScene extends Phaser.Scene {
           const healer = this.partySprites.get('healer');
           const castTarget = this.findSprite(event.cast.targetId);
           healer?.flashCast();
-          // Healer anim: channel → charge loop; finish → cast-action release.
-          // Instant casts (totalMs === 0, e.g. Bonk) complete inside the SAME
-          // advance() call — castFinished arrives this tick, so charge would be
-          // invisible; play the cast-action strip once instead.
-          if (event.cast.totalMs === 0) {
+          // Bonk (and only Bonk) plays the zap strip; other instant casts (totalMs
+          // === 0, resolved same tick as castStarted) keep the heal cast-action.
+          if (event.cast.spellId === SPELLS.bonk.id) {
+            healer?.playZap();
+            pendingBonkImpact = true;
+          } else if (event.cast.totalMs === 0) {
             healer?.playCastRelease();
           } else {
             healer?.setCasting(true);

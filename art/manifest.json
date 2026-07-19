@@ -1,26 +1,71 @@
 {
   "comment": "Combat-unit art registry. Style law: art/STYLE.md. Workflow: .claude/skills/pixellab-art-pipeline/SKILL.md. Checked by `npm run art -- audit` (run from game/). status: live = shipped at target density | legacy = shipped but violates the 32px density rule, queued for regen | planned = not yet generated. canvas: tight = figure fills canvas, feet at bottom | padded-legacy = old PixelLab canvas with dead space. durations name the exposure-sheet constant in game/src/ui/sprites.ts.",
-  "densityRule": { "displayScale": 2 },
-  "tiers": { "party": 32, "trash": 32, "elite": 40, "boss": 48, "colossal": 64 },
+  "densityRule": {
+    "displayScale": 2
+  },
+  "tiers": {
+    "party": 32,
+    "trash": 32,
+    "elite": 40,
+    "boss": 48,
+    "colossal": 64
+  },
   "units": [
     {
       "slug": "healer",
       "archetype": "healer",
-      "facing": "east",
+      "facing": "south",
       "nativeSize": 32,
       "canvas": "tight",
       "status": "live",
-      "pixellabCharacterId": null,
+      "pixellabCharacterId": "7ff83bfc-d23f-4270-8970-fa1b593e1384",
       "assetsDir": "game/public/assets/units/healer",
       "sourceDir": "art/source/armored-paladin",
       "strips": {
-        "idle-still": { "file": "east.png", "frames": 1 },
-        "charge": { "dir": "charge-east", "frames": 5, "loop": true, "durations": "HEALER_CHARGE_FRAME_DURATIONS_MS" },
-        "cast": { "dir": "cast-east", "frames": 7, "durations": "HEALER_CAST_FRAME_DURATIONS_MS" },
-        "sheet": { "file": "sheet.png", "frames": 13 },
-        "idle": { "status": "planned", "frames": 4, "loop": true, "note": "subtle breathing loop from base still" },
-        "attack": { "status": "planned", "frames": 6, "note": "bonk -> arcane zap: hand-flick release, impact VFX lands on target (no projectile)" }
-      }
+        "idle-still": {
+          "file": "south.png",
+          "frames": 1,
+          "note": "south combat facing (STYLE party exception); east.png mirrors for preload compat"
+        },
+        "charge": {
+          "dir": "charge-east",
+          "frames": 5,
+          "loop": true,
+          "durations": "HEALER_CHARGE_FRAME_DURATIONS_MS"
+        },
+        "cast": {
+          "dir": "cast-east",
+          "frames": 7,
+          "durations": "HEALER_CAST_FRAME_DURATIONS_MS"
+        },
+        "sheet": {
+          "file": "sheet.png",
+          "frames": 13
+        },
+        "idle": {
+          "dir": "idle-south",
+          "frames": 5,
+          "loop": true,
+          "status": "live",
+          "durations": "HEALER_IDLE_FRAME_DURATIONS_MS",
+          "note": "south breathing loop; exposure 220,180,250,180,220 — wire in 1B"
+        },
+        "attack": {
+          "dir": "attack-south",
+          "frames": 7,
+          "status": "live",
+          "durations": "HEALER_ZAP_FRAME_DURATIONS_MS",
+          "note": "Bonk zap south; exposure 50,150,267,83,167,117,100 — wire 1B"
+        },
+        "zap-vfx": {
+          "dir": "zap-vfx",
+          "frames": 6,
+          "status": "live",
+          "durations": "ZAP_VFX_FRAME_DURATIONS_MS",
+          "note": "pale-gold target impact; also sheet game/public/assets/zap-vfx.png (192x32); exposure 50,67,100,83,67,50"
+        }
+      },
+      "note": "Party STYLE exception: combat facing south (camera). Mercs remain east."
     },
     {
       "slug": "tank",
@@ -33,8 +78,15 @@
       "assetsDir": "game/public/assets/units/tank",
       "sourceDir": "artifacts/pixellab-starter-tank",
       "strips": {
-        "idle-still": { "file": "east.png", "frames": 1 },
-        "attack": { "dir": "attack-east", "frames": 7, "durations": "MERC_ATTACK_FRAME_DURATIONS_MS" }
+        "idle-still": {
+          "file": "east.png",
+          "frames": 1
+        },
+        "attack": {
+          "dir": "attack-east",
+          "frames": 7,
+          "durations": "MERC_ATTACK_FRAME_DURATIONS_MS"
+        }
       },
       "replacePlan": "regen tight 32x32 with idle still + attack + hurt"
     },
@@ -49,8 +101,15 @@
       "assetsDir": "game/public/assets/units/dps1",
       "sourceDir": "artifacts/pixellab-starter-dps1",
       "strips": {
-        "idle-still": { "file": "east.png", "frames": 1 },
-        "attack": { "dir": "attack-east", "frames": 7, "durations": "MERC_ATTACK_FRAME_DURATIONS_MS" }
+        "idle-still": {
+          "file": "east.png",
+          "frames": 1
+        },
+        "attack": {
+          "dir": "attack-east",
+          "frames": 7,
+          "durations": "MERC_ATTACK_FRAME_DURATIONS_MS"
+        }
       },
       "replacePlan": "regen tight 32x32 with idle still + attack + hurt"
     },
@@ -65,8 +124,15 @@
       "assetsDir": "game/public/assets/units/dps2",
       "sourceDir": "artifacts/pixellab-starter-dps2",
       "strips": {
-        "idle-still": { "file": "east.png", "frames": 1 },
-        "attack": { "dir": "attack-east", "frames": 7, "durations": "MERC_ATTACK_FRAME_DURATIONS_MS" }
+        "idle-still": {
+          "file": "east.png",
+          "frames": 1
+        },
+        "attack": {
+          "dir": "attack-east",
+          "frames": 7,
+          "durations": "MERC_ATTACK_FRAME_DURATIONS_MS"
+        }
       },
       "replacePlan": "regen tight 32x32 with idle still + attack + hurt"
     },
@@ -81,19 +147,138 @@
       "assetsDir": "game/public/assets/units/ash-husk",
       "sourceDir": "artifacts/pixellab-ash-husk",
       "strips": {
-        "idle-still": { "file": "west.png", "frames": 1 }
+        "idle-still": {
+          "file": "west.png",
+          "frames": 1
+        }
       },
       "replacePlan": "regen tight 32x32 with idle still + attack + hurt"
     },
-    { "slug": "iron-husk", "archetype": "enemy", "facing": "west", "nativeSize": 32, "canvas": "tight", "status": "planned", "pixellabCharacterId": null, "assetsDir": "game/public/assets/units/iron-husk", "sourceDir": null, "strips": {} },
-    { "slug": "cinder-wraith", "archetype": "enemy", "facing": "west", "nativeSize": 32, "canvas": "tight", "status": "planned", "pixellabCharacterId": null, "assetsDir": "game/public/assets/units/cinder-wraith", "sourceDir": null, "strips": {} },
-    { "slug": "choir-shade", "archetype": "enemy", "facing": "west", "nativeSize": 32, "canvas": "tight", "status": "planned", "pixellabCharacterId": null, "assetsDir": "game/public/assets/units/choir-shade", "sourceDir": null, "strips": {} },
-    { "slug": "thorn-husk", "archetype": "enemy", "facing": "west", "nativeSize": 32, "canvas": "tight", "status": "planned", "pixellabCharacterId": null, "assetsDir": "game/public/assets/units/thorn-husk", "sourceDir": null, "strips": {} },
-    { "slug": "spire-lancer", "archetype": "enemy", "facing": "west", "nativeSize": 40, "canvas": "tight", "status": "planned", "pixellabCharacterId": null, "assetsDir": "game/public/assets/units/spire-lancer", "sourceDir": null, "strips": {}, "note": "elite tier; special: tunnel-vision" },
-    { "slug": "gate-warden", "archetype": "boss", "facing": "west", "nativeSize": 48, "canvas": "tight", "status": "planned", "pixellabCharacterId": null, "assetsDir": "game/public/assets/units/gate-warden", "sourceDir": null, "strips": {}, "note": "special: bonehowl" },
-    { "slug": "dirge-sovereign", "archetype": "boss", "facing": "west", "nativeSize": 48, "canvas": "tight", "status": "planned", "pixellabCharacterId": null, "assetsDir": "game/public/assets/units/dirge-sovereign", "sourceDir": null, "strips": {}, "note": "special: soul-toll" },
-    { "slug": "thorn-matriarch", "archetype": "boss", "facing": "west", "nativeSize": 48, "canvas": "tight", "status": "planned", "pixellabCharacterId": null, "assetsDir": "game/public/assets/units/thorn-matriarch", "sourceDir": null, "strips": {}, "note": "special: needle-gaze" },
-    { "slug": "ember-colossus", "archetype": "boss", "facing": "west", "nativeSize": 64, "canvas": "tight", "status": "planned", "pixellabCharacterId": null, "assetsDir": "game/public/assets/units/ember-colossus", "sourceDir": null, "strips": {}, "note": "colossal tier; special: emberfall" },
-    { "slug": "hollow-king", "archetype": "boss", "facing": "west", "nativeSize": 64, "canvas": "tight", "status": "planned", "pixellabCharacterId": null, "assetsDir": "game/public/assets/units/hollow-king", "sourceDir": null, "strips": {}, "note": "colossal tier; special: extinction" }
+    {
+      "slug": "iron-husk",
+      "archetype": "enemy",
+      "facing": "west",
+      "nativeSize": 32,
+      "canvas": "tight",
+      "status": "planned",
+      "pixellabCharacterId": null,
+      "assetsDir": "game/public/assets/units/iron-husk",
+      "sourceDir": null,
+      "strips": {}
+    },
+    {
+      "slug": "cinder-wraith",
+      "archetype": "enemy",
+      "facing": "west",
+      "nativeSize": 32,
+      "canvas": "tight",
+      "status": "planned",
+      "pixellabCharacterId": null,
+      "assetsDir": "game/public/assets/units/cinder-wraith",
+      "sourceDir": null,
+      "strips": {}
+    },
+    {
+      "slug": "choir-shade",
+      "archetype": "enemy",
+      "facing": "west",
+      "nativeSize": 32,
+      "canvas": "tight",
+      "status": "planned",
+      "pixellabCharacterId": null,
+      "assetsDir": "game/public/assets/units/choir-shade",
+      "sourceDir": null,
+      "strips": {}
+    },
+    {
+      "slug": "thorn-husk",
+      "archetype": "enemy",
+      "facing": "west",
+      "nativeSize": 32,
+      "canvas": "tight",
+      "status": "planned",
+      "pixellabCharacterId": null,
+      "assetsDir": "game/public/assets/units/thorn-husk",
+      "sourceDir": null,
+      "strips": {}
+    },
+    {
+      "slug": "spire-lancer",
+      "archetype": "enemy",
+      "facing": "west",
+      "nativeSize": 40,
+      "canvas": "tight",
+      "status": "planned",
+      "pixellabCharacterId": null,
+      "assetsDir": "game/public/assets/units/spire-lancer",
+      "sourceDir": null,
+      "strips": {},
+      "note": "elite tier; special: tunnel-vision"
+    },
+    {
+      "slug": "gate-warden",
+      "archetype": "boss",
+      "facing": "west",
+      "nativeSize": 48,
+      "canvas": "tight",
+      "status": "planned",
+      "pixellabCharacterId": null,
+      "assetsDir": "game/public/assets/units/gate-warden",
+      "sourceDir": null,
+      "strips": {},
+      "note": "special: bonehowl"
+    },
+    {
+      "slug": "dirge-sovereign",
+      "archetype": "boss",
+      "facing": "west",
+      "nativeSize": 48,
+      "canvas": "tight",
+      "status": "planned",
+      "pixellabCharacterId": null,
+      "assetsDir": "game/public/assets/units/dirge-sovereign",
+      "sourceDir": null,
+      "strips": {},
+      "note": "special: soul-toll"
+    },
+    {
+      "slug": "thorn-matriarch",
+      "archetype": "boss",
+      "facing": "west",
+      "nativeSize": 48,
+      "canvas": "tight",
+      "status": "planned",
+      "pixellabCharacterId": null,
+      "assetsDir": "game/public/assets/units/thorn-matriarch",
+      "sourceDir": null,
+      "strips": {},
+      "note": "special: needle-gaze"
+    },
+    {
+      "slug": "ember-colossus",
+      "archetype": "boss",
+      "facing": "west",
+      "nativeSize": 64,
+      "canvas": "tight",
+      "status": "planned",
+      "pixellabCharacterId": null,
+      "assetsDir": "game/public/assets/units/ember-colossus",
+      "sourceDir": null,
+      "strips": {},
+      "note": "colossal tier; special: emberfall"
+    },
+    {
+      "slug": "hollow-king",
+      "archetype": "boss",
+      "facing": "west",
+      "nativeSize": 64,
+      "canvas": "tight",
+      "status": "planned",
+      "pixellabCharacterId": null,
+      "assetsDir": "game/public/assets/units/hollow-king",
+      "sourceDir": null,
+      "strips": {},
+      "note": "colossal tier; special: extinction"
+    }
   ]
 }

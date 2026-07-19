@@ -161,6 +161,14 @@ export interface UnitSpriteConfig {
   /** Phaser anim key for a one-shot PixelLab attack strip (registered in BootScene). */
   attackAnimKey?: string;
   /**
+   * Healer-only (chunk 1B): continuous breathing loop (Phaser anim, `repeat: -1`)
+   * played whenever not charging/casting/zapping. Restored after any one-shot
+   * strip (cast-action or zap) completes instead of a static idle frame.
+   */
+  idleAnimKey?: string;
+  /** Healer-only: one-shot Bonk zap strip (registered in BootScene). Played via `playZap()`. */
+  zapAnimKey?: string;
+  /**
    * Extra body Y in container space. PixelLab canvases pad ~25% below the painted
    * feet — shift the sprite down so feet meet the ground line after setDisplaySize.
    */
@@ -208,6 +216,10 @@ export class UnitSprite {
   /** Rest sheet frame for Kenney / healer; undefined for single-image stills. */
   private readonly restFrame: number | undefined;
   private readonly attackAnimKey: string | null;
+  /** Healer-only continuous idle loop key; null for every other unit (see `idleAnimKey` config). */
+  private readonly idleAnimKey: string | null;
+  /** Healer-only Bonk zap strip key; null for every other unit. */
+  private readonly zapAnimKey: string | null;
   /** Resting local Y for the body (PixelLab foot-pad offset); telegraph raise adds on top. */
   private readonly bodyRestY: number;
   private readonly nameText: Phaser.GameObjects.Text | null;
@@ -260,6 +272,8 @@ export class UnitSprite {
     this.restTextureKey = textureKey;
     this.restFrame = config.frame;
     this.attackAnimKey = config.attackAnimKey ?? null;
+    this.idleAnimKey = config.idleAnimKey ?? null;
+    this.zapAnimKey = config.zapAnimKey ?? null;
     this.bodyRestY = config.bodyOffsetY ?? 0;
     const bodySprite =
       config.frame === undefined
@@ -369,6 +383,13 @@ export class UnitSprite {
       .setDepth(HALO_DEPTH)
       .setVisible(false);
 
+    // Healer breathing loop starts immediately at rest; charge/cast/zap stop it
+    // and restore it on completion (see restoreRestPose / returnToIdle below).
+    if (this.idleAnimKey) {
+      this.body.play(this.idleAnimKey, true);
+      this.body.setDisplaySize(this.width, this.height);
+    }
+
     this.update(unit);
   }
 
@@ -405,6 +426,7 @@ export class UnitSprite {
       this.stopChargeCycle();
       this.stopReleaseTimer();
       this.stopAttackAnim();
+      if (this.idleAnimKey) this.body.stop();
       this.scene.tweens.killTweensOf(this.body);
       this.body.setTint(DEAD_TINT);
       this.body.setAlpha(DEAD_ALPHA);
@@ -542,13 +564,40 @@ export class UnitSprite {
     this.body.setDisplaySize(this.width, this.height);
   }
 
+  /**
+   * Healer-only one-shot Bonk zap strip. Locked decision: Bonk and only Bonk
+   * plays this — CombatScene's castStarted handler selects it by spell id.
+   * Rest pose (idle loop) is restored on ANIMATION_COMPLETE, same as playAttack().
+   */
+  playZap(): void {
+    if (!this.zapAnimKey || !this.alive) return;
+    this.body.play(this.zapAnimKey, false);
+    this.body.setDisplaySize(this.width, this.height);
+  }
+
   private restoreRestPose(): void {
-    if (this.restFrame === undefined) {
+    if (this.idleAnimKey) {
+      this.body.play(this.idleAnimKey, true);
+    } else if (this.restFrame === undefined) {
       this.body.setTexture(this.restTextureKey);
     } else {
       this.body.setTexture(this.restTextureKey, this.restFrame);
     }
     this.body.setDisplaySize(this.width, this.height);
+  }
+
+  /**
+   * Returns the healer body to its resting look after a manual (non-Phaser-anim)
+   * frame strip completes — the breathing loop if wired, else the static caster
+   * idle frame. Used by the charge/cast-action pipeline below.
+   */
+  private returnToIdle(): void {
+    if (this.idleAnimKey) {
+      this.body.play(this.idleAnimKey, true);
+      this.body.setDisplaySize(this.width, this.height);
+    } else if (this.casterAnim) {
+      this.body.setFrame(this.casterAnim.idleFrame);
+    }
   }
 
   private stopAttackAnim(): void {
@@ -604,7 +653,7 @@ export class UnitSprite {
     } else {
       this.pendingCharge = false;
       this.stopChargeCycle();
-      if (!this.releaseActive) this.body.setFrame(this.casterAnim.idleFrame);
+      if (!this.releaseActive) this.returnToIdle();
     }
   }
 
@@ -643,7 +692,7 @@ export class UnitSprite {
       this.playCastRelease();
       return;
     }
-    this.body.setFrame(this.casterAnim.idleFrame);
+    this.returnToIdle();
   }
 
   /** Instant-cast alias — same cast-action strip as a successful channel finish. */
@@ -654,6 +703,8 @@ export class UnitSprite {
   private startChargeCycle(): void {
     if (this.chargeCycleTimer || !this.casterAnim) return;
     this.pendingCharge = false;
+    // Manual setFrame() below fights a running Phaser anim (idle loop) — stop it first.
+    if (this.idleAnimKey) this.body.stop();
     const frames = this.casterAnim.chargeFrames;
     const durations = this.casterAnim.chargeDurationsMs;
     let i = 0;
@@ -684,6 +735,8 @@ export class UnitSprite {
   ): void {
     this.stopReleaseTimer();
     if (frames.length === 0) return;
+    // Manual setFrame() below fights a running Phaser anim (idle loop) — stop it first.
+    if (this.idleAnimKey) this.body.stop();
     let i = 0;
     this.body.setFrame(frames[0]!);
     if (markRelease) this.releaseActive = true;
@@ -696,7 +749,7 @@ export class UnitSprite {
         if (this.pendingCharge) {
           this.startChargeCycle();
         } else {
-          this.body.setFrame(this.casterAnim!.idleFrame);
+          this.returnToIdle();
         }
         return;
       }

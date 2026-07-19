@@ -1,0 +1,3 @@
+HEALER_ZAP_FRAME_DURATIONS_MS = [50, 150, 267, 83, 167, 117, 100]
+# f0 rest, f1 antic, f2 antic+ (pre-spark), f3 spark, f4 hold, f5 settle, f6 ready
+# total ~934ms — wire in sprites.ts chunk 1B
