@@ -6,6 +6,7 @@ import { HubScene } from './scenes/HubScene';
 import { TreeScene } from './scenes/TreeScene';
 import { RelicScene } from './scenes/RelicScene';
 import { LoadoutScene } from './scenes/LoadoutScene';
+import { SettingsScene } from './scenes/SettingsScene';
 import { installTestHooks } from './debug/testHooks';
 import { installPlaytimeTracker } from './telemetry';
 
@@ -22,7 +23,16 @@ const game = new Phaser.Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [BootScene, TutorialScene, CombatScene, HubScene, TreeScene, RelicScene, LoadoutScene],
+  scene: [
+    BootScene,
+    TutorialScene,
+    CombatScene,
+    HubScene,
+    TreeScene,
+    RelicScene,
+    LoadoutScene,
+    SettingsScene,
+  ],
 });
 installTestHooks(game);
 installPlaytimeTracker();

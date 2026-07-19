@@ -225,14 +225,15 @@ describe('Example 1 — nested + converging Special1', () => {
     expect(byId.mutation1?.status).toBe('locked');
     expect(byId.special1?.status).toBe('locked');
 
+    // Root itself isn't owned yet (only purchasable) — every edge is 'inactive'.
     expect(v.edges).toEqual(
       expect.arrayContaining([
-        { fromSpotId: 'root', toSpotId: 'buff1' },
-        { fromSpotId: 'root', toSpotId: 'mutation1' },
-        { fromSpotId: 'buff1', toSpotId: 'buff2' },
-        { fromSpotId: 'mutation1', toSpotId: 'mutation2' },
-        { fromSpotId: 'buff2', toSpotId: 'special1' },
-        { fromSpotId: 'mutation2', toSpotId: 'special1' },
+        { fromSpotId: 'root', toSpotId: 'buff1', state: 'inactive' },
+        { fromSpotId: 'root', toSpotId: 'mutation1', state: 'inactive' },
+        { fromSpotId: 'buff1', toSpotId: 'buff2', state: 'inactive' },
+        { fromSpotId: 'mutation1', toSpotId: 'mutation2', state: 'inactive' },
+        { fromSpotId: 'buff2', toSpotId: 'special1', state: 'inactive' },
+        { fromSpotId: 'mutation2', toSpotId: 'special1', state: 'inactive' },
       ]),
     );
     expect(v.edges).toHaveLength(6);
@@ -302,6 +303,139 @@ describe('Example 1 — nested + converging Special1', () => {
     if (result.ok) return;
     expect(result.reason).toBe('cannot-afford');
     expect(result.state).toBe(state);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// v0.3 lattice — edge states (EdgeState union: traversed/available/locked/inactive)
+// ---------------------------------------------------------------------------
+
+describe('edge states (v0.3 lattice)', () => {
+  it('root edges go inactive → available → traversed as ownership progresses', () => {
+    let state = create(EXAMPLE_1, { gold: 100, ruby: 1 });
+
+    // Before any purchase: root not owned yet → every outgoing edge inactive.
+    expect(view(EXAMPLE_1, state).edges.find((e) => e.toSpotId === 'buff1')?.state).toBe(
+      'inactive',
+    );
+
+    state = mustBuy(EXAMPLE_1, state, 'root');
+    let v = view(EXAMPLE_1, state);
+    expect(v.edges.find((e) => e.fromSpotId === 'root' && e.toSpotId === 'buff1')?.state).toBe(
+      'available',
+    );
+    expect(
+      v.edges.find((e) => e.fromSpotId === 'root' && e.toSpotId === 'mutation1')?.state,
+    ).toBe('available');
+
+    state = mustBuy(EXAMPLE_1, state, 'buff1');
+    v = view(EXAMPLE_1, state);
+    expect(v.edges.find((e) => e.fromSpotId === 'root' && e.toSpotId === 'buff1')?.state).toBe(
+      'traversed',
+    );
+    expect(v.edges.find((e) => e.fromSpotId === 'buff1' && e.toSpotId === 'buff2')?.state).toBe(
+      'available',
+    );
+    // Mutation branch untouched — still just available off the owned root.
+    expect(
+      v.edges.find((e) => e.fromSpotId === 'root' && e.toSpotId === 'mutation1')?.state,
+    ).toBe('available');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// v0.3 lattice — exclusive-lock edge state + minLevel gate (dedicated example
+// config; TALENT_TREE-specific oath-lock / crown-level coverage lives in
+// data/talentTree.test.ts).
+// ---------------------------------------------------------------------------
+
+const EXAMPLE_3: TreeConfig = {
+  nodes: [
+    { id: 'root3', content: null, cost: { currency: 'gold', amount: 0 } },
+    {
+      id: 'pathA',
+      content: null,
+      cost: { currency: 'gold', amount: 0 },
+      requires: { mode: 'all', nodes: ['root3'] },
+      exclusiveGroup: 'fork',
+    },
+    {
+      id: 'pathB',
+      content: null,
+      cost: { currency: 'gold', amount: 0 },
+      requires: { mode: 'all', nodes: ['root3'] },
+      exclusiveGroup: 'fork',
+    },
+    {
+      id: 'crown3',
+      content: null,
+      cost: { currency: 'gold', amount: 0 },
+      requires: { mode: 'all', nodes: ['pathA'] },
+      minLevel: 5,
+    },
+  ],
+  spots: [
+    { id: 'root3', chain: ['root3'] },
+    { id: 'pathA', chain: ['pathA'] },
+    { id: 'pathB', chain: ['pathB'] },
+    { id: 'crown3', chain: ['crown3'] },
+  ],
+};
+
+describe('EXAMPLE_3 — exclusive lock destroys the rival edge; minLevel gates a crown', () => {
+  function stateWithPathA(): TreeState {
+    let state = create(EXAMPLE_3, {});
+    state = mustBuy(EXAMPLE_3, state, 'root3');
+    state = mustBuy(EXAMPLE_3, state, 'pathA');
+    return state;
+  }
+
+  it('marks the rival exclusive-locked edge as locked, the taken one as traversed', () => {
+    const v = view(EXAMPLE_3, stateWithPathA());
+    expect(v.edges.find((e) => e.toSpotId === 'pathB')?.state).toBe('locked');
+    expect(v.edges.find((e) => e.toSpotId === 'pathA')?.state).toBe('traversed');
+  });
+
+  it('rejects a minLevel-gated purchase below the threshold', () => {
+    const result = update(EXAMPLE_3, stateWithPathA(), {
+      type: 'purchase',
+      spotId: 'crown3',
+      level: 4,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe('level-too-low');
+  });
+
+  it('accepts a minLevel-gated purchase exactly at the boundary', () => {
+    const result = update(EXAMPLE_3, stateWithPathA(), {
+      type: 'purchase',
+      spotId: 'crown3',
+      level: 5,
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('bypasses the level gate when the caller omits level (back-compat)', () => {
+    const result = update(EXAMPLE_3, stateWithPathA(), { type: 'purchase', spotId: 'crown3' });
+    expect(result.ok).toBe(true);
+  });
+
+  it('view reflects the level gate as a locked status, and bypasses when level is omitted', () => {
+    const state = stateWithPathA();
+    expect(view(EXAMPLE_3, state, 4).spots.find((s) => s.id === 'crown3')?.status).toBe('locked');
+    expect(view(EXAMPLE_3, state, 5).spots.find((s) => s.id === 'crown3')?.status).toBe(
+      'affordable',
+    );
+    expect(view(EXAMPLE_3, state).spots.find((s) => s.id === 'crown3')?.status).toBe('affordable');
+  });
+
+  it('validateConfig rejects a non-positive-integer minLevel', () => {
+    const bad: TreeConfig = {
+      nodes: [{ id: 'r', content: null, cost: { currency: 'gold', amount: 0 }, minLevel: 0 }],
+      spots: [{ id: 'r', chain: ['r'] }],
+    };
+    expect(validateConfig(bad)?.message).toMatch(/minLevel/);
   });
 });
 

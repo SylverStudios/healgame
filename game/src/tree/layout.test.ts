@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { create, layoutSpots, update, view, type TreeConfig } from './index';
+import { create, layoutFromGrid, layoutSpots, update, view, type TreeConfig } from './index';
 
 const TINY: TreeConfig = {
   nodes: [
@@ -47,5 +47,29 @@ describe('layoutSpots', () => {
     state = bought.state;
     const positions = layoutSpots(view(TINY, state), { width: 960 });
     expect(positions.size).toBe(3);
+  });
+});
+
+describe('layoutFromGrid', () => {
+  const spacing = { left: 90, top: 176, colWidth: 130, rowHeight: 70 };
+
+  it('maps col/row to pixels via the linear transform', () => {
+    const positions = layoutFromGrid(
+      { root: { col: 0, row: 2 }, tip: { col: 6, row: 0 } },
+      spacing,
+    );
+    expect(positions.get('root')).toEqual({ x: 90, y: 316 });
+    expect(positions.get('tip')).toEqual({ x: 870, y: 176 });
+  });
+
+  it('handles negative rows (spurs above the row-0 baseline)', () => {
+    const positions = layoutFromGrid({ spur: { col: 3, row: -1 } }, spacing);
+    expect(positions.get('spur')).toEqual({ x: 480, y: 106 });
+  });
+
+  it('omits spots absent from the grid map', () => {
+    const positions = layoutFromGrid({ only: { col: 1, row: 1 } }, spacing);
+    expect(positions.size).toBe(1);
+    expect(positions.get('missing')).toBeUndefined();
   });
 });

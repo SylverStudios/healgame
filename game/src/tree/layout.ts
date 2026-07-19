@@ -1,7 +1,14 @@
 /**
- * Pure layout for a TreeView — no Phaser. Places spots in rows by graph depth
- * (longest path from a root via `edges`). Optional per-spot overrides win when
- * provided (keeps journey click targets stable for a known config).
+ * Pure layout for a TreeView — no Phaser. Two strategies:
+ *
+ *  - `layoutSpots` places rows by graph depth (longest path from a root via
+ *    `edges`), auto-centering each row. Optional per-spot overrides win when
+ *    provided (keeps journey click targets stable for a known config).
+ *  - `layoutFromGrid` (v0.3 lattice) maps a spot's authored `SpotDef.grid`
+ *    (integer col/row — see `data/talentTree.ts`) directly to pixels via
+ *    fixed spacing constants. No graph walk, no auto-centering: the config
+ *    author placed every spot explicitly, so this is a pure linear transform,
+ *    trivially testable without Phaser.
  */
 
 import type { TreeView } from './types';
@@ -9,6 +16,43 @@ import type { TreeView } from './types';
 export interface SpotPosition {
   x: number;
   y: number;
+}
+
+/** Integer grid coordinate for one spot (column = progression depth, row = lane). */
+export interface GridPosition {
+  col: number;
+  row: number;
+}
+
+export interface GridSpacing {
+  /** Pixel x for grid col 0. */
+  left: number;
+  /** Pixel y for grid row 0 (rows may be negative — spurs above the baseline). */
+  top: number;
+  /** Pixel distance between adjacent columns. */
+  colWidth: number;
+  /** Pixel distance between adjacent rows. */
+  rowHeight: number;
+}
+
+/**
+ * Linear grid→pixel transform: `x = left + col * colWidth`,
+ * `y = top + row * rowHeight`. Pure — no graph walk, no Phaser. Spots without
+ * a `grid` entry in the input map are simply absent from the result (caller
+ * decides how to handle, e.g. skip rendering).
+ */
+export function layoutFromGrid(
+  grid: Readonly<Record<string, GridPosition>>,
+  spacing: GridSpacing,
+): Map<string, SpotPosition> {
+  const positions = new Map<string, SpotPosition>();
+  for (const [spotId, pos] of Object.entries(grid)) {
+    positions.set(spotId, {
+      x: spacing.left + pos.col * spacing.colWidth,
+      y: spacing.top + pos.row * spacing.rowHeight,
+    });
+  }
+  return positions;
 }
 
 export interface LayoutOptions {

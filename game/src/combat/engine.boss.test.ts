@@ -182,11 +182,18 @@ describe('Tunnel Vision (boss cast union)', () => {
     expect(ends).toHaveLength(1);
     expect(ends[0]!.targetId).toBe('dps1');
 
-    expect(events.some((e) => e.type === 'unitDied' && e.unitId === 'dps1')).toBe(true);
-    expect(engine.state.party.find((u) => u.id === 'dps1')!.alive).toBe(false);
+    // v0.3 §Coyote: the lethal 5th tick downs dps1 (channel ends that tick); true death
+    // waits for the unsaved 250ms grace window (t=8250, past this advance's t=8000 horizon).
+    expect(events.some((e) => e.type === 'unitDying' && e.unitId === 'dps1')).toBe(true);
+    expect(events.some((e) => e.type === 'unitDied' && e.unitId === 'dps1')).toBe(false);
+    const dpsAt8s = engine.state.party.find((u) => u.id === 'dps1')!;
+    expect(dpsAt8s.alive).toBe(true);
+    expect(dpsAt8s.dying).toBe(true);
 
-    // No 6th tick after death.
+    // Window expires unsaved -> unitDied; no 6th tick after the early end.
     const laterEvents = engine.advance(2000);
+    expect(laterEvents.some((e) => e.type === 'unitDied' && e.unitId === 'dps1')).toBe(true);
+    expect(engine.state.party.find((u) => u.id === 'dps1')!.alive).toBe(false);
     expect(focusTicks(laterEvents)).toHaveLength(0);
   });
 

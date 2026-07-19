@@ -18,13 +18,17 @@
  *   B  seeded post-first-clear save → tree graph: buy Deep Reserves ranks,
  *      arm + swear the Vigil oath in-tree (talent placed, Zealot locked), buy a
  *      follow-up node → hub shows the oath
- *   B3 Alpha 0.2 hourglass: sworn Vigil + Patient Vow → scroll → Still Waters,
- *      shared mid (mend potency), Virtue Vowstrike, Wrath Ascendant + crown;
- *      second seed proves Steady Hands still purchasable on Zealot path
+ *   B3 v0.3 lattice (fits the fixed canvas, no scroll): sworn Vigil + Patient
+ *      Vow → Still Waters, shared mid (mend potency), Virtue Vowstrike, Wrath
+ *      Ascendant crown (level-gated); second seed proves Steady Hands still
+ *      purchasable on Zealot path
  *   B2 combat with the Vigil kit → hover the Solemn Vigil button → tooltip
  *      screenshot (modifier lines from the tree) + mid-fight feedback shot
  *   C  Maw gating (§D1): Ash-Gate-only save → Maw absent; Ash Gate + Iron
  *      Pass cleared → Maw present → enter → unwinnable sandbox → wipe → hub
+ *   Settings  v0.3 chunk H: hubSettings → SettingsScene (slider + Back
+ *      visible) → click slider center (~50%) → click track's left edge via a
+ *      relative offset from the located center (0%) → settingsBack → hub
  *
  * Ash Gate / Iron Pass victory itself is proven deterministically at engine
  * level (src/combat/balance.test.ts); stages B/B3/D2 seed the relevant save
@@ -50,7 +54,7 @@ const shotsDir = (() => {
 mkdirSync(shotsDir, { recursive: true });
 
 const PORT = 4174;
-const SAVE_KEY = 'healgame-save-v7';
+const SAVE_KEY = 'healgame-save-v8';
 
 /** Resolve a semantic GameObject name via window.__healgame (src/debug/testHooks.ts). */
 const locate = (page, name) =>
@@ -135,7 +139,7 @@ async function seedSave(page, save) {
 
 function baseSave(overrides) {
   return {
-    version: 7,
+    version: 8,
     tutorialDone: true,
     xp: 0,
     unlockedSpells: ['bonk', 'solemn-mend'],
@@ -146,6 +150,8 @@ function baseSave(overrides) {
     combatPaceTenths: 10,
     relicIds: [],
     pendingRelicOffers: [],
+    musicVolumePct: 50,
+    recentRuns: [],
     ...overrides,
   };
 }
@@ -154,20 +160,64 @@ function baseSave(overrides) {
  * Naive combat loop: target the tank, then every 2s cast Solemn Mend (by
  * semantic name so Bonk-on-Q loadouts still heal) and click Return when the
  * result overlay exists. Ends when `until(save)` first holds.
+ *
+ * `resultShotName`, if given: the first time combatReturn is located (the
+ * result object exists immediately, alpha-staged — see CombatScene), wait
+ * for the wipe/victory transition + summary panel (outcome, XP, build glyph;
+ * v0.3 chunk E, ~0.5-1.0s transition + staggered reveals, Return last around
+ * ~1s) to fully settle before screenshotting, then click through as usual.
+ *
+ * `castShotNames`, if given ({ castPose, healLand }): no pre-loop shot ever
+ * catches the healer casting — every earlier wait in this file has no spell
+ * click near it, so the healer is always idle at those frames. The very
+ * first Solemn Mend click this loop already makes is reused (no new click)
+ * to grab a mid-cast frame (~700ms into Solemn Mend's 2000ms cast bar, v0.3
+ * chunk F healer cast pose) and a heal-landed frame shortly after
+ * completion (heal-vfx sparkle).
+ *
+ * `bubbleShotName`, if given: v0.3 chunk G fires the wipe/victory banter bubble at the very
+ * start of showResultOverlay(), depth-below the summary panel (so the panel stays readable
+ * once it's fully in) — the panel's own slide-in tween (~120-620ms) can end up covering the
+ * tank's on-screen slot well before this loop's normal 2000ms poll cadence would even notice
+ * combatReturn exists. While a bubble shot is still pending, the loop tightens its poll to
+ * 100ms (reverting to the normal cadence right after) so it catches combatReturn — and takes
+ * the shot — within ~100-250ms of the transition actually starting, comfortably inside the
+ * bubble's fade-in and well before the panel finishes covering that screen position.
  */
-async function playCombat(page, until, timeoutMs = 180_000) {
+async function playCombat(page, until, timeoutMs = 180_000, resultShotName, castShotNames, bubbleShotName) {
   await clickNamed(page, 'combatAlly:tank');
   const start = Date.now();
+  let resultShot = false;
+  let castShotDone = false;
+  let bubbleShot = false;
   while (Date.now() - start < timeoutMs) {
     if (await locate(page, 'combatSpell:solemn-mend')) {
       await clickNamed(page, 'combatSpell:solemn-mend');
+      if (castShotNames && !castShotDone) {
+        castShotDone = true;
+        await page.waitForTimeout(700);
+        await shot(page, castShotNames.castPose);
+        await page.waitForTimeout(1500);
+        await shot(page, castShotNames.healLand);
+      }
     } else {
       await page.keyboard.press('q');
     }
     if (await locate(page, 'combatReturn')) {
+      if (bubbleShotName && !bubbleShot) {
+        bubbleShot = true;
+        await page.waitForTimeout(150);
+        await shot(page, bubbleShotName);
+      }
+      if (resultShotName && !resultShot) {
+        resultShot = true;
+        await page.waitForTimeout(1300);
+        await shot(page, resultShotName);
+      }
       await clickNamed(page, 'combatReturn');
     }
-    await page.waitForTimeout(2000);
+    const tickWaitMs = bubbleShotName && !bubbleShot ? 100 : 2000;
+    await page.waitForTimeout(tickWaitMs);
     const save = await readSave(page);
     if (save && until(save)) return save;
   }
@@ -196,7 +246,7 @@ try {
   await clickNamed(page, 'tutorialLearn');
   await page.waitForTimeout(800);
   let save = await readSave(page);
-  check(save?.version === 7, 'new saves are written as v7');
+  check(save?.version === 8, 'new saves are written as v8');
   check(save?.tutorialDone === true, 'tutorial click sets tutorialDone');
   check(save?.unlockedSpells.includes('solemn-mend') === true, 'Solemn Mend unlocked via tutorial');
   check(save?.unlockedSpells.includes('bonk') === true, 'Bonk is unlocked from the start');
@@ -206,9 +256,22 @@ try {
   await page.waitForTimeout(3500); // let autos land so lunge/'*' feedback is in frame
   await shot(page, 'ash-gate-first-run-feedback');
 
-  save = await playCombat(page, (s) => s.xp > 0);
+  save = await playCombat(
+    page,
+    (s) => s.xp > 0,
+    180_000,
+    'combat-wipe-summary',
+    { castPose: 'combat-healer-cast-pose', healLand: 'combat-heal-sparkle' },
+    'combat-wipe-banter', // v0.3 chunk G: tank's wipe speech bubble, caught just as the transition starts
+  );
   check(save.xp > 0, `first run banked kill XP through the wipe (xp=${save.xp})`);
   check(save.clearedDungeons.length === 0, 'Ash Gate not marked cleared by a wipe');
+  check(
+    save.recentRuns.length === 1 && save.recentRuns[0].outcome === 'wipe',
+    'wipe pushed exactly one RunRecord onto recentRuns',
+  );
+  check(save.recentRuns[0].dungeonId === 'ash-gate', 'RunRecord records the dungeon id');
+  check(save.recentRuns[0].xpGained === save.xp, 'RunRecord xpGained matches the banked run XP (no prior runs)');
   await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(800);
   await shot(page, 'hub-after-first-wipe');
@@ -360,10 +423,11 @@ try {
   check((await locate(page, 'runMod:vigil-oath')) !== null, 'hub run-mods bar shows sworn oath');
   await shot(page, 'hub-with-oath');
 
-  // ---- Stage B3: Alpha 0.2 hourglass (shared mid → Vowstrike → crown) --------
-  console.log('Stage B3: scroll hourglass → Still Waters → shared mid → Vowstrike → crown');
+  // ---- Stage B3: v0.3 lattice (shared mid → Vowstrike → level-gated crown) ---
+  console.log('Stage B3: lattice → Still Waters → shared mid → Vowstrike → crown');
   // Level 12 (xp 660) → 12 talent points; seed spends 3, leaving room for the
-  // branch CD + shared mid + aspect + Wings + crown amp.
+  // branch CD + shared mid + aspect + Wings + crown amp. Level 12 also clears
+  // both crowns' minLevel gates (wrath-ascendant 10, vowbound-crown 12).
   await seedSave(
     page,
     baseSave({
@@ -376,12 +440,10 @@ try {
   await clickNamed(page, 'hubTree');
   await page.waitForTimeout(600);
 
-  // WORLD_HEIGHT 1080 → max scroll 540. Wheel past the clamp, then locate()
-  // converts scrolled world positions to screen px for named clicks.
+  // Whole lattice fits the fixed 960×540 canvas (chunk D) — no scroll needed
+  // to reach the crown row.
   await hoverNamed(page, 'treeBack');
-  await page.mouse.wheel(0, 2000);
-  await page.waitForTimeout(400);
-  await shot(page, 'tree-hourglass-scrolled');
+  await shot(page, 'tree-lattice-vigil-branch');
 
   await clickNamed(page, 'treeNode:vigil-still-waters');
   await page.waitForTimeout(400);
@@ -472,8 +534,19 @@ try {
   await page.mouse.move(480, 270); // off the button (viewport center; not a layout target)
   await page.waitForTimeout(4000); // let autos land for feedback frame
   await shot(page, 'combat-feedback-midfight');
-  save = await playCombat(page, (s) => s.xp > 12);
+  // xp banks per kill DURING the fight, so gate on the RunRecord too — it's only
+  // pushed by HubScene.create() after Return, i.e. once the run truly ended.
+  save = await playCombat(
+    page,
+    (s) => s.xp > 12 && s.recentRuns.length > 0,
+    180_000,
+    'combat-result-summary-lit-glyph',
+  );
   check(save.xp > 12, 'Vigil-kit run banked XP');
+  check(
+    save.recentRuns[0]?.glyph.segments.length > 0,
+    "Vigil-kit run's RunRecord glyph reflects the owned oath→patient-vow→still-waters path",
+  );
   await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(800);
 
@@ -503,6 +576,43 @@ try {
   await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(800);
   await shot(page, 'hub-after-maw');
+
+  // ---- Stage Settings: Hub → Settings volume slider → Back (v0.3 chunk H) ----
+  console.log('Stage Settings: hubSettings → drag/click volume slider → settingsBack');
+  await seedSave(page, baseSave({}));
+  save = await readSave(page);
+  check(save.musicVolumePct === 50, 'seeded save starts at the default 50% music volume');
+
+  await clickNamed(page, 'hubSettings');
+  await page.waitForTimeout(400);
+  check((await locate(page, 'settingsVolumeSlider')) !== null, 'Settings scene shows the volume slider track');
+  check((await locate(page, 'settingsBack')) !== null, 'Settings scene shows Back');
+  await shot(page, 'settings-scene');
+
+  // Clicking the track's located center sets ~50% (already the seeded value —
+  // this proves the click-to-set path itself, not just the seed).
+  await clickNamed(page, 'settingsVolumeSlider');
+  await page.waitForTimeout(300);
+  save = await readSave(page);
+  check(
+    Math.abs(save.musicVolumePct - 50) <= 5,
+    `clicking the slider center sets ~50% (musicVolumePct=${save.musicVolumePct})`,
+  );
+
+  // Half the track width is a relative offset from the *located* center, not
+  // a hard-coded layout coordinate — it must match SettingsScene.ts's
+  // TRACK_WIDTH/2 (400/2) so the click lands on the track's left edge (0%).
+  const SETTINGS_TRACK_HALF_WIDTH = 200;
+  const sliderPos = await locate(page, 'settingsVolumeSlider');
+  await page.mouse.click(sliderPos.x - SETTINGS_TRACK_HALF_WIDTH, sliderPos.y);
+  await page.waitForTimeout(300);
+  save = await readSave(page);
+  check(save.musicVolumePct === 0, `clicking the track's left edge sets musicVolumePct to 0 (got ${save.musicVolumePct})`);
+
+  await clickNamed(page, 'settingsBack');
+  await page.waitForTimeout(400);
+  check((await locate(page, 'hubSettings')) !== null, 'settingsBack returns to Hub (hubSettings visible again)');
+  await shot(page, 'hub-after-settings');
 } finally {
   await browser?.close();
   if (preview) {

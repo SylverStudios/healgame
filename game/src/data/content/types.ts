@@ -25,6 +25,18 @@ export type EnemyAbilityDef =
   | ManaSiphonAbilityDef;
 
 /**
+ * v0.3 chunk F "Boss telegraphs": data-driven wind-up cue played on the boss
+ * sprite for the bossCastStarted → bossCastFinished window (Tunnel Vision:
+ * just its telegraph phase, not the channel — see combat/README.md "Telegraph
+ * → channel"). Optional; CombatScene defaults to 'glow' when absent. Kept to
+ * three members by design ("keep the set tiny" — docs/v0.3-handoff.md).
+ * Presentation-only — never reaches the engine (BossCastDef/BossCastState in
+ * combat/types.ts are untouched; CombatScene resolves this straight off the
+ * authoring registries via the boss's stable mobId).
+ */
+export type BossTelegraphCue = 'glow' | 'raise' | 'pulse';
+
+/**
  * The runtime currently supports one telegraphed boss cast per boss.
  * Add future mechanics as new `kind` members instead of optional fields here.
  */
@@ -37,6 +49,7 @@ export interface PartyAoeAbilityDef {
   intervalMs: number;
   partyDamage: number;
   visualKey: string;
+  telegraph?: BossTelegraphCue;
 }
 
 export interface TunnelVisionAbilityDef {
@@ -50,6 +63,7 @@ export interface TunnelVisionAbilityDef {
   tickMs: number;
   damagePerTick: number;
   visualKey: string;
+  telegraph?: BossTelegraphCue;
 }
 
 /**
@@ -68,6 +82,7 @@ export interface PartyDoTAbilityDef {
   tickMs: number;
   damagePerTick: number;
   visualKey: string;
+  telegraph?: BossTelegraphCue;
 }
 
 /**
@@ -84,6 +99,7 @@ export interface ManaSiphonAbilityDef {
   partyDamage: number;
   manaBurn: number;
   visualKey: string;
+  telegraph?: BossTelegraphCue;
 }
 
 export type MobTag = 'trash' | 'boss';

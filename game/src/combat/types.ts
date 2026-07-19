@@ -17,6 +17,17 @@ export interface Unit {
   mana: number;
   maxMana: number;
   alive: boolean;
+  /**
+   * v0.3 §Coyote: true while this unit is "downed" — hp is 0 but `alive` is
+   * still true. Party members only (enemies/boss never enter this state; see
+   * combat/README.md "Dying state"). A dying unit is a valid heal target
+   * (targeting/casting logic keys off `alive`, not `dying`), takes no further
+   * damage, does not auto-attack (mercs), and is skipped by enemy/boss target
+   * selection. Undefined/false for every non-dying unit.
+   */
+  dying?: boolean;
+  /** ms remaining in the coyote grace window while `dying` is true; undefined otherwise. */
+  coyoteRemainingMs?: number | undefined;
 }
 
 /**
@@ -215,6 +226,11 @@ export type CombatEvent =
   | { type: 'manaBurned'; amount: number }
   | { type: 'cooldownActivated'; id: string; name: string }
   | { type: 'cooldownBuffEnded'; id: string }
+  /** v0.3 §Coyote: a party member hit lethal damage and entered the grace window (not dead yet). */
+  | { type: 'unitDying'; unitId: string; coyoteMs: number }
+  /** v0.3 §Coyote: a heal completed on a dying unit within its window — death cancelled. */
+  | { type: 'unitSaved'; unitId: string }
+  /** Party members: only after an unsaved coyote window expires. Enemies/boss: instant, as before. */
   | { type: 'unitDied'; unitId: string }
   | { type: 'waveStarted'; waveIndex: number }
   | { type: 'combatEnded'; status: CombatStatus };

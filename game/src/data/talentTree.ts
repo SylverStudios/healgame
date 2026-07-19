@@ -476,9 +476,17 @@ const CROWN_REQUIRES: NodeDef['requires'] = {
   nodes: ['vowstrike-virtue', 'vowstrike-vengeance'],
 };
 
+/**
+ * v0.3 lattice §Locked topology: crown level gates ascend. CROWN-V
+ * (wrath-ascendant, Vigil-string end per the sketch) gates lower than
+ * CROWN-Z (vowbound-crown); both stay reachable from either oath via the
+ * shared Vowstrike fork (unchanged requires — see tree/AGENTS.md "Lattice
+ * topology" for why the graph shape didn't need to change).
+ */
 const wrathAscendantNode: NodeDef = {
   id: 'wrath-ascendant',
   requires: CROWN_REQUIRES,
+  minLevel: 10,
   cost: { currency: 'talent', amount: 1 },
   content: content({
     name: 'Wrath Ascendant',
@@ -491,6 +499,7 @@ const wrathAscendantNode: NodeDef = {
 const vowboundCrownNode: NodeDef = {
   id: 'vowbound-crown',
   requires: CROWN_REQUIRES,
+  minLevel: 12,
   cost: { currency: 'talent', amount: 1 },
   content: content({
     name: 'Vowbound Crown',
@@ -533,24 +542,24 @@ export const TALENT_TREE: TreeConfig = {
     vowboundCrownNode,
   ],
   spots: [
-    deepReserves.spot,
-    { id: 'vigil-oath', chain: ['vigil-oath', 'warped-tempo-via-vigil'] },
-    { id: 'zealot-oath', chain: ['zealot-oath', 'warped-tempo-via-zealot'] },
-    patientVow.spot,
-    { id: 'vigil-measured-devotion', chain: ['vigil-measured-devotion'] },
-    { id: 'vigil-graven-scale', chain: ['vigil-graven-scale'] },
-    ferventChain.spot,
-    { id: 'zealot-steady-hands', chain: ['zealot-steady-hands'] },
-    { id: 'vigil-thrift', chain: ['vigil-thrift'] },
-    { id: 'vigil-still-waters', chain: ['vigil-still-waters'] },
-    { id: 'zealot-quick-breath', chain: ['zealot-quick-breath'] },
-    { id: 'zealot-frenzied-liturgy', chain: ['zealot-frenzied-liturgy'] },
-    { id: 'shared-mend-potency', chain: ['shared-mend-potency'] },
-    { id: 'shared-zealous-potency', chain: ['shared-zealous-potency'] },
-    { id: 'vowstrike-virtue', chain: ['vowstrike-virtue'] },
-    { id: 'vowstrike-vengeance', chain: ['vowstrike-vengeance'] },
-    { id: 'wrath-ascendant', chain: ['wrath-ascendant'] },
-    { id: 'vowbound-crown', chain: ['vowbound-crown'] },
+    { ...deepReserves.spot, grid: { col: 0, row: 2 } },
+    { id: 'vigil-oath', chain: ['vigil-oath', 'warped-tempo-via-vigil'], grid: { col: 1, row: 0 } },
+    { id: 'zealot-oath', chain: ['zealot-oath', 'warped-tempo-via-zealot'], grid: { col: 1, row: 4 } },
+    { ...patientVow.spot, grid: { col: 2, row: 0 } },
+    { id: 'vigil-measured-devotion', chain: ['vigil-measured-devotion'], grid: { col: 2, row: 1 } },
+    { id: 'vigil-graven-scale', chain: ['vigil-graven-scale'], grid: { col: 3, row: -1 } },
+    { ...ferventChain.spot, grid: { col: 2, row: 4 } },
+    { id: 'zealot-steady-hands', chain: ['zealot-steady-hands'], grid: { col: 2, row: 3 } },
+    { id: 'vigil-thrift', chain: ['vigil-thrift'], grid: { col: 3, row: 0 } },
+    { id: 'vigil-still-waters', chain: ['vigil-still-waters'], grid: { col: 3, row: 1 } },
+    { id: 'zealot-quick-breath', chain: ['zealot-quick-breath'], grid: { col: 3, row: 4 } },
+    { id: 'zealot-frenzied-liturgy', chain: ['zealot-frenzied-liturgy'], grid: { col: 3, row: 3 } },
+    { id: 'shared-mend-potency', chain: ['shared-mend-potency'], grid: { col: 4, row: 1 } },
+    { id: 'shared-zealous-potency', chain: ['shared-zealous-potency'], grid: { col: 4, row: 3 } },
+    { id: 'vowstrike-virtue', chain: ['vowstrike-virtue'], grid: { col: 5, row: 1 } },
+    { id: 'vowstrike-vengeance', chain: ['vowstrike-vengeance'], grid: { col: 5, row: 3 } },
+    { id: 'wrath-ascendant', chain: ['wrath-ascendant'], grid: { col: 6, row: 0 } },
+    { id: 'vowbound-crown', chain: ['vowbound-crown'], grid: { col: 6, row: 4 } },
   ],
 };
 

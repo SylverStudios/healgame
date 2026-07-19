@@ -1,6 +1,6 @@
 # Combat engine (Chunk 1)
 
-Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-07-15
+Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-07-18
 
 Pure, deterministic TypeScript. No Phaser, no wall-clock, no randomness — driven
 entirely by `advance(dtMs)`. Chunk 2 builds the Phaser view against exactly
@@ -78,9 +78,10 @@ and compiles the ordered dungeon catalog into the engine's resolved
     action-combat conventions (cancelling doesn't refund tempo, only mana) and
     keeps the busy-time invariant (`max(castMs, GCD_MS)` from cast start)
     simple — cancellation shortens the *cast*, never the *GCD*.
-  - **Mid-cast target death**: if the active cast's target dies (from a merc
-    swing, an enemy/boss auto-attack, or Bonehowl/Extinction party damage),
-    the cast is auto-cancelled the instant that death is applied — same tick,
+  - **Mid-cast target death** (amended v0.3 §Coyote — see "Dying state"
+    below): if the active cast's target dies (from a merc swing, an
+    enemy/boss auto-attack, or Bonehowl/Extinction party damage), the cast
+    is auto-cancelled the instant that death is applied — same tick,
     immediately after the `unitDied` event that caused it. `reason:
     'target-dead'`. The cast never reaches `completePlayerCast`: no
     `castFinished`, no heal, and (per Synergy below) no arm/consume. This
@@ -88,6 +89,102 @@ and compiles the ordered dungeon catalog into the engine's resolved
     and arms") — the old rule assumed mana was spent up front and undoing a
     completed cast was worse than letting it resolve into nothing; reserve
     semantics make a clean cancel possible instead.
+    - **Party members only die instantly from the caster's point of view
+      when their coyote window expires unsaved.** A party member hit for
+      lethal damage enters `dying` first (still `alive`) — an in-flight cast
+      targeting them is **not** auto-cancelled just because they entered
+      `dying` (that would defeat the whole feature: the cast might still land
+      inside the window and save them — see "Dying state"). `target-dead`
+      only fires once `finalizeDeath` runs, i.e. once the window expires
+      without a completed heal. Enemies/boss are unaffected by any of this —
+      they still die (and cancel a `damage`-spell cast targeting them, in
+      practice never observable since damage-spell casts are instant) the
+      instant their hp hits 0, exactly as before.
+- **Dying state** (v0.3 §Coyote — coyote-time heals): party members (tank,
+  dps1, dps2, healer) get a 250ms grace window on lethal damage instead of
+  dying instantly. `COYOTE_MS = 250` lives in `data/constants.ts` — the
+  engine imports the constant (data imports are allowed in `combat/`; only
+  Phaser/time/randomness are not) rather than hard-coding the number.
+  **Enemies and the boss never get this — their death is instant, exactly as
+  before.** Only `applyDamageToUnit`'s non-enemy branch (i.e. a party member)
+  ever enters `dying`.
+  - **Entering dying**: when a party member's hp is clamped to 0 by lethal
+    damage, `Unit.alive` stays `true`, `Unit.dying` becomes `true`, and
+    `Unit.coyoteRemainingMs` is set to `COYOTE_MS`. `unitDying { unitId,
+    coyoteMs }` fires — not `unitDied`. Because `alive` never flips, every
+    existing `alive`-gated check (heal targeting: `setTarget`,
+    `resolveCastTargetId`, `fireQueuedCast`; wipe: `checkWipe`) keeps working
+    unmodified — a dying unit reads as "still alive" to all of them, exactly
+    as the locked design requires ("still a valid heal target … must NOT
+    count as dead for wipe checks").
+  - **What changes while dying** (three explicit exclusions, each keyed off
+    the new `dying` flag rather than `alive`):
+    1. **No further damage.** `applyDamageToUnit` returns immediately for a
+       `dying` target — no `damage` event, hp stays clamped at 0. A dying
+       unit is already "downed"; it can't be hit again, only saved or
+       finalized.
+    2. **Doesn't auto-attack.** `resolveMercSwing` skips a `dying` merc (tank
+       or dps) — its swing timer keeps counting in the background (simplest
+       correct behavior — no special-casing needed) but never lands a hit
+       while downed.
+    3. **Excluded from enemy/boss target selection**, exactly as if dead:
+       `pickAllyTarget` (basic enemy/boss autos) and the Tunnel Vision
+       `eligible` list (`startBossFocus`) both add a `!u.dying` check
+       alongside their existing `u.alive` check. A downed unit reads as dead
+       to attackers, alive to the heal/wipe pipeline — deliberately
+       asymmetric, and the whole point of the feature.
+  - **What does NOT change**: click-to-target (`setTarget`) and heal-cast
+    targeting are untouched — both already gate on `alive` alone, so a dying
+    unit remains fully click-targetable and healable with zero extra code.
+  - **Saved**: if a player heal cast **completes** with a `dying` target
+    (checked in `completePlayerCast`, right after the heal is applied) and
+    the heal brought hp above 0, the unit is saved: `dying` clears,
+    `coyoteRemainingMs` clears, `unitSaved { unitId }` fires. `unitDied`
+    never fires for a saved unit. The normal `heal` event still fires first,
+    with its usual overheal math (missing HP is computed against hp 0, same
+    as any near-death heal) — a coyote save is not a special heal formula,
+    just a normal heal that happens to land on a downed target. Mana/refund
+    rules are completely unchanged: the cast completed normally, so no
+    refund, exactly like any other completed cast.
+  - **Expired unsaved**: if `coyoteRemainingMs` reaches ≤0 while still
+    `dying` (i.e. no heal saved them in time), `finalizeDeath` runs: `alive`
+    flips to `false`, `dying` clears, the swing timer is dropped, `unitDied`
+    fires, any active cast still targeting the unit is auto-cancelled
+    (`cancelCastIfTargeting`, `reason: 'target-dead'` — see "Mid-cast target
+    death" above), then `checkWipe` runs. This is the *only* place
+    `unitDied` or a `target-dead` cancel can happen for a party member now —
+    the pre-v0.3 instant-death branch (`applyDamageToUnit`'s non-enemy path)
+    was replaced by `enterDying` + this expiry path.
+  - **Wipe timing**: because `checkWipe` only ever runs from
+    `finalizeDeath`, and `alive` doesn't flip to `false` until a window
+    genuinely expires unsaved, a wipe can only be detected once every party
+    member's window (if any) has been resolved — "all 4 dead" now means "all
+    4 either never entered dying, or entered it and their window expired
+    unsaved." Multiple members downed simultaneously (e.g. a
+    one-shot-strength Bonehowl) each get their own independent
+    `coyoteRemainingMs`, all counted down in lockstep since they were all set
+    to `COYOTE_MS` in the same tick; `resolveCoyoteExpiries` walks the party
+    in stable order (tank, dps1, dps2, healer) so the `combatEnded { status:
+    'wipe' }` event fires exactly once, attached to whichever member's
+    `finalizeDeath` happens to be last in that fixed order.
+  - **Damage-to-a-dying-unit rule** (locked, simplest deterministic option):
+    a `dying` unit takes **no further damage** at all — not "damage that's
+    clamped to 0 and logged", genuinely skipped (`applyDamageToUnit`'s guard
+    is the first line of the function). This applies uniformly regardless of
+    source: merc auto (moot, they don't target allies), enemy/boss auto (moot,
+    `pickAllyTarget` already excludes them), Bonehowl/Extinction party AoE,
+    Emberfall DoT ticks, Tunnel Vision focus ticks, Soul Toll — all route
+    through `applyDamageToUnit`, so the guard is centralized in one place.
+  - **Targeting/swing rule** (locked, simplest deterministic option): a
+    dying unit "reads as downed" — stops swinging, dropped from enemy/boss
+    target selection — while staying fully click-targetable and healable.
+    The alternative (enemies keep attacking a unit already at 0 hp) was
+    rejected as pointless noise once damage-to-dying is a no-op anyway.
+  - **Enemies/boss get no coyote window** — this is party-only grace.
+    `enterDying` is only ever called from the non-`enemy`/`boss` branch of
+    `applyDamageToUnit`; enemy/boss lethal damage always goes through the
+    unchanged `onEnemyDeath` path (instant death, XP credit, wave/victory
+    check).
 - **Cooldowns** (Alpha 0.1 §D6 — first major CDs): data in `data/cooldowns.ts`
   (`CooldownDef`), live per-CD state on `state.cooldowns: CooldownState[]`
   (same order as the `cooldowns` constructor option; empty array when none —
@@ -310,18 +407,28 @@ and compiles the ordered dungeon catalog into the engine's resolved
 
 Simultaneous events resolve in a fixed priority each tick: **cooldown buff
 windows that expired this tick** (`manaCostReduction` → `cooldownBuffEnded`) →
-player cast completes → queued cast fires → boss cast completes (`partyAoE` /
+player cast completes → queued cast fires → **coyote windows that expired
+this tick** (v0.3 §Coyote — any `dying` party member whose grace window hit 0
+and wasn't saved by a heal completing in one of the two previous steps;
+`finalizeDeath` → `unitDied`, `target-dead` cancel of any cast still
+targeting them, then a wipe check) → boss cast completes (`partyAoE` /
 `manaSiphon` party damage, a `partyDoT` window starting, or a `tunnelVision`
 telegraph finishing into a channel) → boss focus tick (`tunnelVision` channel
 damage, if one landed this tick) → party DoT tick (`partyDoT`, if active) →
 merc autos (tank, dps1, dps2) → enemy/boss autos (spawn order) → boss cast
 timer starts a new telegraph/cast (blocked while a `tunnelVision` channel is
 active). `advance()` sub-steps to the next timer boundary — cooldown
-(`remainingCooldownMs`) and buff-window (`manaCostReduction`'s
-`buffRemainingMs`) timers participate in that boundary calculation too, so a
-cooldown becoming ready or a buff window expiring always lands on an exact
-sub-step — so the event log for a given command sequence is independent of
-how the caller chunks `dtMs`. Commands issued between `advance()` calls
+(`remainingCooldownMs`), buff-window (`manaCostReduction`'s
+`buffRemainingMs`), and **coyote (`coyoteRemainingMs`, while `dying`)**
+timers participate in that boundary calculation too, so a cooldown becoming
+ready, a buff window expiring, or a coyote window closing always lands on an
+exact sub-step — so the event log for a given command sequence is independent
+of how the caller chunks `dtMs`. The coyote-expiry step is placed
+deliberately *after* cast completion and the queued-cast fire: if a heal
+completes in the exact same tick a dying target's window would otherwise
+close, the heal resolves first (clearing `dying` via `unitSaved`), so the
+expiry check simply finds nothing left to finalize — the boundary is
+inclusive in the heal's favor. Commands issued between `advance()` calls
 (`castSpell` may emit `castStarted`; `cancelCast` may emit `castCancelled`;
 `activateCooldown` may emit `cooldownActivated`) are buffered and flushed at
 the start of the next `advance()`.

@@ -3,11 +3,11 @@
  * time, no randomness — driven entirely by explicit advance(dtMs) steps.
  *
  * See ./README.md for the rule decisions (mana reserve/refund, cast cancel,
- * queue semantics, boss cast cadence, targeting priority) this implementation
- * encodes.
+ * queue semantics, boss cast cadence, targeting priority, dying state /
+ * coyote-time grace) this implementation encodes.
  */
 
-import { GCD_MS, MERCS, PARTY, REWARDS, TRASH } from '../data/constants';
+import { COYOTE_MS, GCD_MS, MERCS, PARTY, REWARDS, TRASH } from '../data/constants';
 import type {
   BossCastState,
   CastState,
@@ -413,6 +413,11 @@ export class CombatEngine {
     for (const remaining of this.spellCooldownRemaining.values()) {
       if (remaining > 0) min = Math.min(min, remaining);
     }
+    // v0.3 §Coyote: every dying party member's grace window participates in sub-stepping,
+    // exactly like any other timer — its expiry always lands on an exact boundary.
+    for (const unit of this.party) {
+      if (unit.dying && unit.coyoteRemainingMs !== undefined) min = Math.min(min, unit.coyoteRemainingMs);
+    }
     return min;
   }
 
@@ -438,6 +443,10 @@ export class CombatEngine {
         if (next <= 0) this.spellCooldownRemaining.delete(id);
         else this.spellCooldownRemaining.set(id, next);
       }
+    }
+    // v0.3 §Coyote: count down every dying party member's grace window.
+    for (const unit of this.party) {
+      if (unit.dying) unit.coyoteRemainingMs = (unit.coyoteRemainingMs ?? 0) - step;
     }
     // Cooldown timers (Alpha 0.1 §D6): plain cooldown countdown (no event on reaching
     // ready — the UI reads remainingCooldownMs === 0 off state) and manaCostReduction
@@ -470,6 +479,13 @@ export class CombatEngine {
     // 3. GCD/cast busy window ends -> fire queued spell, if any
     if (this.gcdRemainingMs <= 0 && this.playerCast === null) {
       this.fireQueuedCast(events);
+    }
+    // 3b. v0.3 §Coyote: grace windows that expired this tick, for anyone not saved by a heal
+    // that already completed above (steps 2/3) — placed right after cast completion/queue-fire
+    // so a heal landing the same tick the window closes still saves the unit. See README
+    // "Determinism".
+    if (this.status === 'running') {
+      this.resolveCoyoteExpiries(events);
     }
     // 4. boss cast completes -> partyAoE / manaSiphon damage, partyDoT start, or tunnelVision channel
     if (this.status === 'running' && this.bossCastState && this.bossCastState.remainingMs <= 0) {
@@ -606,10 +622,13 @@ export class CombatEngine {
       if (spell.heal <= 0) return;
     }
 
-    // Phase 3 (handoff §D): a cast whose target dies mid-cast is auto-cancelled
-    // (cancelCastIfTargeting) the instant that death is applied, so a cast only
-    // ever reaches completion here with a still-alive target. The `target.alive`
-    // checks below are a defensive invariant guard, not live behavior.
+    // Phase 3 (handoff §D; v0.3 §Coyote): a cast whose target dies mid-cast is auto-cancelled
+    // (cancelCastIfTargeting) the instant that death is applied, so a cast only ever reaches
+    // completion here with a still-alive target. For a party member that means TRUE death
+    // (finalizeDeath, after an unsaved coyote window expires) — entering `dying` alone never
+    // cancels anything, so a cast can complete on (and save) a dying target; see the `dying` save
+    // check right after the heal below. The `target.alive` checks below are a defensive invariant
+    // guard, not live behavior.
     //
     // Consume-then-arm (locked order, phase-2-handoff): a spell that is both a
     // trigger and a buffed target consumes any already-armed bonus for itself
@@ -682,6 +701,15 @@ export class CombatEngine {
       const overheal = raw - applied;
       target.hp += applied;
       events.push({ type: 'heal', targetId: target.id, amount: applied, overheal, spellId: spell.id });
+      // v0.3 §Coyote: a heal that completes on a dying unit (within its grace window, since a
+      // truly-dead target would have auto-cancelled this cast instead — see cancelCastIfTargeting)
+      // saves them: dying clears, no unitDied ever fires. Mana/overheal rules are unchanged — this
+      // heal completed normally, no refund.
+      if (target.dying && target.hp > 0) {
+        target.dying = false;
+        target.coyoteRemainingMs = undefined;
+        events.push({ type: 'unitSaved', unitId: target.id });
+      }
     }
   }
 
@@ -721,7 +749,8 @@ export class CombatEngine {
 
   private resolveMercSwing(mercId: string, events: CombatEvent[]): void {
     const merc = this.getUnit(mercId);
-    if (!merc || !merc.alive) return;
+    // v0.3 §Coyote: a downed (dying) merc doesn't swing until saved or truly dead.
+    if (!merc || !merc.alive || merc.dying) return;
     const target = this.activeEnemies.find((e) => e.alive);
     if (!target) return;
     const role = merc.role === 'tank' ? 'tank' : 'dps';
@@ -738,14 +767,16 @@ export class CombatEngine {
     this.applyDamageToUnit(target, this.enemyStatsFor(enemy.id).autoDamage, enemy.id, events);
   }
 
-  /** Locked micro-choice (poc-spec §10.4): enemies/boss auto-attack the tank only; DPS then healer once the tank is dead. */
+  /** Locked micro-choice (poc-spec §10.4): enemies/boss auto-attack the tank only; DPS then healer
+   *  once the tank is dead. v0.3 §Coyote: a dying (downed) party member reads as dead to this
+   *  selection — skipped in favor of the next-priority living, non-dying member. */
   private pickAllyTarget(): Unit | null {
     const tank = this.getUnit('tank');
-    if (tank && tank.alive) return tank;
-    const dps = this.party.find((u) => u.role === 'dps' && u.alive);
+    if (tank && tank.alive && !tank.dying) return tank;
+    const dps = this.party.find((u) => u.role === 'dps' && u.alive && !u.dying);
     if (dps) return dps;
     const healer = this.getUnit('healer');
-    if (healer && healer.alive) return healer;
+    if (healer && healer.alive && !healer.dying) return healer;
     return null;
   }
 
@@ -760,19 +791,61 @@ export class CombatEngine {
   }
 
   private applyDamageToUnit(target: Unit, amount: number, sourceId: string, events: CombatEvent[]): void {
+    // v0.3 §Coyote: a dying (downed) unit is already at 0 hp and takes no further damage — no
+    // `damage` event, nothing to clamp. It stays exactly as downed as it was the instant it entered
+    // the grace window, until it's saved or its window expires.
+    if (target.dying) return;
     const applied = this.damageAfterArmor(target, amount);
     target.hp = Math.max(0, target.hp - applied);
     events.push({ type: 'damage', targetId: target.id, amount: applied, sourceId });
     if (target.hp <= 0 && target.alive) {
       if (target.role === 'enemy' || target.role === 'boss') {
+        // Enemies/boss never get coyote grace — trash/boss death is instant, as before.
         this.onEnemyDeath(target, events);
       } else {
-        target.alive = false;
-        this.swingTimers.delete(target.id);
-        events.push({ type: 'unitDied', unitId: target.id });
-        // Same tick the death is applied: auto-cancel an active cast targeting this unit.
-        this.cancelCastIfTargeting(target.id, events);
-        this.checkWipe(events);
+        this.enterDying(target, events);
+      }
+    }
+  }
+
+  /**
+   * v0.3 §Coyote: a party member hit for lethal damage enters the grace window instead of dying
+   * immediately — `alive` stays true (still a valid heal target, still counted as "not dead" for
+   * wipe checks), hp is clamped to 0 as before. Only party members ever reach here (see
+   * applyDamageToUnit); enemies/boss always go through onEnemyDeath instead.
+   */
+  private enterDying(target: Unit, events: CombatEvent[]): void {
+    target.dying = true;
+    target.coyoteRemainingMs = COYOTE_MS;
+    events.push({ type: 'unitDying', unitId: target.id, coyoteMs: COYOTE_MS });
+  }
+
+  /**
+   * v0.3 §Coyote: finalizes true death for a dying party member whose grace window expired
+   * unsaved. Mirrors the pre-coyote instant-death branch this replaced: mark dead, drop its swing
+   * timer, emit `unitDied`, auto-cancel any cast still targeting it (`target-dead` — this is the
+   * only place that reason ever fires now), then check for a wipe.
+   */
+  private finalizeDeath(unit: Unit, events: CombatEvent[]): void {
+    unit.alive = false;
+    unit.dying = false;
+    unit.coyoteRemainingMs = undefined;
+    this.swingTimers.delete(unit.id);
+    events.push({ type: 'unitDied', unitId: unit.id });
+    this.cancelCastIfTargeting(unit.id, events);
+    this.checkWipe(events);
+  }
+
+  /**
+   * v0.3 §Coyote: resolves every dying party member whose window hit 0 this tick and wasn't saved
+   * by a heal completing earlier in the same tick (steps 2/3 above). Iterates in stable party
+   * order (tank, dps1, dps2, healer) so multiple simultaneous expiries (e.g. a party-wide one-shot)
+   * resolve deterministically; a wipe fires exactly once, only after the last member's `unitDied`.
+   */
+  private resolveCoyoteExpiries(events: CombatEvent[]): void {
+    for (const unit of this.party) {
+      if (unit.dying && (unit.coyoteRemainingMs ?? 0) <= 0) {
+        this.finalizeDeath(unit, events);
       }
     }
   }
@@ -823,18 +896,11 @@ export class CombatEngine {
 
     const partyDamage = castDef.partyDamage;
     const bossId = this.boss!.id;
+    // v0.3 §Coyote: routed through the shared damage pipeline so a party-wide one-shot enters
+    // dying (grace window) exactly like any other lethal hit, instead of dying instantly.
     for (const unit of this.party) {
       if (!unit.alive) continue;
-      const damage = this.damageAfterArmor(unit, partyDamage);
-      unit.hp = Math.max(0, unit.hp - damage);
-      events.push({ type: 'damage', targetId: unit.id, amount: damage, sourceId: bossId });
-      if (unit.hp <= 0) {
-        unit.alive = false;
-        this.swingTimers.delete(unit.id);
-        events.push({ type: 'unitDied', unitId: unit.id });
-        // Same tick the death is applied: auto-cancel an active cast targeting this unit.
-        this.cancelCastIfTargeting(unit.id, events);
-      }
+      this.applyDamageToUnit(unit, partyDamage, bossId, events);
     }
     if (castDef.kind === 'manaSiphon' && this.status === 'running') {
       const healer = this.getUnit('healer');
@@ -844,7 +910,9 @@ export class CombatEngine {
         if (burned > 0) events.push({ type: 'manaBurned', amount: burned });
       }
     }
-    this.checkWipe(events);
+    // v0.3 §Coyote: a party-wide hit only downs (dying) — it can no longer flip anyone straight
+    // to `alive: false`, so there's nothing for checkWipe to catch here. A wipe from this AoE, if
+    // any, resolves later via resolveCoyoteExpiries once the last downed member's window expires.
     if (this.status === 'running') {
       // Start-to-start cadence: the gap before the next cast is intervalMs - castMs.
       this.bossCastTimerRemainingMs = castDef.intervalMs - castDef.castMs;
@@ -887,8 +955,10 @@ export class CombatEngine {
    * per activation.
    */
   private startBossFocus(castDef: TunnelVisionCastDef, events: CombatEvent[]): void {
+    // v0.3 §Coyote: a dying (downed) party member reads as dead — excluded from focus eligibility,
+    // same as the enemy auto-attack target pick.
     const eligible = this.party
-      .filter((u) => u.alive && u.role !== 'tank')
+      .filter((u) => u.alive && !u.dying && u.role !== 'tank')
       .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     if (eligible.length === 0) {
       // No valid focus target (every non-tank party member is dead) -- skip
@@ -919,14 +989,15 @@ export class CombatEngine {
   private resolveBossFocusTick(events: CombatEvent[]): void {
     const focus = this.bossFocusState!;
     const target = this.getUnit(focus.targetId);
-    if (target && target.alive) {
+    if (target && target.alive && !target.dying) {
       this.applyDamageToUnit(target, focus.damagePerTick, this.boss!.id, events);
       events.push({ type: 'bossFocusTick', targetId: focus.targetId, amount: focus.damagePerTick });
     }
 
     const after = this.getUnit(focus.targetId);
-    if (!after || !after.alive) {
-      // Focus target died mid-channel: end early, no retarget.
+    if (!after || !after.alive || after.dying) {
+      // v0.3 §Coyote: a downed (dying) focus target reads as dead to the boss — the channel ends
+      // early the tick that downs it, no retarget, and does NOT resume if a heal later saves them.
       this.bossFocusState = null;
       events.push({ type: 'bossFocusEnded', targetId: focus.targetId, name: focus.name });
       return;

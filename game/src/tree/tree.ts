@@ -11,6 +11,7 @@
 
 import type {
   ConfigError,
+  EdgeState,
   NodeContent,
   NodeDef,
   NodeView,
@@ -19,6 +20,7 @@ import type {
   SpotView,
   TreeAction,
   TreeConfig,
+  TreeEdge,
   TreeSnapshot,
   TreeState,
   TreeView,
@@ -78,6 +80,15 @@ export function validateConfig(config: TreeConfig): ConfigError | null {
     }
     if (node.cost.currency.trim() === '') {
       return { reason: 'invalid-config', message: `Node "${node.id}" has empty currency` };
+    }
+    if (
+      node.minLevel !== undefined &&
+      (!Number.isInteger(node.minLevel) || node.minLevel < 1)
+    ) {
+      return {
+        reason: 'invalid-config',
+        message: `Node "${node.id}" minLevel must be a positive integer`,
+      };
     }
   }
 
@@ -182,6 +193,18 @@ function requirementsMet(node: NodeDef, owned: ReadonlySet<string>): boolean {
   return mode === 'all' ? nodes.every((id) => owned.has(id)) : nodes.some((id) => owned.has(id));
 }
 
+/**
+ * True when `node` has a `minLevel` gate that `level` fails to clear.
+ * `level === undefined` means the caller doesn't track level — the gate goes
+ * unenforced (back-compat for configs/tests without a minLevel node, and for
+ * callers that never intend to purchase a gated node).
+ */
+function levelLocked(node: NodeDef, level: number | undefined): boolean {
+  if (node.minLevel === undefined) return false;
+  if (level === undefined) return false;
+  return level < node.minLevel;
+}
+
 /** True when another owned node shares this node's exclusiveGroup. */
 function exclusiveLocked(
   node: NodeDef,
@@ -232,6 +255,7 @@ function nextInChain(
 function toNodeView(node: NodeDef): NodeView {
   const view: NodeView = { id: node.id, content: node.content, cost: { ...node.cost } };
   if (node.exclusiveGroup !== undefined) view.exclusiveGroup = node.exclusiveGroup;
+  if (node.minLevel !== undefined) view.minLevel = node.minLevel;
   return view;
 }
 
@@ -243,6 +267,7 @@ function reject(
     | 'requirements-unmet'
     | 'cannot-afford'
     | 'exclusive-locked'
+    | 'level-too-low'
     | 'invalid-config',
   message: string,
 ): UpdateResult {
@@ -343,6 +368,14 @@ export function update(config: TreeConfig, state: TreeState, action: TreeAction)
     );
   }
 
+  if (levelLocked(node, action.level)) {
+    return reject(
+      state,
+      'level-too-low',
+      `Node "${node.id}" requires level ${node.minLevel}, have ${action.level}`,
+    );
+  }
+
   const balance = internal.wallet[node.cost.currency] ?? 0;
   if (balance < node.cost.amount) {
     return reject(
@@ -367,10 +400,12 @@ function spotStatus(
   owned: ReadonlySet<string>,
   wallet: Readonly<Record<string, number>>,
   nodesById: ReadonlyMap<string, NodeDef>,
+  level: number | undefined,
 ): SpotStatus {
   if (next === null) return 'complete';
   if (!requirementsMet(next, owned)) return 'locked';
   if (exclusiveLocked(next, owned, nodesById)) return 'exclusive-locked';
+  if (levelLocked(next, level)) return 'locked';
   const balance = wallet[next.cost.currency] ?? 0;
   return balance >= next.cost.amount ? 'affordable' : 'unaffordable';
 }
@@ -386,8 +421,39 @@ function parentSpotIdsFor(spot: SpotDef, compiled: CompiledConfig): string[] {
   return [...parents];
 }
 
-/** Derive everything a renderer needs from config + opaque state. */
-export function view(config: TreeConfig, state: TreeState): TreeView {
+/**
+ * Rendering state for one config-derived edge — see `EdgeState` in types.ts
+ * for the exact semantics of each bucket.
+ *
+ * `locked` is checked against the *specific* destination node the edge
+ * points at (`toSpot.chain[0]`, the node whose `requires` produced this
+ * edge) rather than the destination spot's aggregate `status`. A spot's
+ * status can read `affordable` even while its natural entry node is
+ * permanently exclusive-locked, because `nextInChain` skips forward to a
+ * `availableIfExclusiveLocked` forsaken-path consolation (e.g.
+ * `warped-tempo-via-zealot`) — the entry edge should still render as
+ * destroyed regardless of whether that consolation was purchased.
+ */
+function edgeState(
+  toFirstNode: NodeDef,
+  owned: ReadonlySet<string>,
+  nodesById: ReadonlyMap<string, NodeDef>,
+  fromOwned: boolean,
+  toOwned: boolean,
+): EdgeState {
+  if (exclusiveLocked(toFirstNode, owned, nodesById)) return 'locked';
+  if (fromOwned && toOwned) return 'traversed';
+  if (fromOwned) return 'available';
+  return 'inactive';
+}
+
+/**
+ * Derive everything a renderer needs from config + opaque state.
+ * `level` (v0.3) feeds `minLevel` gates on both spot status and edge state;
+ * omit when the caller doesn't track level (gate goes unenforced, same as
+ * `update`).
+ */
+export function view(config: TreeConfig, state: TreeState, level?: number): TreeView {
   const compiled = compile(config);
   if ('reason' in compiled) {
     throw new Error(compiled.message);
@@ -404,7 +470,7 @@ export function view(config: TreeConfig, state: TreeState): TreeView {
     const nextNode = nextId === null ? null : compiled.nodesById.get(nextId)!;
     return {
       id: spot.id,
-      status: spotStatus(nextNode, internal.owned, internal.wallet, compiled.nodesById),
+      status: spotStatus(nextNode, internal.owned, internal.wallet, compiled.nodesById, level),
       owned: ownedViews,
       next: nextNode ? toNodeView(nextNode) : null,
       chainLength: spot.chain.length,
@@ -412,11 +478,25 @@ export function view(config: TreeConfig, state: TreeState): TreeView {
     };
   });
 
+  const spotById = new Map(spots.map((s) => [s.id, s]));
+  const spotDefById = new Map(config.spots.map((s) => [s.id, s]));
+  const edges: TreeEdge[] = compiled.edges.map((edge) => {
+    const fromOwned = (spotById.get(edge.fromSpotId)?.owned.length ?? 0) > 0;
+    const toOwned = (spotById.get(edge.toSpotId)?.owned.length ?? 0) > 0;
+    const toFirstNodeId = spotDefById.get(edge.toSpotId)!.chain[0]!;
+    const toFirstNode = compiled.nodesById.get(toFirstNodeId)!;
+    return {
+      fromSpotId: edge.fromSpotId,
+      toSpotId: edge.toSpotId,
+      state: edgeState(toFirstNode, internal.owned, compiled.nodesById, fromOwned, toOwned),
+    };
+  });
+
   return {
     spots,
     wallet: internal.wallet,
     ownedNodeIds: [...internal.owned],
-    edges: compiled.edges,
+    edges,
   };
 }
 

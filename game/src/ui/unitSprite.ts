@@ -19,6 +19,17 @@ import type { Unit } from '../combat/types';
 import { Bar } from './bar';
 import { UNIT_TEXTURE_KEY } from './sprites';
 
+/** Lerp between two 0xRRGGBB colors at `t` in [0, 1] — used by boss telegraph tint cues. */
+function interpolateColor(fromHex: number, toHex: number, t: number): number {
+  const result = Phaser.Display.Color.Interpolate.ColorWithColor(
+    Phaser.Display.Color.ValueToColor(fromHex),
+    Phaser.Display.Color.ValueToColor(toHex),
+    100,
+    Math.round(Phaser.Math.Clamp(t, 0, 1) * 100),
+  );
+  return Phaser.Display.Color.GetColor(result.r, result.g, result.b);
+}
+
 const HP_BAR_HEIGHT = 8;
 const HP_BAR_OFFSET_Y = 10;
 const MANA_BAR_HEIGHT = 6;
@@ -32,6 +43,8 @@ const MANA_FILL_COLOR = 0x3b82f6;
 const DEAD_TINT = 0x3a3a3a;
 const DEAD_ALPHA = 0.4;
 const DEAD_SCALE = 0.85;
+/** v0.3 §Coyote: downed-but-savable (dying) — urgent red, still fully targetable. */
+const DYING_TINT = 0xcc4433;
 
 const NAME_FONT = '11px monospace';
 const NAME_COLOR = '#d8c8b8';
@@ -55,6 +68,41 @@ const TARGET_MARKER_COLOR = 0xf2c14e;
 const LUNGE_DISTANCE = 12;
 const LUNGE_OUT_MS = 90;
 const LUNGE_BACK_MS = 120;
+
+/** v0.3 chunk F: tank swing is a heavier shove — bigger lunge + a squash/stretch beat. */
+const SHOVE_DISTANCE = 20;
+const SHOVE_OUT_MS = 110;
+const SHOVE_BACK_MS = 150;
+const SHOVE_SQUASH_SCALE_X = 1.12;
+const SHOVE_SQUASH_SCALE_Y = 0.9;
+
+/** v0.3 chunk F: DPS swing is a quick double-jab — two small lunges back to back. */
+const JAB_DISTANCE = 9;
+const JAB_OUT_MS = 55;
+const JAB_BACK_MS = 55;
+const JAB_GAP_MS = 30;
+
+/** v0.3 chunk F: healer cast-pose cycle (long casts) and instant-cast flourish timing. */
+const CAST_CYCLE_FRAME_MS = 140;
+const INSTANT_CAST_FLOURISH_MS = 250;
+
+/** v0.3 chunk F: boss telegraph cues (bossCastStarted → bossCastFinished window). */
+const TELEGRAPH_GLOW_COLOR = 0xff8a3d;
+const TELEGRAPH_RAISE_COLOR = 0xfff2c0;
+const TELEGRAPH_GLOW_DURATION_MS = 420;
+const TELEGRAPH_RAISE_DURATION_MS = 420;
+const TELEGRAPH_PULSE_DURATION_MS = 260;
+const TELEGRAPH_GLOW_SCALE = 0.05;
+const TELEGRAPH_PULSE_SCALE = 0.12;
+const TELEGRAPH_RAISE_PX = 8;
+
+/** v0.3 chunk F: mana-regen tick juice — brief bar flash + a mote drifting up off it. */
+const MANA_PULSE_COLOR = 0xbfe0ff;
+const MANA_PULSE_ALPHA = 0.55;
+const MANA_PULSE_DURATION_MS = 260;
+const MANA_MOTE_COLOR = 0x8fc4ff;
+const MANA_MOTE_RISE_DISTANCE = 22;
+const MANA_MOTE_DURATION_MS = 520;
 
 /** `-N` damage floats: modest rise + fade (tuned post–Phase 3 for readability). */
 const DAMAGE_FLOAT_RISE_DISTANCE = 20;
@@ -108,8 +156,13 @@ export interface UnitSpriteConfig {
   y: number;
   width: number;
   height: number;
-  /** Tile index into the Tiny Dungeon sheet — see ui/sprites.ts frameForUnit(). */
+  /** Tile/frame index into `bodyTextureKey` — see ui/sprites.ts frameForUnit(). */
   frame: number;
+  /** Texture key for the body image; defaults to the shared Kenney sheet (UNIT_TEXTURE_KEY)
+   *  when omitted. v0.3 chunk F: the party healer renders from a different sheet instead. */
+  bodyTextureKey?: string;
+  /** v0.3 chunk F: healer-only cast-pose animation. `frame` above must equal `idleFrame`. */
+  casterAnim?: { idleFrame: number; castFrames: readonly number[] };
   showMana: boolean;
   clickable: boolean;
   onClick?: (unitId: string) => void;
@@ -147,6 +200,26 @@ export class UnitSprite {
 
   private alive = true;
 
+  /** v0.3 chunk F: healer-only cast-pose config; null for every other unit. */
+  private readonly casterAnim: { idleFrame: number; castFrames: readonly number[] } | null;
+  private castCycleTimer: Phaser.Time.TimerEvent | null = null;
+  private flourishTimer: Phaser.Time.TimerEvent | null = null;
+  private flourishActive = false;
+
+  /** Local (container-space) Y of the mana bar, when present — used to place the regen pulse. */
+  private readonly manaBarY: number | null;
+
+  /** v0.3 chunk F: pending "second jab" callback from an in-flight lungeJab(), cancelled if a
+   *  new jab starts before it fires (rapid DPS swings should never stack more than 2 jabs). */
+  private pendingJabTimer: Phaser.Time.TimerEvent | null = null;
+
+  /** v0.3 chunk F: boss telegraph state — a repeating tween drives tint/scale/offset each tick. */
+  private telegraphActive = false;
+  private telegraphTween: Phaser.Tweens.Tween | null = null;
+
+  /** v0.3 chunk F: true while a tank shove's squash/stretch tween owns the body's display size. */
+  private squashActive = false;
+
   constructor(unit: Unit, config: UnitSpriteConfig) {
     const { scene, x, y, width, height, frame, showMana, clickable, onClick, facing } = config;
     this.id = unit.id;
@@ -155,13 +228,14 @@ export class UnitSprite {
     this.homeY = y;
     this.width = width;
     this.height = height;
+    this.casterAnim = config.casterAnim ?? null;
 
     this.container = scene.add.container(x, y);
 
     // All children below use coordinates LOCAL to the container (relative to
     // the unit's home position, i.e. as if x=y=0).
     this.body = scene.add
-      .image(0, 0, UNIT_TEXTURE_KEY, frame)
+      .image(0, 0, config.bodyTextureKey ?? UNIT_TEXTURE_KEY, frame)
       .setDisplaySize(width, height)
       .setFlipX(facing === 'left');
     if (clickable) {
@@ -201,9 +275,11 @@ export class UnitSprite {
         .text(0, manaY - MANA_BAR_HEIGHT / 2 - HP_TEXT_GAP, '', { fontFamily: HP_FONT, color: '#a8c8f0' })
         .setOrigin(0.5, 1);
       this.container.add(this.manaText);
+      this.manaBarY = manaY;
     } else {
       this.manaBar = null;
       this.manaText = null;
+      this.manaBarY = null;
     }
 
     // Downward-pointing chevron centered above the topmost bar (mana bar + its
@@ -265,14 +341,29 @@ export class UnitSprite {
     }
 
     if (unit.alive) {
-      this.body.clearTint();
-      this.body.setAlpha(1);
-      // setDisplaySize (not setScale) — the image is already scaled up from
-      // its 16×16 source frame, so raw scale values would shrink it to tile size.
-      this.body.setDisplaySize(this.width, this.height);
+      // v0.3 chunk F: a boss telegraph tween owns tint/scale each tick while active — letting
+      // this branch also clearTint()/setDisplaySize() every frame would fight it (both run once
+      // per game step) and cause flicker, so skip while telegraphing; stopTelegraph() restores
+      // the plain look once the window ends.
+      if (!this.telegraphActive) {
+        // v0.3 §Coyote: a dying unit is downed but savable — death visuals (tint/shrink below)
+        // wait for true death (`alive` flipping), which the engine defers past the grace window.
+        if (unit.dying) this.body.setTint(DYING_TINT);
+        else this.body.clearTint();
+        this.body.setAlpha(1);
+        // setDisplaySize (not setScale) — the image is already scaled up from its 16×16 source
+        // frame, so raw scale values would shrink it to tile size. Skipped mid-shove-squash too
+        // (same fight-every-frame problem as the telegraph guard above).
+        if (!this.squashActive) this.body.setDisplaySize(this.width, this.height);
+      }
       this.hpBar.setVisible(true);
       this.manaBar?.setVisible(true);
     } else {
+      this.stopTelegraph();
+      this.stopCastCycle();
+      this.stopFlourishTimer();
+      this.scene.tweens.killTweensOf(this.body);
+      this.squashActive = false;
       this.body.setTint(DEAD_TINT);
       this.body.setAlpha(DEAD_ALPHA);
       this.body.setDisplaySize(this.width * DEAD_SCALE, this.height * DEAD_SCALE);
@@ -343,6 +434,83 @@ export class UnitSprite {
           ease: 'Quad.easeIn',
         });
       },
+    });
+  }
+
+  /**
+   * v0.3 chunk F: tank swing — a heavier shove than the shared lunge (bigger
+   * forward travel) with a squash/stretch beat on the body at full extension,
+   * settling back to normal proportions on the return. Same kill-and-snap
+   * safety as `lunge()` so repeated shoves never stack an offset.
+   */
+  lungeShove(towardX: number): void {
+    const direction = Math.sign(towardX - this.homeX) || 1;
+    this.scene.tweens.killTweensOf(this.container);
+    this.scene.tweens.killTweensOf(this.body);
+    this.container.x = this.homeX;
+    this.body.setDisplaySize(this.width, this.height);
+    this.scene.tweens.add({
+      targets: this.container,
+      x: this.homeX + direction * SHOVE_DISTANCE,
+      duration: SHOVE_OUT_MS,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        this.scene.tweens.add({
+          targets: this.container,
+          x: this.homeX,
+          duration: SHOVE_BACK_MS,
+          ease: 'Quad.easeIn',
+        });
+      },
+    });
+    this.squashActive = true;
+    this.scene.tweens.add({
+      targets: this.body,
+      displayWidth: this.width * SHOVE_SQUASH_SCALE_X,
+      displayHeight: this.height * SHOVE_SQUASH_SCALE_Y,
+      duration: SHOVE_OUT_MS,
+      ease: 'Quad.easeOut',
+      yoyo: true,
+      onComplete: () => {
+        this.squashActive = false;
+        this.body.setDisplaySize(this.width, this.height);
+      },
+    });
+  }
+
+  /**
+   * v0.3 chunk F: DPS swing — two quick small lunges back to back (a jab-jab)
+   * instead of one lunge. The second jab is scheduled after the first
+   * completes + a short gap; both share the same kill-and-snap safety.
+   */
+  lungeJab(towardX: number): void {
+    const direction = Math.sign(towardX - this.homeX) || 1;
+    this.scene.tweens.killTweensOf(this.container);
+    this.pendingJabTimer?.remove(false);
+    this.pendingJabTimer = null;
+    this.container.x = this.homeX;
+    const singleJab = (onDone: () => void = () => {}) => {
+      this.scene.tweens.add({
+        targets: this.container,
+        x: this.homeX + direction * JAB_DISTANCE,
+        duration: JAB_OUT_MS,
+        ease: 'Quad.easeOut',
+        onComplete: () => {
+          this.scene.tweens.add({
+            targets: this.container,
+            x: this.homeX,
+            duration: JAB_BACK_MS,
+            ease: 'Quad.easeIn',
+            onComplete: onDone,
+          });
+        },
+      });
+    };
+    singleJab(() => {
+      this.pendingJabTimer = this.scene.time.delayedCall(JAB_GAP_MS, () => {
+        this.pendingJabTimer = null;
+        singleJab();
+      });
     });
   }
 
@@ -422,11 +590,179 @@ export class UnitSprite {
     });
   }
 
+  // ---- v0.3 chunk F: healer cast pose (no-op on units without casterAnim) ----------------
+
+  /**
+   * Start/stop the looping cast-pose cycle for a non-instant cast: cycles the
+   * sheet's golden-light frames while `active`, holds/returns to the idle
+   * frame when stopped. A quick instant-cast flourish in flight is left to
+   * finish on its own timer (see `playCastFlourish`) rather than being cut
+   * off by a same-tick `setCasting(false)` from `castFinished`.
+   */
+  setCasting(active: boolean): void {
+    if (!this.casterAnim) return;
+    if (active) {
+      this.stopFlourishTimer();
+      this.startCastCycle();
+    } else {
+      this.stopCastCycle();
+      if (!this.flourishActive) this.body.setFrame(this.casterAnim.idleFrame);
+    }
+  }
+
+  /** One-shot cast-pose flourish for instant (0ms) casts — self-timed, ignores setCasting(false). */
+  playCastFlourish(durationMs: number = INSTANT_CAST_FLOURISH_MS): void {
+    if (!this.casterAnim) return;
+    this.stopCastCycle();
+    this.stopFlourishTimer();
+    const frames = this.casterAnim.castFrames;
+    const stepMs = Math.max(60, Math.floor(durationMs / frames.length));
+    let i = 0;
+    this.body.setFrame(frames[0]!);
+    this.flourishActive = true;
+    this.flourishTimer = this.scene.time.addEvent({
+      delay: stepMs,
+      repeat: frames.length - 1,
+      callback: () => {
+        i++;
+        this.body.setFrame(frames[Math.min(i, frames.length - 1)]!);
+      },
+    });
+    this.scene.time.delayedCall(durationMs, () => {
+      this.flourishActive = false;
+      this.flourishTimer = null;
+      this.body.setFrame(this.casterAnim!.idleFrame);
+    });
+  }
+
+  private startCastCycle(): void {
+    if (this.castCycleTimer || !this.casterAnim) return;
+    const frames = this.casterAnim.castFrames;
+    let i = 0;
+    this.body.setFrame(frames[0]!);
+    this.castCycleTimer = this.scene.time.addEvent({
+      delay: CAST_CYCLE_FRAME_MS,
+      loop: true,
+      callback: () => {
+        i = (i + 1) % frames.length;
+        this.body.setFrame(frames[i]!);
+      },
+    });
+  }
+
+  private stopCastCycle(): void {
+    this.castCycleTimer?.remove(false);
+    this.castCycleTimer = null;
+  }
+
+  private stopFlourishTimer(): void {
+    this.flourishTimer?.remove(false);
+    this.flourishTimer = null;
+    this.flourishActive = false;
+  }
+
+  // ---- v0.3 chunk F: boss telegraph (bossCastStarted → bossCastFinished window) ---------
+
+  /**
+   * Begin a data-driven telegraph cue on this unit's body. A single repeating
+   * tween drives a 0..1 proxy that `applyTelegraphFrame` maps to tint/scale/
+   * offset each tick — `update()` skips its own tint/size writes while this
+   * is active (see the `telegraphActive` guard there) so the two never fight.
+   */
+  startTelegraph(cue: 'glow' | 'raise' | 'pulse'): void {
+    this.stopTelegraph();
+    this.telegraphActive = true;
+    const proxy = { t: 0 };
+    const duration =
+      cue === 'pulse'
+        ? TELEGRAPH_PULSE_DURATION_MS
+        : cue === 'raise'
+          ? TELEGRAPH_RAISE_DURATION_MS
+          : TELEGRAPH_GLOW_DURATION_MS;
+    this.telegraphTween = this.scene.tweens.add({
+      targets: proxy,
+      t: 1,
+      duration,
+      yoyo: true,
+      repeat: -1,
+      ease: cue === 'pulse' ? 'Quad.easeOut' : 'Sine.easeInOut',
+      onUpdate: () => this.applyTelegraphFrame(cue, proxy.t),
+    });
+  }
+
+  private applyTelegraphFrame(cue: 'glow' | 'raise' | 'pulse', t: number): void {
+    switch (cue) {
+      case 'glow': {
+        this.body.setTint(interpolateColor(0xffffff, TELEGRAPH_GLOW_COLOR, t));
+        const scale = 1 + t * TELEGRAPH_GLOW_SCALE;
+        this.body.setDisplaySize(this.width * scale, this.height * scale);
+        break;
+      }
+      case 'raise': {
+        this.body.setY(-t * TELEGRAPH_RAISE_PX);
+        this.body.setTint(interpolateColor(0xffffff, TELEGRAPH_RAISE_COLOR, t));
+        break;
+      }
+      case 'pulse': {
+        const scale = 1 + t * TELEGRAPH_PULSE_SCALE;
+        this.body.setDisplaySize(this.width * scale, this.height * scale);
+        break;
+      }
+    }
+  }
+
+  /** Ends the telegraph and restores the plain look; safe to call when no telegraph is active. */
+  stopTelegraph(): void {
+    this.telegraphTween?.remove();
+    this.telegraphTween = null;
+    if (!this.telegraphActive) return;
+    this.telegraphActive = false;
+    this.body.setY(0);
+    this.body.clearTint();
+    this.body.setDisplaySize(this.width, this.height);
+  }
+
+  // ---- v0.3 chunk F: mana-regen tick juice -----------------------------------------------
+
+  /** Brief bright flash across the mana bar + a small mote drifting up off it (no-op if no mana bar). */
+  pulseMana(): void {
+    if (!this.manaBar || this.manaBarY === null) return;
+    const worldY = this.homeY + this.manaBarY;
+    const overlay = this.scene.add
+      .rectangle(this.homeX, worldY, this.width, MANA_BAR_HEIGHT, MANA_PULSE_COLOR, MANA_PULSE_ALPHA)
+      .setDepth(12);
+    this.scene.tweens.add({
+      targets: overlay,
+      alpha: 0,
+      duration: MANA_PULSE_DURATION_MS,
+      onComplete: () => overlay.destroy(),
+    });
+
+    const mote = this.scene.add.circle(this.homeX, worldY, 3, MANA_MOTE_COLOR, 0.9).setDepth(49);
+    this.scene.tweens.add({
+      targets: mote,
+      y: worldY - MANA_MOTE_RISE_DISTANCE,
+      alpha: 0,
+      duration: MANA_MOTE_DURATION_MS,
+      ease: 'Quad.easeOut',
+      onComplete: () => mote.destroy(),
+    });
+  }
+
   /** Kills any in-flight tweens on the container/floats before destroying, so a mid-animation
    *  rebuild (waveStarted rebuilds the enemy roster) can never touch a dead game object. */
   destroy(): void {
     this.scene.tweens.killTweensOf(this.container);
     this.scene.tweens.killTweensOf(this.bossFocusMarker);
+    this.scene.tweens.killTweensOf(this.body);
+    this.telegraphTween?.remove();
+    this.telegraphTween = null;
+    this.castCycleTimer?.remove(false);
+    this.castCycleTimer = null;
+    this.flourishTimer?.remove(false);
+    this.flourishTimer = null;
+    this.pendingJabTimer?.remove(false);
+    this.pendingJabTimer = null;
     for (const float of this.activeFloats) {
       this.scene.tweens.killTweensOf(float);
       float.destroy();

@@ -11,6 +11,7 @@ import {
   pruneManaSpends,
   type ManaSpendEntry,
 } from './manaSpendTracker';
+import { HEAL_VFX_FRAME_COUNT, HEAL_VFX_TEXTURE_KEY } from './sprites';
 
 const BOSS_SHAKE_DURATION_MS = 150;
 const BOSS_SHAKE_INTENSITY = 0.004;
@@ -23,10 +24,14 @@ const CAST_BEAM_COLOR = 0xf2c14e;
 const CAST_BEAM_WIDTH = 2;
 const CAST_BEAM_DURATION_MS = 280;
 
-const HEAL_RIPPLE_COLOR = 0x5dff7a;
 const HEAL_PARTICLE_COLOR = 0x7ad67a;
 const HEAL_PARTICLE_COUNT = 6;
 const HEAL_PARTICLE_DURATION_MS = 480;
+
+/** v0.3 chunk F: heal-vfx sparkle burst — 32×32 native frames scaled ×2 to read at unit size. */
+const HEAL_VFX_DISPLAY_SIZE = 64;
+const HEAL_VFX_FRAME_MS = 55;
+const HEAL_VFX_DEPTH = 49;
 
 const AURA_DEPTH = 8;
 const AURA_CORE_COLOR = 0xf2e6a0;
@@ -66,19 +71,29 @@ export function showCastBeam(
   return line;
 }
 
-/** Ground ripple under a healed target — green to match heal floats. */
-export function showHealRipple(scene: Phaser.Scene, x: number, groundY: number): void {
-  const ripple = scene.add
-    .ellipse(x, groundY + 4, 52, 12, HEAL_RIPPLE_COLOR, 0.4)
-    .setStrokeStyle(1, 0x3a8a4a)
-    .setDepth(5);
-  scene.tweens.add({
-    targets: ripple,
-    scaleX: 1.7,
-    scaleY: 1.5,
-    alpha: 0,
-    duration: 360,
-    onComplete: () => ripple.destroy(),
+/**
+ * v0.3 chunk F: one-shot green sparkle burst (heal-vfx.png, 6 frames) played
+ * over a heal target — the primary heal-land read, replacing the ground
+ * ripple (see CombatScene's `heal` handler: two green heal effects stacked
+ * read as noise, and the sparkle centers on the unit rather than the ground).
+ */
+export function showHealSparkle(scene: Phaser.Scene, x: number, y: number): void {
+  const sprite = scene.add
+    .image(x, y - 10, HEAL_VFX_TEXTURE_KEY, 0)
+    .setDisplaySize(HEAL_VFX_DISPLAY_SIZE, HEAL_VFX_DISPLAY_SIZE)
+    .setDepth(HEAL_VFX_DEPTH);
+  let frame = 0;
+  const timer = scene.time.addEvent({
+    delay: HEAL_VFX_FRAME_MS,
+    repeat: HEAL_VFX_FRAME_COUNT - 1,
+    callback: () => {
+      frame++;
+      if (frame < HEAL_VFX_FRAME_COUNT) sprite.setFrame(frame);
+    },
+  });
+  scene.time.delayedCall(HEAL_VFX_FRAME_MS * HEAL_VFX_FRAME_COUNT, () => {
+    timer.remove(false);
+    sprite.destroy();
   });
 }
 

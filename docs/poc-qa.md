@@ -953,3 +953,56 @@ Balance-focused local telemetry for friend playtests (no analytics SDK):
 5. **Glance CLI** — `npm run telemetry -- path/to.json` prints deterministic
    rollups (dungeon win rates, presses key/click, talent frequency) before
    handing the full dump to an agent.
+
+---
+
+# v0.3 "Presence, Lattice, Grace" (2026-07-18)
+
+Status: current · Last verified: 2026-07-18
+
+Decided micro-choices shipped this phase (full detail: module docs +
+`git log` for the deleted `docs/v0.3-handoff.md`):
+
+1. **Coyote time** — `COYOTE_MS = 250` (`data/constants.ts`). Party members
+   only; enemies/boss die instantly as before. Dying units: no further
+   damage, no swings, skipped by enemy targeting and Tunnel Vision focus
+   (channel ends early on a downed focus target and never resumes), still
+   click-targetable/healable. `unitDying` / `unitSaved` / deferred `unitDied`
+   events; `target-dead` cast cancel only fires on true death. Expiries
+   resolve after cast-completion in the tick order so a same-tick heal saves.
+2. **Lattice tree** — spots carry integer `grid {col,row}`; existing requires
+   DAG kept (it already forms the lattice), `minLevel` gates: Wrath Ascendant
+   10, Vowbound Crown 12 (service-enforced, `level-too-low` reject). TreeView
+   exposes edges: traversed/available/locked/inactive. TreeScene fits one
+   960×540 screen, no scrolling.
+3. **Build glyph** — `buildGlyphFromTree(config, ownedIds)` → deterministic
+   `{ id, segments }` (FNV-1a over the owned edge set); drawn by
+   `ui/buildGlyph.ts` normalized to the glyph's own bounding box.
+4. **Run summary** — combat end slides a panel over the dimmed field
+   (~0.5–1s staggered reveals; Return ~1s, inside journey's poll). RunRecord
+   `{ outcome, dungeonId, xpGained, glyph }` pushed once per run by Hub into
+   the save's `recentRuns` (max 5, newest first).
+5. **Banter** — close call = first living ally at `hp*100 <= maxHp*25`
+   (dying counts), latched once per fight; healer speaks close-call+victory,
+   tank speaks wipe at the summary-transition start; healer voice branches
+   Vigil/Zealot/neutral. `pickBanterLine` deterministic by default, rng
+   injectable.
+6. **Boss telegraphs** — data-driven `telegraph: 'glow' | 'raise' | 'pulse'`
+   per ability (Bonehowl raise, Tunnel Vision glow, Extinction pulse,
+   Emberfall glow, Soul Toll pulse, Needle Gaze raise); named cast bar
+   demoted to an unlabeled sliver above the boss; log still names casts.
+7. **Audio/Settings** — save v8 (`healgame-save-v7` purged): `musicVolumePct`
+   int 0..100 default 50, `recentRuns`. Music singleton (`ui/music.ts`):
+   0 ⇒ stop+destroy (no muted stream); autoplay defers to Phaser's
+   first-gesture unlock; asset path in one constant
+   (`assets/audio/supervirus-background.wav`, placeholder generated loop
+   until the real track lands). Settings scene: `hubSettings` /
+   `settingsVolumeSlider` / `settingsBack` journey names.
+8. **Balance bot** — disciplined bot upgraded (OOM-panic Still Waters,
+   anticipatory Frenzied Liturgy, pressure-windowed Wrath Ascendant, focus
+   stabilization, coyote-save queuing, `overhealTotal` telemetry). All 28
+   `balance.test.ts` gates unchanged and green.
+9. **Healer art** — user-authored Aseprite sheets: `ragged-healer-sheet.png`
+   (14×4 frames of 64px; right-facing row, cast columns with golden light)
+   and `heal-vfx.png` (6×32px sparkle) replace the healer's Kenney tile and
+   accompany heal landings.

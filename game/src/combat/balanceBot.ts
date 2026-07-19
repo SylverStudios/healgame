@@ -4,9 +4,29 @@
  */
 import { CombatEngine } from './engine';
 import { SPELLS } from '../data/constants';
+import { BONEHOWL, EMBERFALL, EXTINCTION, SOUL_TOLL } from '../data/enemyAbilities';
 import { loadoutFromSave, type CombatMods } from '../data/talentTree';
 import type { SaveData } from '../save/save';
 import type { CombatEngineOptions, EncounterDef, RelicDef, SpellDef, Unit } from './types';
+
+/**
+ * Named boss casts that hit the whole party (or drain healer mana) the instant
+ * they finish — as opposed to Tunnel Vision / Needle Gaze, which telegraph
+ * into a single-target channel. `state.bossCast` doesn't carry `kind`, so the
+ * bot recognizes "a party-wide hit is imminent" the same way a playtester
+ * reading the boss's wind-up would: by which cast is winding up.
+ */
+const PARTY_WIDE_CAST_NAMES: ReadonlySet<string> = new Set([
+  BONEHOWL.name,
+  EXTINCTION.name,
+  EMBERFALL.name,
+  SOUL_TOLL.name,
+]);
+
+/** How soon before a known party-wide cast lands counts as "anticipate the burst". */
+const BURST_ANTICIPATION_MS = 2000;
+/** Recency window (ms) after a burst/DoT/mana-burn actually lands that still counts as "spike pressure". */
+const RECENT_BURST_WINDOW_MS = 3000;
 
 export const BALANCE_STEP_MS = 250;
 export const BALANCE_MAX_MS = 10 * 60 * 1000;
@@ -25,13 +45,15 @@ export interface BotRun {
   survivors: number;
   healerManaLeft: number;
   cdActivations: number;
+  /** v0.3 §Balance bot: sum of wasted heal (`heal` event `overheal`) across the fight. */
+  overhealTotal: number;
 }
 
 /** Minimal synthetic SaveData for loadoutFromSave. Omits `actionBar` so
  *  loadout keeps every unlocked/tree spell (full kit for balance bots). */
 export function makeBalanceSave(overrides: Partial<SaveData>): SaveData {
   return {
-    version: 7,
+    version: 8,
     tutorialDone: true,
     xp: 0,
     unlockedSpells: [],
@@ -42,6 +64,8 @@ export function makeBalanceSave(overrides: Partial<SaveData>): SaveData {
     combatPaceTenths: 10,
     relicIds: [],
     pendingRelicOffers: [],
+    musicVolumePct: 50,
+    recentRuns: [],
     ...overrides,
   };
 }
@@ -297,7 +321,10 @@ export function runBot(
   let manaBurns = 0;
   let healsCast = 0;
   let cdActivations = 0;
+  let overhealTotal = 0;
   let focusTargetId: string | null = null;
+  /** Sim time of the last bossCastFinished/partyDoTStarted/manaBurned event — recency, not "ever happened". */
+  let lastBurstAtMs = -Infinity;
 
   while (elapsed < BALANCE_MAX_MS) {
     const state = engine.state;
@@ -323,16 +350,36 @@ export function runBot(
         .sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp);
       const tank = state.party.find((u) => u.role === 'tank');
       const tankCriticalUnit = tank && tank.alive && tank.hp <= 6 ? tank : undefined;
-      const focusUnit =
-        focusTargetId != null
-          ? state.party.find((u) => u.id === focusTargetId && u.alive && u.hp * 2 <= u.maxHp)
-          : undefined;
-      const target: Unit | undefined = tankCriticalUnit ?? focusUnit ?? injured[0];
+      const focusUnitRaw =
+        focusTargetId != null ? state.party.find((u) => u.id === focusTargetId && u.alive) : undefined;
+      // Emergency tier: the focused unit is already critically low (unchanged threshold).
+      const focusCriticalUnit = focusUnitRaw && focusUnitRaw.hp * 2 <= focusUnitRaw.maxHp ? focusUnitRaw : undefined;
+      // v0.3 §Balance bot triage: the Tunnel Vision/Needle Gaze channel guarantees more
+      // ticks land on this unit — stabilize it ahead of the 50% critical line instead of
+      // waiting, so a slow cast (Solemn Vigil) has time to land before it gets dangerous.
+      const focusStabilizeUnit =
+        !focusCriticalUnit && focusUnitRaw && focusUnitRaw.hp < focusUnitRaw.maxHp ? focusUnitRaw : undefined;
+      // v0.3 §Coyote: a downed (dying) ally is savable for a short grace window — top priority,
+      // above every other emergency signal, since a lost tick here can mean a permanent death.
+      const dyingAlly = state.party.find((u) => u.dying);
+      const target: Unit | undefined =
+        dyingAlly ?? tankCriticalUnit ?? focusCriticalUnit ?? focusStabilizeUnit ?? injured[0];
       const enemiesAlive = state.enemies.some((e) => e.alive);
+
+      // v0.3 §Balance bot cooldown timing: anticipate a *known* party-wide/DoT/mana-burn
+      // cast landing soon (Bonehowl/Extinction/Emberfall/Soul Toll — Tunnel Vision/Needle
+      // Gaze telegraphs are excluded, they resolve into a single-target channel, not a
+      // party hit) and recognize a burst that *just* landed. Both are time-windowed —
+      // "ever happened this fight" is not a pressure signal.
+      const burstSoon =
+        state.bossCast !== null &&
+        PARTY_WIDE_CAST_NAMES.has(state.bossCast.name) &&
+        state.bossCast.remainingMs <= BURST_ANTICIPATION_MS;
+      const recentBurst = elapsed - lastBurstAtMs <= RECENT_BURST_WINDOW_MS;
 
       if (target) {
         const missing = target.maxHp - target.hp;
-        const emergency = target === tankCriticalUnit || target === focusUnit;
+        const emergency = target === dyingAlly || target === tankCriticalUnit || target === focusCriticalUnit;
 
         // Determine the intended next heal (used for CD activation decisions).
         // Must mirror the heal priority in the `if (free)` block below.
@@ -351,28 +398,38 @@ export function runBot(
           intendedHeal = zealousFlare;
         }
 
-        // Spike pressure signal for healBonus (Wrath Ascendant) activation.
-        const underPressure =
-          tankCriticalUnit !== undefined ||
-          focusUnit !== undefined ||
-          (tank && tank.alive && tank.hp * 5 <= tank.maxHp * 4) || // tank ≤80% HP
-          bossCastFinished > 0 ||
-          partyDoTStarted > 0 ||
-          manaBurns > 0;
+        // Spike-pressure signal for healBonus (Wrath Ascendant): a real emergency, an
+        // imminent known burst, or one that just landed — NOT "a boss cast has ever
+        // finished in this fight" (that was permanently true after minute one).
+        const spikePressure =
+          tankCriticalUnit !== undefined || focusCriticalUnit !== undefined || burstSoon || recentBurst;
+        const manaTight = healer.maxMana > 0 && healer.mana * 5 <= healer.maxMana * 2; // ≤40% mana
 
         for (const def of cooldownDefs) {
           const cdState = state.cooldowns.find((c) => c.id === def.id);
           if (!cdState || cdState.remainingCooldownMs > 0) continue;
           if (def.effect.kind === 'manaCostReduction') {
-            engine.activateCooldown(def.id);
-            cdActivations += 1;
-          } else if (def.effect.kind === 'freeNextHeal' && intendedHeal) {
-            engine.activateCooldown(def.id);
-            cdActivations += 1;
-          } else if (def.effect.kind === 'healBonus' && underPressure) {
-            // Wrath Ascendant: activate during spike pressure windows.
-            engine.activateCooldown(def.id);
-            cdActivations += 1;
+            // Frenzied Liturgy: open the discount window ahead of a known burst, or once
+            // mana is genuinely getting tight mid-fight — not the instant it's off cooldown.
+            if (burstSoon || (enemiesAlive && manaTight)) {
+              engine.activateCooldown(def.id);
+              cdActivations += 1;
+            }
+          } else if (def.effect.kind === 'freeNextHeal') {
+            // Still Waters: the OOM panic button — only when the intended heal genuinely
+            // can't be afforded, not "whenever a heal happens to be coming up".
+            const trueOOM = intendedHeal !== undefined && healer.mana < intendedHeal.mana;
+            if (trueOOM) {
+              engine.activateCooldown(def.id);
+              cdActivations += 1;
+            }
+          } else if (def.effect.kind === 'healBonus') {
+            // Wrath Ascendant: only pop it when a real (non-overheal) heal is queued up
+            // to receive the bonus during a genuine spike window.
+            if (spikePressure && intendedHeal !== undefined) {
+              engine.activateCooldown(def.id);
+              cdActivations += 1;
+            }
           }
         }
 
@@ -382,9 +439,27 @@ export function runBot(
             cooldownDefs.find((d) => d.id === c.id)?.effect.kind === 'freeNextHeal',
         );
 
+        // v0.3 §Coyote: keep a save lined up even while the healer is mid-cast on someone
+        // else. `castSpell` while busy queues (fires the instant the current busy window
+        // ends) — that can beat waiting for the next free tick inside a 250ms window. A
+        // save only needs hp>0, so this always reaches for the fastest affordable heal.
+        if (dyingAlly && target === dyingAlly && !free) {
+          let saveSpell: SpellDef | undefined;
+          if (zealousFlare && (healer.mana >= zealousFlare.mana || armedFreeHeal)) saveSpell = zealousFlare;
+          else if (zealousMending && (healer.mana >= zealousMending.mana || armedFreeHeal))
+            saveSpell = zealousMending;
+          else if (solemnMend && (healer.mana >= solemnMend.mana || armedFreeHeal)) saveSpell = solemnMend;
+          if (saveSpell) {
+            engine.setTarget(dyingAlly.id);
+            engine.castSpell(saveSpell.id);
+          }
+        }
+
         if (free) {
           let healIntent: SpellDef | undefined;
           if (emergency) {
+            // v0.3 §Coyote: fastest-affordable-first — a save/critical-tier heal only
+            // needs to land, not top the target off, so cast time beats raw heal size.
             if (zealousFlare && (healer.mana >= zealousFlare.mana || armedFreeHeal)) healIntent = zealousFlare;
             else if (zealousMending && (healer.mana >= zealousMending.mana || armedFreeHeal))
               healIntent = zealousMending;
@@ -416,7 +491,11 @@ export function runBot(
                 missing,
                 emergency,
               ) ?? healIntent;
-          } else {
+          } else if (!emergency) {
+            // v0.3 §Balance bot: pressure-aware weaving — never spend a free GCD on
+            // Vowstrike while a coyote save or focus-target triage still needs it (an
+            // `emergency` target with no affordable heal is still an emergency); weave
+            // freely once the party is genuinely stable.
             spell = pickVowstrikeFiller(
               vowstrikeVirtue,
               vowstrikeVengeance,
@@ -445,14 +524,24 @@ export function runBot(
     }
 
     for (const event of engine.advance(BALANCE_STEP_MS)) {
-      if (event.type === 'bossCastFinished') bossCastFinished += 1;
+      if (event.type === 'bossCastFinished') {
+        bossCastFinished += 1;
+        lastBurstAtMs = elapsed;
+      }
       if (event.type === 'bossFocusStarted') {
         bossFocusStarted += 1;
         focusTargetId = event.targetId;
       }
       if (event.type === 'bossFocusEnded') focusTargetId = null;
-      if (event.type === 'partyDoTStarted') partyDoTStarted += 1;
-      if (event.type === 'manaBurned') manaBurns += 1;
+      if (event.type === 'partyDoTStarted') {
+        partyDoTStarted += 1;
+        lastBurstAtMs = elapsed;
+      }
+      if (event.type === 'manaBurned') {
+        manaBurns += 1;
+        lastBurstAtMs = elapsed;
+      }
+      if (event.type === 'heal') overhealTotal += event.overheal;
     }
     elapsed += BALANCE_STEP_MS;
   }
@@ -473,6 +562,7 @@ export function runBot(
         survivors: engine.state.party.filter((u) => u.alive).length,
         healerManaLeft: healer?.mana ?? 0,
         cdActivations,
+        overhealTotal,
       };
     }
     throw new Error('balance bot hit the 10-minute cap');
@@ -489,6 +579,7 @@ export function runBot(
     survivors: engine.state.party.filter((u) => u.alive).length,
     healerManaLeft: healer?.mana ?? 0,
     cdActivations,
+    overhealTotal,
   };
 }
 
@@ -527,7 +618,9 @@ export function formatBotRunLine(label: string, run: BotRun): string {
     ` | castDone ${run.bossCastFinished}` +
     ` | focus ${run.bossFocusStarted}` +
     ` | DoT ${run.partyDoTStarted}` +
-    ` | manaBurn ${run.manaBurns}`
+    ` | manaBurn ${run.manaBurns}` +
+    ` | cds ${run.cdActivations}` +
+    ` | overheal ${run.overhealTotal}`
   );
 }
 

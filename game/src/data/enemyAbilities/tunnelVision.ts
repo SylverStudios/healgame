@@ -11,4 +11,7 @@ export const TUNNEL_VISION = {
   tickMs: 1_000,
   damagePerTick: 2,
   visualKey: 'tunnel-vision',
+  // v0.3 chunk F: telegraph phase only — the channel already has its own crimson focus
+  // brand (bossFocusStarted), so a plain warm 'glow' here avoids double-signaling.
+  telegraph: 'glow',
 } as const satisfies EnemyAbilityDef;

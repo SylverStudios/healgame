@@ -15,4 +15,6 @@ export const SOUL_TOLL = {
   partyDamage: 4,
   manaBurn: 10,
   visualKey: 'soul-toll',
+  // v0.3 chunk F: a tolling bell reads as rhythmic thumps.
+  telegraph: 'pulse',
 } as const satisfies EnemyAbilityDef;
