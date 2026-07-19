@@ -1,11 +1,41 @@
 # Changelog — healgame
 
-Status: current · Authority: shipped-history summary (details in poc-qa) · Last verified: 2026-07-17
+Status: current · Authority: shipped-history summary (details in poc-qa) · Last verified: 2026-07-18
 
 Newest first. Numbers and rule detail live in `game/src/data/` and
 [`poc-qa.md`](./poc-qa.md) — this file is the short ship log.
 
 ---
+
+## 2026-07-18 — v0.3 "Presence, Lattice, Grace"
+
+- **Coyote-time heals**: lethal damage downs a party member into a 250ms
+  `dying` grace window (still healable, takes no further damage, read as dead
+  by attackers); a heal completing in the window saves them, and in-flight
+  casts are no longer cancelled just because the target dropped. Death
+  visuals wait for true death.
+- **Lattice talent tree**: grid-coordinate topology (root at the left edge,
+  Vigil string up, Zealot string down, shared spine converging to the
+  vowstrike fork), level-gated crowns (Wrath Ascendant Lv 10, Vowbound Crown
+  Lv 12), four-state edge rendering with the traversed path lit bright, and
+  a deterministic **build glyph** of the lit path.
+- **Run summary**: wipe/victory now transitions into a summary panel
+  (outcome, run XP, build glyph); the last 5 runs persist on the save
+  (`recentRuns`) with a last-run display on the Hub.
+- **Combat juice**: healer renders from the new ragged-healer sheet with a
+  golden cast-pose animation; heal sparkles on targets; tank shove / DPS
+  double-jab swing animations; mana-regen tick pulse; data-driven boss
+  telegraphs (glow/raise/pulse) replacing the named cast bar as the primary
+  tell.
+- **Party banter**: speech bubbles — healer on close call (≤25% ally HP,
+  once per fight) and victory, tank on wipe; healer lines branch by oath
+  (Vigil solemn / Zealot fervent).
+- **Music + Settings**: looped background track (placeholder pending the
+  real score) with a Settings scene volume slider; 0% fully stops playback.
+  Save v8 (`musicVolumePct`, `recentRuns`).
+- **Smarter balance bot**: deliberate cooldown timing, overheal-aware triage,
+  Tunnel Vision stabilization, coyote-save queuing — all pinned difficulty
+  gates unchanged (The Maw still unwinnable).
 
 ## 2026-07-17 — Feedback opens Gmail in-browser
 

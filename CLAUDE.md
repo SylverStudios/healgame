@@ -1,6 +1,6 @@
 # CLAUDE.md — operating healgame
 
-Status: current · Authority: gates, hard rules, working style · Last verified: 2026-07-17
+Status: current · Authority: gates, hard rules, working style · Last verified: 2026-07-18
 
 healgame is a healer-focused auto-battler: Phaser 3 + TypeScript (strict) +
 Vite. The game lives in `game/`; design docs in `docs/`. Doc conventions and
@@ -76,10 +76,13 @@ game/src/
 - **Pure logic first**: meta/combat/tree behavior lives in tested pure
   functions; scenes are thin wiring that call them and `saveGame()`
   immediately after any mutation. New logic gets colocated `*.test.ts`.
-- **Temp art only, one exception**: combat units render Kenney Tiny Dungeon
+- **Temp art only, few exceptions**: combat units render Kenney Tiny Dungeon
   16×16 tiles (CC0; sheet in `game/public/assets/`, unit→tile mapping in
-  `game/src/ui/sprites.ts`, `pixelArt: true`). Everything else stays rects,
-  bars, monospace text, dark palette (`#1a1210` bg) — reject polish creep.
+  `game/src/ui/sprites.ts`, `pixelArt: true`); the party healer + heal VFX
+  use the user-authored Aseprite sheets (`ragged-healer-sheet.png`,
+  `heal-vfx.png`), and background audio is a placeholder generated loop
+  (`assets/audio/`, see its README). Everything else stays rects, bars,
+  monospace text, dark palette (`#1a1210` bg) — reject polish creep.
 - **Scope discipline**: reject additions outside the active planning handoff
   (or, if none, outside what [`docs/CHANGELOG.md`](docs/CHANGELOG.md) and
   [`docs/poc-qa.md`](docs/poc-qa.md) already shipped). poc-spec §9 is the PoC
@@ -92,7 +95,7 @@ game/src/
   Journey resolves via `window.__healgame.locate(name)` — layout changes must
   **not** require journey coordinate edits. Adding a new interactive control
   means naming it and clicking it by name.
-- **Save changes**: `SaveData` is versioned (`healgame-save-v7`); during
+- **Save changes**: `SaveData` is versioned (`healgame-save-v8`); during
   development, shape changes rotate the key and `loadSave` deletes stale or
   unrecognized data instead of migrating it.
 
