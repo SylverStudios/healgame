@@ -16,7 +16,8 @@
     "telemetry": "tsx scripts/telemetry.ts",
     "check": "npm run typecheck && npm run lint && npm run test && vite build",
     "verify": "node scripts/verify.mjs",
-    "verify:fast": "node scripts/verify.mjs --fast"
+    "verify:fast": "node scripts/verify.mjs --fast",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
     "phaser": "^3.87.0"

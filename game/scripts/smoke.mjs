@@ -7,6 +7,7 @@
  */
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright';
+import { freePort } from './lib/freePort.mjs';
 
 const args = process.argv.slice(2);
 function argValue(flag, fallback) {
@@ -16,7 +17,7 @@ function argValue(flag, fallback) {
 const screenshotPath = argValue('--screenshot', null);
 const waitMs = Number(argValue('--wait', '3000'));
 
-const PORT = 4173;
+const PORT = await freePort();
 
 function startPreview() {
   return new Promise((resolve, reject) => {
