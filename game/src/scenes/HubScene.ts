@@ -3,7 +3,7 @@
  * ended, applies pending first-clear relic offers, and launches unlocked
  * dungeons from a vertical challenge list (current uncleared dungeon marked
  * CURRENT). Talent Tree / Spellbook sit above the dungeon stack. Run mods
- * (oath + relics) live in the shared top-right RunModsBar. Temp art only —
+ * (oath + relics) live in the shared top-left RunModsBar. Temp art only —
  * panels + text buttons, dark palette, monospace.
  */
 
@@ -111,20 +111,20 @@ export class HubScene extends Phaser.Scene {
     this.buildNotices(notices);
     this.buildButtons(save, this.metaButtonsY(notices.length));
     this.buildLastRunGlyph(save);
-    new RunModsBar(this, runModsFromSave(save), { viewWidth: width });
+    new RunModsBar(this, runModsFromSave(save));
   }
 
   /**
    * Optional cheap Hub hook (v0.3 chunk E, minimum deliverable is the combat
    * summary panel — this is the "nice to have"): one small glyph + "+N xp"
-   * line for the most recent run, top-left corner (mirrors RunModsBar's
-   * top-right placement). Non-interactive — no multi-run browser.
+   * line for the most recent run, top-right corner (mirrors RunModsBar's
+   * top-left placement). Non-interactive — no multi-run browser.
    */
   private buildLastRunGlyph(save: SaveData): void {
     const last = save.recentRuns[0];
     if (!last) return;
 
-    const x = 46;
+    const x = this.scale.width - 46;
     const y = 26;
     const outcomeColor = last.outcome === 'victory' ? ACCENT_COLOR : DANGER_COLOR;
     if (hasBuildGlyph(last.glyph)) {

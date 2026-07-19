@@ -12,7 +12,7 @@ import { relicGlyphColorById } from './relicColors';
 const ICON_RADIUS = 12;
 const ICON_GAP = 8;
 const ICON_BORDER = 0x0a0605;
-const MARGIN_RIGHT = 30;
+const MARGIN_LEFT = 30;
 const MARGIN_TOP = 30;
 
 const TOOLTIP_BG = 0x241a15;
@@ -32,10 +32,8 @@ const OATH_GLYPH_COLOR: Record<string, number> = {
 };
 
 export interface RunModsBarOptions {
-  /** Right edge of the view (icons grow leftward from here). */
-  viewWidth: number;
-  /** Override default top-right padding. */
-  marginRight?: number;
+  /** Override default top-left padding. */
+  marginLeft?: number;
   marginTop?: number;
   /** Tree HUD needs scrollFactor 0. */
   scrollFactor?: number;
@@ -72,7 +70,7 @@ export function runModTargetName(modId: string): string {
 }
 
 /**
- * Top-right horizontal strip of hoverable run-mod icons. No-op when `mods` is
+ * Top-left horizontal strip of hoverable run-mod icons. No-op when `mods` is
  * empty (nothing drawn). Callers own lifecycle — destroy when leaving the scene.
  */
 export class RunModsBar {
@@ -83,8 +81,8 @@ export class RunModsBar {
   private readonly nameText: Phaser.GameObjects.Text;
   private readonly descText: Phaser.GameObjects.Text;
 
-  constructor(scene: Phaser.Scene, mods: readonly RunModDisplay[], options: RunModsBarOptions) {
-    const marginRight = options.marginRight ?? MARGIN_RIGHT;
+  constructor(scene: Phaser.Scene, mods: readonly RunModDisplay[], options: RunModsBarOptions = {}) {
+    const marginLeft = options.marginLeft ?? MARGIN_LEFT;
     const marginTop = options.marginTop ?? MARGIN_TOP;
     const scrollFactor = options.scrollFactor ?? 1;
     const depth = options.depth ?? 200;
@@ -93,7 +91,7 @@ export class RunModsBar {
 
     this.tooltipBg = scene.add
       .rectangle(0, 0, 10, 10, TOOLTIP_BG)
-      .setOrigin(1, 0)
+      .setOrigin(0, 0)
       .setStrokeStyle(1, TOOLTIP_BORDER);
     this.kindText = scene.add.text(0, 0, '', {
       fontFamily: FONT,
@@ -120,12 +118,12 @@ export class RunModsBar {
     if (mods.length === 0) return;
 
     const step = ICON_RADIUS * 2 + ICON_GAP;
-    const startX = options.viewWidth - marginRight - ICON_RADIUS;
+    const startX = marginLeft + ICON_RADIUS;
     const y = marginTop;
 
     mods.forEach((mod, i) => {
-      // Oath leftmost, relic toward the right edge.
-      const x = startX - (mods.length - 1 - i) * step;
+      // Oath first, then relics — strip grows rightward from the left edge.
+      const x = startX + i * step;
       const glyph = drawRunModGlyph(scene, x, y, mod.id, mod.kind);
       // Invisible hit circle — diamonds' rotated bounds are awkward for hover.
       const hit = scene.add
@@ -145,13 +143,10 @@ export class RunModsBar {
     this.nameText.setText(mod.name);
     this.descText.setText(mod.description);
 
-    this.kindText.setPosition(-TOOLTIP_PADDING - this.kindText.width, TOOLTIP_PADDING);
-    this.nameText.setPosition(
-      -TOOLTIP_PADDING - this.nameText.width,
-      TOOLTIP_PADDING + this.kindText.height + 2,
-    );
+    this.kindText.setPosition(TOOLTIP_PADDING, TOOLTIP_PADDING);
+    this.nameText.setPosition(TOOLTIP_PADDING, TOOLTIP_PADDING + this.kindText.height + 2);
     this.descText.setPosition(
-      -TOOLTIP_PADDING - this.descText.width,
+      TOOLTIP_PADDING,
       TOOLTIP_PADDING + this.kindText.height + this.nameText.height + 6,
     );
 
@@ -160,7 +155,7 @@ export class RunModsBar {
     const panelHeight =
       this.kindText.height + this.nameText.height + this.descText.height + TOOLTIP_PADDING * 2 + 8;
     this.tooltipBg.setSize(panelWidth, panelHeight);
-    this.tooltip.setPosition(iconX - ICON_RADIUS - 6, iconY + ICON_RADIUS + 6);
+    this.tooltip.setPosition(iconX + ICON_RADIUS + 6, iconY + ICON_RADIUS + 6);
     this.tooltip.setVisible(true);
   }
 

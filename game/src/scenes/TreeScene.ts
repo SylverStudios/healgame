@@ -635,7 +635,6 @@ export class TreeScene extends Phaser.Scene {
   private syncRunModsBar(): void {
     this.runModsBar?.destroy();
     this.runModsBar = new RunModsBar(this, runModsFromSave(this.save), {
-      viewWidth: this.scale.width,
       depth: 250,
     });
   }
