@@ -24,7 +24,11 @@ import { Bar } from '../ui/bar';
 import { UnitSprite } from '../ui/unitSprite';
 import {
   attackAnimKeyForUnit,
+  HEALER_CAST_FRAME_DURATIONS_MS,
   HEALER_CAST_FRAMES,
+  HEALER_CAST_RELEASE_LEAD_MS,
+  HEALER_CHARGE_FRAME_DURATIONS_MS,
+  HEALER_CHARGE_FRAMES,
   HEALER_IDLE_FRAME,
   HEALER_SHEET_TEXTURE_KEY,
   presentationForUnit,
@@ -92,12 +96,14 @@ const GROUND_LINE_MARGIN = 40;
  *  (handoff §B). Presentation-only — index into this array, never reorder the engine's. */
 const PARTY_VISUAL_ORDER = ['healer', 'dps2', 'dps1', 'tank'];
 
-// Display sizes: PixelLab canvases are ~92px with heavy padding around a ~40px
-// figure, so they display larger than Kenney's filled 16×16 tiles. The ragged
-// healer sheet matches the same party display size so the line reads as one
-// roster. Kenney sizes stay multiples of 16.
-const PARTY_CUSTOM_WIDTH = 112;
-const PARTY_CUSTOM_HEIGHT = 112;
+// Display sizes: PixelLab merc canvases are ~92px with heavy padding around a
+// ~40px figure. The armored-paladin healer is native 32×32 (tight canvas) and
+// displays at 2× for a chunky SNES read — mercs stay at 112 until they get
+// matching 32×32 art. Kenney sizes stay multiples of 16.
+const PARTY_MERC_WIDTH = 112;
+const PARTY_MERC_HEIGHT = 112;
+const PARTY_HEALER_WIDTH = 64;
+const PARTY_HEALER_HEIGHT = 64;
 const PARTY_KENNEY_WIDTH = 48;
 const PARTY_KENNEY_HEIGHT = 48;
 const TRASH_CUSTOM_WIDTH = 72;
@@ -106,10 +112,10 @@ const TRASH_CUSTOM_HEIGHT = 72;
  * Padded canvases leave empty pixels under painted feet. Shift the body down
  * by that fraction of display height so feet meet GROUND_Y.
  * - PixelLab stills: ~23px pad on a ~92px canvas
- * - Ragged healer sheet: ~17px pad on a 64px frame (same idle/cast baseline)
+ * - Armored-paladin healer: ~2px pad on a 32px frame
  */
 const PIXELLAB_FOOT_PAD_RATIO = 23 / 92;
-const HEALER_FOOT_PAD_RATIO = 17 / 64;
+const HEALER_FOOT_PAD_RATIO = 2 / 32;
 const TRASH_KENNEY_WIDTH = 32;
 const TRASH_KENNEY_HEIGHT = 32;
 const BOSS_UNIT_WIDTH = 80;
@@ -202,7 +208,7 @@ function slotX(index: number, count: number, left: number, right: number): numbe
 }
 
 /** Home Y for a unit of `height` so its bottom edge (feet) sits on GROUND_Y — units have
- *  different heights (party custom 112 / trash 72 / Kenney smaller), so their container
+ *  different heights (mercs 112 / healer 64 / trash 72 / Kenney smaller), so their container
  *  centers (which is what x/y position) differ even though they all read as standing on
  *  one ground line. */
 function groundAnchorY(height: number): number {
@@ -417,13 +423,21 @@ export class CombatScene extends Phaser.Scene {
         PARTY_SLOT_LEFT,
         PARTY_SLOT_RIGHT,
       );
-      // Healer: ragged sheet + cast poses. Tank/DPS: PixelLab stills + attack strips
-      // (fixed facing). All custom party bodies share one display size.
+      // Healer: 32×32 armored-paladin sheet + cast loop. Tank/DPS: PixelLab
+      // stills + attack strips (fixed facing). Healer displays smaller until
+      // mercs move to the same native density.
       const isHealer = unit.role === 'healer';
       const presentation = presentationForUnit(unit);
-      const isCustom = isHealer || presentation.kind === 'texture';
-      const width = isCustom ? PARTY_CUSTOM_WIDTH : PARTY_KENNEY_WIDTH;
-      const height = isCustom ? PARTY_CUSTOM_HEIGHT : PARTY_KENNEY_HEIGHT;
+      const width = isHealer
+        ? PARTY_HEALER_WIDTH
+        : presentation.kind === 'texture'
+          ? PARTY_MERC_WIDTH
+          : PARTY_KENNEY_WIDTH;
+      const height = isHealer
+        ? PARTY_HEALER_HEIGHT
+        : presentation.kind === 'texture'
+          ? PARTY_MERC_HEIGHT
+          : PARTY_KENNEY_HEIGHT;
       const y = groundAnchorY(height);
       const attackAnimKey = attackAnimKeyForUnit(unit);
       const bodyOffsetY = isHealer
@@ -442,7 +456,14 @@ export class CombatScene extends Phaser.Scene {
               frame: HEALER_IDLE_FRAME,
               bodyTextureKey: HEALER_SHEET_TEXTURE_KEY,
               bodyOffsetY,
-              casterAnim: { idleFrame: HEALER_IDLE_FRAME, castFrames: HEALER_CAST_FRAMES },
+              fixedFacing: true,
+              casterAnim: {
+                idleFrame: HEALER_IDLE_FRAME,
+                chargeFrames: HEALER_CHARGE_FRAMES,
+                chargeDurationsMs: HEALER_CHARGE_FRAME_DURATIONS_MS,
+                castFrames: HEALER_CAST_FRAMES,
+                castDurationsMs: HEALER_CAST_FRAME_DURATIONS_MS,
+              },
             }
           : presentation.kind === 'texture'
             ? {
@@ -722,13 +743,12 @@ export class CombatScene extends Phaser.Scene {
           const healer = this.partySprites.get('healer');
           const castTarget = this.findSprite(event.cast.targetId);
           healer?.flashCast();
-          // v0.3 chunk F "Healer caster-side anim": any player cast (heals AND Bonk) plays the
-          // sheet's cast-pose frames. Instant casts (totalMs === 0, e.g. Bonk) complete inside
-          // the SAME advance() call — castFinished arrives this same tick, so a plain
-          // setCasting(true) would be invisible; playCastFlourish self-times instead and
-          // ignores the castFinished/castCancelled setCasting(false) below.
+          // Healer anim: channel → charge loop; finish → cast-action release.
+          // Instant casts (totalMs === 0, e.g. Bonk) complete inside the SAME
+          // advance() call — castFinished arrives this tick, so charge would be
+          // invisible; play the cast-action strip once instead.
           if (event.cast.totalMs === 0) {
-            healer?.playCastFlourish();
+            healer?.playCastRelease();
           } else {
             healer?.setCasting(true);
           }
@@ -750,7 +770,8 @@ export class CombatScene extends Phaser.Scene {
           break;
         }
         case 'castFinished':
-          this.partySprites.get('healer')?.setCasting(false);
+          // Channel → cast-action; instant already started release on castStarted.
+          this.partySprites.get('healer')?.finishCast();
           break;
         case 'bossCastStarted': {
           // v0.3 chunk F "Boss telegraphs": wind-up/glow cue on the boss sprite for the
@@ -966,6 +987,15 @@ export class CombatScene extends Phaser.Scene {
       this.playerCastBar.setVisible(true);
       const spell = this.sceneData.loadout.spells.find((s) => s.id === cast.spellId);
       this.playerCastLabel.setText(spell?.name ?? cast.spellId).setVisible(true);
+      // Start cast-action before resolve so flash/contact land near the heal.
+      // Skip the first tick (remaining === total) so charge gets at least one frame.
+      if (
+        cast.totalMs > 0 &&
+        cast.remainingMs < cast.totalMs &&
+        cast.remainingMs <= HEALER_CAST_RELEASE_LEAD_MS
+      ) {
+        this.partySprites.get('healer')?.beginEarlyCastRelease();
+      }
     } else {
       this.playerCastBar.setVisible(false);
       this.playerCastLabel.setVisible(false);

@@ -75,9 +75,8 @@ const LUNGE_DISTANCE = 12;
 const LUNGE_OUT_MS = 90;
 const LUNGE_BACK_MS = 120;
 
-/** v0.3 chunk F: healer cast-pose cycle (long casts) and instant-cast flourish timing. */
-const CAST_CYCLE_FRAME_MS = 140;
-const INSTANT_CAST_FLOURISH_MS = 250;
+/** Fallback step when a caster strip has no per-frame exposure sheet. */
+const CASTER_DEFAULT_FRAME_MS = 100;
 
 /** v0.3 chunk F: boss telegraph cues (bossCastStarted → bossCastFinished window). */
 const TELEGRAPH_GLOW_COLOR = 0xff8a3d;
@@ -166,8 +165,17 @@ export interface UnitSpriteConfig {
    * feet — shift the sprite down so feet meet the ground line after setDisplaySize.
    */
   bodyOffsetY?: number;
-  /** v0.3 chunk F: healer-only cast-pose animation. `frame` above must equal `idleFrame`. */
-  casterAnim?: { idleFrame: number; castFrames: readonly number[] };
+  /**
+   * Healer cast pipeline: charge loops while channeling; cast-action plays once
+   * on release (or as the instant flourish). `frame` above must equal `idleFrame`.
+   */
+  casterAnim?: {
+    idleFrame: number;
+    chargeFrames: readonly number[];
+    chargeDurationsMs: readonly number[];
+    castFrames: readonly number[];
+    castDurationsMs: readonly number[];
+  };
   showMana: boolean;
   /** When false, omit the role/name overlay (party sprites). Defaults to true. */
   showName?: boolean;
@@ -218,11 +226,13 @@ export class UnitSprite {
 
   private alive = true;
 
-  /** v0.3 chunk F: healer-only cast-pose config; null for every other unit. */
-  private readonly casterAnim: { idleFrame: number; castFrames: readonly number[] } | null;
-  private castCycleTimer: Phaser.Time.TimerEvent | null = null;
-  private flourishTimer: Phaser.Time.TimerEvent | null = null;
-  private flourishActive = false;
+  /** Healer cast pipeline config; null for every other unit. */
+  private readonly casterAnim: NonNullable<UnitSpriteConfig['casterAnim']> | null;
+  private chargeCycleTimer: Phaser.Time.TimerEvent | null = null;
+  private releaseTimer: Phaser.Time.TimerEvent | null = null;
+  private releaseActive = false;
+  /** Queued next cast arrived during cast-action — start charge when release ends. */
+  private pendingCharge = false;
 
   /** Local (container-space) Y of the mana bar, when present — used to place the regen pulse. */
   private readonly manaBarY: number | null;
@@ -391,8 +401,9 @@ export class UnitSprite {
       this.manaBar?.setVisible(true);
     } else {
       this.stopTelegraph();
-      this.stopCastCycle();
-      this.stopFlourishTimer();
+      this.pendingCharge = false;
+      this.stopChargeCycle();
+      this.stopReleaseTimer();
       this.stopAttackAnim();
       this.scene.tweens.killTweensOf(this.body);
       this.body.setTint(DEAD_TINT);
@@ -573,75 +584,139 @@ export class UnitSprite {
     });
   }
 
-  // ---- v0.3 chunk F: healer cast pose (no-op on units without casterAnim) ----------------
+  // ---- Healer charge / cast-action (no-op without casterAnim) ----------------------------
 
   /**
-   * Start/stop the looping cast-pose cycle for a non-instant cast: cycles the
-   * sheet's golden-light frames while `active`, holds/returns to the idle
-   * frame when stopped. A quick instant-cast flourish in flight is left to
-   * finish on its own timer (see `playCastFlourish`) rather than being cut
-   * off by a same-tick `setCasting(false)` from `castFinished`.
+   * Start/stop the charge loop for a channeled cast. Stopping alone returns to
+   * idle (cancel path). If a cast-action is still playing (queued spell fired
+   * same tick as finish), charge is deferred until the release completes —
+   * never clip the flash/contact.
    */
   setCasting(active: boolean): void {
     if (!this.casterAnim) return;
     if (active) {
-      this.stopFlourishTimer();
-      this.startCastCycle();
+      if (this.releaseActive) {
+        this.pendingCharge = true;
+        return;
+      }
+      this.pendingCharge = false;
+      this.startChargeCycle();
     } else {
-      this.stopCastCycle();
-      if (!this.flourishActive) this.body.setFrame(this.casterAnim.idleFrame);
+      this.pendingCharge = false;
+      this.stopChargeCycle();
+      if (!this.releaseActive) this.body.setFrame(this.casterAnim.idleFrame);
     }
   }
 
-  /** One-shot cast-pose flourish for instant (0ms) casts — self-timed, ignores setCasting(false). */
-  playCastFlourish(durationMs: number = INSTANT_CAST_FLOURISH_MS): void {
+  /**
+   * One-shot cast-action strip (orb → flash → recover). Used for instant casts
+   * on start, early lead-in before cast end, and `finishCast()`. Self-timed.
+   */
+  playCastRelease(): void {
     if (!this.casterAnim) return;
-    this.stopCastCycle();
-    this.stopFlourishTimer();
-    const frames = this.casterAnim.castFrames;
-    const stepMs = Math.max(60, Math.floor(durationMs / frames.length));
+    if (this.releaseActive) return;
+    this.stopChargeCycle();
+    this.playFrameStrip(
+      this.casterAnim.castFrames,
+      this.casterAnim.castDurationsMs,
+      /* markRelease */ true,
+    );
+  }
+
+  /**
+   * Begin cast-action before `castFinished` so flash/contact land near the heal
+   * resolve. No-op unless currently charging (avoids double-start).
+   */
+  beginEarlyCastRelease(): void {
+    if (!this.casterAnim || this.releaseActive || !this.chargeCycleTimer) return;
+    this.playCastRelease();
+  }
+
+  /**
+   * Successful cast end: play the cast-action if we were still charging. No-op
+   * when early release or an instant cast already started the strip.
+   */
+  finishCast(): void {
+    if (!this.casterAnim) return;
+    if (this.releaseActive) return;
+    if (this.chargeCycleTimer) {
+      this.playCastRelease();
+      return;
+    }
+    this.body.setFrame(this.casterAnim.idleFrame);
+  }
+
+  /** Instant-cast alias — same cast-action strip as a successful channel finish. */
+  playCastFlourish(): void {
+    this.playCastRelease();
+  }
+
+  private startChargeCycle(): void {
+    if (this.chargeCycleTimer || !this.casterAnim) return;
+    this.pendingCharge = false;
+    const frames = this.casterAnim.chargeFrames;
+    const durations = this.casterAnim.chargeDurationsMs;
     let i = 0;
     this.body.setFrame(frames[0]!);
-    this.flourishActive = true;
-    this.flourishTimer = this.scene.time.addEvent({
-      delay: stepMs,
-      repeat: frames.length - 1,
-      callback: () => {
-        i++;
-        this.body.setFrame(frames[Math.min(i, frames.length - 1)]!);
-      },
-    });
-    this.scene.time.delayedCall(durationMs, () => {
-      this.flourishActive = false;
-      this.flourishTimer = null;
-      this.body.setFrame(this.casterAnim!.idleFrame);
-    });
+    const step = () => {
+      i = (i + 1) % frames.length;
+      this.body.setFrame(frames[i]!);
+      this.chargeCycleTimer = this.scene.time.delayedCall(
+        durations[i] ?? CASTER_DEFAULT_FRAME_MS,
+        step,
+      );
+    };
+    this.chargeCycleTimer = this.scene.time.delayedCall(
+      durations[0] ?? CASTER_DEFAULT_FRAME_MS,
+      step,
+    );
   }
 
-  private startCastCycle(): void {
-    if (this.castCycleTimer || !this.casterAnim) return;
-    const frames = this.casterAnim.castFrames;
+  private stopChargeCycle(): void {
+    this.chargeCycleTimer?.remove(false);
+    this.chargeCycleTimer = null;
+  }
+
+  private playFrameStrip(
+    frames: readonly number[],
+    durationsMs: readonly number[],
+    markRelease: boolean,
+  ): void {
+    this.stopReleaseTimer();
+    if (frames.length === 0) return;
     let i = 0;
     this.body.setFrame(frames[0]!);
-    this.castCycleTimer = this.scene.time.addEvent({
-      delay: CAST_CYCLE_FRAME_MS,
-      loop: true,
-      callback: () => {
-        i = (i + 1) % frames.length;
-        this.body.setFrame(frames[i]!);
-      },
-    });
+    if (markRelease) this.releaseActive = true;
+
+    const advance = () => {
+      i++;
+      if (i >= frames.length) {
+        this.releaseActive = false;
+        this.releaseTimer = null;
+        if (this.pendingCharge) {
+          this.startChargeCycle();
+        } else {
+          this.body.setFrame(this.casterAnim!.idleFrame);
+        }
+        return;
+      }
+      this.body.setFrame(frames[i]!);
+      this.releaseTimer = this.scene.time.delayedCall(
+        durationsMs[i] ?? CASTER_DEFAULT_FRAME_MS,
+        advance,
+      );
+    };
+
+    this.releaseTimer = this.scene.time.delayedCall(
+      durationsMs[0] ?? CASTER_DEFAULT_FRAME_MS,
+      advance,
+    );
   }
 
-  private stopCastCycle(): void {
-    this.castCycleTimer?.remove(false);
-    this.castCycleTimer = null;
-  }
-
-  private stopFlourishTimer(): void {
-    this.flourishTimer?.remove(false);
-    this.flourishTimer = null;
-    this.flourishActive = false;
+  private stopReleaseTimer(): void {
+    this.releaseTimer?.remove(false);
+    this.releaseTimer = null;
+    this.releaseActive = false;
   }
 
   // ---- v0.3 chunk F: boss telegraph (bossCastStarted → bossCastFinished window) ---------
@@ -741,10 +816,9 @@ export class UnitSprite {
     this.body.stop();
     this.telegraphTween?.remove();
     this.telegraphTween = null;
-    this.castCycleTimer?.remove(false);
-    this.castCycleTimer = null;
-    this.flourishTimer?.remove(false);
-    this.flourishTimer = null;
+    this.pendingCharge = false;
+    this.stopChargeCycle();
+    this.stopReleaseTimer();
     for (const float of this.activeFloats) {
       this.scene.tweens.killTweensOf(float);
       float.destroy();

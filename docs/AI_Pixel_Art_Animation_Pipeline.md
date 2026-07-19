@@ -168,6 +168,7 @@ Avoid:
 -   Stretchy limbs
 -   Smearing
 -   AI artifacts
+-   Equal frame timing on combat strips (reads floaty)
 
 Prefer:
 
@@ -176,6 +177,12 @@ Prefer:
 -   Subtle robe movement
 -   Readable silhouettes
 -   Crisp spell effects
+-   FE-style exposure sheets — hold contact / antic longer, flash smears
+    briefly (see `.claude/skills/pixellab-unit-art/SKILL.md` "Timing" and
+    https://lost-worlds.neocities.org/blog/2024/10/20/fire-emblem-animation/)
+
+For healer casts: keep **charge** (loop while channeling) and **cast-action**
+(one-shot release) as separate animations.
 
 Animations should read clearly even at 200% zoom.
 

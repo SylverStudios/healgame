@@ -9,6 +9,11 @@ import {
   DPS2_TEXTURE_KEY,
   frameForMobVisualKey,
   frameForUnit,
+  HEALER_CAST_FRAME_DURATIONS_MS,
+  HEALER_CAST_FRAMES,
+  HEALER_CAST_RELEASE_LEAD_MS,
+  HEALER_CHARGE_FRAME_DURATIONS_MS,
+  HEALER_CHARGE_FRAMES,
   MERC_ATTACK_FRAME_DURATIONS_MS,
   presentationForUnit,
   TANK_TEXTURE_KEY,
@@ -96,6 +101,38 @@ describe('merc attack exposure sheet', () => {
       expect(totalMs).toBeGreaterThan(400);
       expect(totalMs).toBeLessThan(800);
     }
+  });
+});
+
+describe('healer charge / cast exposure sheets', () => {
+  it('keeps charge and cast strip lengths matched to their duration tables', () => {
+    expect(HEALER_CHARGE_FRAME_DURATIONS_MS.length).toBe(HEALER_CHARGE_FRAMES.length);
+    expect(HEALER_CAST_FRAME_DURATIONS_MS.length).toBe(HEALER_CAST_FRAMES.length);
+  });
+
+  it('holds cast contact longer than the flash smear', () => {
+    // Sheet: wind-up, orb, orb-peak, flash, contact, follow, settle.
+    const flashMs = HEALER_CAST_FRAME_DURATIONS_MS[3]!;
+    const contactMs = HEALER_CAST_FRAME_DURATIONS_MS[4]!;
+    const orbPeakMs = HEALER_CAST_FRAME_DURATIONS_MS[2]!;
+    expect(flashMs).toBeLessThanOrEqual(50);
+    expect(contactMs).toBeGreaterThanOrEqual(133);
+    expect(orbPeakMs).toBeGreaterThanOrEqual(100);
+    expect(contactMs).toBeGreaterThan(flashMs);
+  });
+
+  it('dwells on the peak charge frame longer than the in-betweens', () => {
+    const peakMs = HEALER_CHARGE_FRAME_DURATIONS_MS[3]!;
+    const growMs = HEALER_CHARGE_FRAME_DURATIONS_MS[2]!;
+    expect(peakMs).toBeGreaterThan(growMs);
+  });
+
+  it('leads the cast-action so flash lands near castFinished', () => {
+    expect(HEALER_CAST_RELEASE_LEAD_MS).toBe(
+      HEALER_CAST_FRAME_DURATIONS_MS.slice(0, 4).reduce((sum, ms) => sum + ms, 0),
+    );
+    expect(HEALER_CAST_RELEASE_LEAD_MS).toBeGreaterThan(200);
+    expect(HEALER_CAST_RELEASE_LEAD_MS).toBeLessThan(500);
   });
 });
 
