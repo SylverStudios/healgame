@@ -10,6 +10,12 @@ description: >-
 
 # PixelLab unit art (healgame)
 
+> **New units go through the successor skill:**
+> [`pixellab-art-pipeline`](../pixellab-art-pipeline/SKILL.md) — archetype
+> contracts (healer/ally/enemy/boss), canvas tiers, `npm run art` frame
+> tooling, and `art/manifest.json`. This file remains the canon for the
+> shipped healer charge/cast strips and the wiring contract.
+
 Produce **art only** unless the user explicitly asks to wire sprites into code.
 Ship exports under `artifacts/`; do not invent gameplay numbers or change
 `game/src/` by default.
