@@ -69,23 +69,11 @@ const TARGET_MARKER_GAP = 8;
 const TARGET_MARKER_TEXT_CLEARANCE = 12;
 const TARGET_MARKER_COLOR = 0xf2c14e;
 
-/** Locked visual decisions (phase-2-handoff): lunge 12px, out 90ms / back 120ms. */
+/** Locked visual decisions (phase-2-handoff): lunge 12px, out 90ms / back 120ms.
+ *  Used by Kenney enemies / boss / healer — PixelLab party mercs play attack strips in place. */
 const LUNGE_DISTANCE = 12;
 const LUNGE_OUT_MS = 90;
 const LUNGE_BACK_MS = 120;
-
-/** v0.3 chunk F: tank swing is a heavier shove — bigger lunge + a squash/stretch beat. */
-const SHOVE_DISTANCE = 20;
-const SHOVE_OUT_MS = 110;
-const SHOVE_BACK_MS = 150;
-const SHOVE_SQUASH_SCALE_X = 1.12;
-const SHOVE_SQUASH_SCALE_Y = 0.9;
-
-/** v0.3 chunk F: DPS swing is a quick double-jab — two small lunges back to back. */
-const JAB_DISTANCE = 9;
-const JAB_OUT_MS = 55;
-const JAB_BACK_MS = 55;
-const JAB_GAP_MS = 30;
 
 /** v0.3 chunk F: healer cast-pose cycle (long casts) and instant-cast flourish timing. */
 const CAST_CYCLE_FRAME_MS = 140;
@@ -181,6 +169,8 @@ export interface UnitSpriteConfig {
   /** v0.3 chunk F: healer-only cast-pose animation. `frame` above must equal `idleFrame`. */
   casterAnim?: { idleFrame: number; castFrames: readonly number[] };
   showMana: boolean;
+  /** When false, omit the role/name overlay (party sprites). Defaults to true. */
+  showName?: boolean;
   clickable: boolean;
   onClick?: (unitId: string) => void;
   /** Side-view facing line (side-view-layout-handoff §A): party faces right, enemies face
@@ -212,7 +202,7 @@ export class UnitSprite {
   private readonly attackAnimKey: string | null;
   /** Resting local Y for the body (PixelLab foot-pad offset); telegraph raise adds on top. */
   private readonly bodyRestY: number;
-  private readonly nameText: Phaser.GameObjects.Text;
+  private readonly nameText: Phaser.GameObjects.Text | null;
   private readonly hpBar: Bar;
   private readonly hpText: Phaser.GameObjects.Text;
   private readonly manaBar: Bar | null;
@@ -237,16 +227,9 @@ export class UnitSprite {
   /** Local (container-space) Y of the mana bar, when present — used to place the regen pulse. */
   private readonly manaBarY: number | null;
 
-  /** v0.3 chunk F: pending "second jab" callback from an in-flight lungeJab(), cancelled if a
-   *  new jab starts before it fires (rapid DPS swings should never stack more than 2 jabs). */
-  private pendingJabTimer: Phaser.Time.TimerEvent | null = null;
-
   /** v0.3 chunk F: boss telegraph state — a repeating tween drives tint/scale/offset each tick. */
   private telegraphActive = false;
   private telegraphTween: Phaser.Tweens.Tween | null = null;
-
-  /** v0.3 chunk F: true while a tank shove's squash/stretch tween owns the body's display size. */
-  private squashActive = false;
 
   constructor(unit: Unit, config: UnitSpriteConfig) {
     const { scene, x, y, width, height, showMana, clickable, onClick, facing } = config;
@@ -277,7 +260,7 @@ export class UnitSprite {
       .setFlipX(!config.fixedFacing && facing === 'left');
     // Attack strips swap textures each frame — keep display size pinned.
     this.body.on(Phaser.Animations.Events.ANIMATION_UPDATE, () => {
-      if (!this.squashActive) this.body.setDisplaySize(this.width, this.height);
+      this.body.setDisplaySize(this.width, this.height);
     });
     this.body.on(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
       this.restoreRestPose();
@@ -294,12 +277,17 @@ export class UnitSprite {
     this.container.add(this.body);
 
     // Name stays centered on the body (including PixelLab foot-pad offset).
-    this.nameText = scene.add
-      .text(0, this.bodyRestY, unit.name, { fontFamily: NAME_FONT, color: NAME_COLOR })
-      .setStroke('#0a0605', 3)
-      .setOrigin(0.5)
-      .setDepth(1);
-    this.container.add(this.nameText);
+    // Party omits names — roles are clear from sprites; enemies keep labels.
+    if (config.showName === false) {
+      this.nameText = null;
+    } else {
+      this.nameText = scene.add
+        .text(0, this.bodyRestY, unit.name, { fontFamily: NAME_FONT, color: NAME_COLOR })
+        .setStroke('#0a0605', 3)
+        .setOrigin(0.5)
+        .setDepth(1);
+      this.container.add(this.nameText);
+    }
 
     const hpY = -height / 2 - HP_BAR_OFFSET_Y;
     const meterHalf = this.meterWidth / 2;
@@ -396,9 +384,8 @@ export class UnitSprite {
         else this.body.clearTint();
         this.body.setAlpha(1);
         // setDisplaySize (not setScale) — the image is already scaled up from its 16×16 source
-        // frame, so raw scale values would shrink it to tile size. Skipped mid-shove-squash too
-        // (same fight-every-frame problem as the telegraph guard above).
-        if (!this.squashActive) this.body.setDisplaySize(this.width, this.height);
+        // frame, so raw scale values would shrink it to tile size.
+        this.body.setDisplaySize(this.width, this.height);
       }
       this.hpBar.setVisible(true);
       this.manaBar?.setVisible(true);
@@ -408,7 +395,6 @@ export class UnitSprite {
       this.stopFlourishTimer();
       this.stopAttackAnim();
       this.scene.tweens.killTweensOf(this.body);
-      this.squashActive = false;
       this.body.setTint(DEAD_TINT);
       this.body.setAlpha(DEAD_ALPHA);
       this.body.setDisplaySize(this.width * DEAD_SCALE, this.height * DEAD_SCALE);
@@ -482,85 +468,6 @@ export class UnitSprite {
     });
   }
 
-  /**
-   * v0.3 chunk F: tank swing — a heavier shove than the shared lunge (bigger
-   * forward travel) with a squash/stretch beat on the body at full extension,
-   * settling back to normal proportions on the return. Same kill-and-snap
-   * safety as `lunge()` so repeated shoves never stack an offset.
-   */
-  lungeShove(towardX: number): void {
-    const direction = Math.sign(towardX - this.homeX) || 1;
-    this.scene.tweens.killTweensOf(this.container);
-    this.scene.tweens.killTweensOf(this.body);
-    this.container.x = this.homeX;
-    this.body.setDisplaySize(this.width, this.height);
-    this.playAttack();
-    this.scene.tweens.add({
-      targets: this.container,
-      x: this.homeX + direction * SHOVE_DISTANCE,
-      duration: SHOVE_OUT_MS,
-      ease: 'Quad.easeOut',
-      onComplete: () => {
-        this.scene.tweens.add({
-          targets: this.container,
-          x: this.homeX,
-          duration: SHOVE_BACK_MS,
-          ease: 'Quad.easeIn',
-        });
-      },
-    });
-    this.squashActive = true;
-    this.scene.tweens.add({
-      targets: this.body,
-      displayWidth: this.width * SHOVE_SQUASH_SCALE_X,
-      displayHeight: this.height * SHOVE_SQUASH_SCALE_Y,
-      duration: SHOVE_OUT_MS,
-      ease: 'Quad.easeOut',
-      yoyo: true,
-      onComplete: () => {
-        this.squashActive = false;
-        this.body.setDisplaySize(this.width, this.height);
-      },
-    });
-  }
-
-  /**
-   * v0.3 chunk F: DPS swing — two quick small lunges back to back (a jab-jab)
-   * instead of one lunge. The second jab is scheduled after the first
-   * completes + a short gap; both share the same kill-and-snap safety.
-   */
-  lungeJab(towardX: number): void {
-    const direction = Math.sign(towardX - this.homeX) || 1;
-    this.scene.tweens.killTweensOf(this.container);
-    this.pendingJabTimer?.remove(false);
-    this.pendingJabTimer = null;
-    this.container.x = this.homeX;
-    this.playAttack();
-    const singleJab = (onDone: () => void = () => {}) => {
-      this.scene.tweens.add({
-        targets: this.container,
-        x: this.homeX + direction * JAB_DISTANCE,
-        duration: JAB_OUT_MS,
-        ease: 'Quad.easeOut',
-        onComplete: () => {
-          this.scene.tweens.add({
-            targets: this.container,
-            x: this.homeX,
-            duration: JAB_BACK_MS,
-            ease: 'Quad.easeIn',
-            onComplete: onDone,
-          });
-        },
-      });
-    };
-    singleJab(() => {
-      this.pendingJabTimer = this.scene.time.delayedCall(JAB_GAP_MS, () => {
-        this.pendingJabTimer = null;
-        singleJab();
-      });
-    });
-  }
-
   /** Spawns a `-N` float at this unit's home position for a `damage` event on it. Always
    *  shown — including 0 and overkill raw amounts (handoff §A: no clamping to remaining HP). */
   spawnDamageFloat(amount: number): void {
@@ -573,7 +480,7 @@ export class UnitSprite {
     );
   }
 
-  /** Spawns a `+N` float at this unit's home position for an effective (`amount > 0`) heal. */
+  /** Spawns a `+N` float for the full heal cast (applied + overheal). */
   spawnHealFloat(amount: number): void {
     if (amount <= 0) return;
     this.spawnFloatText(
@@ -630,7 +537,7 @@ export class UnitSprite {
     } else {
       this.body.setTexture(this.restTextureKey, this.restFrame);
     }
-    if (!this.squashActive) this.body.setDisplaySize(this.width, this.height);
+    this.body.setDisplaySize(this.width, this.height);
   }
 
   private stopAttackAnim(): void {
@@ -838,8 +745,6 @@ export class UnitSprite {
     this.castCycleTimer = null;
     this.flourishTimer?.remove(false);
     this.flourishTimer = null;
-    this.pendingJabTimer?.remove(false);
-    this.pendingJabTimer = null;
     for (const float of this.activeFloats) {
       this.scene.tweens.killTweensOf(float);
       float.destroy();

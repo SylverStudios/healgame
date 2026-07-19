@@ -314,7 +314,7 @@ export class CombatScene extends Phaser.Scene {
     this.rebuildEnemies(this.engine.state.enemies);
     this.buildHud();
     this.buildCastBars();
-    new RunModsBar(this, runModsFromSave(save), { viewWidth: VIEW_WIDTH });
+    new RunModsBar(this, runModsFromSave(save));
 
     this.spellBar = new SpellBar(
       this,
@@ -453,6 +453,7 @@ export class CombatScene extends Phaser.Scene {
               }
             : { frame: presentation.frame }),
         showMana: isHealer,
+        showName: false,
         clickable: true,
         onClick: (id) => this.onAllyClick(id),
         facing: 'right',
@@ -683,13 +684,15 @@ export class CombatScene extends Phaser.Scene {
           // if it belongs to a roster already replaced by a same-tick waveStarted rebuild.
           const attacker = this.findSprite(event.sourceId);
           if (attacker) {
-            const towardX = victim?.getHomeX() ?? attacker.getHomeX();
-            // v0.3 chunk F "Tank/DPS attack anims": role-tinted swing strength — tank shoves
-            // (bigger lunge + squash), dps double-jabs; enemies/boss/healer keep the shared lunge.
+            // Party mercs with PixelLab attack strips play the anim in place.
+            // Kenney enemies / boss / healer (no strip) still use the shared position lunge.
             const attackerUnit = this.engine.state.party.find((u) => u.id === event.sourceId);
-            if (attackerUnit?.role === 'tank') attacker.lungeShove(towardX);
-            else if (attackerUnit?.role === 'dps') attacker.lungeJab(towardX);
-            else attacker.lunge(towardX);
+            if (attackerUnit?.role === 'tank' || attackerUnit?.role === 'dps') {
+              attacker.playAttack();
+            } else {
+              const towardX = victim?.getHomeX() ?? attacker.getHomeX();
+              attacker.lunge(towardX);
+            }
           }
           this.combatLog.push(
             `${this.formatTimestamp()} ${this.resolveUnitName(event.sourceId)} hits ${this.resolveUnitName(event.targetId)} -${event.amount}`,
@@ -698,8 +701,10 @@ export class CombatScene extends Phaser.Scene {
         }
         case 'heal': {
           const target = this.findSprite(event.targetId);
+          // Float shows the full cast (applied + overheal) so overheal still reads as a big heal.
+          const rawHeal = event.amount + event.overheal;
           target?.flashHeal();
-          target?.spawnHealFloat(event.amount);
+          target?.spawnHealFloat(rawHeal);
           if (target) {
             // v0.3 chunk F "Heal target sparkle": heal-vfx.png replaces the ground ripple as
             // the primary heal-land read — ripple + particles + sparkle all firing together
@@ -708,9 +713,8 @@ export class CombatScene extends Phaser.Scene {
             showHealParticles(this, target.getHomeX(), target.getHomeY());
             shakeHealImpact(this);
           }
-          const overheal = event.overheal > 0 ? ` (${event.overheal} over)` : '';
           this.combatLog.push(
-            `${this.formatTimestamp()} ${this.resolveSpellName(event.spellId)} heals ${this.resolveUnitName(event.targetId)} +${event.amount}${overheal}`,
+            `${this.formatTimestamp()} ${this.resolveSpellName(event.spellId)} heals ${this.resolveUnitName(event.targetId)} +${rawHeal}`,
           );
           break;
         }
