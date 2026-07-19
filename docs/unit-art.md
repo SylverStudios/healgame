@@ -2,6 +2,11 @@
 
 Status: current · Authority: combat unit tile mapping + relic icons · Last verified: 2026-07-19
 
+Style law (density, canvas tiers, palette, timing): [`art/STYLE.md`](../art/STYLE.md).
+Unit registry + audit: [`art/manifest.json`](../art/manifest.json) via
+`npm run art -- audit`. Generation workflow:
+`.claude/skills/pixellab-art-pipeline/SKILL.md`.
+
 Combat units render from two presentation paths (see `game/src/ui/sprites.ts`
 `presentationForUnit`):
 
