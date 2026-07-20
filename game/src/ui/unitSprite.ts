@@ -75,9 +75,6 @@ const LUNGE_DISTANCE = 12;
 const LUNGE_OUT_MS = 90;
 const LUNGE_BACK_MS = 120;
 
-/** Fallback step when a caster strip has no per-frame exposure sheet. */
-const CASTER_DEFAULT_FRAME_MS = 100;
-
 /** v0.3 chunk F: boss telegraph cues (bossCastStarted → bossCastFinished window). */
 const TELEGRAPH_GLOW_COLOR = 0xff8a3d;
 const TELEGRAPH_RAISE_COLOR = 0xfff2c0;
@@ -160,21 +157,29 @@ export interface UnitSpriteConfig {
   fixedFacing?: boolean;
   /** Phaser anim key for a one-shot PixelLab attack strip (registered in BootScene). */
   attackAnimKey?: string;
+  /** Phaser anim key for a one-shot hurt reaction strip (registered in BootScene). */
+  hurtAnimKey?: string;
+  /**
+   * Healer-only (chunk 1B): continuous breathing loop (Phaser anim, `repeat: -1`)
+   * played whenever not charging/casting/zapping. Restored after any one-shot
+   * strip (cast-action or zap) completes instead of a static idle frame.
+   */
+  idleAnimKey?: string;
+  /** Healer-only: one-shot Bonk zap strip (registered in BootScene). Played via `playZap()`. */
+  zapAnimKey?: string;
+  /** Healer-only: one-shot Vowstrike attack strip. Played via `playVowstrike()`. */
+  vowstrikeAnimKey?: string;
   /**
    * Extra body Y in container space. PixelLab canvases pad ~25% below the painted
    * feet — shift the sprite down so feet meet the ground line after setDisplaySize.
    */
   bodyOffsetY?: number;
   /**
-   * Healer cast pipeline: charge loops while channeling; cast-action plays once
-   * on release (or as the instant flourish). `frame` above must equal `idleFrame`.
+   * Healer cast pipeline: Solemn/Zealous charge loops while channeling;
+   * cast-action plays once on release (or as the instant flourish).
    */
   casterAnim?: {
-    idleFrame: number;
-    chargeFrames: readonly number[];
-    chargeDurationsMs: readonly number[];
-    castFrames: readonly number[];
-    castDurationsMs: readonly number[];
+    styles: Record<'solemn' | 'zealous', { chargeAnimKey: string; castAnimKey: string }>;
   };
   showMana: boolean;
   /** When false, omit the role/name overlay (party sprites). Defaults to true. */
@@ -208,6 +213,14 @@ export class UnitSprite {
   /** Rest sheet frame for Kenney / healer; undefined for single-image stills. */
   private readonly restFrame: number | undefined;
   private readonly attackAnimKey: string | null;
+  /** One-shot hurt reaction strip key; null for units without one (see `hurtAnimKey` config). */
+  private readonly hurtAnimKey: string | null;
+  /** Healer-only continuous idle loop key; null for every other unit (see `idleAnimKey` config). */
+  private readonly idleAnimKey: string | null;
+  /** Healer-only Bonk zap strip key; null for every other unit. */
+  private readonly zapAnimKey: string | null;
+  /** Healer-only Vowstrike attack strip key; null for every other unit. */
+  private readonly vowstrikeAnimKey: string | null;
   /** Resting local Y for the body (PixelLab foot-pad offset); telegraph raise adds on top. */
   private readonly bodyRestY: number;
   private readonly nameText: Phaser.GameObjects.Text | null;
@@ -228,11 +241,13 @@ export class UnitSprite {
 
   /** Healer cast pipeline config; null for every other unit. */
   private readonly casterAnim: NonNullable<UnitSpriteConfig['casterAnim']> | null;
-  private chargeCycleTimer: Phaser.Time.TimerEvent | null = null;
-  private releaseTimer: Phaser.Time.TimerEvent | null = null;
+  private castStyle: 'solemn' | 'zealous' = 'solemn';
+  private charging = false;
   private releaseActive = false;
   /** Queued next cast arrived during cast-action — start charge when release ends. */
   private pendingCharge = false;
+  private readonly castAnimKeys: ReadonlySet<string>;
+  private readonly chargeAnimKeys: ReadonlySet<string>;
 
   /** Local (container-space) Y of the mana bar, when present — used to place the regen pulse. */
   private readonly manaBarY: number | null;
@@ -251,6 +266,9 @@ export class UnitSprite {
     this.height = height;
     this.meterWidth = Math.min(width, METER_MAX_WIDTH);
     this.casterAnim = config.casterAnim ?? null;
+    const styleEntries = this.casterAnim ? Object.values(this.casterAnim.styles) : [];
+    this.castAnimKeys = new Set(styleEntries.map((s) => s.castAnimKey));
+    this.chargeAnimKeys = new Set(styleEntries.map((s) => s.chargeAnimKey));
 
     this.container = scene.add.container(x, y);
 
@@ -260,6 +278,10 @@ export class UnitSprite {
     this.restTextureKey = textureKey;
     this.restFrame = config.frame;
     this.attackAnimKey = config.attackAnimKey ?? null;
+    this.hurtAnimKey = config.hurtAnimKey ?? null;
+    this.idleAnimKey = config.idleAnimKey ?? null;
+    this.zapAnimKey = config.zapAnimKey ?? null;
+    this.vowstrikeAnimKey = config.vowstrikeAnimKey ?? null;
     this.bodyRestY = config.bodyOffsetY ?? 0;
     const bodySprite =
       config.frame === undefined
@@ -272,9 +294,24 @@ export class UnitSprite {
     this.body.on(Phaser.Animations.Events.ANIMATION_UPDATE, () => {
       this.body.setDisplaySize(this.width, this.height);
     });
-    this.body.on(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
-      this.restoreRestPose();
-    });
+    this.body.on(
+      Phaser.Animations.Events.ANIMATION_COMPLETE,
+      (animation: Phaser.Animations.Animation) => {
+        const key = animation.key;
+        if (this.castAnimKeys.has(key)) {
+          this.releaseActive = false;
+          if (this.pendingCharge) {
+            this.startChargeCycle();
+          } else {
+            this.restoreRestPose();
+          }
+          return;
+        }
+        // Charge loops never complete (repeat: -1). Zap / attack / other one-shots → idle.
+        if (this.chargeAnimKeys.has(key)) return;
+        this.restoreRestPose();
+      },
+    );
     if (clickable) {
       // Hit area is the full frame bounds (including transparent pixels) —
       // same clickable box the old rect gave, so journey.mjs targets hold.
@@ -369,6 +406,13 @@ export class UnitSprite {
       .setDepth(HALO_DEPTH)
       .setVisible(false);
 
+    // Healer breathing loop starts immediately at rest; charge/cast/zap stop it
+    // and restore it on completion (see restoreRestPose / returnToIdle below).
+    if (this.idleAnimKey) {
+      this.body.play(this.idleAnimKey, true);
+      this.body.setDisplaySize(this.width, this.height);
+    }
+
     this.update(unit);
   }
 
@@ -403,8 +447,9 @@ export class UnitSprite {
       this.stopTelegraph();
       this.pendingCharge = false;
       this.stopChargeCycle();
-      this.stopReleaseTimer();
+      this.releaseActive = false;
       this.stopAttackAnim();
+      if (this.idleAnimKey) this.body.stop();
       this.scene.tweens.killTweensOf(this.body);
       this.body.setTint(DEAD_TINT);
       this.body.setAlpha(DEAD_ALPHA);
@@ -542,8 +587,45 @@ export class UnitSprite {
     this.body.setDisplaySize(this.width, this.height);
   }
 
+  /**
+   * Play the hurt reaction strip if one is wired for this unit. Rest pose is
+   * restored on ANIMATION_COMPLETE (see constructor). Safe no-op for units
+   * without one. Mirrors `playAttack()` — either call simply restarts
+   * whichever body anim was playing, so no explicit priority is needed.
+   */
+  playHurt(): void {
+    if (!this.hurtAnimKey || !this.alive) return;
+    this.body.play(this.hurtAnimKey, false);
+    this.body.setDisplaySize(this.width, this.height);
+  }
+
+  /**
+   * Healer-only one-shot Bonk zap strip. Locked decision: Bonk and only Bonk
+   * plays this — CombatScene's castStarted handler selects it by spell id.
+   * Rest pose (idle loop) is restored on ANIMATION_COMPLETE, same as playAttack().
+   */
+  playZap(): void {
+    if (!this.zapAnimKey || !this.alive) return;
+    this.body.play(this.zapAnimKey, false);
+    this.body.setDisplaySize(this.width, this.height);
+  }
+
+  /** Healer-only Vowstrike oath-strike (both aspects). Snaps to idle on complete. */
+  playVowstrike(): void {
+    if (!this.vowstrikeAnimKey || !this.alive) return;
+    this.body.play(this.vowstrikeAnimKey, false);
+    this.body.setDisplaySize(this.width, this.height);
+  }
+
+  private isInstantAttackPlaying(): boolean {
+    const key = this.body.anims.currentAnim?.key;
+    return key === this.zapAnimKey || key === this.vowstrikeAnimKey;
+  }
+
   private restoreRestPose(): void {
-    if (this.restFrame === undefined) {
+    if (this.idleAnimKey) {
+      this.body.play(this.idleAnimKey, true);
+    } else if (this.restFrame === undefined) {
       this.body.setTexture(this.restTextureKey);
     } else {
       this.body.setTexture(this.restTextureKey, this.restFrame);
@@ -586,11 +668,16 @@ export class UnitSprite {
 
   // ---- Healer charge / cast-action (no-op without casterAnim) ----------------------------
 
+  /** Select Solemn vs Zealous body language before starting a cast. */
+  setCastStyle(style: 'solemn' | 'zealous'): void {
+    this.castStyle = style;
+  }
+
   /**
    * Start/stop the charge loop for a channeled cast. Stopping alone returns to
-   * idle (cancel path). If a cast-action is still playing (queued spell fired
-   * same tick as finish), charge is deferred until the release completes —
-   * never clip the flash/contact.
+   * idle (cancel path — tween/snap via idle loop; no dedicated cancel strip).
+   * If a cast-action is still playing (queued spell fired same tick as finish),
+   * charge is deferred until the release completes — never clip contact.
    */
   setCasting(active: boolean): void {
     if (!this.casterAnim) return;
@@ -604,46 +691,46 @@ export class UnitSprite {
     } else {
       this.pendingCharge = false;
       this.stopChargeCycle();
-      if (!this.releaseActive) this.body.setFrame(this.casterAnim.idleFrame);
+      if (!this.releaseActive) this.restoreRestPose();
     }
   }
 
   /**
-   * One-shot cast-action strip (orb → flash → recover). Used for instant casts
-   * on start, early lead-in before cast end, and `finishCast()`. Self-timed.
+   * One-shot cast-action strip (charge-key → release climax). Used for instant
+   * casts on start, early lead-in before cast end, and `finishCast()`.
    */
   playCastRelease(): void {
-    if (!this.casterAnim) return;
-    if (this.releaseActive) return;
+    if (!this.casterAnim || this.releaseActive) return;
     this.stopChargeCycle();
-    this.playFrameStrip(
-      this.casterAnim.castFrames,
-      this.casterAnim.castDurationsMs,
-      /* markRelease */ true,
-    );
+    const { castAnimKey } = this.casterAnim.styles[this.castStyle];
+    this.releaseActive = true;
+    this.body.play(castAnimKey, false);
+    this.body.setDisplaySize(this.width, this.height);
   }
 
   /**
-   * Begin cast-action before `castFinished` so flash/contact land near the heal
+   * Begin cast-action before `castFinished` so contact lands near the heal
    * resolve. No-op unless currently charging (avoids double-start).
    */
   beginEarlyCastRelease(): void {
-    if (!this.casterAnim || this.releaseActive || !this.chargeCycleTimer) return;
+    if (!this.casterAnim || this.releaseActive || !this.charging) return;
     this.playCastRelease();
   }
 
   /**
    * Successful cast end: play the cast-action if we were still charging. No-op
-   * when early release or an instant cast already started the strip.
+   * when early release, an instant already started the strip, or a Bonk /
+   * Vowstrike attack strip is up.
    */
   finishCast(): void {
     if (!this.casterAnim) return;
     if (this.releaseActive) return;
-    if (this.chargeCycleTimer) {
+    if (this.isInstantAttackPlaying()) return;
+    if (this.charging) {
       this.playCastRelease();
       return;
     }
-    this.body.setFrame(this.casterAnim.idleFrame);
+    this.restoreRestPose();
   }
 
   /** Instant-cast alias — same cast-action strip as a successful channel finish. */
@@ -652,71 +739,21 @@ export class UnitSprite {
   }
 
   private startChargeCycle(): void {
-    if (this.chargeCycleTimer || !this.casterAnim) return;
+    if (!this.casterAnim || this.charging) return;
     this.pendingCharge = false;
-    const frames = this.casterAnim.chargeFrames;
-    const durations = this.casterAnim.chargeDurationsMs;
-    let i = 0;
-    this.body.setFrame(frames[0]!);
-    const step = () => {
-      i = (i + 1) % frames.length;
-      this.body.setFrame(frames[i]!);
-      this.chargeCycleTimer = this.scene.time.delayedCall(
-        durations[i] ?? CASTER_DEFAULT_FRAME_MS,
-        step,
-      );
-    };
-    this.chargeCycleTimer = this.scene.time.delayedCall(
-      durations[0] ?? CASTER_DEFAULT_FRAME_MS,
-      step,
-    );
+    this.charging = true;
+    const { chargeAnimKey } = this.casterAnim.styles[this.castStyle];
+    this.body.play(chargeAnimKey, true);
+    this.body.setDisplaySize(this.width, this.height);
   }
 
   private stopChargeCycle(): void {
-    this.chargeCycleTimer?.remove(false);
-    this.chargeCycleTimer = null;
-  }
-
-  private playFrameStrip(
-    frames: readonly number[],
-    durationsMs: readonly number[],
-    markRelease: boolean,
-  ): void {
-    this.stopReleaseTimer();
-    if (frames.length === 0) return;
-    let i = 0;
-    this.body.setFrame(frames[0]!);
-    if (markRelease) this.releaseActive = true;
-
-    const advance = () => {
-      i++;
-      if (i >= frames.length) {
-        this.releaseActive = false;
-        this.releaseTimer = null;
-        if (this.pendingCharge) {
-          this.startChargeCycle();
-        } else {
-          this.body.setFrame(this.casterAnim!.idleFrame);
-        }
-        return;
-      }
-      this.body.setFrame(frames[i]!);
-      this.releaseTimer = this.scene.time.delayedCall(
-        durationsMs[i] ?? CASTER_DEFAULT_FRAME_MS,
-        advance,
-      );
-    };
-
-    this.releaseTimer = this.scene.time.delayedCall(
-      durationsMs[0] ?? CASTER_DEFAULT_FRAME_MS,
-      advance,
-    );
-  }
-
-  private stopReleaseTimer(): void {
-    this.releaseTimer?.remove(false);
-    this.releaseTimer = null;
-    this.releaseActive = false;
+    if (!this.charging) return;
+    this.charging = false;
+    const key = this.body.anims.currentAnim?.key;
+    if (key && this.chargeAnimKeys.has(key)) {
+      this.body.stop();
+    }
   }
 
   // ---- v0.3 chunk F: boss telegraph (bossCastStarted → bossCastFinished window) ---------
@@ -818,7 +855,7 @@ export class UnitSprite {
     this.telegraphTween = null;
     this.pendingCharge = false;
     this.stopChargeCycle();
-    this.stopReleaseTimer();
+    this.releaseActive = false;
     for (const float of this.activeFloats) {
       this.scene.tweens.killTweensOf(float);
       float.destroy();

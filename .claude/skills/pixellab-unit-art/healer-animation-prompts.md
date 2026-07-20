@@ -8,13 +8,54 @@ frames — keep FE exposure timing in `game/src/ui/sprites.ts`.
 
 Ship PNGs (sprite sheets or frame folders). GIFs are preview-only.
 
+Combat facing for the live healer is **south** (see `art/manifest.json`). Older
+`charge-east` / `cast-east` paths are legacy naming; new Solemn/Zealous work
+targets south.
+
+## Cast-style generation (Solemn / Zealous) — prefer Method B
+
+Explored 2026-07-19 under `artifacts/pixellab-healer-cast-styles/`. **Shipped
+Method B south** into `game/public/assets/units/healer/`
+(`charge-*-south/`, `cast-*-south/`) — Solemn for `solemn-*` +
+`vowstrike-virtue`, Zealous for `zealous-*` + `vowstrike-vengeance`. Charge
+loops while channeling; cancel snaps to idle. Zealous release south is
+acceptable for now; a more expressive re-roll is backlog. Full cost/facing
+rules: [`../pixellab-art-pipeline/SKILL.md`](../pixellab-art-pipeline/SKILL.md)
+§ “Cast / holdable-pose generation”.
+
+Short form:
+
+- **Do not** ship philosophy charge/release from text-only v3 (Method A) —
+  climax drifts.
+- **Do** author climax keys with `create_character_state` (~20–40 gens each —
+  only after pose approval), then interpolate with
+  `custom_start_frame_url` + `end_frame_url` (1 gen / strip).
+- South-readable Zealous: avoid “arms behind body” (occluded); use lean,
+  fists cocked high/beside shoulders, cape flare, forward thrust toward camera.
+- Review gallery: `open artifacts/pixellab-healer-cast-styles/review-all.html`
+
+| Style | Charge climax (hold) | Release climax |
+|---|---|---|
+| Solemn | Hands clasped at chest, head bowed, compressed/statuesque, soft chest glow | Head up, arms open wide, chest open — receiving/flowing out |
+| Zealous | Forward lean, coiled ready (south-readable), pressure building | Preferred: lunge + both arms thrust toward camera (projection). Overhead alt explored, not preferred |
+
+PixelLab state ids from that exploration (base
+`7ff83bfc-d23f-4270-8970-fa1b593e1384`):
+
+| Key | character_id |
+|---|---|
+| Solemn charge | `f3248a61-c0d3-492a-8a47-5b6ab78389ab` |
+| Zealous charge v1 | `50a72e86-e402-4de3-a4b9-085849718ff0` |
+| Solemn release | `b95130c6-ae99-42c8-9d70-da992dde2a86` |
+| Zealous release | `be0ee6fb-b5c0-40e2-8cc8-22fbe82fafde` |
+
 ## Pipeline map
 
 | Role in game | Strip | Generator used | Notes |
 |---|---|---|---|
-| Idle still | `east.png` | Base image create | Reference size; FE Sacred Stones density |
-| Charge (loop while channeling) | `charge-east/` | Motion prompt + base image | Rhythmic palm glow; must loop cleanly |
-| Cast-action (one-shot release) | `cast-east/` | Motion prompt + base image | Build → flash → slump → recover |
+| Idle still | `south.png` (+ `east.png` compat) | Base image create | South combat facing |
+| Charge (loop while channeling) | `charge-east/` (legacy) → prefer south Method B | Key pose + interpolate | Must loop / hold cleanly |
+| Cast-action (one-shot release) | `cast-east/` (legacy) → prefer south Method B | Charge-key → release-key | Clear contact + recover |
 
 **Always pass the base character image** into the animation step (identity lock).
 Do not re-describe the full outfit in motion prompts — describe **motion + VFX
@@ -23,17 +64,22 @@ only**, and let the base image carry silhouette / palette.
 ### PixelLab MCP (preferred when available)
 
 ```
-create_character(...)  OR  reuse character_id for the base
+# Method B (preferred for Solemn/Zealous charge+release):
+create_character_state(...)          # climax key — expensive; approve pose first
 → animate_character(
-    character_id,
+    character_id,                    # base healer id
     mode="v3",
-    directions=["east"],          # party faces right
-    animation_name="healer-charge" | "healer-cast",
-    action_description="<motion prompt below>",
-    frame_count=8,                # even; tune 6–10
-    keep_first_frame=true,        # frame 0 ≈ rest when useful
-    custom_start_frame_url=...    # prefer URL over inline base64
+    directions=["south"],
+    animation_name="healer-<strip>",
+    action_description="<short motion arc>",
+    frame_count=6|8,
+    keep_first_frame=true,
+    custom_start_frame_url=<idle or charge-key URL>,
+    end_frame_url=<charge-key or release-key URL>
   )
+
+# Method A (cheap scout / simple glow only — not for philosophy climaxes):
+animate_character(..., custom_start_frame_url=<idle>, action_description=...)
 ```
 
 `action_description` should stay motion-focused (PixelLab guidance). Our shipped

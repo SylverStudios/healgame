@@ -19,18 +19,23 @@ import type {
   Unit,
 } from '../combat/types';
 import { getEncounterById } from '../data/encounters';
-import { GCD_MS } from '../data/constants';
+import { GCD_MS, SPELLS } from '../data/constants';
 import { Bar } from '../ui/bar';
 import { UnitSprite } from '../ui/unitSprite';
 import {
   attackAnimKeyForUnit,
-  HEALER_CAST_FRAME_DURATIONS_MS,
-  HEALER_CAST_FRAMES,
   HEALER_CAST_RELEASE_LEAD_MS,
-  HEALER_CHARGE_FRAME_DURATIONS_MS,
-  HEALER_CHARGE_FRAMES,
+  HEALER_CAST_STYLE_ANIMS,
+  HEALER_IDLE_ANIM_KEY,
   HEALER_IDLE_FRAME,
   HEALER_SHEET_TEXTURE_KEY,
+  HEALER_VOWSTRIKE_ANIM_KEY,
+  HEALER_VOWSTRIKE_IMPACT_LEAD_MS,
+  HEALER_ZAP_ANIM_KEY,
+  HEALER_ZAP_IMPACT_LEAD_MS,
+  healerCastStyleForSpell,
+  hurtAnimKeyForUnit,
+  isVowstrikeSpell,
   presentationForUnit,
 } from '../ui/sprites';
 import { SpellBar } from '../ui/spellBar';
@@ -42,6 +47,7 @@ import {
   showCastBeam,
   showHealParticles,
   showHealSparkle,
+  showZapImpact,
 } from '../ui/combatFx';
 import { PaceToggle } from '../ui/paceToggle';
 import { loadSave, saveGame, type SaveData } from '../save/save';
@@ -96,24 +102,19 @@ const GROUND_LINE_MARGIN = 40;
  *  (handoff §B). Presentation-only — index into this array, never reorder the engine's. */
 const PARTY_VISUAL_ORDER = ['healer', 'dps2', 'dps1', 'tank'];
 
-// Display sizes: PixelLab merc canvases are ~92px with heavy padding around a
-// ~40px figure. The armored-paladin healer is native 32×32 (tight canvas) and
-// displays at 2× for a chunky SNES read — mercs stay at 112 until they get
-// matching 32×32 art. Kenney sizes stay multiples of 16.
+// Display: legacy padded mercs 112 (none left in the live party); tight
+// 32×32 (healer/tank/dps1/dps2) 64; Kenney 48.
 const PARTY_MERC_WIDTH = 112;
 const PARTY_MERC_HEIGHT = 112;
 const PARTY_HEALER_WIDTH = 64;
 const PARTY_HEALER_HEIGHT = 64;
+const PARTY_TIGHT_MERC_WIDTH = 64; // native×2
+const PARTY_TIGHT_MERC_HEIGHT = 64;
 const PARTY_KENNEY_WIDTH = 48;
 const PARTY_KENNEY_HEIGHT = 48;
 const TRASH_CUSTOM_WIDTH = 72;
 const TRASH_CUSTOM_HEIGHT = 72;
-/**
- * Padded canvases leave empty pixels under painted feet. Shift the body down
- * by that fraction of display height so feet meet GROUND_Y.
- * - PixelLab stills: ~23px pad on a ~92px canvas
- * - Armored-paladin healer: ~2px pad on a 32px frame
- */
+/** Foot pad as fraction of display height: legacy ~23/92, tight native ~2/32. */
 const PIXELLAB_FOOT_PAD_RATIO = 23 / 92;
 const HEALER_FOOT_PAD_RATIO = 2 / 32;
 const TRASH_KENNEY_WIDTH = 32;
@@ -423,26 +424,19 @@ export class CombatScene extends Phaser.Scene {
         PARTY_SLOT_LEFT,
         PARTY_SLOT_RIGHT,
       );
-      // Healer: 32×32 armored-paladin sheet + cast loop. Tank/DPS: PixelLab
-      // stills + attack strips (fixed facing). Healer displays smaller until
-      // mercs move to the same native density.
+      // Healer/tank/dps1/dps2: tight 32→64. No more legacy padded 112 party mercs.
       const isHealer = unit.role === 'healer';
+      const isTightMerc = unit.id === 'tank' || unit.id === 'dps1' || unit.id === 'dps2';
       const presentation = presentationForUnit(unit);
-      const width = isHealer
-        ? PARTY_HEALER_WIDTH
-        : presentation.kind === 'texture'
-          ? PARTY_MERC_WIDTH
-          : PARTY_KENNEY_WIDTH;
-      const height = isHealer
-        ? PARTY_HEALER_HEIGHT
-        : presentation.kind === 'texture'
-          ? PARTY_MERC_HEIGHT
-          : PARTY_KENNEY_HEIGHT;
+      const isLegacyMerc = presentation.kind === 'texture' && !isTightMerc;
+      const width = isHealer ? PARTY_HEALER_WIDTH : isTightMerc ? PARTY_TIGHT_MERC_WIDTH : isLegacyMerc ? PARTY_MERC_WIDTH : PARTY_KENNEY_WIDTH;
+      const height = isHealer ? PARTY_HEALER_HEIGHT : isTightMerc ? PARTY_TIGHT_MERC_HEIGHT : isLegacyMerc ? PARTY_MERC_HEIGHT : PARTY_KENNEY_HEIGHT;
       const y = groundAnchorY(height);
       const attackAnimKey = attackAnimKeyForUnit(unit);
-      const bodyOffsetY = isHealer
+      const hurtAnimKey = hurtAnimKeyForUnit(unit);
+      const bodyOffsetY = isHealer || isTightMerc
         ? Math.round(height * HEALER_FOOT_PAD_RATIO)
-        : presentation.kind === 'texture'
+        : isLegacyMerc
           ? Math.round(height * PIXELLAB_FOOT_PAD_RATIO)
           : 0;
       const sprite = new UnitSprite(unit, {
@@ -457,12 +451,11 @@ export class CombatScene extends Phaser.Scene {
               bodyTextureKey: HEALER_SHEET_TEXTURE_KEY,
               bodyOffsetY,
               fixedFacing: true,
+              idleAnimKey: HEALER_IDLE_ANIM_KEY,
+              zapAnimKey: HEALER_ZAP_ANIM_KEY,
+              vowstrikeAnimKey: HEALER_VOWSTRIKE_ANIM_KEY,
               casterAnim: {
-                idleFrame: HEALER_IDLE_FRAME,
-                chargeFrames: HEALER_CHARGE_FRAMES,
-                chargeDurationsMs: HEALER_CHARGE_FRAME_DURATIONS_MS,
-                castFrames: HEALER_CAST_FRAMES,
-                castDurationsMs: HEALER_CAST_FRAME_DURATIONS_MS,
+                styles: HEALER_CAST_STYLE_ANIMS,
               },
             }
           : presentation.kind === 'texture'
@@ -471,6 +464,7 @@ export class CombatScene extends Phaser.Scene {
                 fixedFacing: true,
                 bodyOffsetY,
                 ...(attackAnimKey === undefined ? {} : { attackAnimKey }),
+                ...(hurtAnimKey === undefined ? {} : { hurtAnimKey }),
               }
             : { frame: presentation.frame }),
         showMana: isHealer,
@@ -694,25 +688,37 @@ export class CombatScene extends Phaser.Scene {
   // ---- event feedback --------------------------------------------------------
 
   private handleEvents(events: CombatEvent[]): void {
+    // Bonk / Vowstrike: same-tick castStarted+damage — defer hit juice to climax frame.
+    let pendingHealerImpact: { leadMs: number; showZapVfx: boolean } | null = null;
     for (const event of events) {
       switch (event.type) {
         case 'damage': {
           const victim = this.findSprite(event.targetId);
-          victim?.flashDamage();
-          victim?.spawnDamageFloat(event.amount);
-          // Guard: the attacker (and/or victim) may already be dead this tick — sprites persist
-          // until the next rebuildEnemies(), so the lookup is safe, but the sprite may be absent
-          // if it belongs to a roster already replaced by a same-tick waveStarted rebuild.
+          // Guard: attacker/victim sprites may already be gone after a same-tick wave rebuild.
           const attacker = this.findSprite(event.sourceId);
-          if (attacker) {
-            // Party mercs with PixelLab attack strips play the anim in place.
-            // Kenney enemies / boss / healer (no strip) still use the shared position lunge.
-            const attackerUnit = this.engine.state.party.find((u) => u.id === event.sourceId);
-            if (attackerUnit?.role === 'tank' || attackerUnit?.role === 'dps') {
-              attacker.playAttack();
-            } else {
-              const towardX = victim?.getHomeX() ?? attacker.getHomeX();
-              attacker.lunge(towardX);
+          if (pendingHealerImpact && victim) {
+            const { leadMs, showZapVfx } = pendingHealerImpact;
+            const amount = event.amount;
+            const x = victim.getHomeX();
+            const y = victim.getHomeY();
+            this.time.delayedCall(leadMs, () => {
+              victim.flashDamage();
+              victim.spawnDamageFloat(amount);
+              victim.playHurt();
+              if (showZapVfx) showZapImpact(this, x, y);
+            });
+            pendingHealerImpact = null;
+          } else {
+            victim?.flashDamage();
+            victim?.spawnDamageFloat(event.amount);
+            victim?.playHurt(); // no-op unless UNIT_HURT_ANIMS wires this unit
+            if (attacker) {
+              const attackerUnit = this.engine.state.party.find((u) => u.id === event.sourceId);
+              if (attackerUnit?.role === 'tank' || attackerUnit?.role === 'dps') {
+                attacker.playAttack();
+              } else {
+                attacker.lunge(victim?.getHomeX() ?? attacker.getHomeX());
+              }
             }
           }
           this.combatLog.push(
@@ -742,17 +748,21 @@ export class CombatScene extends Phaser.Scene {
         case 'castStarted': {
           const healer = this.partySprites.get('healer');
           const castTarget = this.findSprite(event.cast.targetId);
+          const castSpell = this.sceneData.loadout.spells.find((s) => s.id === event.cast.spellId);
           healer?.flashCast();
-          // Healer anim: channel → charge loop; finish → cast-action release.
-          // Instant casts (totalMs === 0, e.g. Bonk) complete inside the SAME
-          // advance() call — castFinished arrives this tick, so charge would be
-          // invisible; play the cast-action strip once instead.
-          if (event.cast.totalMs === 0) {
-            healer?.playCastRelease();
+          if (event.cast.spellId === SPELLS.bonk.id) {
+            healer?.playZap();
+            pendingHealerImpact = { leadMs: HEALER_ZAP_IMPACT_LEAD_MS, showZapVfx: true };
+          } else if (isVowstrikeSpell(event.cast.spellId)) {
+            healer?.playVowstrike();
+            pendingHealerImpact = { leadMs: HEALER_VOWSTRIKE_IMPACT_LEAD_MS, showZapVfx: false };
           } else {
-            healer?.setCasting(true);
+            healer?.setCastStyle(healerCastStyleForSpell(event.cast.spellId));
+            if (event.cast.totalMs === 0) healer?.playCastRelease();
+            else healer?.setCasting(true);
           }
-          if (healer && castTarget) {
+          // Heal beam only — damage spells (Bonk / Vowstrike) use body/VFX reads.
+          if (healer && castTarget && castSpell && castSpell.heal > 0) {
             showCastBeam(
               this,
               healer.getHomeX(),
@@ -763,15 +773,16 @@ export class CombatScene extends Phaser.Scene {
           }
           // Presentation-only spend estimate (base spell cost). Discounts / free
           // charges may mean the engine reserved less — aura is juice, not accounting.
-          const castSpell = this.sceneData.loadout.spells.find((s) => s.id === event.cast.spellId);
           if (castSpell && castSpell.mana > 0) {
             this.manaAura?.recordSpend(castSpell.mana, this.elapsedMs);
           }
           break;
         }
         case 'castFinished':
-          // Channel → cast-action; instant already started release on castStarted.
-          this.partySprites.get('healer')?.finishCast();
+          // Skip Bonk / Vowstrike — their attack strips are already playing.
+          if (event.spellId !== SPELLS.bonk.id && !isVowstrikeSpell(event.spellId)) {
+            this.partySprites.get('healer')?.finishCast();
+          }
           break;
         case 'bossCastStarted': {
           // v0.3 chunk F "Boss telegraphs": wind-up/glow cue on the boss sprite for the

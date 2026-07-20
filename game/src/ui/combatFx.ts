@@ -11,7 +11,13 @@ import {
   pruneManaSpends,
   type ManaSpendEntry,
 } from './manaSpendTracker';
-import { HEAL_VFX_FRAME_COUNT, HEAL_VFX_TEXTURE_KEY } from './sprites';
+import {
+  HEAL_VFX_FRAME_COUNT,
+  HEAL_VFX_TEXTURE_KEY,
+  ZAP_VFX_FRAME_COUNT,
+  ZAP_VFX_FRAME_DURATIONS_MS,
+  ZAP_VFX_TEXTURE_KEY,
+} from './sprites';
 
 const BOSS_SHAKE_DURATION_MS = 150;
 const BOSS_SHAKE_INTENSITY = 0.004;
@@ -32,6 +38,10 @@ const HEAL_PARTICLE_DURATION_MS = 480;
 const HEAL_VFX_DISPLAY_SIZE = 64;
 const HEAL_VFX_FRAME_MS = 55;
 const HEAL_VFX_DEPTH = 49;
+
+/** Chunk 1B: pale-gold Bonk impact burst on the enemy target — mirrors heal-vfx sizing/depth. */
+const ZAP_VFX_DISPLAY_SIZE = 64;
+const ZAP_VFX_DEPTH = 49;
 
 const AURA_DEPTH = 8;
 const AURA_CORE_COLOR = 0xf2e6a0;
@@ -95,6 +105,32 @@ export function showHealSparkle(scene: Phaser.Scene, x: number, y: number): void
     timer.remove(false);
     sprite.destroy();
   });
+}
+
+/**
+ * Chunk 1B: one-shot pale-gold impact burst played on the enemy target when
+ * Bonk lands — mirrors `showHealSparkle`'s wiring but with per-frame holds
+ * (heal-vfx uses one fixed delay; zap-vfx's exposure sheet is uneven).
+ */
+export function showZapImpact(scene: Phaser.Scene, x: number, y: number): void {
+  const sprite = scene.add
+    .image(x, y - 10, ZAP_VFX_TEXTURE_KEY, 0)
+    .setDisplaySize(ZAP_VFX_DISPLAY_SIZE, ZAP_VFX_DISPLAY_SIZE)
+    .setDepth(ZAP_VFX_DEPTH);
+  let frame = 0;
+  const step = () => {
+    frame++;
+    if (frame >= ZAP_VFX_FRAME_COUNT) {
+      sprite.destroy();
+      return;
+    }
+    sprite.setFrame(frame);
+    const nextDelay =
+      ZAP_VFX_FRAME_DURATIONS_MS[frame] ??
+      ZAP_VFX_FRAME_DURATIONS_MS[ZAP_VFX_FRAME_DURATIONS_MS.length - 1]!;
+    scene.time.delayedCall(nextDelay, step);
+  };
+  scene.time.delayedCall(ZAP_VFX_FRAME_DURATIONS_MS[0]!, step);
 }
 
 /**

@@ -125,9 +125,14 @@ anims until the user explicitly approves the quoted cost.
 
 ## Healer charge / cast — prompt library + reprocess
 
-Canonical prompts, seeds, and install steps:
+Canonical prompts, seeds, Solemn/Zealous Method B notes, and install steps:
 
 → [`healer-animation-prompts.md`](healer-animation-prompts.md)
+
+For holdable charge/release philosophy poses, prefer **key pose +
+`end_frame` interpolate** over text-only v3. Cost, facing, and scout-vs-lock
+rules: [`../pixellab-art-pipeline/SKILL.md`](../pixellab-art-pipeline/SKILL.md)
+§ “Cast / holdable-pose generation”.
 
 When the user wants a **different base character** with the same kit:
 

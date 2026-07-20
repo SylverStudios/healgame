@@ -11,13 +11,20 @@ import {
   HEALER_SHEET_FRAME_SIZE,
   HEALER_SHEET_TEXTURE_KEY,
   HEALER_SHEET_URL,
+  HEALER_STRIP_ANIMS,
   HEAL_VFX_FRAME_SIZE,
   HEAL_VFX_TEXTURE_KEY,
   HEAL_VFX_URL,
   TANK_TEXTURE_KEY,
   TANK_TEXTURE_URL,
   UNIT_ATTACK_ANIMS,
+  UNIT_HURT_ANIMS,
+  ZAP_VFX_FRAME_SIZE,
+  ZAP_VFX_TEXTURE_KEY,
+  ZAP_VFX_URL,
   attackAnimFrames,
+  healerStripAnimFrames,
+  hurtAnimFrames,
   UNIT_FRAME_SIZE,
   UNIT_TEXTURE_KEY,
   UNIT_TEXTURE_URL,
@@ -45,6 +52,18 @@ export class BootScene extends Phaser.Scene {
       frameWidth: HEAL_VFX_FRAME_SIZE,
       frameHeight: HEAL_VFX_FRAME_SIZE,
     });
+    // Healer strips (idle, zap, Solemn/Zealous charge+cast) — one texture key
+    // per frame, like the merc attack strips (not packed into sheet.png).
+    for (const def of HEALER_STRIP_ANIMS) {
+      for (let i = 0; i < def.frameCount; i++) {
+        this.load.image(def.frameKey(i), def.frameUrl(i));
+      }
+    }
+    // Bonk impact VFX on the enemy target — mirrors heal-vfx wiring.
+    this.load.spritesheet(ZAP_VFX_TEXTURE_KEY, ZAP_VFX_URL, {
+      frameWidth: ZAP_VFX_FRAME_SIZE,
+      frameHeight: ZAP_VFX_FRAME_SIZE,
+    });
     // PixelLab stills — single images, authored facing (no flipX at draw time).
     this.load.image(TANK_TEXTURE_KEY, TANK_TEXTURE_URL);
     this.load.image(DPS1_TEXTURE_KEY, DPS1_TEXTURE_URL);
@@ -60,12 +79,20 @@ export class BootScene extends Phaser.Scene {
         this.load.image(def.frameKey(i), def.frameUrl(i));
       }
     }
+    // Hurt reaction strips: same per-frame texture loading as attack strips.
+    for (const def of UNIT_HURT_ANIMS) {
+      for (let i = 0; i < def.frameCount; i++) {
+        this.load.image(def.frameKey(i), def.frameUrl(i));
+      }
+    }
     // Looped background music (see ui/music.ts MUSIC_URL).
     this.load.audio(MUSIC_ASSET_KEY, MUSIC_URL);
   }
 
   create(): void {
     this.registerUnitAttackAnims();
+    this.registerUnitHurtAnims();
+    this.registerHealerStripAnims();
     const save = loadSave();
     initMusic(this.game, save.musicVolumePct);
     if (save.tutorialDone) {
@@ -84,6 +111,30 @@ export class BootScene extends Phaser.Scene {
         key: def.animKey,
         frames: [...attackAnimFrames(def)],
         repeat: 0,
+      });
+    }
+  }
+
+  /** One-shot hurt reaction anims for party mercs — mirrors registerUnitAttackAnims(). */
+  private registerUnitHurtAnims(): void {
+    for (const def of UNIT_HURT_ANIMS) {
+      if (this.anims.exists(def.animKey)) continue;
+      this.anims.create({
+        key: def.animKey,
+        frames: [...hurtAnimFrames(def)],
+        repeat: 0,
+      });
+    }
+  }
+
+  /** Healer idle/charge loops (repeat: -1) + zap/cast one-shots (repeat: 0). */
+  private registerHealerStripAnims(): void {
+    for (const def of HEALER_STRIP_ANIMS) {
+      if (this.anims.exists(def.animKey)) continue;
+      this.anims.create({
+        key: def.animKey,
+        frames: [...healerStripAnimFrames(def)],
+        repeat: def.loop ? -1 : 0,
       });
     }
   }
