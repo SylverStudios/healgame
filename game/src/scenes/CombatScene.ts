@@ -35,6 +35,7 @@ import {
   presentationForUnit,
 } from '../ui/sprites';
 import { SpellBar } from '../ui/spellBar';
+import { CAST_BAR_FRAME_TEXTURE_KEY } from '../ui/spellSprites';
 import { CombatLog } from '../ui/combatLog';
 import { FONT, FONT_SIZE_XS, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG } from '../ui/theme';
 import {
@@ -547,6 +548,9 @@ export class CombatScene extends Phaser.Scene {
     const centerX = VIEW_WIDTH / 2;
 
     const playerBarX = centerX - PLAYER_CAST_BAR_WIDTH / 2;
+    // Framed (chunk 3, bible item 3) — GCD sliver and boss cast sliver stay
+    // unframed (too thin to read a border at their height; see pixellab-3
+    // ledger). `undefined` keeps Bar's own default bg color.
     this.playerCastBar = new Bar(
       this,
       playerBarX,
@@ -554,6 +558,8 @@ export class CombatScene extends Phaser.Scene {
       PLAYER_CAST_BAR_WIDTH,
       PLAYER_CAST_BAR_HEIGHT,
       PLAYER_CAST_FILL_COLOR,
+      undefined,
+      CAST_BAR_FRAME_TEXTURE_KEY,
     );
     this.playerCastBar.setVisible(false);
     this.playerCastLabel = this.add
