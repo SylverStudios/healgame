@@ -47,7 +47,7 @@ behavior, layout constants, and gameplay data do not change.
 | 3 | Spell-bar/HUD framing kit + 16×16 spell icons → ui/spellBar.ts, glyph.ts, bar.ts (additive), spellTooltip.ts, assets/ui/ | 1 | **done** (2026-07-20; full verify green, central-agent re-verified; icons for all 7 spells + 3 CDs, glyph fallback kept; ledger artifacts/pixellab-3/README.md) |
 | 4 | Meta-scene panel kit + result panel → NEW ui/panels.ts; Hub/Tutorial/Loadout/Relic/Settings; result overlay | 3 | **done** (2026-07-20; full verify green, central-agent re-verified; hub/result screenshots checked; ledger artifacts/pixellab-4/README.md) |
 | 5 | Portraits in bubbles/tutorial/result → ui/speechBubble.ts, assets/units/portraits/ | 4 | **done** (2026-07-20; subagent hit 3 stream/session interruptions, resumed each time — central agent finished the last step (verify + ledger) directly; full verify green; all 4 party portraits shipped; ledger artifacts/pixellab-5/README.md) |
-| 6 | Scene transitions, code-only → NEW ui/transitions.ts, scene.start seams | 0 | todo |
+| 6 | Scene transitions, code-only → NEW ui/transitions.ts, scene.start seams | 0 | **done** (2026-07-20; full verify green, central-agent re-verified; zero PixelLab spend; every scene.start seam covered — plain fade or the hub/tutorial→combat chunky wipe) |
 | 7 | Talent-tree sockets + edge textures → TreeScene, assets/ui/tree/ | 3 | todo |
 | 8 | Per-dungeon battlefield variants → assets/battlefields/*, battlefieldForEncounter() | 2 | todo |
 | 9 | Title/tutorial dress-up → TutorialScene, hub title | 4,5 | todo |
@@ -119,6 +119,17 @@ subagents report entries; they never edit either.
   (type-only `Phaser` usage) can. Prefer a tiny local helper (see
   `speechBubble.ts`'s `clamp()`, `music.ts`'s `clampMusicPct()`) over
   `Phaser.Math.Clamp` in any module you're about to unit-test.
+- **Transitions (chunk 6)**: `ui/transitions.ts` — `fadeToScene(scene, key,
+  data?, durationMs?)` wraps every `scene.start()`; `fadeInOnCreate(scene)`
+  goes at the top of each target scene's `create()` (after any early-return
+  redirect, e.g. RelicScene's empty-offers case, so it never fires on a
+  scene that's about to bounce again); `chunkyWipeIn(scene, w, h)` is
+  CombatScene-only, called as the last line of `create()` — a blocky
+  Rectangle-grid reveal, not a shader (postFX pixelate is WebGL-only, same
+  class of issue as NineSlice). Combat entry uses the shorter
+  `COMBAT_ENTRY_FADE_OUT_MS` fade-out paired with the wipe so the total
+  stays under the 400ms budget. Zero PixelLab spend, no ledger/manifest
+  entries for this chunk.
 - **Art process**: style-reference armored-paladin/relic art in every
   generation; prompts + accepted IDs in artifacts/pixellab-<item>/README.md;
   source PNGs in art/source/; subagents report manifest/CLAUDE.md entries

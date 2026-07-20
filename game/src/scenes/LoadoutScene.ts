@@ -14,6 +14,7 @@ import { glyphChar } from '../ui/glyph';
 import type { SpellDef } from '../combat/types';
 import { FONT, FONT_SIZE_XS, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG } from '../ui/theme';
 import { addButton } from '../ui/panels';
+import { fadeInOnCreate, fadeToScene } from '../ui/transitions';
 
 const BG_COLOR = 0x1a1210;
 const BUTTON_COLOR = 0x3a2a22;
@@ -41,6 +42,9 @@ export class LoadoutScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.setBackgroundColor(BG_COLOR);
     this.selectedSlot = null;
+    // Chunk 6 (bible item 6): fade in once, on scene entry — not inside
+    // rebuild(), which also re-runs on every in-scene slot/pick click.
+    fadeInOnCreate(this);
     this.rebuild();
   }
 
@@ -129,7 +133,7 @@ export class LoadoutScene extends Phaser.Scene {
     }
 
     this.makeButton(width / 2, height - 40, 200, 44, 'Back', () => {
-      this.scene.start(SceneKeys.Hub);
+      fadeToScene(this, SceneKeys.Hub);
     }, 'loadoutBack');
   }
 

@@ -36,6 +36,7 @@ import { battlefieldTexturesForVariant } from '../ui/battlefield';
 import { spellBarTextures } from '../ui/spellSprites';
 import { panelKitTextures } from '../ui/panels';
 import { portraitTextures } from '../ui/portraitSprites';
+import { fadeToScene } from '../ui/transitions';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -126,10 +127,12 @@ export class BootScene extends Phaser.Scene {
     // so in practice this resolves immediately here; it only actually waits
     // on a slow/cold font load, and only up to its own 2s safety timeout.
     void fontsReady.then(() => {
+      // Chunk 6 (bible item 6): fade instead of a hard cut — target scenes
+      // fade back in via fadeInOnCreate() at the top of their own create().
       if (save.tutorialDone) {
-        this.scene.start(SceneKeys.Hub);
+        fadeToScene(this, SceneKeys.Hub);
       } else {
-        this.scene.start(SceneKeys.Tutorial);
+        fadeToScene(this, SceneKeys.Tutorial);
       }
     });
   }

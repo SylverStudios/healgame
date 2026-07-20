@@ -14,6 +14,7 @@ import { loadSave, saveGame } from '../save/save';
 import { clampMusicPct, setMusicVolumePct } from '../ui/music';
 import { FONT, FONT_SIZE_SM, FONT_SIZE_LG } from '../ui/theme';
 import { addButton, addPanel } from '../ui/panels';
+import { fadeInOnCreate, fadeToScene } from '../ui/transitions';
 
 const BG_COLOR = 0x1a1210;
 const TRACK_COLOR = 0x3a2a22;
@@ -48,6 +49,8 @@ export class SettingsScene extends Phaser.Scene {
   create(): void {
     this.dragging = false;
     this.cameras.main.setBackgroundColor(BG_COLOR);
+    // Chunk 6 (bible item 6): fade in on scene entry.
+    fadeInOnCreate(this);
     const { width, height } = this.scale;
     const centerX = width / 2;
 
@@ -117,7 +120,7 @@ export class SettingsScene extends Phaser.Scene {
       200,
       44,
       'Back',
-      () => this.scene.start(SceneKeys.Hub),
+      () => fadeToScene(this, SceneKeys.Hub),
       'settingsBack',
     );
   }
