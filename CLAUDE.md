@@ -101,9 +101,12 @@ game/src/
   pixel-art chrome (`assets/ui/`): spell/cooldown button frames, keycap
   chips, the player cast-bar frame, and 16×16 spell/cooldown icons
   (registry in `ui/spellSprites.ts`, glyph-char fallback for unmapped
-  ids); and meta scenes + the combat result overlay use the shared
+  ids); meta scenes + the combat result overlay use the shared
   panel/button/banner chrome (`ui/panels.ts`: code-drawn corner brackets +
-  a PixelLab iron edge band, `assets/ui/panels/`). Target density for new
+  a PixelLab iron edge band, `assets/ui/panels/`); and party bust portraits
+  (`assets/units/portraits/`, `ui/portraitSprites.ts`) show beside banter
+  bubbles, on the tutorial screen, and on the combat result panel
+  (victory=healer, wipe=tank). Target density for new
   character art is **32×32** (bosses may be
   larger canvases at the same density). Everything else stays rects, bars,
   monospace text, dark palette (`#1a1210` bg) — reject polish creep.

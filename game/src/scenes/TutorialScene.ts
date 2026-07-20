@@ -13,6 +13,7 @@ import { SPELLS } from '../data/constants';
 import type { CombatSceneData } from './CombatScene';
 import { FONT, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG, PALETTE_NUM } from '../ui/theme';
 import { addButton, addPanel } from '../ui/panels';
+import { drawFramedPortrait, PORTRAIT_FRAME_DISPLAY_SIZE } from '../ui/portraitSprites';
 
 const BG_COLOR = 0x1a1210;
 const BUTTON_COLOR = 0x3a2a22;
@@ -20,6 +21,10 @@ const BORDER_COLOR = 0x0a0605;
 const TEXT_COLOR = '#e8d8c8';
 const DIM_COLOR = '#a89888';
 const ACCENT_COLOR = '#f2c14e';
+
+// Chunk 5 (bible item 5): healer bust beside the copy panel — same
+// drawFramedPortrait inset as the combat result panel (ui/portraitSprites.ts).
+const TUTORIAL_PORTRAIT_GAP = 12;
 
 export class TutorialScene extends Phaser.Scene {
   constructor() {
@@ -51,15 +56,26 @@ export class TutorialScene extends Phaser.Scene {
     ].join('\n');
 
     // Chunk 4 (bible item 4): copy panel — ui/panels.ts.
-    addPanel(this, width / 2, 220, 700, 150);
+    const copyPanelWidth = 700;
+    const copyPanelX = width / 2;
+    const copyPanelY = 220;
+    addPanel(this, copyPanelX, copyPanelY, copyPanelWidth, 150);
     this.add
-      .text(width / 2, 220, instructions, {
+      .text(copyPanelX, copyPanelY, instructions, {
         fontFamily: FONT,
         fontSize: FONT_SIZE_SM,
         color: DIM_COLOR,
         align: 'center',
       })
       .setOrigin(0.5);
+
+    // Chunk 5 (bible item 5): healer bust beside the copy panel (see const doc above).
+    // Shown immediately (no reveal tween — this screen has none elsewhere), so undo
+    // drawFramedPortrait's default alpha-0 start.
+    const portraitX = copyPanelX - copyPanelWidth / 2 - TUTORIAL_PORTRAIT_GAP - PORTRAIT_FRAME_DISPLAY_SIZE / 2;
+    const healerPortrait = drawFramedPortrait(this, portraitX, copyPanelY, 'healer', 0);
+    healerPortrait?.frame.container.setAlpha(1);
+    healerPortrait?.image.setAlpha(1);
 
     const buttonY = height - 110;
     const button = this.add
