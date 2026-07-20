@@ -46,7 +46,7 @@ behavior, layout constants, and gameplay data do not change.
 | 2 | Ash Gate battlefield: backdrop + platforms → ui/battlefield.ts, assets/battlefields/ashgate/ | 0 | **done** (2026-07-20; full verify green, central-agent re-verified; screenshot 02-ash-gate-first-run-feedback.png; ledger artifacts/pixellab-1/README.md) |
 | 3 | Spell-bar/HUD framing kit + 16×16 spell icons → ui/spellBar.ts, glyph.ts, bar.ts (additive), spellTooltip.ts, assets/ui/ | 1 | **done** (2026-07-20; full verify green, central-agent re-verified; icons for all 7 spells + 3 CDs, glyph fallback kept; ledger artifacts/pixellab-3/README.md) |
 | 4 | Meta-scene panel kit + result panel → NEW ui/panels.ts; Hub/Tutorial/Loadout/Relic/Settings; result overlay | 3 | **done** (2026-07-20; full verify green, central-agent re-verified; hub/result screenshots checked; ledger artifacts/pixellab-4/README.md) |
-| 5 | Portraits in bubbles/tutorial/result → ui/speechBubble.ts, assets/units/portraits/ | 4 | todo |
+| 5 | Portraits in bubbles/tutorial/result → ui/speechBubble.ts, assets/units/portraits/ | 4 | **done** (2026-07-20; subagent hit 3 stream/session interruptions, resumed each time — central agent finished the last step (verify + ledger) directly; full verify green; all 4 party portraits shipped; ledger artifacts/pixellab-5/README.md) |
 | 6 | Scene transitions, code-only → NEW ui/transitions.ts, scene.start seams | 0 | todo |
 | 7 | Talent-tree sockets + edge textures → TreeScene, assets/ui/tree/ | 3 | todo |
 | 8 | Per-dungeon battlefield variants → assets/battlefields/*, battlefieldForEncounter() | 2 | todo |
@@ -107,6 +107,18 @@ subagents report entries; they never edit either.
   the Frame, never un-hide the rect. CURRENT/selected = gold outline
   overlay; per-relic hover accent via `accentColor` option. Settings
   volume track stays unframed (too thin), panel behind it instead.
+- **Portraits (chunk 5)**: `ui/portraitSprites.ts` registry (4/4 units
+  shipped: healer/tank/dps1/dps2) + `drawFramedPortrait`/
+  `revealFramedPortrait`/`revealResultPortrait` helpers built on top of
+  `ui/panels.ts`'s 'sm' `Frame` — reuse these, don't invent new portrait
+  chrome. **Gotcha for any future module with both a colocated pure-logic
+  test AND a real (non-type) `Phaser.Math.*`/similar call at module scope**:
+  importing it under vitest (no jsdom) crashes with "navigator is not
+  defined" the first time anything actually imports that module, because
+  the real `Phaser` value import can't be elided the way `ui/battlefield.ts`
+  (type-only `Phaser` usage) can. Prefer a tiny local helper (see
+  `speechBubble.ts`'s `clamp()`, `music.ts`'s `clampMusicPct()`) over
+  `Phaser.Math.Clamp` in any module you're about to unit-test.
 - **Art process**: style-reference armored-paladin/relic art in every
   generation; prompts + accepted IDs in artifacts/pixellab-<item>/README.md;
   source PNGs in art/source/; subagents report manifest/CLAUDE.md entries
@@ -131,6 +143,11 @@ subagents report entries; they never edit either.
   accepted, its edge band reused everywhere; corners are code-drawn —
   PixelLab art is illegible below ~12px, third confirmation). Job IDs in
   artifacts/pixellab-4/README.md.
+- Chunk 5 portrait spend: 4 accepted jobs = **80** → balance **1407** after
+  chunk 5 (healer/tank/dps1/dps2 all accepted; 2 free failed tank
+  submissions — base64 re-encoding glitch, not a content issue — and 1
+  uncharged dps2 timeout, balance math confirms neither billed). Job IDs in
+  artifacts/pixellab-5/README.md.
 - Floor: stop art spend if a chunk would drop balance below **800**; check
   `get_balance` before each art chunk.
 

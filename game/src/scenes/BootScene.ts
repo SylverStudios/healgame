@@ -28,6 +28,7 @@ import { fontsReady } from '../ui/theme';
 import { battlefieldTexturesForVariant } from '../ui/battlefield';
 import { spellBarTextures } from '../ui/spellSprites';
 import { panelKitTextures } from '../ui/panels';
+import { portraitTextures } from '../ui/portraitSprites';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -72,6 +73,11 @@ export class BootScene extends Phaser.Scene {
     // — Hub/Tutorial/Loadout/Relic/Settings + combat result overlay/wave
     // banner. See ui/panels.ts.
     for (const texture of panelKitTextures()) {
+      this.load.image(texture.key, texture.url);
+    }
+    // FE-style bust portraits (temp-art exception, bible item 5) — banter
+    // bubbles, tutorial, combat result panel. See ui/portraitSprites.ts.
+    for (const texture of portraitTextures()) {
       this.load.image(texture.key, texture.url);
     }
     // Attack strips: one texture key per frame (not packed into Kenney).

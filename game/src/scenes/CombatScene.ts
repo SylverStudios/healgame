@@ -59,6 +59,7 @@ import { buildRunSummary, hasBuildGlyph } from '../ui/runSummary';
 import { drawBuildGlyph } from '../ui/buildGlyph';
 import { detectCloseCall, pickBanterLine, type BanterSpeaker, type BanterTrigger } from '../data/banter';
 import { showSpeechBubble } from '../ui/speechBubble';
+import { portraitTextureKey, revealResultPortrait } from '../ui/portraitSprites';
 import { MOB_REGISTRY } from '../data/mobs';
 import { ENEMY_ABILITY_REGISTRY } from '../data/enemyAbilities';
 import type { BossTelegraphCue } from '../data/content/types';
@@ -187,7 +188,6 @@ const GLYPH_CELL = 20;
 const GLYPH_COLOR = 0xfff2df;
 const RETURN_DELAY_MS = 940;
 const RETURN_REVEAL_MS = 220;
-
 
 // v0.3 chunk G: party banter (docs/v0.3-handoff.md "Banter"). Bubble anchor Y is the
 // speaker's home Y minus enough clearance to clear its always-on overlay stack (HP bar +
@@ -1040,10 +1040,9 @@ export class CombatScene extends Phaser.Scene {
   // ---- end of combat -------------------------------------------------------------
 
   /**
-   * v0.3 chunk G: shows one speech bubble above `speaker`'s sprite with a banter line for
-   * (trigger, speaker) — subclass comes from the already-loaded save (`this.save.subclass`),
-   * never read from tree/save internals here. No-op if the speaker's sprite is gone (never
-   * happens for tank/healer, who persist for the whole fight, but keeps this call site safe).
+   * v0.3 chunk G: shows one speech bubble (chunk 5: + speaker bust) above `speaker`'s sprite
+   * with a banter line for (trigger, speaker) — subclass comes from the already-loaded save,
+   * never read from tree/save internals here. No-op if the speaker's sprite is gone (safe).
    */
   private fireBanterBubble(trigger: BanterTrigger, speaker: BanterSpeaker): void {
     const sprite = this.partySprites.get(speaker);
@@ -1061,6 +1060,7 @@ export class CombatScene extends Phaser.Scene {
       text: line,
       viewWidth: VIEW_WIDTH,
       viewHeight: VIEW_HEIGHT,
+      portraitTextureKey: portraitTextureKey(speaker), // chunk 5: no-op if texture missing.
     });
   }
 
@@ -1113,6 +1113,8 @@ export class CombatScene extends Phaser.Scene {
       duration: PANEL_SLIDE_MS,
       ease: 'Quad.easeOut',
     });
+
+    revealResultPortrait(this, status, centerX, centerY, PANEL_WIDTH, OVERLAY_DEPTH + 2, { delay: TITLE_DELAY_MS, duration: TITLE_REVEAL_MS }); // chunk 5 bust
 
     if (summary.outcomeLabel !== null) {
       const titleText = this.add
