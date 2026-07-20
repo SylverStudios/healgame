@@ -15,19 +15,31 @@
  * (`pixelArt: true`, set once in `main.ts`) — only x/y/depth vary per layout,
  * texture pixels are never rescaled.
  *
- * `buildBattlefield(scene, variantKey)` is deliberately keyed by a variant
- * string even though `'ashgate'` is the only variant today — chunk 8
- * (`docs/ui-theme-handoff.md` chunk table) adds `battlefieldForEncounter()`
- * on top of this without reshaping the API.
+ * `buildBattlefield(scene, variantKey, params)` is keyed by a variant string
+ * — chunk 2 shipped only `'ash-gate'`; chunk 8 (`docs/ui-theme-handoff.md`
+ * chunk table) generalized `VARIANT_TEXTURES`/the image-layout math to all 6
+ * dungeon ids and added `battlefieldForEncounter()` on top, without
+ * reshaping `buildBattlefield`/`battlefieldTexturesForVariant` themselves.
  */
 
 import Phaser from 'phaser';
 import { PALETTE_NUM } from './theme';
 
-export type BattlefieldVariantKey = 'ashgate';
+/** One entry per dungeon (`data/dungeons/index.ts` DUNGEON_ORDER) — closed
+ *  union so an unknown/mistyped variant is a compile error, not a silent
+ *  runtime miss. Not every key necessarily has shipped art yet; see
+ *  `VARIANT_TEXTURES` below and `battlefieldForEncounter()`'s fallback. */
+export type BattlefieldVariantKey =
+  | 'ash-gate'
+  | 'iron-pass'
+  | 'cinder-vault'
+  | 'verdant-rift'
+  | 'black-choir'
+  | 'the-maw';
 
 /** One PixelLab-sourced battlefield texture; BootScene preloads every entry
- *  a variant needs via {@link battlefieldTexturesForVariant}. */
+ *  a variant needs via {@link battlefieldTexturesForVariant} /
+ *  {@link allBattlefieldTextures}. */
 export interface BattlefieldTexture {
   readonly key: string;
   readonly url: string;
@@ -36,36 +48,137 @@ export interface BattlefieldTexture {
   readonly nativeHeight: number;
 }
 
+/** The three structure-prop textures every battlefield variant composes:
+ *  a centered gate/arch-equivalent, a mirrored wall-fragment prop, and one
+ *  platform slice (reused under both the party and enemy line). */
+interface BattlefieldVariantTextures {
+  readonly gateArch: BattlefieldTexture;
+  readonly wallFragment: BattlefieldTexture;
+  readonly platform: BattlefieldTexture;
+}
+
+// Recolors of the ash-gate source objects (chunk 8) keep the exact same
+// canvas sizes as their source (PixelLab `create_object_state` re-skins
+// color/material, not composition) — one shared size per asset slot.
+const GATE_ARCH_NATIVE = { nativeWidth: 300, nativeHeight: 200 } as const;
+const WALL_FRAGMENT_NATIVE = { nativeWidth: 140, nativeHeight: 110 } as const;
+const PLATFORM_NATIVE = { nativeWidth: 170, nativeHeight: 40 } as const;
+
+// ---- Ash Gate (chunk 2) — frozen; do not regenerate or rename these keys ---
+
 const ASHGATE_GATE_ARCH: BattlefieldTexture = {
   key: 'battlefield-ashgate-gate-arch',
   url: 'assets/battlefields/ashgate/gate-arch.png',
-  nativeWidth: 300,
-  nativeHeight: 200,
+  ...GATE_ARCH_NATIVE,
 };
 const ASHGATE_WALL_FRAGMENT: BattlefieldTexture = {
   key: 'battlefield-ashgate-wall-fragment',
   url: 'assets/battlefields/ashgate/wall-fragment.png',
-  nativeWidth: 140,
-  nativeHeight: 110,
+  ...WALL_FRAGMENT_NATIVE,
 };
 const ASHGATE_PLATFORM: BattlefieldTexture = {
   key: 'battlefield-ashgate-platform',
   url: 'assets/battlefields/ashgate/platform.png',
-  nativeWidth: 170,
-  nativeHeight: 40,
+  ...PLATFORM_NATIVE,
 };
 
-/** variant -> its PixelLab textures. Only 'ashgate' ships; extend this map
- *  (never the function shape) when chunk 8 adds per-dungeon variants. */
-const VARIANT_TEXTURES: Record<BattlefieldVariantKey, readonly BattlefieldTexture[]> = {
-  ashgate: [ASHGATE_GATE_ARCH, ASHGATE_WALL_FRAGMENT, ASHGATE_PLATFORM],
+/** Builds the 3-texture set for a variant whose art lives at
+ *  `assets/battlefields/<folder>/{gate-arch,wall-fragment,platform}.png`,
+ *  keyed `battlefield-<variant>-...` for BootScene/Phaser texture lookup. */
+function variantTextures(variant: BattlefieldVariantKey, folder: string): BattlefieldVariantTextures {
+  return {
+    gateArch: {
+      key: `battlefield-${variant}-gate-arch`,
+      url: `assets/battlefields/${folder}/gate-arch.png`,
+      ...GATE_ARCH_NATIVE,
+    },
+    wallFragment: {
+      key: `battlefield-${variant}-wall-fragment`,
+      url: `assets/battlefields/${folder}/wall-fragment.png`,
+      ...WALL_FRAGMENT_NATIVE,
+    },
+    platform: {
+      key: `battlefield-${variant}-platform`,
+      url: `assets/battlefields/${folder}/platform.png`,
+      ...PLATFORM_NATIVE,
+    },
+  };
+}
+
+/** variant -> its PixelLab structure-prop textures. `Partial` because a
+ *  dungeon whose art didn't ship (budget/timebox) simply has no entry here
+ *  — {@link battlefieldTexturesForVariant} and {@link battlefieldForEncounter}
+ *  both fall back to `'ash-gate'` in that case, never a runtime crash. */
+const VARIANT_TEXTURES: Partial<Record<BattlefieldVariantKey, BattlefieldVariantTextures>> = {
+  'ash-gate': {
+    gateArch: ASHGATE_GATE_ARCH,
+    wallFragment: ASHGATE_WALL_FRAGMENT,
+    platform: ASHGATE_PLATFORM,
+  },
+  'iron-pass': variantTextures('iron-pass', 'iron-pass'),
+  'cinder-vault': variantTextures('cinder-vault', 'cinder-vault'),
+  'verdant-rift': variantTextures('verdant-rift', 'verdant-rift'),
+  'black-choir': variantTextures('black-choir', 'black-choir'),
+  'the-maw': variantTextures('the-maw', 'the-maw'),
 };
+
+function texturesForVariant(variant: BattlefieldVariantKey): BattlefieldVariantTextures {
+  // Non-null: 'ash-gate' always has an entry above, so this can only be
+  // undefined for a variant with no shipped art, which falls back to it.
+  return VARIANT_TEXTURES[variant] ?? (VARIANT_TEXTURES['ash-gate'] as BattlefieldVariantTextures);
+}
 
 /** Every texture a variant needs — BootScene loops this to `this.load.image(...)`. */
 export function battlefieldTexturesForVariant(
   variant: BattlefieldVariantKey,
 ): readonly BattlefieldTexture[] {
-  return VARIANT_TEXTURES[variant];
+  const textures = texturesForVariant(variant);
+  return [textures.gateArch, textures.wallFragment, textures.platform];
+}
+
+const ALL_VARIANT_KEYS: readonly BattlefieldVariantKey[] = [
+  'ash-gate',
+  'iron-pass',
+  'cinder-vault',
+  'verdant-rift',
+  'black-choir',
+  'the-maw',
+];
+
+/** Union of every texture across every variant, deduped by key — BootScene
+ *  preloads this once instead of looping `battlefieldTexturesForVariant` per
+ *  variant and re-queuing the same ash-gate fallback images repeatedly for
+ *  any dungeon that didn't ship its own art. */
+export function allBattlefieldTextures(): readonly BattlefieldTexture[] {
+  const seen = new Map<string, BattlefieldTexture>();
+  for (const variant of ALL_VARIANT_KEYS) {
+    for (const texture of battlefieldTexturesForVariant(variant)) {
+      seen.set(texture.key, texture);
+    }
+  }
+  return [...seen.values()];
+}
+
+// ---- encounter -> variant lookup (chunk 8) ---------------------------------
+
+// Only variants with shipped art are listed — compile.ts pins
+// `EncounterDef.id === dungeon.id`, so this keys directly off encounterId
+// with no extra lookup table. Any dungeon id not listed here (art not shipped
+// this chunk, or a genuinely unknown id) falls back to 'ash-gate' below.
+const ENCOUNTER_VARIANT: Partial<Record<string, BattlefieldVariantKey>> = {
+  'ash-gate': 'ash-gate',
+  'iron-pass': 'iron-pass',
+  'cinder-vault': 'cinder-vault',
+  'verdant-rift': 'verdant-rift',
+  'black-choir': 'black-choir',
+  'the-maw': 'the-maw',
+};
+
+/** Resolves an encounter/dungeon id to its battlefield variant, defaulting
+ *  unknown or not-yet-themed ids to `'ash-gate'` (safe fallback — matches
+ *  the chunk-2-era behavior where every dungeon reused Ash Gate art). */
+export function battlefieldForEncounter(encounterId: string): BattlefieldVariantKey {
+  return ENCOUNTER_VARIANT[encounterId] ?? 'ash-gate';
 }
 
 // ---- pure layout math (colocated battlefield.test.ts covers this) ---------
@@ -90,41 +203,44 @@ export const BACKDROP_DEPTH_PLATFORM = -1;
 /** How much the wall-fragment props overlap the gate arch's outer edge — the
  *  arch renders as a self-contained opaque diorama (see pixellab-1/README.md
  *  "gate-arch has no alpha channel"), so the fragments both extend the ruins
- *  to the screen edges *and* mask that seam. */
+ *  to the screen edges *and* mask that seam. Every variant's gate-arch is a
+ *  recolor of the same source object, so it shares this property. */
 const WALL_FRAGMENT_OVERLAP_PX = 100;
 
 /**
- * Ash Gate image-layer placement given the combat view's frozen layout
+ * Image-layer placement for `textures` given the combat view's frozen layout
  * constants (`CombatScene.ts`: GROUND_Y, party/enemy slot centers). Pure —
- * no Phaser objects — so it's unit-testable without a scene.
+ * no Phaser objects — so it's unit-testable without a scene. Composition is
+ * locked across every variant (arch centered, two mirrored wall-fragments,
+ * platform under each line) — chunk 8 parameterized this by texture set
+ * instead of forking a copy per dungeon; only the art referenced changes.
  */
-export function ashGateImageLayouts(params: {
-  viewWidth: number;
-  groundY: number;
-  partyCenterX: number;
-  enemyCenterX: number;
-}): BattlefieldImageLayout[] {
+export function battlefieldImageLayouts(
+  textures: BattlefieldVariantTextures,
+  params: { viewWidth: number; groundY: number; partyCenterX: number; enemyCenterX: number },
+): BattlefieldImageLayout[] {
   const { viewWidth, groundY, partyCenterX, enemyCenterX } = params;
+  const { gateArch, wallFragment, platform } = textures;
   const centerX = viewWidth / 2;
 
-  const archW = ASHGATE_GATE_ARCH.nativeWidth * 2;
-  const archH = ASHGATE_GATE_ARCH.nativeHeight * 2;
+  const archW = gateArch.nativeWidth * 2;
+  const archH = gateArch.nativeHeight * 2;
   // Arch bottom (its painted walkway/braziers) sits just under GROUND_Y — the
   // platform slices draw in front of it (depth -1 > -4) and cover the seam.
   const archBottomY = groundY + 5;
 
-  const fragW = ASHGATE_WALL_FRAGMENT.nativeWidth * 2;
-  const fragH = ASHGATE_WALL_FRAGMENT.nativeHeight * 2;
+  const fragW = wallFragment.nativeWidth * 2;
+  const fragH = wallFragment.nativeHeight * 2;
   const fragBottomY = groundY + 30;
   const fragOffsetX = archW / 2 + fragW / 2 - WALL_FRAGMENT_OVERLAP_PX;
 
-  const platformW = ASHGATE_PLATFORM.nativeWidth * 2;
-  const platformH = ASHGATE_PLATFORM.nativeHeight * 2;
+  const platformW = platform.nativeWidth * 2;
+  const platformH = platform.nativeHeight * 2;
   const platformY = groundY + 30;
 
   return [
     {
-      textureKey: ASHGATE_GATE_ARCH.key,
+      textureKey: gateArch.key,
       x: centerX,
       y: archBottomY - archH / 2,
       displayWidth: archW,
@@ -132,7 +248,7 @@ export function ashGateImageLayouts(params: {
       depth: BACKDROP_DEPTH_STRUCTURE,
     },
     {
-      textureKey: ASHGATE_WALL_FRAGMENT.key,
+      textureKey: wallFragment.key,
       x: centerX - fragOffsetX,
       y: fragBottomY - fragH / 2,
       displayWidth: fragW,
@@ -141,7 +257,7 @@ export function ashGateImageLayouts(params: {
       flipX: true,
     },
     {
-      textureKey: ASHGATE_WALL_FRAGMENT.key,
+      textureKey: wallFragment.key,
       x: centerX + fragOffsetX,
       y: fragBottomY - fragH / 2,
       displayWidth: fragW,
@@ -149,7 +265,7 @@ export function ashGateImageLayouts(params: {
       depth: BACKDROP_DEPTH_STRUCTURE,
     },
     {
-      textureKey: ASHGATE_PLATFORM.key,
+      textureKey: platform.key,
       x: partyCenterX,
       y: platformY,
       displayWidth: platformW,
@@ -157,7 +273,7 @@ export function ashGateImageLayouts(params: {
       depth: BACKDROP_DEPTH_PLATFORM,
     },
     {
-      textureKey: ASHGATE_PLATFORM.key,
+      textureKey: platform.key,
       x: enemyCenterX,
       y: platformY,
       displayWidth: platformW,
@@ -169,13 +285,15 @@ export function ashGateImageLayouts(params: {
 }
 
 /**
- * Ember-haze band placement (code-drawn — see pixellab-1/README.md: three
+ * Haze-band placement (code-drawn — see pixellab-1/README.md: three
  * `create_map_object` rerolls of an ember-haze prop failed to converge
  * — one came back fully transparent, one came back near-empty — so this
  * layer stays code-drawn rather than grinding a fourth reroll, per the
- * phase's timebox rule). Pure numbers so the geometry is testable.
+ * phase's timebox rule). Geometry is identical for every variant (only the
+ * tone passed to {@link buildAtmosphereHaze} changes) — pure numbers so the
+ * geometry is testable.
  */
-export function ashGateHazeBandLayout(groundY: number): { y: number; height: number } {
+export function battlefieldHazeBandLayout(groundY: number): { y: number; height: number } {
   return { y: groundY - 40, height: 36 };
 }
 
@@ -194,11 +312,44 @@ function mixPaletteColor(a: number, b: number, t: number): number {
   return (r << 16) | (g << 8) | bl;
 }
 
+/** Per-variant sky-horizon/haze tone + haze-mote color — all `mixPaletteColor`
+ *  blends of `PALETTE_NUM` entries (no new hex constants), chosen to read as
+ *  each dungeon's flavor (chunk 8, docs/ui-theme-research.md §4 item 8):
+ *  ash-gate = ember orange (unchanged from chunk 2), iron-pass = cool
+ *  blue-white frost, cinder-vault = hotter ember, verdant-rift = bio green,
+ *  black-choir = faint ghost-blue candlelight, the-maw = deep void red. */
+const VARIANT_ATMOSPHERE: Record<BattlefieldVariantKey, { hazeTone: number; moteColor: number }> = {
+  'ash-gate': {
+    hazeTone: mixPaletteColor(PALETTE_NUM.bg, PALETTE_NUM.danger, 0.18),
+    moteColor: PALETTE_NUM.gold,
+  },
+  'iron-pass': {
+    hazeTone: mixPaletteColor(PALETTE_NUM.bg, PALETTE_NUM.mana, 0.24),
+    moteColor: PALETTE_NUM.mana,
+  },
+  'cinder-vault': {
+    hazeTone: mixPaletteColor(PALETTE_NUM.bg, PALETTE_NUM.danger, 0.32),
+    moteColor: PALETTE_NUM.gold,
+  },
+  'verdant-rift': {
+    hazeTone: mixPaletteColor(PALETTE_NUM.bg, PALETTE_NUM.health, 0.22),
+    moteColor: PALETTE_NUM.health,
+  },
+  'black-choir': {
+    hazeTone: mixPaletteColor(PALETTE_NUM.bg, PALETTE_NUM.mana, 0.12),
+    moteColor: PALETTE_NUM.dim,
+  },
+  'the-maw': {
+    hazeTone: mixPaletteColor(PALETTE_NUM.bg, PALETTE_NUM.danger, 0.1),
+    moteColor: PALETTE_NUM.danger,
+  },
+};
+
 // ---- scene wiring -----------------------------------------------------------
 
 /**
  * Builds the full layered battlefield for `variant` into `scene`, back to
- * front: sky gradient -> far silhouette -> structure props -> ember haze ->
+ * front: sky gradient -> far silhouette -> structure props -> haze band ->
  * platform slices. Call once from `CombatScene.create()` in place of the old
  * `buildGroundLine()`. No return value — every object it creates is static,
  * non-interactive set-dressing; the scene never needs to reach back into it.
@@ -209,28 +360,32 @@ export function buildBattlefield(
   params: { viewWidth: number; viewHeight: number; groundY: number; partyCenterX: number; enemyCenterX: number },
 ): void {
   const { viewWidth, viewHeight, groundY } = params;
+  const atmosphere = VARIANT_ATMOSPHERE[variant];
 
-  buildSkyGradient(scene, viewWidth, viewHeight, groundY);
+  buildSkyGradient(scene, viewWidth, viewHeight, groundY, atmosphere.hazeTone);
   buildFarSilhouette(scene, viewWidth, groundY);
+  buildAtmosphereHaze(scene, viewWidth, groundY, atmosphere.hazeTone, atmosphere.moteColor);
 
-  const horizonTone = mixPaletteColor(PALETTE_NUM.bg, PALETTE_NUM.danger, 0.18);
-  buildEmberHaze(scene, viewWidth, groundY, horizonTone);
-
-  for (const layout of ashGateImageLayouts(params)) {
+  const textures = texturesForVariant(variant);
+  for (const layout of battlefieldImageLayouts(textures, params)) {
     const image = scene.add
       .image(layout.x, layout.y, layout.textureKey)
       .setDisplaySize(layout.displayWidth, layout.displayHeight)
       .setDepth(layout.depth);
     if (layout.flipX === true) image.setFlipX(true);
   }
-  void variant; // single variant today; kept as a param for the chunk-8 lookup
 }
 
-/** Two-stop-feeling gradient: bg -> warm ember horizon -> near-black floor
- *  shadow, drawn as two stacked Graphics gradients (Phaser gradients only
+/** Two-stop-feeling gradient: bg -> horizon tone -> near-black floor shadow,
+ *  drawn as two stacked Graphics gradients (Phaser gradients only
  *  interpolate linearly between two colors per rect). */
-function buildSkyGradient(scene: Phaser.Scene, viewWidth: number, viewHeight: number, groundY: number): void {
-  const horizonTone = mixPaletteColor(PALETTE_NUM.bg, PALETTE_NUM.danger, 0.18);
+function buildSkyGradient(
+  scene: Phaser.Scene,
+  viewWidth: number,
+  viewHeight: number,
+  groundY: number,
+  horizonTone: number,
+): void {
   const floorTone = mixPaletteColor(PALETTE_NUM.borderDark, 0x000000, 0.4);
 
   const graphics = scene.add.graphics().setDepth(-6);
@@ -241,7 +396,9 @@ function buildSkyGradient(scene: Phaser.Scene, viewWidth: number, viewHeight: nu
 }
 
 /** Jagged distant skyline — visible mainly at the corners the structure
- *  props don't reach, giving the backdrop a sense of depth beyond them. */
+ *  props don't reach, giving the backdrop a sense of depth beyond them.
+ *  Stays a flat dark silhouette across every variant (no theme-specific
+ *  tone) — it reads as distant terrain regardless of the foreground dungeon. */
 function buildFarSilhouette(scene: Phaser.Scene, viewWidth: number, groundY: number): void {
   const baseY = groundY - 80;
   const peakSpan = 60;
@@ -266,11 +423,19 @@ function buildFarSilhouette(scene: Phaser.Scene, viewWidth: number, groundY: num
   graphics.fillPath();
 }
 
-/** Drifting ember-haze band (code fallback for the failed map_object prop —
- *  see {@link ashGateHazeBandLayout}): a soft tinted band plus a few glow
- *  motes, in front of the structure props, behind the platform slices. */
-function buildEmberHaze(scene: Phaser.Scene, viewWidth: number, groundY: number, tone: number): void {
-  const { y, height } = ashGateHazeBandLayout(groundY);
+/** Drifting haze band (code fallback for the failed map_object prop — see
+ *  {@link battlefieldHazeBandLayout}): a soft tinted band plus a few glow
+ *  motes, in front of the structure props, behind the platform slices.
+ *  `tone`/`moteColor` are the only per-variant inputs (chunk 8) — geometry
+ *  is shared. */
+function buildAtmosphereHaze(
+  scene: Phaser.Scene,
+  viewWidth: number,
+  groundY: number,
+  tone: number,
+  moteColor: number,
+): void {
+  const { y, height } = battlefieldHazeBandLayout(groundY);
   const graphics = scene.add.graphics().setDepth(BACKDROP_DEPTH_HAZE);
   graphics.fillStyle(tone, 0.16);
   graphics.fillRect(0, y, viewWidth, height);
@@ -280,7 +445,7 @@ function buildEmberHaze(scene: Phaser.Scene, viewWidth: number, groundY: number,
     const x = ((i + 0.5) / moteCount) * viewWidth;
     const motelY = y + height * (0.25 + 0.5 * ((i * 37) % 10) / 10);
     scene.add
-      .circle(x, motelY, 1.5, PALETTE_NUM.gold, 0.35)
+      .circle(x, motelY, 1.5, moteColor, 0.35)
       .setDepth(BACKDROP_DEPTH_HAZE);
   }
 }

@@ -49,7 +49,7 @@ behavior, layout constants, and gameplay data do not change.
 | 5 | Portraits in bubbles/tutorial/result → ui/speechBubble.ts, assets/units/portraits/ | 4 | **done** (2026-07-20; subagent hit 3 stream/session interruptions, resumed each time — central agent finished the last step (verify + ledger) directly; full verify green; all 4 party portraits shipped; ledger artifacts/pixellab-5/README.md) |
 | 6 | Scene transitions, code-only → NEW ui/transitions.ts, scene.start seams | 0 | **done** (2026-07-20; full verify green, central-agent re-verified; zero PixelLab spend; every scene.start seam covered — plain fade or the hub/tutorial→combat chunky wipe) |
 | 7 | Talent-tree sockets + edge textures → TreeScene, assets/ui/tree/ | 3 | **done** (2026-07-20; full verify green, central-agent re-verified; both PixelLab jobs accepted first try, no rerolls; ledger artifacts/pixellab-7/README.md) |
-| 8 | Per-dungeon battlefield variants → assets/battlefields/*, battlefieldForEncounter() | 2 | todo |
+| 8 | Per-dungeon battlefield variants → assets/battlefields/*, battlefieldForEncounter() | 2 | **done** (2026-07-20; full verify green, central-agent re-verified; all 5 remaining dungeons shipped custom art, none fell back to Ash Gate; ledger artifacts/pixellab-8/README.md) |
 | 9 | Title/tutorial dress-up → TutorialScene, hub title | 4,5 | todo |
 | 10 | Final QA: full verify + journey, smoke --shots visual pass, CLAUDE.md exception list + CHANGELOG, QA note, draft PR | all | todo (central agent) |
 
@@ -80,15 +80,21 @@ subagents report entries; they never edit either.
   ENEMY_SLOT 580–880, SPELL_BAR_Y=508, spell button 100×52, keycap 18×14.
 - **Backdrops are composed layers** (code gradient + map_object props +
   platform slices), never one full-screen painting (bible §3 gap note).
-- **Battlefield API (chunk 2, for chunk 8)**: `ui/battlefield.ts` exposes
-  `buildBattlefield(scene, variantKey, params)` +
-  `battlefieldTexturesForVariant(variantKey)`; chunk 8 extends the variant
-  map and adds `battlefieldForEncounter()` on top — do not reshape these.
-  `create_map_object` has NO `style_images` param (style-match via prompt
-  vocabulary instead); the ember-haze band is code-drawn after 3 failed
-  generations — do not retry it as a map_object. Gate-arch is an opaque
-  diorama whose seam is masked by overlapping wall fragments; manifest has
-  a `battlefields` array (audit tool ignores it).
+- **Battlefield API (chunk 2/8, done)**: `ui/battlefield.ts` — closed
+  `BattlefieldVariantKey` union over all 6 dungeon ids;
+  `battlefieldForEncounter(encounterId)` looks up the variant (defaults
+  unknown ids to `'ash-gate'`, `encounterId === dungeonId` per
+  `data/content/compile.ts`); `buildBattlefield(scene, variantKey, params)`
+  / `battlefieldTexturesForVariant(variantKey)` signatures unchanged from
+  chunk 2; `allBattlefieldTextures()` feeds BootScene's single preload
+  loop. `create_map_object` has NO `style_images` param (style-match via
+  prompt vocabulary); `create_object_state` recolors of Ash Gate's 3
+  source objects were the cheap path for the other 5 dungeons and (unlike
+  Ash Gate's opaque diorama) came back with real alpha. Ash Gate's own
+  assets/layout are frozen — never re-touch them when adding a 7th variant
+  later. Manifest has a `battlefields` array (audit tool ignores it). Gotcha
+  seen once: a `create_object_state` job can stall with a climbing ETA
+  instead of shrinking — don't wait it out, reroll (it converges normally).
 - **Spell-UI chrome (chunk 3)**: icon/frame registry is `ui/spellSprites.ts`
   (relicSprites pattern; `glyphChar` stays the fallback for unmapped ids —
   never remove it). `Bar` gained optional `frameTextureKey` (frame texture
@@ -169,6 +175,11 @@ subagents report entries; they never edit either.
 - Chunk 7 tree-dressing spend: 2 jobs = **45** → balance **1362** after
   chunk 7 (socket-ring + edge-strip, both accepted first try). Job IDs in
   artifacts/pixellab-7/README.md.
+- Chunk 8 per-dungeon variants spend: 16 jobs (15 accepted + 1 stalled job
+  abandoned unused) ≈ **300** → balance **1062** after chunk 8 (all 5
+  remaining dungeons — Iron Pass/Cinder Vault/Verdant Rift/Black
+  Choir/The Maw — shipped custom `create_object_state` recolors of Ash
+  Gate's 3 source objects). Job IDs in artifacts/pixellab-8/README.md.
 - Floor: stop art spend if a chunk would drop balance below **800**; check
   `get_balance` before each art chunk.
 

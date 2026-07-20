@@ -32,7 +32,7 @@ import {
 import { RELIC_TEXTURE_IDS, relicTextureKey, relicTextureUrl } from '../ui/relicSprites';
 import { initMusic, MUSIC_ASSET_KEY, MUSIC_URL } from '../ui/music';
 import { fontsReady } from '../ui/theme';
-import { battlefieldTexturesForVariant } from '../ui/battlefield';
+import { allBattlefieldTextures } from '../ui/battlefield';
 import { spellBarTextures } from '../ui/spellSprites';
 import { panelKitTextures } from '../ui/panels';
 import { portraitTextures } from '../ui/portraitSprites';
@@ -80,9 +80,10 @@ export class BootScene extends Phaser.Scene {
     for (const id of RELIC_TEXTURE_IDS) {
       this.load.image(relicTextureKey(id), relicTextureUrl(id));
     }
-    // Ash Gate combat battlefield (temp-art exception): backdrop structure
-    // props + platform slice — see ui/battlefield.ts.
-    for (const texture of battlefieldTexturesForVariant('ashgate')) {
+    // Per-dungeon combat battlefields (temp-art exception): backdrop
+    // structure props + platform slice per variant, deduped across all 6
+    // dungeon ids (chunk 8) — see ui/battlefield.ts.
+    for (const texture of allBattlefieldTextures()) {
       this.load.image(texture.key, texture.url);
     }
     // Spell-bar/HUD framing kit + spell/cooldown icons (temp-art exception,

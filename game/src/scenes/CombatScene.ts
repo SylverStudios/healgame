@@ -22,7 +22,7 @@ import { getEncounterById } from '../data/encounters';
 import { GCD_MS, SPELLS } from '../data/constants';
 import { Bar } from '../ui/bar';
 import { UnitSprite } from '../ui/unitSprite';
-import { buildBattlefield } from '../ui/battlefield';
+import { battlefieldForEncounter, buildBattlefield } from '../ui/battlefield';
 import {
   attackAnimKeyForUnit,
   HEALER_CAST_RELEASE_LEAD_MS,
@@ -315,7 +315,7 @@ export class CombatScene extends Phaser.Scene {
       relics: relicsById(save.relicIds),
     });
 
-    buildBattlefield(this, 'ashgate', {
+    buildBattlefield(this, battlefieldForEncounter(this.sceneData.encounterId), {
       viewWidth: VIEW_WIDTH,
       viewHeight: VIEW_HEIGHT,
       groundY: GROUND_Y,
