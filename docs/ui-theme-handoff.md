@@ -44,7 +44,7 @@ behavior, layout constants, and gameplay data do not change.
 | 0 | Baseline; ui/theme.ts; balance recorded | — | **done** (commit 02a9d03) |
 | 1 | Pixel font game-wide | 0 | **done** (commit 4c60513; full verify green on the code path, verify:fast + smoke-shot green after the v16 ttf swap) |
 | 2 | Ash Gate battlefield: backdrop + platforms → ui/battlefield.ts, assets/battlefields/ashgate/ | 0 | **done** (2026-07-20; full verify green, central-agent re-verified; screenshot 02-ash-gate-first-run-feedback.png; ledger artifacts/pixellab-1/README.md) |
-| 3 | Spell-bar/HUD framing kit + 16×16 spell icons → ui/spellBar.ts, glyph.ts, bar.ts (additive), spellTooltip.ts, assets/ui/ | 1 | todo |
+| 3 | Spell-bar/HUD framing kit + 16×16 spell icons → ui/spellBar.ts, glyph.ts, bar.ts (additive), spellTooltip.ts, assets/ui/ | 1 | **done** (2026-07-20; full verify green, central-agent re-verified; icons for all 7 spells + 3 CDs, glyph fallback kept; ledger artifacts/pixellab-3/README.md) |
 | 4 | Meta-scene panel kit + result panel → NEW ui/panels.ts; Hub/Tutorial/Loadout/Relic/Settings; result overlay | 3 | todo |
 | 5 | Portraits in bubbles/tutorial/result → ui/speechBubble.ts, assets/units/portraits/ | 4 | todo |
 | 6 | Scene transitions, code-only → NEW ui/transitions.ts, scene.start seams | 0 | todo |
@@ -89,6 +89,15 @@ subagents report entries; they never edit either.
   generations — do not retry it as a map_object. Gate-arch is an opaque
   diorama whose seam is masked by overlapping wall fragments; manifest has
   a `battlefields` array (audit tool ignores it).
+- **Spell-UI chrome (chunk 3)**: icon/frame registry is `ui/spellSprites.ts`
+  (relicSprites pattern; `glyphChar` stays the fallback for unmapped ids —
+  never remove it). `Bar` gained optional `frameTextureKey` (frame texture
+  authored at half bar size with transparent center). Tooltip panel is a
+  plain rect + 4 code-drawn corner ornaments, NOT Phaser NineSlice
+  (WebGL-only — don't switch). Micro-bars (GCD/boss slivers, unit HP/mana)
+  stay unframed by decision. UI chrome does NOT get manifest rows — the
+  registry module + artifacts/pixellab-3/README.md are its traceability.
+  Prefer single-element `create_ui_asset` jobs (multi-element stalled).
 - **Art process**: style-reference armored-paladin/relic art in every
   generation; prompts + accepted IDs in artifacts/pixellab-<item>/README.md;
   source PNGs in art/source/; subagents report manifest/CLAUDE.md entries
@@ -104,6 +113,10 @@ subagents report entries; they never edit either.
   (gate-arch, wall-fragment, platform accepted first-try; 3 ember-haze
   attempts all rejected — band stays code-drawn, do not retry it as a
   map_object). Job IDs in artifacts/pixellab-1/README.md.
+- Chunk 3 spell-UI spend: **90** → balance **1567** after chunk 3 (10-icon
+  batch + cast-bar/button/keycap frames; a multi-element `create_ui_asset`
+  job stalled at 64% and was abandoned uncharged — prefer single-element
+  jobs). Job IDs in artifacts/pixellab-3/README.md.
 - Floor: stop art spend if a chunk would drop balance below **800**; check
   `get_balance` before each art chunk.
 

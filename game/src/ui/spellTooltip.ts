@@ -9,6 +9,14 @@
 import Phaser from 'phaser';
 import type { SpellCardModel } from './spellCard';
 import { FONT, FONT_SIZE_XS, FONT_SIZE_SM } from './theme';
+import { TOOLTIP_CORNER_NATIVE_SIZE, TOOLTIP_CORNER_TEXTURE_KEY } from './spellSprites';
+
+/** Corner ornament display size (2x native — density rule). Panel width/height
+ *  are content-driven every frame, so the panel itself stays a plain bordered
+ *  rectangle (`bg`) rather than a stretched frame texture — see pixellab-3
+ *  ledger "why not NineSlice" (Phaser's NineSlice GameObject is WebGL-only,
+ *  a renderer-compatibility risk not worth taking for a tooltip). */
+const CORNER_DISPLAY_SIZE = TOOLTIP_CORNER_NATIVE_SIZE.width * 2;
 
 const PADDING = 8;
 const LINE_GAP = 3;
@@ -59,6 +67,10 @@ export class SpellTooltip {
   private readonly screenWidth: number;
   private readonly container: Phaser.GameObjects.Container;
   private readonly bg: Phaser.GameObjects.Rectangle;
+  /** Four ember-rivet corner ornaments (TL/TR/BL/BR, one texture reused via
+   *  flip) — null when BootScene hasn't loaded the art (plain bordered
+   *  rectangle fallback, unchanged from before this chunk). */
+  private readonly corners: Phaser.GameObjects.Image[] | null;
   private readonly dynamic: Phaser.GameObjects.GameObject[] = [];
 
   constructor(scene: Phaser.Scene, options: SpellTooltipOptions | number = {}) {
@@ -67,11 +79,34 @@ export class SpellTooltip {
     this.scene = scene;
     this.screenWidth = opts.screenWidth ?? 960;
     this.bg = scene.add.rectangle(0, 0, 10, 10, BG_COLOR).setOrigin(0, 0).setStrokeStyle(1, BORDER_COLOR);
+    this.corners = scene.textures.exists(TOOLTIP_CORNER_TEXTURE_KEY)
+      ? [
+          scene.add.image(0, 0, TOOLTIP_CORNER_TEXTURE_KEY).setOrigin(0, 0).setDisplaySize(CORNER_DISPLAY_SIZE, CORNER_DISPLAY_SIZE),
+          scene.add.image(0, 0, TOOLTIP_CORNER_TEXTURE_KEY).setOrigin(1, 0).setFlipX(true).setDisplaySize(CORNER_DISPLAY_SIZE, CORNER_DISPLAY_SIZE),
+          scene.add.image(0, 0, TOOLTIP_CORNER_TEXTURE_KEY).setOrigin(0, 1).setFlipY(true).setDisplaySize(CORNER_DISPLAY_SIZE, CORNER_DISPLAY_SIZE),
+          scene.add.image(0, 0, TOOLTIP_CORNER_TEXTURE_KEY).setOrigin(1, 1).setFlipX(true).setFlipY(true).setDisplaySize(CORNER_DISPLAY_SIZE, CORNER_DISPLAY_SIZE),
+        ]
+      : null;
     this.container = scene.add
-      .container(0, 0, [this.bg])
+      .container(0, 0, this.corners ? [this.bg, ...this.corners] : [this.bg])
       .setDepth(opts.depth ?? DEPTH)
       .setScrollFactor(opts.scrollFactor ?? 0)
       .setVisible(false);
+  }
+
+  /** Re-anchors the four corner ornaments to the panel's current (post-resize) bounds. */
+  private positionCorners(width: number, height: number): void {
+    if (!this.corners) return;
+    const [tl, tr, bl, br] = this.corners as [
+      Phaser.GameObjects.Image,
+      Phaser.GameObjects.Image,
+      Phaser.GameObjects.Image,
+      Phaser.GameObjects.Image,
+    ];
+    tl.setPosition(0, 0);
+    tr.setPosition(width, 0);
+    bl.setPosition(0, height);
+    br.setPosition(width, height);
   }
 
   /** Fills the panel with a spell slot card; returns size for caller placement. */
@@ -162,6 +197,7 @@ export class SpellTooltip {
 
     const panelHeight = cursorY - (card.notes.length > 0 || card.description ? LINE_GAP : 0) + PADDING;
     this.bg.setSize(panelWidth, Math.max(panelHeight, PADDING * 2));
+    this.positionCorners(panelWidth, this.bg.height);
     return { width: panelWidth, height: this.bg.height };
   }
 
@@ -178,6 +214,7 @@ export class SpellTooltip {
     const panelWidth = maxWidth + PADDING * 2;
     const panelHeight = Math.max(cursorY - LINE_GAP + PADDING, PADDING * 2);
     this.bg.setSize(panelWidth, panelHeight);
+    this.positionCorners(panelWidth, panelHeight);
     return { width: panelWidth, height: panelHeight };
   }
 

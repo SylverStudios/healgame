@@ -33,6 +33,7 @@ import { RELIC_TEXTURE_IDS, relicTextureKey, relicTextureUrl } from '../ui/relic
 import { initMusic, MUSIC_ASSET_KEY, MUSIC_URL } from '../ui/music';
 import { fontsReady } from '../ui/theme';
 import { battlefieldTexturesForVariant } from '../ui/battlefield';
+import { spellBarTextures } from '../ui/spellSprites';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -78,6 +79,11 @@ export class BootScene extends Phaser.Scene {
     // Ash Gate combat battlefield (temp-art exception): backdrop structure
     // props + platform slice — see ui/battlefield.ts.
     for (const texture of battlefieldTexturesForVariant('ashgate')) {
+      this.load.image(texture.key, texture.url);
+    }
+    // Spell-bar/HUD framing kit + spell/cooldown icons (temp-art exception,
+    // bible item 3) — see ui/spellSprites.ts.
+    for (const texture of spellBarTextures()) {
       this.load.image(texture.key, texture.url);
     }
     // Attack strips: one texture key per frame (not packed into Kenney).
