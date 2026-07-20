@@ -89,7 +89,16 @@ game/src/
   VFX uses the user-authored sheet (`heal-vfx.png`); relic icons are
   hand-authored 32×32 stills (`assets/relics/`, `ui/relicSprites.ts`); and
   background audio is a placeholder generated loop (`assets/audio/`, see its
-  README). Target density for new character art is **32×32** (bosses may be
+  README); UI/HUD text renders in the bundled 16px-native pixel font
+  (`HealgameIron`, `game/public/assets/fonts/`, loaded via `ui/theme.ts`
+  `fontsReady`) — digits currently fall back to monospace, and the debug
+  combat log (`ui/combatLog.ts`) intentionally stays monospace; and combat
+  renders a layered battlefield (`ui/battlefield.ts`,
+  `assets/battlefields/ashgate/`): code-drawn sky gradient/silhouette/ember
+  haze plus PixelLab structure props and platform slices under the
+  party/enemy lines — only the Ash Gate variant exists, reused by every
+  encounter until per-dungeon variants land. Target density for new
+  character art is **32×32** (bosses may be
   larger canvases at the same density). Everything else stays rects, bars,
   monospace text, dark palette (`#1a1210` bg) — reject polish creep.
 - **Scope discipline**: reject additions outside the active planning handoff

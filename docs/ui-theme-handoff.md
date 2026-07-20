@@ -42,8 +42,8 @@ behavior, layout constants, and gameplay data do not change.
 | id | what | depends | status |
 |---|---|---|---|
 | 0 | Baseline; ui/theme.ts; balance recorded | — | **done** (commit 02a9d03) |
-| 1 | Pixel font game-wide | 0 | **done** (commit a716302; full verify green on the code path, verify:fast + smoke-shot green after the v16 ttf swap) |
-| 2 | Ash Gate battlefield: backdrop + platforms → ui/battlefield.ts, assets/battlefields/ashgate/ | 0 | todo |
+| 1 | Pixel font game-wide | 0 | **done** (commit 4c60513; full verify green on the code path, verify:fast + smoke-shot green after the v16 ttf swap) |
+| 2 | Ash Gate battlefield: backdrop + platforms → ui/battlefield.ts, assets/battlefields/ashgate/ | 0 | **done** (2026-07-20; full verify green, central-agent re-verified; screenshot 02-ash-gate-first-run-feedback.png; ledger artifacts/pixellab-1/README.md) |
 | 3 | Spell-bar/HUD framing kit + 16×16 spell icons → ui/spellBar.ts, glyph.ts, bar.ts (additive), spellTooltip.ts, assets/ui/ | 1 | todo |
 | 4 | Meta-scene panel kit + result panel → NEW ui/panels.ts; Hub/Tutorial/Loadout/Relic/Settings; result overlay | 3 | todo |
 | 5 | Portraits in bubbles/tutorial/result → ui/speechBubble.ts, assets/units/portraits/ | 4 | todo |
@@ -80,6 +80,15 @@ subagents report entries; they never edit either.
   ENEMY_SLOT 580–880, SPELL_BAR_Y=508, spell button 100×52, keycap 18×14.
 - **Backdrops are composed layers** (code gradient + map_object props +
   platform slices), never one full-screen painting (bible §3 gap note).
+- **Battlefield API (chunk 2, for chunk 8)**: `ui/battlefield.ts` exposes
+  `buildBattlefield(scene, variantKey, params)` +
+  `battlefieldTexturesForVariant(variantKey)`; chunk 8 extends the variant
+  map and adds `battlefieldForEncounter()` on top — do not reshape these.
+  `create_map_object` has NO `style_images` param (style-match via prompt
+  vocabulary instead); the ember-haze band is code-drawn after 3 failed
+  generations — do not retry it as a map_object. Gate-arch is an opaque
+  diorama whose seam is masked by overlapping wall fragments; manifest has
+  a `battlefields` array (audit tool ignores it).
 - **Art process**: style-reference armored-paladin/relic art in every
   generation; prompts + accepted IDs in artifacts/pixellab-<item>/README.md;
   source PNGs in art/source/; subagents report manifest/CLAUDE.md entries
@@ -91,6 +100,10 @@ subagents report entries; they never edit either.
 - Chunk 1 font spend: 6 jobs = **124** → balance **1663** after chunk 1
   (v1 reg+bold 8px weathered — illegible; v2, v3 8px rerolls — illegible;
   v16 reg+bold 16px — SHIPPED). Job IDs in artifacts/pixellab-2/README.md.
+- Chunk 2 battlefield spend: 6 jobs = **6** → balance **1657** after chunk 2
+  (gate-arch, wall-fragment, platform accepted first-try; 3 ember-haze
+  attempts all rejected — band stays code-drawn, do not retry it as a
+  map_object). Job IDs in artifacts/pixellab-1/README.md.
 - Floor: stop art spend if a chunk would drop balance below **800**; check
   `get_balance` before each art chunk.
 
@@ -113,10 +126,8 @@ one checkpoint.
 
 ## CLAUDE.md exception sentences queued (add at chunk 10 or per-chunk)
 
-- Font (chunk 1): "UI/HUD text renders in the bundled 16px-native pixel
-  font (`HealgameIron`, `game/public/assets/fonts/`, loaded via
-  `ui/theme.ts` `fontsReady`); digits currently fall back to monospace, and
-  the debug combat log (`ui/combatLog.ts`) intentionally stays monospace."
+- (none queued — font (chunk 1) and battlefield (chunk 2) sentences were
+  added to CLAUDE.md's temp-art bullet at the chunk-2 checkpoint.)
 
 ## Resuming in a fresh session
 
