@@ -48,7 +48,7 @@ behavior, layout constants, and gameplay data do not change.
 | 4 | Meta-scene panel kit + result panel → NEW ui/panels.ts; Hub/Tutorial/Loadout/Relic/Settings; result overlay | 3 | **done** (2026-07-20; full verify green, central-agent re-verified; hub/result screenshots checked; ledger artifacts/pixellab-4/README.md) |
 | 5 | Portraits in bubbles/tutorial/result → ui/speechBubble.ts, assets/units/portraits/ | 4 | **done** (2026-07-20; subagent hit 3 stream/session interruptions, resumed each time — central agent finished the last step (verify + ledger) directly; full verify green; all 4 party portraits shipped; ledger artifacts/pixellab-5/README.md) |
 | 6 | Scene transitions, code-only → NEW ui/transitions.ts, scene.start seams | 0 | **done** (2026-07-20; full verify green, central-agent re-verified; zero PixelLab spend; every scene.start seam covered — plain fade or the hub/tutorial→combat chunky wipe) |
-| 7 | Talent-tree sockets + edge textures → TreeScene, assets/ui/tree/ | 3 | todo |
+| 7 | Talent-tree sockets + edge textures → TreeScene, assets/ui/tree/ | 3 | **done** (2026-07-20; full verify green, central-agent re-verified; both PixelLab jobs accepted first try, no rerolls; ledger artifacts/pixellab-7/README.md) |
 | 8 | Per-dungeon battlefield variants → assets/battlefields/*, battlefieldForEncounter() | 2 | todo |
 | 9 | Title/tutorial dress-up → TutorialScene, hub title | 4,5 | todo |
 | 10 | Final QA: full verify + journey, smoke --shots visual pass, CLAUDE.md exception list + CHANGELOG, QA note, draft PR | all | todo (central agent) |
@@ -130,6 +130,13 @@ subagents report entries; they never edit either.
   `COMBAT_ENTRY_FADE_OUT_MS` fade-out paired with the wipe so the total
   stays under the 400ms budget. Zero PixelLab spend, no ledger/manifest
   entries for this chunk.
+- **Tree dressing (chunk 7)**: `ui/treeSockets.ts` — one socket-ring texture
+  + one edge-groove texture, both reused via `setTint` across all
+  states/edges (chunks 3/4's "one asset, many tints" pattern, not one asset
+  per state). `inactive` edges (1px) stay plain `lineBetween` — texture
+  reads as noise at that weight. Locked dead-branch X marks draw in a final
+  pass over everything so they can't be obscured. `src/tree/` stayed
+  read-only; `layoutFromGrid`/`TREE_POSITIONS` untouched.
 - **Art process**: style-reference armored-paladin/relic art in every
   generation; prompts + accepted IDs in artifacts/pixellab-<item>/README.md;
   source PNGs in art/source/; subagents report manifest/CLAUDE.md entries
@@ -159,6 +166,9 @@ subagents report entries; they never edit either.
   submissions — base64 re-encoding glitch, not a content issue — and 1
   uncharged dps2 timeout, balance math confirms neither billed). Job IDs in
   artifacts/pixellab-5/README.md.
+- Chunk 7 tree-dressing spend: 2 jobs = **45** → balance **1362** after
+  chunk 7 (socket-ring + edge-strip, both accepted first try). Job IDs in
+  artifacts/pixellab-7/README.md.
 - Floor: stop art spend if a chunk would drop balance below **800**; check
   `get_balance` before each art chunk.
 

@@ -103,10 +103,14 @@ game/src/
   (registry in `ui/spellSprites.ts`, glyph-char fallback for unmapped
   ids); meta scenes + the combat result overlay use the shared
   panel/button/banner chrome (`ui/panels.ts`: code-drawn corner brackets +
-  a PixelLab iron edge band, `assets/ui/panels/`); and party bust portraits
+  a PixelLab iron edge band, `assets/ui/panels/`); party bust portraits
   (`assets/units/portraits/`, `ui/portraitSprites.ts`) show beside banter
   bubbles, on the tutorial screen, and on the combat result panel
-  (victory=healer, wipe=tank). Target density for new
+  (victory=healer, wipe=tank); and talent-tree node sockets are a PixelLab
+  20×20 bezel ring tinted per state (`ui/treeSockets.ts`,
+  `assets/ui/tree/socket-ring.png`) with edges as a PixelLab 48×8 groove
+  strip stretched/rotated per edge and tinted per `EdgeState`
+  (`assets/ui/tree/edge-strip.png`). Target density for new
   character art is **32×32** (bosses may be
   larger canvases at the same density). Everything else stays rects, bars,
   monospace text, dark palette (`#1a1210` bg) — reject polish creep.
