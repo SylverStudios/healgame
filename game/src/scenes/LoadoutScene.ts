@@ -13,6 +13,7 @@ import { ACTION_HOTKEY_LETTERS, actionHotkeyLabel } from '../ui/actionHotkeys';
 import { glyphChar } from '../ui/glyph';
 import type { SpellDef } from '../combat/types';
 import { FONT, FONT_SIZE_XS, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG } from '../ui/theme';
+import { addButton } from '../ui/panels';
 
 const BG_COLOR = 0x1a1210;
 const BUTTON_COLOR = 0x3a2a22;
@@ -77,6 +78,12 @@ export class LoadoutScene extends Phaser.Scene {
         .setStrokeStyle(selected ? 3 : 2, selected ? ACCENT_BORDER : BORDER_COLOR)
         .setInteractive({ useHandCursor: true })
         .setName(`loadoutSlot:${i}`);
+      // Chunk 4: selected slot reuses the Hub CURRENT gold-outline convention.
+      addButton(this, x, slotY, SLOT_W, SLOT_H, {
+        fillColor: selected ? BUTTON_HOVER : BUTTON_COLOR,
+        state: selected ? 'current' : 'normal',
+        hitRect: bg,
+      });
       const letter = ACTION_HOTKEY_LETTERS[i] ?? '?';
       const shiftLabel = actionHotkeyLabel(ACTION_HOTKEY_LETTERS.length + i) ?? `s${letter}`;
       // XS (8px), not the SM snap: four stacked lines share an 88px-tall slot
@@ -157,6 +164,7 @@ export class LoadoutScene extends Phaser.Scene {
         .setStrokeStyle(1, BORDER_COLOR)
         .setInteractive({ useHandCursor: true })
         .setName(choice.id ? `loadoutPick:${choice.id}` : 'loadoutPick:empty');
+      const frame = addButton(this, x, y, PICK_W, PICK_H, { fillColor: BUTTON_COLOR, borderWidth: 1, hitRect: bg });
       this.add
         .text(x, y, `${choice.glyph}  ${choice.label}`, {
           fontFamily: FONT,
@@ -164,8 +172,8 @@ export class LoadoutScene extends Phaser.Scene {
           color: TEXT_COLOR,
         })
         .setOrigin(0.5);
-      bg.on('pointerover', () => bg.setFillStyle(BUTTON_HOVER).setStrokeStyle(2, ACCENT_BORDER));
-      bg.on('pointerout', () => bg.setFillStyle(BUTTON_COLOR).setStrokeStyle(1, BORDER_COLOR));
+      bg.on('pointerover', () => frame.setState('hover'));
+      bg.on('pointerout', () => frame.setState('normal'));
       bg.on('pointerdown', () => {
         const save = loadSave();
         const next =
@@ -193,6 +201,7 @@ export class LoadoutScene extends Phaser.Scene {
       .setStrokeStyle(2, BORDER_COLOR)
       .setInteractive({ useHandCursor: true })
       .setName(name);
+    addButton(this, x, y, w, h, { fillColor: BUTTON_COLOR, hitRect: rect });
     this.add.text(x, y, label, { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: TEXT_COLOR }).setOrigin(0.5);
     rect.on('pointerdown', onClick);
   }

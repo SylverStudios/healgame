@@ -45,7 +45,7 @@ behavior, layout constants, and gameplay data do not change.
 | 1 | Pixel font game-wide | 0 | **done** (commit 4c60513; full verify green on the code path, verify:fast + smoke-shot green after the v16 ttf swap) |
 | 2 | Ash Gate battlefield: backdrop + platforms → ui/battlefield.ts, assets/battlefields/ashgate/ | 0 | **done** (2026-07-20; full verify green, central-agent re-verified; screenshot 02-ash-gate-first-run-feedback.png; ledger artifacts/pixellab-1/README.md) |
 | 3 | Spell-bar/HUD framing kit + 16×16 spell icons → ui/spellBar.ts, glyph.ts, bar.ts (additive), spellTooltip.ts, assets/ui/ | 1 | **done** (2026-07-20; full verify green, central-agent re-verified; icons for all 7 spells + 3 CDs, glyph fallback kept; ledger artifacts/pixellab-3/README.md) |
-| 4 | Meta-scene panel kit + result panel → NEW ui/panels.ts; Hub/Tutorial/Loadout/Relic/Settings; result overlay | 3 | todo |
+| 4 | Meta-scene panel kit + result panel → NEW ui/panels.ts; Hub/Tutorial/Loadout/Relic/Settings; result overlay | 3 | **done** (2026-07-20; full verify green, central-agent re-verified; hub/result screenshots checked; ledger artifacts/pixellab-4/README.md) |
 | 5 | Portraits in bubbles/tutorial/result → ui/speechBubble.ts, assets/units/portraits/ | 4 | todo |
 | 6 | Scene transitions, code-only → NEW ui/transitions.ts, scene.start seams | 0 | todo |
 | 7 | Talent-tree sockets + edge textures → TreeScene, assets/ui/tree/ | 3 | todo |
@@ -98,6 +98,15 @@ subagents report entries; they never edit either.
   stay unframed by decision. UI chrome does NOT get manifest rows — the
   registry module + artifacts/pixellab-3/README.md are its traceability.
   Prefer single-element `create_ui_asset` jobs (multi-element stalled).
+- **Panel kit (chunk 4)**: `ui/panels.ts` `addPanel`/`addButton`/`addBanner`
+  + `Frame` class — chunks 5/7/9 build on it, don't fork a second kit.
+  Manual nine-slice (corner Images + stretched edge Images + Rectangle
+  fill); corners are code-drawn (PixelLab illegible below ~12px). A `Frame`
+  wrapping a named hitRect hides that rect's own fill/stroke and owns all
+  state styling (`setState('hover'|...)`); hover handlers must go through
+  the Frame, never un-hide the rect. CURRENT/selected = gold outline
+  overlay; per-relic hover accent via `accentColor` option. Settings
+  volume track stays unframed (too thin), panel behind it instead.
 - **Art process**: style-reference armored-paladin/relic art in every
   generation; prompts + accepted IDs in artifacts/pixellab-<item>/README.md;
   source PNGs in art/source/; subagents report manifest/CLAUDE.md entries
@@ -117,6 +126,11 @@ subagents report entries; they never edit either.
   batch + cast-bar/button/keycap frames; a multi-element `create_ui_asset`
   job stalled at 64% and was abandoned uncharged — prefer single-element
   jobs). Job IDs in artifacts/pixellab-3/README.md.
+- Chunk 4 panel-kit spend: 2 jobs = **80** → balance **1487** after chunk 4
+  (panel-frame job rejected — off-palette kit sheet; button-frame job
+  accepted, its edge band reused everywhere; corners are code-drawn —
+  PixelLab art is illegible below ~12px, third confirmation). Job IDs in
+  artifacts/pixellab-4/README.md.
 - Floor: stop art spend if a chunk would drop balance below **800**; check
   `get_balance` before each art chunk.
 

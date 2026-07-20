@@ -34,6 +34,7 @@ import { initMusic, MUSIC_ASSET_KEY, MUSIC_URL } from '../ui/music';
 import { fontsReady } from '../ui/theme';
 import { battlefieldTexturesForVariant } from '../ui/battlefield';
 import { spellBarTextures } from '../ui/spellSprites';
+import { panelKitTextures } from '../ui/panels';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -84,6 +85,12 @@ export class BootScene extends Phaser.Scene {
     // Spell-bar/HUD framing kit + spell/cooldown icons (temp-art exception,
     // bible item 3) — see ui/spellSprites.ts.
     for (const texture of spellBarTextures()) {
+      this.load.image(texture.key, texture.url);
+    }
+    // Meta-scene panel/button/banner kit (temp-art exception, bible item 4)
+    // — Hub/Tutorial/Loadout/Relic/Settings + combat result overlay/wave
+    // banner. See ui/panels.ts.
+    for (const texture of panelKitTextures()) {
       this.load.image(texture.key, texture.url);
     }
     // Attack strips: one texture key per frame (not packed into Kenney).
