@@ -11,7 +11,8 @@ import { loadoutFromSave } from '../data/talentTree';
 import { ASH_GATE } from '../data/encounters';
 import { SPELLS } from '../data/constants';
 import type { CombatSceneData } from './CombatScene';
-import { FONT, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG } from '../ui/theme';
+import { FONT, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG, PALETTE_NUM } from '../ui/theme';
+import { addButton, addPanel } from '../ui/panels';
 
 const BG_COLOR = 0x1a1210;
 const BUTTON_COLOR = 0x3a2a22;
@@ -49,6 +50,8 @@ export class TutorialScene extends Phaser.Scene {
       'XP from every enemy kill is kept even if you wipe.',
     ].join('\n');
 
+    // Chunk 4 (bible item 4): copy panel — ui/panels.ts.
+    addPanel(this, width / 2, 220, 700, 150);
     this.add
       .text(width / 2, 220, instructions, {
         fontFamily: FONT,
@@ -64,6 +67,7 @@ export class TutorialScene extends Phaser.Scene {
       .setStrokeStyle(2, BORDER_COLOR)
       .setInteractive({ useHandCursor: true })
       .setName('tutorialLearn');
+    addButton(this, width / 2, buttonY, 340, 74, { fillColor: PALETTE_NUM.panelLight, hitRect: button });
     this.add
       .text(width / 2, buttonY, 'Learn Solemn Mend', { fontFamily: FONT, fontSize: FONT_SIZE_MD, color: ACCENT_COLOR })
       .setOrigin(0.5);

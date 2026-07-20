@@ -27,7 +27,8 @@ import { drawBuildGlyph } from '../ui/buildGlyph';
 import type { CombatResult, CombatSceneData } from './CombatScene';
 import type { DungeonDef } from '../data/content/types';
 import { loadTelemetry, recordReset, sendPlaytestMail } from '../telemetry';
-import { FONT, FONT_SIZE_SM, FONT_SIZE_LG } from '../ui/theme';
+import { FONT, FONT_SIZE_SM, FONT_SIZE_LG, PALETTE_NUM } from '../ui/theme';
+import { addBanner, addButton, addPanel } from '../ui/panels';
 
 interface HubSceneData {
   combatResult?: CombatResult;
@@ -105,6 +106,8 @@ export class HubScene extends Phaser.Scene {
       return;
     }
 
+    // Chunk 4 (bible item 4): shared panel/button/banner kit — ui/panels.ts.
+    addBanner(this, width / 2, 40, 240, 44);
     this.add.text(width / 2, 40, 'Hub', { fontFamily: FONT, fontSize: FONT_SIZE_LG, color: TEXT_COLOR }).setOrigin(0.5);
 
     this.buildStats(save);
@@ -146,6 +149,9 @@ export class HubScene extends Phaser.Scene {
     const nextLevelXp = xpForLevel(level + 1);
     const xpLine = `XP ${save.xp}/${nextLevelXp} → Level ${level + 1}${hasZealous ? '' : ` + ${SPELLS.zealousMending.name}`}`;
 
+    // Chunk 4: hub stats block gets a light frame (bible item 4 "hub stats
+    // block if it helps") — sized around the two text lines below.
+    addPanel(this, width / 2, 94, 560, 56, { size: 'sm' });
     this.add
       .text(width / 2, 82, `Level ${level}   •   Talent Points ${availableTalentPoints(save)} unplaced`, {
         fontFamily: FONT,
@@ -165,9 +171,7 @@ export class HubScene extends Phaser.Scene {
   private buildNotices(notices: HubNotice[]): void {
     notices.forEach((notice, i) => {
       const y = NOTICE_START_Y + i * NOTICE_ROW_H;
-      this.add
-        .rectangle(this.scale.width / 2, y, 440, NOTICE_H, NOTICE_BG_COLOR)
-        .setStrokeStyle(1, BORDER_COLOR);
+      addPanel(this, this.scale.width / 2, y, 440, NOTICE_H, { size: 'sm', fillColor: NOTICE_BG_COLOR });
       this.add
         .text(this.scale.width / 2, y, notice.text, { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: ACCENT_COLOR })
         .setOrigin(0.5);
@@ -282,6 +286,13 @@ export class HubScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
       .setName(hubDungeonTargetName(dungeon.id));
     rect.on('pointerdown', onClick);
+    // Chunk 4: framed row — CURRENT keeps its gold-outline accent (state
+    // 'current'), now drawn by ui/panels.ts instead of the rect's own stroke.
+    addButton(this, x, y, DUNGEON_BUTTON_WIDTH, DUNGEON_BUTTON_HEIGHT, {
+      fillColor: bgColor,
+      state: isCurrent ? 'current' : 'normal',
+      hitRect: rect,
+    });
 
     const orderLabel = dungeon.order === 1 ? '' : ` · ${dungeon.order}`;
     const titleColor = isCurrent ? ACCENT_COLOR : TEXT_COLOR;
@@ -432,6 +443,7 @@ export class HubScene extends Phaser.Scene {
       .setStrokeStyle(2, BORDER_COLOR)
       .setInteractive({ useHandCursor: true })
       .setName(name);
+    addButton(this, x, y, w, h, { fillColor: PALETTE_NUM.panelLight, hitRect: rect });
     this.add
       .text(x, y, label, {
         fontFamily: FONT,

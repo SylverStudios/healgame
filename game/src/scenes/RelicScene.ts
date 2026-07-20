@@ -15,10 +15,10 @@ import type { RelicDef } from '../combat/types';
 import { drawRunModGlyph } from '../ui/runModsBar';
 import { relicGlyphColor, relicGlyphColorCss } from '../ui/relicColors';
 import { FONT, FONT_SIZE_SM, FONT_SIZE_MD } from '../ui/theme';
+import { addBanner, addPanel } from '../ui/panels';
 
 const BG_COLOR = 0x1a1210;
 const CARD_BG = 0x3a2a22;
-const CARD_BG_HOVER = 0x4a3a2e;
 const BORDER_COLOR = 0x0a0605;
 const TEXT_COLOR = '#e8d8c8';
 const DIM_COLOR = '#a89888';
@@ -40,6 +40,8 @@ export class RelicScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(BG_COLOR);
     const { width, height } = this.scale;
 
+    // Chunk 4 (bible item 4): header banner — ui/panels.ts.
+    addBanner(this, width / 2, 64, 360, 64);
     this.add
       .text(width / 2, 48, 'Choose a Relic', { fontFamily: FONT, fontSize: FONT_SIZE_MD, color: TEXT_COLOR })
       .setOrigin(0.5);
@@ -71,6 +73,14 @@ export class RelicScene extends Phaser.Scene {
       .setStrokeStyle(2, BORDER_COLOR)
       .setInteractive({ useHandCursor: true })
       .setName(`relicCard:${relic.id}`);
+    // Chunk 4: framed card — ui/panels.ts. Hover swaps to 'hover' state via
+    // the frame's own API instead of mutating `bg` (which the frame now owns
+    // visually) — see the `hitRect` doc in ui/panels.ts.
+    const frame = addPanel(this, x, y, CARD_WIDTH, CARD_HEIGHT, {
+      fillColor: CARD_BG,
+      accentColor: accent,
+      hitRect: bg,
+    });
 
     this.add
       .text(x, y - CARD_HEIGHT / 2 + 28, relic.name, {
@@ -92,8 +102,8 @@ export class RelicScene extends Phaser.Scene {
       })
       .setOrigin(0.5, 0);
 
-    bg.on('pointerover', () => bg.setFillStyle(CARD_BG_HOVER).setStrokeStyle(2, accent));
-    bg.on('pointerout', () => bg.setFillStyle(CARD_BG).setStrokeStyle(2, BORDER_COLOR));
+    bg.on('pointerover', () => frame.setState('hover'));
+    bg.on('pointerout', () => frame.setState('normal'));
     bg.on('pointerdown', () => this.pick(relic));
   }
 

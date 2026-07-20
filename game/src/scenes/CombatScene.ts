@@ -36,8 +36,9 @@ import {
 } from '../ui/sprites';
 import { SpellBar } from '../ui/spellBar';
 import { CAST_BAR_FRAME_TEXTURE_KEY } from '../ui/spellSprites';
+import { addBanner, addPanel, addButton } from '../ui/panels';
 import { CombatLog } from '../ui/combatLog';
-import { FONT, FONT_SIZE_XS, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG } from '../ui/theme';
+import { FONT, FONT_SIZE_XS, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG, PALETTE_NUM } from '../ui/theme';
 import {
   ManaSpendAura,
   shakeBossImpact,
@@ -532,14 +533,15 @@ export class CombatScene extends Phaser.Scene {
       .setDepth(90)
       .setVisible(false);
 
-    const bannerBg = this.add
-      .rectangle(0, 0, WAVE_BANNER_WIDTH, WAVE_BANNER_HEIGHT, 0x241a15, 0.92)
-      .setStrokeStyle(2, 0x8a7868);
+    // Chunk 4 (bible item 4): shared panel/button/banner kit — ui/panels.ts.
+    // Local (0,0) position: this frame's own container is re-parented into
+    // `waveBanner` below, which owns the on-screen position + show/hide tween.
+    const bannerFrame = addBanner(this, 0, 0, WAVE_BANNER_WIDTH, WAVE_BANNER_HEIGHT, { fillAlpha: 0.92 });
     this.waveBannerText = this.add
       .text(0, 0, '', { fontFamily: FONT, fontSize: FONT_SIZE_MD, color: '#e8d8c8' })
       .setOrigin(0.5);
     this.waveBanner = this.add
-      .container(VIEW_WIDTH / 2, WAVE_BANNER_Y, [bannerBg, this.waveBannerText])
+      .container(VIEW_WIDTH / 2, WAVE_BANNER_Y, [bannerFrame.container, this.waveBannerText])
       .setDepth(80)
       .setAlpha(0);
   }
@@ -1095,13 +1097,16 @@ export class CombatScene extends Phaser.Scene {
       .setAlpha(0);
     this.tweens.add({ targets: backdrop, alpha: OVERLAY_ALPHA, duration: OVERLAY_FADE_MS });
 
-    const panel = this.add
-      .rectangle(centerX, centerY - PANEL_SLIDE_OFFSET, PANEL_WIDTH, PANEL_HEIGHT, 0x241a15, 0.96)
-      .setStrokeStyle(2, 0x8a7868)
-      .setDepth(OVERLAY_DEPTH + 1)
-      .setAlpha(0);
+    // Chunk 4 (bible item 4): framed result panel — ui/panels.ts. The panel's
+    // own Container is what the existing slide-in tween drives (y + alpha),
+    // same choreography as the old flat rect.
+    const panel = addPanel(this, centerX, centerY - PANEL_SLIDE_OFFSET, PANEL_WIDTH, PANEL_HEIGHT, {
+      fillAlpha: 0.96,
+      depth: OVERLAY_DEPTH + 1,
+    });
+    panel.container.setAlpha(0);
     this.tweens.add({
-      targets: panel,
+      targets: panel.container,
       y: centerY,
       alpha: 1,
       delay: PANEL_SLIDE_DELAY_MS,
@@ -1155,6 +1160,8 @@ export class CombatScene extends Phaser.Scene {
       });
     }
 
+    // combatReturn keeps its exact original rect (hit area/name unchanged) —
+    // ui/panels.ts draws framed chrome around it (chunk-3 SpellButton pattern).
     const returnButton = this.add
       .rectangle(centerX, centerY + 105, 180, 40, 0x3a2a22)
       .setStrokeStyle(1, 0x0a0605)
@@ -1166,6 +1173,12 @@ export class CombatScene extends Phaser.Scene {
         const combatResult: CombatResult = { encounterId: this.sceneData.encounterId, status, xp };
         this.scene.start(this.sceneData.returnTo, { combatResult });
       });
+    const returnFrame = addButton(this, centerX, centerY + 105, 180, 40, {
+      fillColor: PALETTE_NUM.panelLight,
+      depth: OVERLAY_DEPTH + 2,
+      hitRect: returnButton,
+    });
+    returnFrame.container.setAlpha(0);
 
     const returnText = this.add
       .text(centerX, centerY + 105, 'Return', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: '#e8d8c8' })
@@ -1176,7 +1189,7 @@ export class CombatScene extends Phaser.Scene {
     // All result objects (especially combatReturn) exist immediately; only
     // their presentation is staged, so semantic journey lookup remains stable.
     this.tweens.add({
-      targets: [returnButton, returnText],
+      targets: [returnButton, returnFrame.container, returnText],
       alpha: 1,
       delay: RETURN_DELAY_MS,
       duration: RETURN_REVEAL_MS,

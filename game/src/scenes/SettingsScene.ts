@@ -13,6 +13,7 @@ import { SceneKeys } from './keys';
 import { loadSave, saveGame } from '../save/save';
 import { clampMusicPct, setMusicVolumePct } from '../ui/music';
 import { FONT, FONT_SIZE_SM, FONT_SIZE_LG } from '../ui/theme';
+import { addButton, addPanel } from '../ui/panels';
 
 const BG_COLOR = 0x1a1210;
 const TRACK_COLOR = 0x3a2a22;
@@ -56,6 +57,12 @@ export class SettingsScene extends Phaser.Scene {
 
     const save = loadSave();
     this.currentPct = clampMusicPct(save.musicVolumePct);
+
+    // Chunk 4 (bible item 4): settings panel — ui/panels.ts. The volume
+    // track itself stays an unframed flat sliver (10px tall — same "too thin
+    // for a border to read as anything but noise" finding chunk 3 recorded
+    // for the GCD/boss-cast micro-bars; see artifacts/pixellab-4/README.md).
+    addPanel(this, centerX, 193, 460, 130);
 
     this.add
       .text(centerX, 156, 'Music Volume', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: DIM_COLOR })
@@ -156,6 +163,7 @@ export class SettingsScene extends Phaser.Scene {
       .setStrokeStyle(2, BORDER_COLOR)
       .setInteractive({ useHandCursor: true })
       .setName(name);
+    addButton(this, x, y, w, h, { fillColor: BUTTON_COLOR, hitRect: rect });
     this.add.text(x, y, label, { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: TEXT_COLOR }).setOrigin(0.5);
     rect.on('pointerdown', onClick);
   }
