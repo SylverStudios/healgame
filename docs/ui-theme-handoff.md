@@ -50,7 +50,7 @@ behavior, layout constants, and gameplay data do not change.
 | 6 | Scene transitions, code-only → NEW ui/transitions.ts, scene.start seams | 0 | **done** (2026-07-20; full verify green, central-agent re-verified; zero PixelLab spend; every scene.start seam covered — plain fade or the hub/tutorial→combat chunky wipe) |
 | 7 | Talent-tree sockets + edge textures → TreeScene, assets/ui/tree/ | 3 | **done** (2026-07-20; full verify green, central-agent re-verified; both PixelLab jobs accepted first try, no rerolls; ledger artifacts/pixellab-7/README.md) |
 | 8 | Per-dungeon battlefield variants → assets/battlefields/*, battlefieldForEncounter() | 2 | **done** (2026-07-20; full verify green, central-agent re-verified; all 5 remaining dungeons shipped custom art, none fell back to Ash Gate; ledger artifacts/pixellab-8/README.md) |
-| 9 | Title/tutorial dress-up → TutorialScene, hub title | 4,5 | todo |
+| 9 | Title/tutorial dress-up → TutorialScene, hub title | 4,5 | **done** (2026-07-20; code-only gold wordmark accent + shadow layer on Tutorial's "healgame" and Hub's "Hub" title, zero PixelLab spend; full verify green, central-agent re-verified) |
 | 10 | Final QA: full verify + journey, smoke --shots visual pass, CLAUDE.md exception list + CHANGELOG, QA note, draft PR | all | todo (central agent) |
 
 Chunks 0 and 10 belong to the central agent. CLAUDE.md and

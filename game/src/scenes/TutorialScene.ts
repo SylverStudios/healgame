@@ -11,7 +11,7 @@ import { loadoutFromSave } from '../data/talentTree';
 import { ASH_GATE } from '../data/encounters';
 import { SPELLS } from '../data/constants';
 import type { CombatSceneData } from './CombatScene';
-import { FONT, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG, PALETTE_NUM } from '../ui/theme';
+import { FONT, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG, PALETTE, PALETTE_NUM } from '../ui/theme';
 import { addButton, addPanel } from '../ui/panels';
 import { drawFramedPortrait, PORTRAIT_FRAME_DISPLAY_SIZE } from '../ui/portraitSprites';
 import { COMBAT_ENTRY_FADE_OUT_MS, fadeInOnCreate, fadeToScene } from '../ui/transitions';
@@ -38,8 +38,25 @@ export class TutorialScene extends Phaser.Scene {
     // Chunk 6 (bible item 6): fade in on scene entry.
     fadeInOnCreate(this);
 
+    // Chunk 9 (bible item 9): wordmark treatment for the title — this is the
+    // "one genuine gap" the chunk-9 bible item calls out (font-at-display-size,
+    // healer portrait, and panel kit already ship from chunks 1/5/4). Code-only
+    // per docs/ui-theme-handoff.md's chunk-9 guidance: gold accent (this
+    // codebase's established "important text" convention — panel-kit CURRENT
+    // outline, button labels) plus a 1px-offset shadow layer in the panel
+    // kit's dark border shade for a flat pixel-outline look (no soft
+    // gradients/anti-aliasing, per art/STYLE.md). Zero PixelLab spend.
+    const TITLE_Y = 60;
+    const TITLE_SHADOW_OFFSET = 2;
     this.add
-      .text(width / 2, 60, 'healgame', { fontFamily: FONT, fontSize: FONT_SIZE_LG, color: TEXT_COLOR })
+      .text(width / 2 + TITLE_SHADOW_OFFSET, TITLE_Y + TITLE_SHADOW_OFFSET, 'healgame', {
+        fontFamily: FONT,
+        fontSize: FONT_SIZE_LG,
+        color: PALETTE.borderDark,
+      })
+      .setOrigin(0.5);
+    this.add
+      .text(width / 2, TITLE_Y, 'healgame', { fontFamily: FONT, fontSize: FONT_SIZE_LG, color: PALETTE.gold })
       .setOrigin(0.5);
 
     this.add
