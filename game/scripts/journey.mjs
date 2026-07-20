@@ -347,7 +347,7 @@ try {
   await shot(page, 'hub-iron-pass-unlocked'); // visual: Iron Pass button present, no Maw button below it
 
   // Later dungeon buttons must not exist yet — locate is null (not an inert pixel click).
-  check((await locate(page, 'hubDungeon:the-maw')) === null, 'The Maw button absent before Black Choir is cleared');
+  check((await locate(page, 'hubDungeon:the-maw')) === null, 'The Maw button absent before Gloam Sanctum is cleared');
   check((await locate(page, 'hubDungeon:cinder-vault')) === null, 'Cinder Vault absent before Iron Pass is cleared');
   check((await locate(page, 'hubDungeon:iron-pass')) !== null, 'Iron Pass button present after Ash Gate clear');
 
@@ -551,8 +551,8 @@ try {
   await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(800);
 
-  // ---- Stage C: Maw gating — gated on Black Choir, still unwinnable -----
-  console.log('Stage C: Maw gating — absent after Iron Pass alone, present + unwinnable after Black Choir');
+  // ---- Stage C: Maw gating — gated on Gloam Sanctum, still unwinnable -----
+  console.log('Stage C: Maw gating — absent after Black Choir alone, present + unwinnable after Gloam Sanctum');
   await seedSave(page, baseSave({ clearedDungeons: ['ash-gate', 'iron-pass'] }));
   check((await locate(page, 'hubDungeon:cinder-vault')) !== null, 'Cinder Vault present after Iron Pass clear');
   check((await locate(page, 'hubDungeon:the-maw')) === null, 'The Maw still gated after Iron Pass alone');
@@ -562,10 +562,25 @@ try {
       clearedDungeons: ['ash-gate', 'iron-pass', 'cinder-vault', 'verdant-rift', 'black-choir'],
     }),
   );
+  check((await locate(page, 'hubDungeon:gloam-sanctum')) !== null, 'Gloam Sanctum present after Black Choir clear');
+  check((await locate(page, 'hubDungeon:the-maw')) === null, 'The Maw still gated after Black Choir alone');
+  await seedSave(
+    page,
+    baseSave({
+      clearedDungeons: [
+        'ash-gate',
+        'iron-pass',
+        'cinder-vault',
+        'verdant-rift',
+        'black-choir',
+        'gloam-sanctum',
+      ],
+    }),
+  );
   save = await readSave(page);
   const xpBeforeMaw = save.xp;
   await shot(page, 'hub-maw-unlocked'); // visual: The Maw button now present
-  check((await locate(page, 'hubDungeon:the-maw')) !== null, 'The Maw button present after Black Choir clear');
+  check((await locate(page, 'hubDungeon:the-maw')) !== null, 'The Maw button present after Gloam Sanctum clear');
   await clickNamed(page, 'hubDungeon:the-maw');
   await page.waitForTimeout(1000);
   await shot(page, 'maw-combat-start');

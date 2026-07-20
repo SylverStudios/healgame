@@ -3,7 +3,8 @@ import type { DungeonDef } from '../content/types';
 /**
  * Dungeon 5 — first fight that wants the Alpha 0.2 crown kit. Maxed crown
  * builds clear under Soul Toll mana pressure; oath-path kits without
- * Vowstrike/crown wipe. Extinction-scale impossibility stays on The Maw.
+ * Vowstrike/crown wipe. Gloam Sanctum is the deeper tree check after this;
+ * extinction-scale impossibility stays on The Maw.
  */
 export const BLACK_CHOIR_DUNGEON = {
   id: 'black-choir',

@@ -8,6 +8,26 @@ Ship summary (newest first): [`CHANGELOG.md`](./CHANGELOG.md).
 enforced by automated gates. Later Alpha sections below amend the baseline
 (Phase 2+ subclass UX, mid dungeons, CDs, relics, loadout, etc.).
 
+---
+
+# Gloam Sanctum (Dungeon 6) — 2026-07-19
+
+Status: current · Last verified: 2026-07-19
+
+Inserted between Black Choir and The Maw. Notably harder than Black Choir via
+denser trash (final pack of 4) and Null Psalm (manaSiphon) with an earlier
+first cast (3.5s) and tighter cadence (11s).
+
+| Gate | Outcome |
+|---|---|
+| Full Patient / Fervent crown kits (4 oath×aspect) | victory, ≥2 alive |
+| Shallow crown (Vowstrike/Wrath/Crown, path ranks skimmed) | wipe — still clears Black Choir |
+| Mid-tree / Measured crown | wipe |
+| The Maw | still unwinnable; unlocks after Gloam Sanctum |
+
+Tuned with `npm run content -- balance`; pinned in `combat/balance.test.ts`.
+Hub journey Stage C seeds `gloam-sanctum` before The Maw appears.
+
 ## How to run
 
 ```bash
@@ -741,7 +761,7 @@ Status: current · Last verified: 2026-07-15
 Proof add that reused `tunnelVision` (Needle Gaze) with new trash/boss data
 only. Clearable with maxed kits (≥3 alive, Needle Gaze lands ≥1). Inserted
 between Cinder Vault and Black Choir; Black Choir unlocks after Verdant Rift;
-The Maw is Dungeon 6.
+The Maw is Dungeon 7 (Gloam Sanctum inserted as Dungeon 6).
 
 ---
 
@@ -933,6 +953,7 @@ is the XP curb below.
 | Cinder Vault | 1 | 13 |
 | Verdant Rift | 2 | 26 |
 | Black Choir | 2 | 18 |
+| Gloam Sanctum | 2 | 24 |
 | The Maw | 3 | 9 |
 
 Level thresholds unchanged (L2@10, L3@30, L4@60…). Cumulative after CV ≈ 32

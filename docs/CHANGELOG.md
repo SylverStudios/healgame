@@ -7,6 +7,14 @@ Newest first. Numbers and rule detail live in `game/src/data/` and
 
 ---
 
+## 2026-07-19 — Gloam Sanctum (Dungeon 6)
+
+- **New dungeon** between Black Choir and The Maw: denser trash + Null Psalm
+  (earlier/tighter mana siphon than Soul Toll).
+- Full Patient / Fervent crown kits clear; shallow crown kits that still clear
+  Black Choir wipe — wants more path depth before The Maw.
+- The Maw is now Dungeon 7; unlocks after Gloam Sanctum.
+
 ## 2026-07-19 — Post-v0.3 playtest: harder mid bosses, stock music, unit art
 
 - **Mid/late bosses harder**: Spire Lancer HP 340 + denser Tunnel Vision;

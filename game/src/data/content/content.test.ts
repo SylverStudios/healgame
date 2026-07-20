@@ -183,11 +183,12 @@ describe('live dungeon content', () => {
       'cinder-vault',
       'verdant-rift',
       'black-choir',
+      'gloam-sanctum',
       'the-maw',
     ]);
     expect(all[0]).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[0]);
     expect(all[1]).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[1]);
-    expect(all[5]).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[2]);
+    expect(all[6]).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[2]);
   });
 
   it('assembles deterministically from explicit order, independent of catalog array order', () => {
@@ -203,6 +204,7 @@ describe('live dungeon content', () => {
       'cinder-vault',
       'verdant-rift',
       'black-choir',
+      'gloam-sanctum',
       'the-maw',
     ]);
     expect(compileAllDungeons(reordered)).toEqual(compileAllDungeons(reordered));
@@ -221,8 +223,8 @@ describe('live dungeon content', () => {
   it('formats a stable preview with effective overrides and ability cadence', () => {
     expect(formatDungeonPreview('the-maw', CONTENT_CATALOGS)).toBe(
       [
-        'Dungeon 6: The Maw [the-maw]',
-        'Unlock: clear black-choir',
+        'Dungeon 7: The Maw [the-maw]',
+        'Unlock: clear gloam-sanctum',
         'Rewards: XP 3/enemy, relic offer on first clear',
         'Visual: the-maw',
         'Wave 1:',

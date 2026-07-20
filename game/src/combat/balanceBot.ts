@@ -4,7 +4,7 @@
  */
 import { CombatEngine } from './engine';
 import { SPELLS } from '../data/constants';
-import { BONEHOWL, EMBERFALL, EXTINCTION, SOUL_TOLL } from '../data/enemyAbilities';
+import { BONEHOWL, EMBERFALL, EXTINCTION, NULL_PSALM, SOUL_TOLL } from '../data/enemyAbilities';
 import { loadoutFromSave, type CombatMods } from '../data/talentTree';
 import type { SaveData } from '../save/save';
 import type { CombatEngineOptions, EncounterDef, RelicDef, SpellDef, Unit } from './types';
@@ -21,6 +21,7 @@ const PARTY_WIDE_CAST_NAMES: ReadonlySet<string> = new Set([
   EXTINCTION.name,
   EMBERFALL.name,
   SOUL_TOLL.name,
+  NULL_PSALM.name,
 ]);
 
 /** How soon before a known party-wide cast lands counts as "anticipate the burst". */
@@ -166,7 +167,8 @@ export const VIGIL_VENGEANCE_SAVE: SaveData = makeBalanceSave({
 
 /**
  * Vigil efficiency mid-clear kit (Measured Devotion path + crown).
- * Skips Patient Vow / Graven Scale; still clears all pre-Maw content.
+ * Skips Patient Vow / Graven Scale; clears through Black Choir. Gloam
+ * Sanctum wants Patient / Fervent path depth beyond this kit.
  */
 export const VIGIL_EFFICIENCY_SAVE: SaveData = makeBalanceSave({
   xp: 910, // xpForLevel(14)
@@ -263,6 +265,48 @@ export const ZEALOT_MID_TREE_SAVE: SaveData = makeBalanceSave({
   subclass: 'zealot',
 });
 
+/**
+ * Shallow Vigil crown — Vowstrike / Wrath / Crown with Patient Vow only rank 1
+ * and no Graven Scale / Still Waters. Clears Black Choir; should wipe on
+ * Gloam Sanctum (path-depth gate beyond the first crown check).
+ */
+export const VIGIL_SHALLOW_CROWN_SAVE: SaveData = makeBalanceSave({
+  xp: 910,
+  unlockedSpells: ['solemn-mend', 'zealous-mending'],
+  treeRanks: {
+    'deep-reserves': 3,
+    'vigil-oath': 1,
+    'vigil-patient-vow': 1,
+    'vigil-thrift': 1,
+    'shared-mend-potency': 1,
+    'shared-zealous-potency': 1,
+    'vowstrike-virtue': 1,
+    'wrath-ascendant': 1,
+    'vowbound-crown': 1,
+  },
+  subclass: 'vigil',
+});
+
+/**
+ * Shallow Zealot crown — Vowstrike / Wrath / Crown with Fervent Chain only
+ * rank 1 and no Steady Hands / Quick Breath / Frenzied Liturgy.
+ */
+export const ZEALOT_SHALLOW_CROWN_SAVE: SaveData = makeBalanceSave({
+  xp: 910,
+  unlockedSpells: ['solemn-mend', 'zealous-mending'],
+  treeRanks: {
+    'deep-reserves': 3,
+    'zealot-oath': 1,
+    'zealot-fervent-chain': 1,
+    'shared-mend-potency': 1,
+    'shared-zealous-potency': 1,
+    'vowstrike-virtue': 1,
+    'wrath-ascendant': 1,
+    'vowbound-crown': 1,
+  },
+  subclass: 'zealot',
+});
+
 export const VIGIL_LOADOUT: CombatMods = loadoutFromSave(VIGIL_SAVE);
 export const VIGIL_VENGEANCE_LOADOUT: CombatMods = loadoutFromSave(VIGIL_VENGEANCE_SAVE);
 export const VIGIL_EFFICIENCY_LOADOUT: CombatMods = loadoutFromSave(VIGIL_EFFICIENCY_SAVE);
@@ -270,6 +314,8 @@ export const ZEALOT_LOADOUT: CombatMods = loadoutFromSave(ZEALOT_SAVE);
 export const ZEALOT_VENGEANCE_LOADOUT: CombatMods = loadoutFromSave(ZEALOT_VENGEANCE_SAVE);
 export const VIGIL_MID_TREE_LOADOUT: CombatMods = loadoutFromSave(VIGIL_MID_TREE_SAVE);
 export const ZEALOT_MID_TREE_LOADOUT: CombatMods = loadoutFromSave(ZEALOT_MID_TREE_SAVE);
+export const VIGIL_SHALLOW_CROWN_LOADOUT: CombatMods = loadoutFromSave(VIGIL_SHALLOW_CROWN_SAVE);
+export const ZEALOT_SHALLOW_CROWN_LOADOUT: CombatMods = loadoutFromSave(ZEALOT_SHALLOW_CROWN_SAVE);
 
 /**
  * All maxed builds for `npm run content -- balance`.

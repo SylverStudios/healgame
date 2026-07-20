@@ -26,4 +26,5 @@ export const IRON_PASS = requiredEncounter('iron-pass');
 export const CINDER_VAULT = requiredEncounter('cinder-vault');
 export const VERDANT_RIFT = requiredEncounter('verdant-rift');
 export const BLACK_CHOIR = requiredEncounter('black-choir');
+export const GLOAM_SANCTUM = requiredEncounter('gloam-sanctum');
 export const THE_MAW = requiredEncounter('the-maw');
