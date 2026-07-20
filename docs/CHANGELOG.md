@@ -7,6 +7,36 @@ Newest first. Numbers and rule detail live in `game/src/data/` and
 
 ---
 
+## 2026-07-20 — UI theming: FE-GBA presentation pass
+
+Presentation only — no engine, layout-constant, or gameplay-data changes;
+journey required zero coordinate/name edits across the whole phase.
+
+- **Pixel font**: game-wide `HealgameIron` 16px-glyph PixelLab font replaces
+  system monospace (digits still fall back to monospace; combat log stays
+  monospace by design).
+- **Combat battlefield**: layered backdrop (code sky gradient + PixelLab
+  structure props) + FE-style perspective platform slices under the
+  party/enemy lines, replacing the flat black void + 2px ground line. All 6
+  dungeons have a distinct variant (Ash Gate original; the other 5 are
+  `create_object_state` recolors), resolved per-encounter via
+  `battlefieldForEncounter()`.
+- **Spell-bar chrome**: framed spell/cooldown buttons, keycap chips, cast-bar
+  frame, and real 16×16 icons for all 7 spells + 3 major cooldowns
+  (glyph-char fallback preserved for anything unmapped).
+- **Shared panel kit**: Hub, Tutorial, Loadout, Relic, Settings, and the
+  combat result overlay now share one nine-slice panel/button/banner
+  language (`ui/panels.ts`) instead of flat rects.
+- **Party portraits**: FE-style bust portraits beside banter bubbles, on the
+  tutorial screen, and on the result panel (victory=healer, wipe=tank).
+- **Scene transitions**: every scene change fades; entering combat plays a
+  chunky blocky "into battle" reveal instead of a hard cut.
+- **Talent tree**: node circles become framed sockets (locked / affordable /
+  owned / armed / exclusive-locked); edges become a tinted groove-strip
+  texture per `EdgeState`, keeping the locked dead-branch break+X cue.
+- **Title wordmark**: Tutorial's and Hub's titles get a gold accent + shadow
+  treatment instead of reading as plain body text.
+
 ## 2026-07-19 — Post-v0.3 playtest: harder mid bosses, stock music, unit art
 
 - **Mid/late bosses harder**: Spire Lancer HP 340 + denser Tunnel Vision;
