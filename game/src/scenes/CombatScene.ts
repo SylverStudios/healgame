@@ -29,9 +29,13 @@ import {
   HEALER_IDLE_ANIM_KEY,
   HEALER_IDLE_FRAME,
   HEALER_SHEET_TEXTURE_KEY,
+  HEALER_VOWSTRIKE_ANIM_KEY,
+  HEALER_VOWSTRIKE_IMPACT_LEAD_MS,
   HEALER_ZAP_ANIM_KEY,
+  HEALER_ZAP_IMPACT_LEAD_MS,
   healerCastStyleForSpell,
   hurtAnimKeyForUnit,
+  isVowstrikeSpell,
   presentationForUnit,
 } from '../ui/sprites';
 import { SpellBar } from '../ui/spellBar';
@@ -449,6 +453,7 @@ export class CombatScene extends Phaser.Scene {
               fixedFacing: true,
               idleAnimKey: HEALER_IDLE_ANIM_KEY,
               zapAnimKey: HEALER_ZAP_ANIM_KEY,
+              vowstrikeAnimKey: HEALER_VOWSTRIKE_ANIM_KEY,
               casterAnim: {
                 styles: HEALER_CAST_STYLE_ANIMS,
               },
@@ -683,32 +688,38 @@ export class CombatScene extends Phaser.Scene {
   // ---- event feedback --------------------------------------------------------
 
   private handleEvents(events: CombatEvent[]): void {
-    // Bridges Bonk's same-tick castStarted → damage so the impact VFX knows to fire.
-    let pendingBonkImpact = false;
+    // Bonk / Vowstrike: same-tick castStarted+damage — defer hit juice to climax frame.
+    let pendingHealerImpact: { leadMs: number; showZapVfx: boolean } | null = null;
     for (const event of events) {
       switch (event.type) {
         case 'damage': {
           const victim = this.findSprite(event.targetId);
-          victim?.flashDamage();
-          victim?.spawnDamageFloat(event.amount);
-          victim?.playHurt(); // no-op unless UNIT_HURT_ANIMS wires this unit
-          // Guard: the attacker (and/or victim) may already be dead this tick — sprites persist
-          // until the next rebuildEnemies(), so the lookup is safe, but the sprite may be absent
-          // if it belongs to a roster already replaced by a same-tick waveStarted rebuild.
+          // Guard: attacker/victim sprites may already be gone after a same-tick wave rebuild.
           const attacker = this.findSprite(event.sourceId);
-          if (attacker) {
-            // Mercs: attack strip. Others: lunge — except Bonk (zap already playing).
-            const attackerUnit = this.engine.state.party.find((u) => u.id === event.sourceId);
-            if (attackerUnit?.role === 'tank' || attackerUnit?.role === 'dps') {
-              attacker.playAttack();
-            } else if (!pendingBonkImpact) {
-              const towardX = victim?.getHomeX() ?? attacker.getHomeX();
-              attacker.lunge(towardX);
+          if (pendingHealerImpact && victim) {
+            const { leadMs, showZapVfx } = pendingHealerImpact;
+            const amount = event.amount;
+            const x = victim.getHomeX();
+            const y = victim.getHomeY();
+            this.time.delayedCall(leadMs, () => {
+              victim.flashDamage();
+              victim.spawnDamageFloat(amount);
+              victim.playHurt();
+              if (showZapVfx) showZapImpact(this, x, y);
+            });
+            pendingHealerImpact = null;
+          } else {
+            victim?.flashDamage();
+            victim?.spawnDamageFloat(event.amount);
+            victim?.playHurt(); // no-op unless UNIT_HURT_ANIMS wires this unit
+            if (attacker) {
+              const attackerUnit = this.engine.state.party.find((u) => u.id === event.sourceId);
+              if (attackerUnit?.role === 'tank' || attackerUnit?.role === 'dps') {
+                attacker.playAttack();
+              } else {
+                attacker.lunge(victim?.getHomeX() ?? attacker.getHomeX());
+              }
             }
-          }
-          if (pendingBonkImpact && victim) {
-            showZapImpact(this, victim.getHomeX(), victim.getHomeY());
-            pendingBonkImpact = false;
           }
           this.combatLog.push(
             `${this.formatTimestamp()} ${this.resolveUnitName(event.sourceId)} hits ${this.resolveUnitName(event.targetId)} -${event.amount}`,
@@ -739,18 +750,16 @@ export class CombatScene extends Phaser.Scene {
           const castTarget = this.findSprite(event.cast.targetId);
           const castSpell = this.sceneData.loadout.spells.find((s) => s.id === event.cast.spellId);
           healer?.flashCast();
-          // Bonk (and only Bonk) plays the zap strip; other spells pick Solemn vs
-          // Zealous body language, then charge (channeled) or cast-action (instant).
           if (event.cast.spellId === SPELLS.bonk.id) {
             healer?.playZap();
-            pendingBonkImpact = true;
+            pendingHealerImpact = { leadMs: HEALER_ZAP_IMPACT_LEAD_MS, showZapVfx: true };
+          } else if (isVowstrikeSpell(event.cast.spellId)) {
+            healer?.playVowstrike();
+            pendingHealerImpact = { leadMs: HEALER_VOWSTRIKE_IMPACT_LEAD_MS, showZapVfx: false };
           } else {
             healer?.setCastStyle(healerCastStyleForSpell(event.cast.spellId));
-            if (event.cast.totalMs === 0) {
-              healer?.playCastRelease();
-            } else {
-              healer?.setCasting(true);
-            }
+            if (event.cast.totalMs === 0) healer?.playCastRelease();
+            else healer?.setCasting(true);
           }
           // Heal beam only — damage spells (Bonk / Vowstrike) use body/VFX reads.
           if (healer && castTarget && castSpell && castSpell.heal > 0) {
@@ -770,8 +779,8 @@ export class CombatScene extends Phaser.Scene {
           break;
         }
         case 'castFinished':
-          // Channel → cast-action. Skip Bonk — zap already playing; finishCast snaps idle.
-          if (event.spellId !== SPELLS.bonk.id) {
+          // Skip Bonk / Vowstrike — their attack strips are already playing.
+          if (event.spellId !== SPELLS.bonk.id && !isVowstrikeSpell(event.spellId)) {
             this.partySprites.get('healer')?.finishCast();
           }
           break;

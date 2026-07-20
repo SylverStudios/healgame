@@ -291,13 +291,18 @@ export type HealerCastStyle = 'solemn' | 'zealous';
 
 /**
  * Map spell → cast style. Solemn-* → solemn; Zealous-* → zealous;
- * Vowstrike Virtue → solemn, Reckoning → zealous; everything else → solemn.
+ * everything else → solemn. Vowstrike uses its own attack strip (not this).
  */
 export function healerCastStyleForSpell(spellId: string): HealerCastStyle {
-  if (spellId.startsWith('zealous-') || spellId === 'vowstrike-vengeance') {
+  if (spellId.startsWith('zealous-')) {
     return 'zealous';
   }
   return 'solemn';
+}
+
+/** Instant oath-strike — both aspects share one attack strip. */
+export function isVowstrikeSpell(spellId: string): boolean {
+  return spellId === 'vowstrike-virtue' || spellId === 'vowstrike-vengeance';
 }
 
 /**
@@ -346,15 +351,47 @@ export const HEALER_IDLE_ANIM_KEY = 'unit-healer-idle';
 export const HEALER_IDLE_FRAME_DURATIONS_MS: readonly number[] = [220, 180, 250, 180, 220] as const;
 
 /**
- * Healer south Bonk zap strip (chunk 1B) — the ONLY spell that plays this;
- * other instant casts keep the heal cast-action release. 7 frames, individual
- * PNGs under `attack-south/`.
+ * Healer south Bonk zap strip (chunk 1B) — Bonk only. 7 frames under
+ * `attack-south/`.
  */
 export const HEALER_ZAP_ANIM_KEY = 'unit-healer-zap';
 /** FE exposure: quick antic, held spark (contact), snappy recovery. Not equal times. */
 export const HEALER_ZAP_FRAME_DURATIONS_MS: readonly number[] = [
   50, 150, 267, 83, 167, 117, 100,
 ] as const;
+/** Index of the held spark / contact silhouette in the Bonk zap strip. */
+export const HEALER_ZAP_CLIMAX_FRAME_INDEX = 2;
+/**
+ * Delay Bonk hit presentation (float / hurt / zap-vfx) this many ms after
+ * castStarted so the impact lands when the spark frame begins. Engine damage
+ * still resolves instantly; this is presentation-only.
+ */
+export const HEALER_ZAP_IMPACT_LEAD_MS: number = HEALER_ZAP_FRAME_DURATIONS_MS.slice(
+  0,
+  HEALER_ZAP_CLIMAX_FRAME_INDEX,
+).reduce((sum, ms) => sum + ms, 0);
+
+/**
+ * Healer south Vowstrike oath-strike — both aspects. Method B approach strip
+ * (idle → raised-fist climax); recovery snaps to idle on complete. 5 frames
+ * under `vowstrike-south/`.
+ */
+export const HEALER_VOWSTRIKE_ANIM_KEY = 'unit-healer-vowstrike';
+/** FE exposure: snappy raise, held climax glow. Total well under GCD_MS. */
+export const HEALER_VOWSTRIKE_FRAME_DURATIONS_MS: readonly number[] = [
+  33, // leave idle
+  40, // arm rising
+  50, // near peak
+  67, // approach glow
+  167, // climax hold (raised fist + pale-gold burst)
+] as const;
+/** Index of the raised-fist contact silhouette. */
+export const HEALER_VOWSTRIKE_CLIMAX_FRAME_INDEX = 4;
+/** Presentation delay until Vowstrike climax begins (engine still instant). */
+export const HEALER_VOWSTRIKE_IMPACT_LEAD_MS: number = HEALER_VOWSTRIKE_FRAME_DURATIONS_MS.slice(
+  0,
+  HEALER_VOWSTRIKE_CLIMAX_FRAME_INDEX,
+).reduce((sum, ms) => sum + ms, 0);
 
 export const HEALER_SOLEMN_CHARGE_ANIM_KEY = 'unit-healer-charge-solemn';
 export const HEALER_ZEALOUS_CHARGE_ANIM_KEY = 'unit-healer-charge-zealous';
@@ -398,6 +435,15 @@ export const HEALER_ZAP_ANIM: HealerStripAnimDef = {
   frameDurationsMs: HEALER_ZAP_FRAME_DURATIONS_MS,
 };
 
+export const HEALER_VOWSTRIKE_ANIM: HealerStripAnimDef = {
+  animKey: HEALER_VOWSTRIKE_ANIM_KEY,
+  frameCount: 5,
+  loop: false,
+  frameKey: (i) => healerFrameKey('vowstrike', i),
+  frameUrl: (i) => healerFrameUrl('vowstrike-south', i),
+  frameDurationsMs: HEALER_VOWSTRIKE_FRAME_DURATIONS_MS,
+};
+
 export const HEALER_SOLEMN_CHARGE_ANIM: HealerStripAnimDef = {
   animKey: HEALER_SOLEMN_CHARGE_ANIM_KEY,
   frameCount: 4,
@@ -438,6 +484,7 @@ export const HEALER_ZEALOUS_CAST_ANIM: HealerStripAnimDef = {
 export const HEALER_STRIP_ANIMS: readonly HealerStripAnimDef[] = [
   HEALER_IDLE_ANIM,
   HEALER_ZAP_ANIM,
+  HEALER_VOWSTRIKE_ANIM,
   HEALER_SOLEMN_CHARGE_ANIM,
   HEALER_ZEALOUS_CHARGE_ANIM,
   HEALER_SOLEMN_CAST_ANIM,

@@ -75,14 +75,21 @@
           "frames": 9,
           "status": "live",
           "durations": "HEALER_CAST_FRAME_DURATIONS_MS",
-          "note": "Solemn Method B release; vowstrike-virtue instant uses this too"
+          "note": "Solemn Method B release; solemn-* heals"
         },
         "cast-zealous": {
           "dir": "cast-zealous-south",
           "frames": 9,
           "status": "live",
           "durations": "HEALER_CAST_FRAME_DURATIONS_MS",
-          "note": "Zealous Method B forward release; vowstrike-vengeance instant too"
+          "note": "Zealous Method B forward release; zealous-* heals"
+        },
+        "vowstrike": {
+          "dir": "vowstrike-south",
+          "frames": 5,
+          "status": "live",
+          "durations": "HEALER_VOWSTRIKE_FRAME_DURATIONS_MS",
+          "note": "Instant oath-strike (both aspects); Method B idle to climax; recover snaps idle; climax state d94ad5b6"
         }
       },
       "note": "Party STYLE exception: combat facing south (camera). Mercs remain east."

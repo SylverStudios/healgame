@@ -167,6 +167,8 @@ export interface UnitSpriteConfig {
   idleAnimKey?: string;
   /** Healer-only: one-shot Bonk zap strip (registered in BootScene). Played via `playZap()`. */
   zapAnimKey?: string;
+  /** Healer-only: one-shot Vowstrike attack strip. Played via `playVowstrike()`. */
+  vowstrikeAnimKey?: string;
   /**
    * Extra body Y in container space. PixelLab canvases pad ~25% below the painted
    * feet — shift the sprite down so feet meet the ground line after setDisplaySize.
@@ -217,6 +219,8 @@ export class UnitSprite {
   private readonly idleAnimKey: string | null;
   /** Healer-only Bonk zap strip key; null for every other unit. */
   private readonly zapAnimKey: string | null;
+  /** Healer-only Vowstrike attack strip key; null for every other unit. */
+  private readonly vowstrikeAnimKey: string | null;
   /** Resting local Y for the body (PixelLab foot-pad offset); telegraph raise adds on top. */
   private readonly bodyRestY: number;
   private readonly nameText: Phaser.GameObjects.Text | null;
@@ -277,6 +281,7 @@ export class UnitSprite {
     this.hurtAnimKey = config.hurtAnimKey ?? null;
     this.idleAnimKey = config.idleAnimKey ?? null;
     this.zapAnimKey = config.zapAnimKey ?? null;
+    this.vowstrikeAnimKey = config.vowstrikeAnimKey ?? null;
     this.bodyRestY = config.bodyOffsetY ?? 0;
     const bodySprite =
       config.frame === undefined
@@ -605,6 +610,18 @@ export class UnitSprite {
     this.body.setDisplaySize(this.width, this.height);
   }
 
+  /** Healer-only Vowstrike oath-strike (both aspects). Snaps to idle on complete. */
+  playVowstrike(): void {
+    if (!this.vowstrikeAnimKey || !this.alive) return;
+    this.body.play(this.vowstrikeAnimKey, false);
+    this.body.setDisplaySize(this.width, this.height);
+  }
+
+  private isInstantAttackPlaying(): boolean {
+    const key = this.body.anims.currentAnim?.key;
+    return key === this.zapAnimKey || key === this.vowstrikeAnimKey;
+  }
+
   private restoreRestPose(): void {
     if (this.idleAnimKey) {
       this.body.play(this.idleAnimKey, true);
@@ -702,12 +719,13 @@ export class UnitSprite {
 
   /**
    * Successful cast end: play the cast-action if we were still charging. No-op
-   * when early release, an instant already started the strip, or Bonk zap is up.
+   * when early release, an instant already started the strip, or a Bonk /
+   * Vowstrike attack strip is up.
    */
   finishCast(): void {
     if (!this.casterAnim) return;
     if (this.releaseActive) return;
-    if (this.zapAnimKey && this.body.anims.currentAnim?.key === this.zapAnimKey) return;
+    if (this.isInstantAttackPlaying()) return;
     if (this.charging) {
       this.playCastRelease();
       return;

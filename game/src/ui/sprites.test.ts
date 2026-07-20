@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { UnitRole } from '../combat/types';
+import { GCD_MS } from '../data/constants';
 import { MOBS } from '../data/mobs';
 import {
   ASH_HUSK_TEXTURE_KEY,
@@ -25,11 +26,19 @@ import {
   HEALER_STRIP_ANIMS,
   HEALER_ZEALOUS_CAST_ANIM,
   HEALER_ZEALOUS_CHARGE_ANIM,
+  HEALER_VOWSTRIKE_ANIM,
+  HEALER_VOWSTRIKE_ANIM_KEY,
+  HEALER_VOWSTRIKE_CLIMAX_FRAME_INDEX,
+  HEALER_VOWSTRIKE_FRAME_DURATIONS_MS,
+  HEALER_VOWSTRIKE_IMPACT_LEAD_MS,
   HEALER_ZAP_ANIM,
   HEALER_ZAP_ANIM_KEY,
+  HEALER_ZAP_CLIMAX_FRAME_INDEX,
   HEALER_ZAP_FRAME_DURATIONS_MS,
+  HEALER_ZAP_IMPACT_LEAD_MS,
   healerCastStyleForSpell,
   healerStripAnimFrames,
+  isVowstrikeSpell,
   hurtAnimFrames,
   hurtAnimKeyForUnit,
   MERC_ATTACK_FRAME_DURATIONS_MS,
@@ -226,8 +235,10 @@ describe('healer charge / cast exposure sheets (Solemn / Zealous)', () => {
     expect(healerCastStyleForSpell('solemn-vigil')).toBe('solemn');
     expect(healerCastStyleForSpell('zealous-mending')).toBe('zealous');
     expect(healerCastStyleForSpell('zealous-flare')).toBe('zealous');
-    expect(healerCastStyleForSpell('vowstrike-virtue')).toBe('solemn');
-    expect(healerCastStyleForSpell('vowstrike-vengeance')).toBe('zealous');
+    // Vowstrike uses its own attack strip; cast-style mapping is unused for it.
+    expect(isVowstrikeSpell('vowstrike-virtue')).toBe(true);
+    expect(isVowstrikeSpell('vowstrike-vengeance')).toBe(true);
+    expect(isVowstrikeSpell('bonk')).toBe(false);
   });
 
   it('registers charge as loops and cast as one-shots for both styles', () => {
@@ -241,14 +252,16 @@ describe('healer charge / cast exposure sheets (Solemn / Zealous)', () => {
 });
 
 describe('healer idle / zap exposure sheets (chunk 1B)', () => {
-  it('keeps idle and zap strip lengths matched to their duration tables', () => {
+  it('keeps idle / zap / vowstrike strip lengths matched to their duration tables', () => {
     expect(HEALER_IDLE_FRAME_DURATIONS_MS.length).toBe(HEALER_IDLE_ANIM.frameCount);
     expect(HEALER_ZAP_FRAME_DURATIONS_MS.length).toBe(HEALER_ZAP_ANIM.frameCount);
+    expect(HEALER_VOWSTRIKE_FRAME_DURATIONS_MS.length).toBe(HEALER_VOWSTRIKE_ANIM.frameCount);
   });
 
   it('never uses equal frame times (FE holds, not a uniform GIF cadence)', () => {
     expect(new Set(HEALER_IDLE_FRAME_DURATIONS_MS).size).toBeGreaterThan(1);
     expect(new Set(HEALER_ZAP_FRAME_DURATIONS_MS).size).toBeGreaterThan(1);
+    expect(new Set(HEALER_VOWSTRIKE_FRAME_DURATIONS_MS).size).toBeGreaterThan(1);
     expect(new Set(ZAP_VFX_FRAME_DURATIONS_MS).size).toBeGreaterThan(1);
   });
 
@@ -261,18 +274,46 @@ describe('healer idle / zap exposure sheets (chunk 1B)', () => {
 
   it('holds the zap spark longer than the antic and recovery frames', () => {
     // Sheet: antic, spark-antic, spark hold (contact), snap, recover, settle, rest.
-    const sparkMs = HEALER_ZAP_FRAME_DURATIONS_MS[2]!;
+    const sparkMs = HEALER_ZAP_FRAME_DURATIONS_MS[HEALER_ZAP_CLIMAX_FRAME_INDEX]!;
     const anticMs = HEALER_ZAP_FRAME_DURATIONS_MS[0]!;
     expect(sparkMs).toBeGreaterThan(anticMs);
     expect(sparkMs).toBeGreaterThanOrEqual(200);
   });
 
-  it('registers idle as a loop and zap as a one-shot', () => {
+  it('delays Bonk hit presentation until the zap spark frame begins', () => {
+    expect(HEALER_ZAP_IMPACT_LEAD_MS).toBe(
+      HEALER_ZAP_FRAME_DURATIONS_MS.slice(0, HEALER_ZAP_CLIMAX_FRAME_INDEX).reduce(
+        (sum, ms) => sum + ms,
+        0,
+      ),
+    );
+    expect(HEALER_ZAP_IMPACT_LEAD_MS).toBe(200);
+    expect(HEALER_ZAP_IMPACT_LEAD_MS).toBeLessThan(GCD_MS);
+  });
+
+  it('holds the Vowstrike climax longer than the raise frames and stays under GCD', () => {
+    const climaxMs = HEALER_VOWSTRIKE_FRAME_DURATIONS_MS[HEALER_VOWSTRIKE_CLIMAX_FRAME_INDEX]!;
+    const firstMs = HEALER_VOWSTRIKE_FRAME_DURATIONS_MS[0]!;
+    expect(climaxMs).toBeGreaterThan(firstMs);
+    expect(HEALER_VOWSTRIKE_IMPACT_LEAD_MS).toBe(
+      HEALER_VOWSTRIKE_FRAME_DURATIONS_MS.slice(0, HEALER_VOWSTRIKE_CLIMAX_FRAME_INDEX).reduce(
+        (sum, ms) => sum + ms,
+        0,
+      ),
+    );
+    const totalMs = HEALER_VOWSTRIKE_FRAME_DURATIONS_MS.reduce((sum, ms) => sum + ms, 0);
+    expect(totalMs).toBeLessThan(GCD_MS);
+    expect(HEALER_VOWSTRIKE_IMPACT_LEAD_MS).toBeLessThan(300);
+  });
+
+  it('registers idle as a loop and zap / vowstrike as one-shots', () => {
     expect(HEALER_IDLE_ANIM.loop).toBe(true);
     expect(HEALER_ZAP_ANIM.loop).toBe(false);
+    expect(HEALER_VOWSTRIKE_ANIM.loop).toBe(false);
     expect(HEALER_STRIP_ANIMS.map((d) => d.animKey)).toEqual([
       HEALER_IDLE_ANIM_KEY,
       HEALER_ZAP_ANIM_KEY,
+      HEALER_VOWSTRIKE_ANIM_KEY,
       HEALER_SOLEMN_CHARGE_ANIM.animKey,
       HEALER_ZEALOUS_CHARGE_ANIM.animKey,
       HEALER_SOLEMN_CAST_ANIM.animKey,
