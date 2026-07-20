@@ -22,6 +22,7 @@ import { getEncounterById } from '../data/encounters';
 import { GCD_MS, SPELLS } from '../data/constants';
 import { Bar } from '../ui/bar';
 import { UnitSprite } from '../ui/unitSprite';
+import { buildBattlefield } from '../ui/battlefield';
 import {
   attackAnimKeyForUnit,
   HEALER_CAST_RELEASE_LEAD_MS,
@@ -94,9 +95,6 @@ const PARTY_SLOT_LEFT = 80;
 const PARTY_SLOT_RIGHT = 380;
 const ENEMY_SLOT_LEFT = 580;
 const ENEMY_SLOT_RIGHT = 880;
-const GROUND_LINE_COLOR = 0x3a2a22;
-const GROUND_LINE_WIDTH = 2;
-const GROUND_LINE_MARGIN = 40;
 
 /** Engine party order is tank → dps1 → dps2 → healer (unchanged); visual left→right
  *  order is healer · dps2 · dps1 · tank so the tank stands nearest the enemy line
@@ -315,7 +313,13 @@ export class CombatScene extends Phaser.Scene {
       relics: relicsById(save.relicIds),
     });
 
-    this.buildGroundLine();
+    buildBattlefield(this, 'ashgate', {
+      viewWidth: VIEW_WIDTH,
+      viewHeight: VIEW_HEIGHT,
+      groundY: GROUND_Y,
+      partyCenterX: (PARTY_SLOT_LEFT + PARTY_SLOT_RIGHT) / 2,
+      enemyCenterX: (ENEMY_SLOT_LEFT + ENEMY_SLOT_RIGHT) / 2,
+    });
     this.buildPartySprites();
     this.rebuildEnemies(this.engine.state.enemies);
     this.buildHud();
@@ -395,20 +399,6 @@ export class CombatScene extends Phaser.Scene {
   }
 
   // ---- setup --------------------------------------------------------------
-
-  /** One flat line under the battle line so the facing line reads as standing on shared
-   *  ground (handoff §A, optional) — drawn once behind everything else, no animation. */
-  private buildGroundLine(): void {
-    this.add
-      .rectangle(
-        VIEW_WIDTH / 2,
-        GROUND_Y,
-        ENEMY_SLOT_RIGHT - PARTY_SLOT_LEFT + GROUND_LINE_MARGIN * 2,
-        GROUND_LINE_WIDTH,
-        GROUND_LINE_COLOR,
-      )
-      .setDepth(-1);
-  }
 
   private buildPartySprites(): void {
     const party = this.engine.state.party;

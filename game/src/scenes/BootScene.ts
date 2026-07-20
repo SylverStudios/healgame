@@ -32,6 +32,7 @@ import {
 import { RELIC_TEXTURE_IDS, relicTextureKey, relicTextureUrl } from '../ui/relicSprites';
 import { initMusic, MUSIC_ASSET_KEY, MUSIC_URL } from '../ui/music';
 import { fontsReady } from '../ui/theme';
+import { battlefieldTexturesForVariant } from '../ui/battlefield';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -73,6 +74,11 @@ export class BootScene extends Phaser.Scene {
     // PixelLab relic icons (64×64) — run-mod bar + RelicScene cards.
     for (const id of RELIC_TEXTURE_IDS) {
       this.load.image(relicTextureKey(id), relicTextureUrl(id));
+    }
+    // Ash Gate combat battlefield (temp-art exception): backdrop structure
+    // props + platform slice — see ui/battlefield.ts.
+    for (const texture of battlefieldTexturesForVariant('ashgate')) {
+      this.load.image(texture.key, texture.url);
     }
     // Attack strips: one texture key per frame (not packed into Kenney).
     for (const def of UNIT_ATTACK_ANIMS) {
