@@ -1,6 +1,7 @@
 # UI-theming phase — orchestrator handoff & live state
 
-Status: planning · Authority: active phase handoff (wins this phase's scope)
+Status: **shipped, pending PR merge** · Authority: active phase handoff (wins
+this phase's scope until merged, then retire per `ship-phase`)
 · Updated: 2026-07-20 by the central agent
 
 This file is the durable state of the UI-theming phase so a fresh
@@ -15,27 +16,29 @@ Replace the PoC temp-art UI (flat rects, monospace, black void) with the
 FE-GBA-styled presentation from the bible. Presentation only — engine
 behavior, layout constants, and gameplay data do not change.
 
-## Done-means checklist (verify each before declaring the phase done)
+## Done-means checklist — all 10 satisfied, verified at chunk 10 (2026-07-20)
 
-1. All in-game text in a bundled PixelLab .ttf pixel font (monospace only
-   for the debug combat log). ← shipped, chunk 1 (digits caveat below)
-2. Ash Gate combat: layered backdrop + perspective platform slices under
-   party/enemy lines; units in front; feet at GROUND_Y=340.
-3. Spell buttons/keycaps/cast bars/tooltips in pixel-art frames; real 16×16
-   spell icons, glyph char fallback (relicSprites.ts pattern).
-4. Hub/Tutorial/Loadout/Relic/Settings + combat result panel share one
-   nine-slice panel/button kit (ui/panels.ts).
-5. Banter bubbles, tutorial, result panel show bust portraits
-   (victory=healer, wipe=tank).
-6. Every scene change fades (~150–250ms); hub→combat chunky pixel wipe;
-   total <400ms.
-7. Talent-tree nodes = framed sockets (locked/affordable/owned); edges =
-   textured strips tinted per EdgeState; layout untouched.
-8. Every shipped dungeon resolves a battlefield variant via data-driven
-   battlefieldForEncounter().
-9. Tutorial/title dressed with wordmark, portrait, panel kit.
-10. Full `npm run verify` green; journey zero coordinate/name edits;
-    CLAUDE.md temp-art exception list names each new asset class.
+1. ✅ All in-game text in a bundled PixelLab .ttf pixel font (monospace only
+   for the debug combat log). Chunk 1 (digits caveat below).
+2. ✅ Ash Gate combat: layered backdrop + perspective platform slices under
+   party/enemy lines; units in front; feet at GROUND_Y=340. Chunk 2.
+3. ✅ Spell buttons/keycaps/cast bars/tooltips in pixel-art frames; real 16×16
+   spell icons, glyph char fallback (relicSprites.ts pattern). Chunk 3.
+4. ✅ Hub/Tutorial/Loadout/Relic/Settings + combat result panel share one
+   nine-slice panel/button kit (ui/panels.ts). Chunk 4.
+5. ✅ Banter bubbles, tutorial, result panel show bust portraits
+   (victory=healer, wipe=tank). Chunk 5.
+6. ✅ Every scene change fades (~150–250ms); hub→combat chunky pixel wipe;
+   total <400ms. Chunk 6.
+7. ✅ Talent-tree nodes = framed sockets (locked/affordable/owned); edges =
+   textured strips tinted per EdgeState; layout untouched. Chunk 7.
+8. ✅ Every shipped dungeon resolves a battlefield variant via data-driven
+   battlefieldForEncounter() — all 6 dungeons have a distinct variant. Chunk 8.
+9. ✅ Tutorial/title dressed with wordmark, portrait, panel kit. Chunk 9.
+10. ✅ Full `npm run verify` green; journey zero coordinate/name edits (confirmed
+    via `git log` — `journey.mjs`/`semantic-targets.md` untouched across every
+    commit in the phase); CLAUDE.md temp-art exception list names each new
+    asset class (restructured into a scannable sub-list at chunk 10).
 
 ## Chunk table (sequential; most touch shared scenes)
 
@@ -51,7 +54,7 @@ behavior, layout constants, and gameplay data do not change.
 | 7 | Talent-tree sockets + edge textures → TreeScene, assets/ui/tree/ | 3 | **done** (2026-07-20; full verify green, central-agent re-verified; both PixelLab jobs accepted first try, no rerolls; ledger artifacts/pixellab-7/README.md) |
 | 8 | Per-dungeon battlefield variants → assets/battlefields/*, battlefieldForEncounter() | 2 | **done** (2026-07-20; full verify green, central-agent re-verified; all 5 remaining dungeons shipped custom art, none fell back to Ash Gate; ledger artifacts/pixellab-8/README.md) |
 | 9 | Title/tutorial dress-up → TutorialScene, hub title | 4,5 | **done** (2026-07-20; code-only gold wordmark accent + shadow layer on Tutorial's "healgame" and Hub's "Hub" title, zero PixelLab spend; full verify green, central-agent re-verified) |
-| 10 | Final QA: full verify + journey, smoke --shots visual pass, CLAUDE.md exception list + CHANGELOG, QA note, draft PR | all | todo (central agent) |
+| 10 | Final QA: full verify + journey, smoke --shots visual pass, CLAUDE.md exception list + CHANGELOG, QA note, draft PR | all | **done** (2026-07-20; see "Chunk 10 — final QA note" below) |
 
 Chunks 0 and 10 belong to the central agent. CLAUDE.md and
 art/manifest.json are central-agent-only files at every checkpoint —
@@ -204,6 +207,51 @@ one checkpoint.
 
 - (none queued — font (chunk 1) and battlefield (chunk 2) sentences were
   added to CLAUDE.md's temp-art bullet at the chunk-2 checkpoint.)
+
+## Chunk 10 — final QA note (2026-07-20, central agent)
+
+**Gate**: `npm run verify` from `game/` — all 6 stages (typecheck, lint,
+test, build, smoke, journey) green on a clean final run, after every chunk
+was independently re-verified by the central agent (not just trusted from
+subagent reports) before its checkpoint commit.
+
+**Journey discipline**: `git log 02a9d03^..HEAD -- game/scripts/journey.mjs
+docs/semantic-targets.md` returns zero commits — the whole phase shipped
+without a single journey coordinate or interactive-object-name edit, exactly
+as the mission required.
+
+**Visual pass**: reviewed screenshots covering every re-skinned surface —
+combat (all 6 dungeon battlefields, framed spell bar/tooltips/cast bar,
+banter portrait, result panel), Hub, Tutorial, Talent Tree (all edge/socket
+states), Relic, Settings — nothing stuck mid-transition, nothing
+double-drawn, no battlefield/panel art overlapping interactive elements.
+
+**Doc hygiene**: CLAUDE.md's temp-art exception bullet was restructured
+(chunk 10) from one long run-on sentence into a scannable per-asset-class
+sub-list — same content, easier to audit at a glance; the `ui/` line in the
+file-map table was updated from "placeholder widgets" (stale after this
+phase) to reflect what's actually there now. `docs/CHANGELOG.md` got a
+2026-07-20 entry summarizing all 9 content chunks.
+
+**PixelLab spend, whole phase**: phase-start balance 1787 → final balance
+**1062** (confirmed live via `get_balance`) = **725 generations** spent
+across chunks 1/2/3/4/5/7/8 (chunks 6 and 9 were code-only, zero spend).
+Well above the 800 floor throughout — no chunk was ever blocked by budget.
+Per-chunk breakdown and every job ID/prompt/verdict live in
+`artifacts/pixellab-{1,2,3,4,5,7,8}/README.md`.
+
+**Process notes worth remembering for the next phase** (see "Locked
+decisions" above for the full technical list): chunk 5's subagent hit three
+consecutive session/stream interruptions (external infra issues, not task
+failures) and was resumed from transcript each time via `SendMessage`,
+finishing with the central agent completing its last step directly once the
+code was left in a clean, compiling state — worth knowing this recovery path
+works if it happens again. Chunk 5 also surfaced a real, reusable gotcha:
+a module with both a colocated pure-logic test and genuine (non-type)
+`Phaser.Math.*`/similar usage at module scope crashes vitest's non-jsdom
+environment on import — prefer a tiny local helper (`speechBubble.ts`'s
+`clamp()`) over importing `Phaser` as a real runtime value in anything
+that's going to be unit-tested.
 
 ## Resuming in a fresh session
 
