@@ -40,6 +40,7 @@ import {
 } from '../ui/sprites';
 import { SpellBar } from '../ui/spellBar';
 import { CombatLog } from '../ui/combatLog';
+import { FONT, FONT_SIZE_XS, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG } from '../ui/theme';
 import {
   ManaSpendAura,
   shakeBossImpact,
@@ -160,8 +161,7 @@ const PACE_TOGGLE_Y = VIEW_HEIGHT - 8;
 
 /** Cast-cancel toast (handoff §D UI row): short-lived line just above the player cast bar. */
 const TOAST_Y = 368;
-const TOAST_FONT = 'monospace';
-const TOAST_FONT_SIZE = '14px';
+const TOAST_FONT_SIZE = FONT_SIZE_SM;
 const TOAST_COLOR = '#e8d8c8';
 const TOAST_FADE_MS = 1500;
 
@@ -189,7 +189,6 @@ const GLYPH_COLOR = 0xfff2df;
 const RETURN_DELAY_MS = 940;
 const RETURN_REVEAL_MS = 220;
 
-const HUD_FONT = 'monospace';
 
 // v0.3 chunk G: party banter (docs/v0.3-handoff.md "Banter"). Bubble anchor Y is the
 // speaker's home Y minus enough clearance to clear its always-on overlay stack (HP bar +
@@ -520,15 +519,15 @@ export class CombatScene extends Phaser.Scene {
 
   private buildHud(): void {
     this.waveText = this.add
-      .text(VIEW_WIDTH / 2, WAVE_TEXT_Y, '', { fontFamily: HUD_FONT, fontSize: '16px', color: '#e8d8c8' })
+      .text(VIEW_WIDTH / 2, WAVE_TEXT_Y, '', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: '#e8d8c8' })
       .setOrigin(0.5, 0);
     this.rewardsText = this.add
-      .text(REWARDS_X, REWARDS_Y, '', { fontFamily: HUD_FONT, fontSize: '14px', color: '#f2c14e' })
+      .text(REWARDS_X, REWARDS_Y, '', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: '#f2c14e' })
       .setOrigin(0, 0);
     this.focusCalloutText = this.add
       .text(VIEW_WIDTH / 2, FOCUS_CALLOUT_Y, '', {
-        fontFamily: HUD_FONT,
-        fontSize: '15px',
+        fontFamily: FONT,
+        fontSize: FONT_SIZE_SM,
         color: '#e05a4e',
       })
       .setStroke('#0a0605', 3)
@@ -540,7 +539,7 @@ export class CombatScene extends Phaser.Scene {
       .rectangle(0, 0, WAVE_BANNER_WIDTH, WAVE_BANNER_HEIGHT, 0x241a15, 0.92)
       .setStrokeStyle(2, 0x8a7868);
     this.waveBannerText = this.add
-      .text(0, 0, '', { fontFamily: HUD_FONT, fontSize: '22px', color: '#e8d8c8' })
+      .text(0, 0, '', { fontFamily: FONT, fontSize: FONT_SIZE_MD, color: '#e8d8c8' })
       .setOrigin(0.5);
     this.waveBanner = this.add
       .container(VIEW_WIDTH / 2, WAVE_BANNER_Y, [bannerBg, this.waveBannerText])
@@ -562,7 +561,7 @@ export class CombatScene extends Phaser.Scene {
     );
     this.playerCastBar.setVisible(false);
     this.playerCastLabel = this.add
-      .text(centerX, PLAYER_CAST_BAR_Y, '', { fontFamily: HUD_FONT, fontSize: '13px', color: '#1a1210' })
+      .text(centerX, PLAYER_CAST_BAR_Y, '', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: '#1a1210' })
       .setOrigin(0.5)
       .setVisible(false);
 
@@ -570,11 +569,14 @@ export class CombatScene extends Phaser.Scene {
     this.gcdBar = new Bar(this, playerBarX, gcdY, PLAYER_CAST_BAR_WIDTH, GCD_BAR_HEIGHT, GCD_FILL_COLOR);
     this.gcdBar.setVisible(false);
 
+    // XS (8px), not the SM snap: this label sits just above the spell-bar
+    // buttons (queuedY ≈ 419 vs button tops ≈ 420 — see SPELL_BAR_Y comment
+    // above) with almost no clearance; a 16px line would clip into the row.
     const queuedY = gcdY + GCD_BAR_HEIGHT / 2 + QUEUED_SPELL_GAP;
     this.queuedSpellLabel = this.add
       .text(centerX, queuedY, '', {
-        fontFamily: HUD_FONT,
-        fontSize: '12px',
+        fontFamily: FONT,
+        fontSize: FONT_SIZE_XS,
         color: QUEUED_SPELL_COLOR,
       })
       .setOrigin(0.5)
@@ -598,7 +600,7 @@ export class CombatScene extends Phaser.Scene {
   /** Short-lived status line for castCancelled (handoff §D) — only toast source in the scene. */
   private buildToast(): void {
     this.toastText = this.add
-      .text(VIEW_WIDTH / 2, TOAST_Y, '', { fontFamily: TOAST_FONT, fontSize: TOAST_FONT_SIZE, color: TOAST_COLOR })
+      .text(VIEW_WIDTH / 2, TOAST_Y, '', { fontFamily: FONT, fontSize: TOAST_FONT_SIZE, color: TOAST_COLOR })
       .setOrigin(0.5)
       .setAlpha(0);
   }
@@ -1125,8 +1127,8 @@ export class CombatScene extends Phaser.Scene {
     if (summary.outcomeLabel !== null) {
       const titleText = this.add
         .text(centerX, centerY - 80, summary.outcomeLabel, {
-          fontFamily: HUD_FONT,
-          fontSize: '36px',
+          fontFamily: FONT,
+          fontSize: FONT_SIZE_LG,
           color: '#f2c14e',
         })
         .setOrigin(0.5)
@@ -1137,8 +1139,8 @@ export class CombatScene extends Phaser.Scene {
 
     const xpText = this.add
       .text(centerX, centerY - 28, `XP +${summary.xpGained}`, {
-        fontFamily: HUD_FONT,
-        fontSize: '18px',
+        fontFamily: FONT,
+        fontSize: FONT_SIZE_SM,
         color: '#e8d8c8',
       })
       .setOrigin(0.5)
@@ -1148,7 +1150,7 @@ export class CombatScene extends Phaser.Scene {
 
     if (hasBuildGlyph(summary.glyph)) {
       const glyphLabel = this.add
-        .text(centerX, centerY + 8, 'BUILD', { fontFamily: HUD_FONT, fontSize: '11px', color: '#a89888' })
+        .text(centerX, centerY + 8, 'BUILD', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: '#a89888' })
         .setOrigin(0.5)
         .setDepth(OVERLAY_DEPTH + 2)
         .setAlpha(0);
@@ -1181,7 +1183,7 @@ export class CombatScene extends Phaser.Scene {
       });
 
     const returnText = this.add
-      .text(centerX, centerY + 105, 'Return', { fontFamily: HUD_FONT, fontSize: '16px', color: '#e8d8c8' })
+      .text(centerX, centerY + 105, 'Return', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: '#e8d8c8' })
       .setOrigin(0.5)
       .setDepth(OVERLAY_DEPTH + 3)
       .setAlpha(0);

@@ -8,6 +8,7 @@
 
 import Phaser from 'phaser';
 import type { SpellCardModel } from './spellCard';
+import { FONT, FONT_SIZE_XS, FONT_SIZE_SM } from './theme';
 
 const PADDING = 8;
 const LINE_GAP = 3;
@@ -16,9 +17,12 @@ const BG_COLOR = 0x241a15;
 const BORDER_COLOR = 0x0a0605;
 const EFFECT_BAND_COLOR = 0x2e241e;
 const DIVIDER_COLOR = 0x3a2a22;
-const FONT = 'monospace';
-const FONT_SIZE = '12px';
-const LABEL_SIZE = '10px';
+const FONT_SIZE = FONT_SIZE_SM;
+/** XS (8px), not the SM snap: keeps the EFFECT/COST/CAST/CD caption line
+ *  visually subordinate to the value line right below it — both would read
+ *  as the same weight at the SM snap. Panel auto-sizes to content either
+ *  way, so there's no overlap risk from the smaller size. */
+const LABEL_SIZE = FONT_SIZE_XS;
 const DEPTH = 300;
 /** Keeps the three-column strip readable and consistent across spells. */
 const MIN_CARD_WIDTH = 220;

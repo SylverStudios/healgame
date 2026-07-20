@@ -1,7 +1,7 @@
 /**
  * First scene a new player sees (poc-spec §3): a one-click "learn your heal"
  * moment, then straight into Ash Gate for the expected first wipe. Temp art
- * only — panels + text buttons, dark palette, monospace.
+ * only — panels + text buttons, dark palette, pixel font.
  */
 
 import Phaser from 'phaser';
@@ -11,6 +11,7 @@ import { loadoutFromSave } from '../data/talentTree';
 import { ASH_GATE } from '../data/encounters';
 import { SPELLS } from '../data/constants';
 import type { CombatSceneData } from './CombatScene';
+import { FONT, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG } from '../ui/theme';
 
 const BG_COLOR = 0x1a1210;
 const BUTTON_COLOR = 0x3a2a22;
@@ -18,7 +19,6 @@ const BORDER_COLOR = 0x0a0605;
 const TEXT_COLOR = '#e8d8c8';
 const DIM_COLOR = '#a89888';
 const ACCENT_COLOR = '#f2c14e';
-const FONT = 'monospace';
 
 export class TutorialScene extends Phaser.Scene {
   constructor() {
@@ -30,13 +30,13 @@ export class TutorialScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(BG_COLOR);
 
     this.add
-      .text(width / 2, 60, 'healgame', { fontFamily: FONT, fontSize: '32px', color: TEXT_COLOR })
+      .text(width / 2, 60, 'healgame', { fontFamily: FONT, fontSize: FONT_SIZE_LG, color: TEXT_COLOR })
       .setOrigin(0.5);
 
     this.add
       .text(width / 2, 112, "You are the warband's only healer.", {
         fontFamily: FONT,
-        fontSize: '18px',
+        fontSize: FONT_SIZE_SM,
         color: TEXT_COLOR,
       })
       .setOrigin(0.5);
@@ -52,7 +52,7 @@ export class TutorialScene extends Phaser.Scene {
     this.add
       .text(width / 2, 220, instructions, {
         fontFamily: FONT,
-        fontSize: '14px',
+        fontSize: FONT_SIZE_SM,
         color: DIM_COLOR,
         align: 'center',
       })
@@ -65,7 +65,7 @@ export class TutorialScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
       .setName('tutorialLearn');
     this.add
-      .text(width / 2, buttonY, 'Learn Solemn Mend', { fontFamily: FONT, fontSize: '20px', color: ACCENT_COLOR })
+      .text(width / 2, buttonY, 'Learn Solemn Mend', { fontFamily: FONT, fontSize: FONT_SIZE_MD, color: ACCENT_COLOR })
       .setOrigin(0.5);
 
     button.on('pointerdown', () => this.onLearnSpell());

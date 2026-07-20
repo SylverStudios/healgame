@@ -7,12 +7,12 @@
  */
 
 import Phaser from 'phaser';
+import { DEBUG_FONT } from './theme';
 
 const MAX_LINES = 20;
 
 const HEADER_X_FROM_RIGHT = 14; // header right edge sits at screenWidth - 14 (~946 at 960 wide)
 const HEADER_Y = 14;
-const HEADER_FONT = 'monospace';
 const HEADER_FONT_SIZE = '13px';
 const HEADER_COLOR = '#e8d8c8';
 
@@ -20,7 +20,6 @@ const PANEL_WIDTH = 280;
 const PANEL_TOP_Y = 34;
 const PANEL_PADDING = 8;
 const LINE_FONT_SIZE = '11px';
-const LINE_FONT = 'monospace';
 const LINE_COLOR = '#d8c8b8';
 const LINE_HEIGHT = 12;
 
@@ -53,7 +52,7 @@ export class CombatLog {
 
     this.headerText = scene.add
       .text(headerX, HEADER_Y, COLLAPSED_LABEL, {
-        fontFamily: HEADER_FONT,
+        fontFamily: DEBUG_FONT,
         fontSize: HEADER_FONT_SIZE,
         color: HEADER_COLOR,
       })
@@ -79,7 +78,7 @@ export class CombatLog {
 
     this.linesText = scene.add
       .text(this.panelX + PANEL_PADDING, PANEL_TOP_Y + PANEL_PADDING, '', {
-        fontFamily: LINE_FONT,
+        fontFamily: DEBUG_FONT,
         fontSize: LINE_FONT_SIZE,
         color: LINE_COLOR,
         lineSpacing: LINE_HEIGHT - 11,
