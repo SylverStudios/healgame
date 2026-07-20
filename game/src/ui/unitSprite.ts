@@ -300,16 +300,24 @@ export class UnitSprite {
         const key = animation.key;
         if (this.castAnimKeys.has(key)) {
           this.releaseActive = false;
-          if (this.pendingCharge) {
-            this.startChargeCycle();
-          } else {
-            this.restoreRestPose();
-          }
+          this.finishBodyOneShot();
           return;
         }
-        // Charge loops never complete (repeat: -1). Zap / attack / other one-shots → idle.
+        // Charge loops never complete (repeat: -1). Zap / attack / other one-shots → idle
+        // (or a cast that queued during the one-shot via pendingCharge).
         if (this.chargeAnimKeys.has(key)) return;
-        this.restoreRestPose();
+        this.finishBodyOneShot();
+      },
+    );
+    // Cast-action interrupted by zap/vowstrike (or anything else) fires STOP, not
+    // COMPLETE — without this, releaseActive stays true and every later charge/cast
+    // is deferred forever (setCasting → pendingCharge; finishCast early-returns).
+    this.body.on(
+      Phaser.Animations.Events.ANIMATION_STOP,
+      (animation: Phaser.Animations.Animation) => {
+        if (animation?.key && this.castAnimKeys.has(animation.key)) {
+          this.releaseActive = false;
+        }
       },
     );
     if (clickable) {
@@ -606,6 +614,7 @@ export class UnitSprite {
    */
   playZap(): void {
     if (!this.zapAnimKey || !this.alive) return;
+    this.beginInstantAttackBody();
     this.body.play(this.zapAnimKey, false);
     this.body.setDisplaySize(this.width, this.height);
   }
@@ -613,8 +622,28 @@ export class UnitSprite {
   /** Healer-only Vowstrike oath-strike (both aspects). Snaps to idle on complete. */
   playVowstrike(): void {
     if (!this.vowstrikeAnimKey || !this.alive) return;
+    this.beginInstantAttackBody();
     this.body.play(this.vowstrikeAnimKey, false);
     this.body.setDisplaySize(this.width, this.height);
+  }
+
+  /**
+   * Instant damage strips may replace a live cast-action. Clear the release lock
+   * up front so a STOP (not COMPLETE) on the cast strip can't leave charge/cast
+   * gated forever. pendingCharge is kept — honored when this one-shot completes.
+   */
+  private beginInstantAttackBody(): void {
+    this.releaseActive = false;
+    this.stopChargeCycle();
+  }
+
+  /** After any healer one-shot: resume a queued channel, else breathing idle. */
+  private finishBodyOneShot(): void {
+    if (this.pendingCharge) {
+      this.startChargeCycle();
+    } else {
+      this.restoreRestPose();
+    }
   }
 
   private isInstantAttackPlaying(): boolean {
