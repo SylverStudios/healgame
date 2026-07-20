@@ -24,15 +24,13 @@ import { Bar } from '../ui/bar';
 import { UnitSprite } from '../ui/unitSprite';
 import {
   attackAnimKeyForUnit,
-  HEALER_CAST_FRAME_DURATIONS_MS,
-  HEALER_CAST_FRAMES,
   HEALER_CAST_RELEASE_LEAD_MS,
-  HEALER_CHARGE_FRAME_DURATIONS_MS,
-  HEALER_CHARGE_FRAMES,
+  HEALER_CAST_STYLE_ANIMS,
   HEALER_IDLE_ANIM_KEY,
   HEALER_IDLE_FRAME,
   HEALER_SHEET_TEXTURE_KEY,
   HEALER_ZAP_ANIM_KEY,
+  healerCastStyleForSpell,
   hurtAnimKeyForUnit,
   presentationForUnit,
 } from '../ui/sprites';
@@ -452,11 +450,7 @@ export class CombatScene extends Phaser.Scene {
               idleAnimKey: HEALER_IDLE_ANIM_KEY,
               zapAnimKey: HEALER_ZAP_ANIM_KEY,
               casterAnim: {
-                idleFrame: HEALER_IDLE_FRAME,
-                chargeFrames: HEALER_CHARGE_FRAMES,
-                chargeDurationsMs: HEALER_CHARGE_FRAME_DURATIONS_MS,
-                castFrames: HEALER_CAST_FRAMES,
-                castDurationsMs: HEALER_CAST_FRAME_DURATIONS_MS,
+                styles: HEALER_CAST_STYLE_ANIMS,
               },
             }
           : presentation.kind === 'texture'
@@ -703,12 +697,11 @@ export class CombatScene extends Phaser.Scene {
           // if it belongs to a roster already replaced by a same-tick waveStarted rebuild.
           const attacker = this.findSprite(event.sourceId);
           if (attacker) {
-            // Party mercs with PixelLab attack strips play the anim in place.
-            // Kenney enemies / boss / healer (no strip) still use the shared position lunge.
+            // Mercs: attack strip. Others: lunge — except Bonk (zap already playing).
             const attackerUnit = this.engine.state.party.find((u) => u.id === event.sourceId);
             if (attackerUnit?.role === 'tank' || attackerUnit?.role === 'dps') {
               attacker.playAttack();
-            } else {
+            } else if (!pendingBonkImpact) {
               const towardX = victim?.getHomeX() ?? attacker.getHomeX();
               attacker.lunge(towardX);
             }
@@ -744,18 +737,23 @@ export class CombatScene extends Phaser.Scene {
         case 'castStarted': {
           const healer = this.partySprites.get('healer');
           const castTarget = this.findSprite(event.cast.targetId);
+          const castSpell = this.sceneData.loadout.spells.find((s) => s.id === event.cast.spellId);
           healer?.flashCast();
-          // Bonk (and only Bonk) plays the zap strip; other instant casts (totalMs
-          // === 0, resolved same tick as castStarted) keep the heal cast-action.
+          // Bonk (and only Bonk) plays the zap strip; other spells pick Solemn vs
+          // Zealous body language, then charge (channeled) or cast-action (instant).
           if (event.cast.spellId === SPELLS.bonk.id) {
             healer?.playZap();
             pendingBonkImpact = true;
-          } else if (event.cast.totalMs === 0) {
-            healer?.playCastRelease();
           } else {
-            healer?.setCasting(true);
+            healer?.setCastStyle(healerCastStyleForSpell(event.cast.spellId));
+            if (event.cast.totalMs === 0) {
+              healer?.playCastRelease();
+            } else {
+              healer?.setCasting(true);
+            }
           }
-          if (healer && castTarget) {
+          // Heal beam only — damage spells (Bonk / Vowstrike) use body/VFX reads.
+          if (healer && castTarget && castSpell && castSpell.heal > 0) {
             showCastBeam(
               this,
               healer.getHomeX(),
@@ -766,15 +764,16 @@ export class CombatScene extends Phaser.Scene {
           }
           // Presentation-only spend estimate (base spell cost). Discounts / free
           // charges may mean the engine reserved less — aura is juice, not accounting.
-          const castSpell = this.sceneData.loadout.spells.find((s) => s.id === event.cast.spellId);
           if (castSpell && castSpell.mana > 0) {
             this.manaAura?.recordSpend(castSpell.mana, this.elapsedMs);
           }
           break;
         }
         case 'castFinished':
-          // Channel → cast-action; instant already started release on castStarted.
-          this.partySprites.get('healer')?.finishCast();
+          // Channel → cast-action. Skip Bonk — zap already playing; finishCast snaps idle.
+          if (event.spellId !== SPELLS.bonk.id) {
+            this.partySprites.get('healer')?.finishCast();
+          }
           break;
         case 'bossCastStarted': {
           // v0.3 chunk F "Boss telegraphs": wind-up/glow cue on the boss sprite for the

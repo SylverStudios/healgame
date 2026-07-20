@@ -32,12 +32,12 @@ Everything else in the game stays temp art per CLAUDE.md.
   11 rows, 16px tiles, no spacing) + license copy alongside.
 - `game/public/assets/units/healer/` — armored-paladin healer. Combat still
   is `south.png` (camera-facing still; `east.png` mirrors for preload compat).
-  `sheet.png` = idle + charge + cast-action (unchanged, still east charge/cast
-  frames — known facing mismatch, not fixed this chunk). `idle-south/0–4.png`
-  is the south breathing loop; `attack-south/0–6.png` is the Bonk zap strip.
-  `charge-east/`, `cast-east/` unchanged. Source: `art/source/armored-paladin/`.
-  Charge loops while channeling; cast-action plays once on release (FE
-  exposure timings in `sprites.ts`).
+  `sheet.png` is a rest/preload still. Live strips: `idle-south/` (breathing),
+  `charge-solemn-south/` + `charge-zealous-south/` (4f charge loops),
+  `cast-solemn-south/` + `cast-zealous-south/` (9f releases),
+  `attack-south/` (Bonk zap). Source: `art/source/armored-paladin/`.
+  Spell → style: solemn-* / vowstrike-virtue → Solemn; zealous-* /
+  vowstrike-vengeance → Zealous; bonk → zap only (FE exposure in `sprites.ts`).
 - `game/public/assets/units/tank/` — tight 32×32 tank (`east.png` +
   `attack-east/0–6.png` + `hurt-east/0–4.png`). Displays at 64 with the
   healer foot-pad ratio. Own exposure sheets: `TANK_ATTACK_FRAME_DURATIONS_MS`,
@@ -97,24 +97,20 @@ Everything else in the game stays temp art per CLAUDE.md.
   `sprites.ts`, `UNIT_HURT_ANIMS` parallel to `UNIT_ATTACK_ANIMS`).
   `UnitSprite.playHurt()` runs whenever a `damage` event lands on a unit
   with a wired hurt strip (no-op otherwise), then restores the rest still.
-- **Healer sheet**: CombatScene special case — charge loop on `castStarted`
-  (channeled), cast-action strip on `finishCast` / instant `playCastRelease`;
-  cancel returns to idle. Not selected by `presentationForUnit`. Texture key
-  `unit-healer`, 32×32 frames, authored facing (no flipX).
+- **Healer Solemn / Zealous cast**: CombatScene special case — per-spell
+  `healerCastStyleForSpell` picks charge/cast strips from `HEALER_CAST_STYLE_ANIMS`.
+  Charge loops on `castStarted` (channeled); cast-action on `finishCast` /
+  instant `playCastRelease`; cancel snaps to idle. Not selected by
+  `presentationForUnit`. Texture key `unit-healer`, south-facing, no flipX.
 - **Healer idle / Bonk zap** (chunk 1B): `unit-healer-idle` is a continuous
   Phaser anim (`repeat: -1`, `idle-south/` frames, `HEALER_IDLE_FRAME_DURATIONS_MS`)
-  that plays whenever the healer isn't charging/casting — including between
-  and after casts. `unit-healer-zap` is a one-shot anim (`attack-south/`
-  frames, `HEALER_ZAP_FRAME_DURATIONS_MS`) that **only** Bonk's `castStarted`
-  plays (matched by `SPELLS.bonk.id`, not `totalMs === 0`, so other instant
-  casts keep the heal cast-action). Registered in `sprites.ts`
-  (`HEALER_STRIP_ANIMS`) parallel to `UNIT_ATTACK_ANIMS` — kept separate
-  because it needs loop vs one-shot semantics per strip. `UnitSprite` stops
-  the idle anim before any manual charge/cast frame stepping and resumes it
-  on `ANIMATION_COMPLETE` / cast end (see `playZap()` / `returnToIdle()`).
-  `zap-vfx` (`assets/zap-vfx.png`, `ZAP_VFX_FRAME_DURATIONS_MS`) is a
-  one-shot pale-gold impact played on the enemy target when Bonk's damage
-  lands (`combatFx.showZapImpact`, mirrors `showHealSparkle`).
+  that plays whenever the healer isn't charging/casting/zapping. `unit-healer-zap`
+  is a one-shot (`attack-south/`, `HEALER_ZAP_FRAME_DURATIONS_MS`) that **only**
+  Bonk's `castStarted` plays — `castFinished` skips `finishCast` for Bonk so
+  the strip isn't snapped idle same-tick. All healer strips register via
+  `HEALER_STRIP_ANIMS` (loop vs one-shot per strip). `zap-vfx`
+  (`assets/zap-vfx.png`) is the pale-gold target impact on Bonk damage
+  (`combatFx.showZapImpact`).
 - `pixelArt: true` in `main.ts` gives nearest-neighbor filtering game-wide.
 - Display sizes (`CombatScene.ts`): tight 32×32 party (healer, tank, dps1,
   dps2) at **64** (2×) — no more legacy padded 112 party mercs; Kenney party
@@ -131,7 +127,7 @@ Everything else in the game stays temp art per CLAUDE.md.
 | tank | tight 32 still + attack + hurt | `unit-tank` + `unit-tank-attack` + `unit-tank-hurt` |
 | dps1 | tight 32 still + attack + hurt | `unit-dps1` + `unit-dps1-attack` + `unit-dps1-hurt` |
 | dps2 | tight 32 still + attack + hurt | `unit-dps2` + `unit-dps2-attack` + `unit-dps2-hurt` |
-| healer | 32×32 armored-paladin sheet | `unit-healer` idle + charge loop + cast-action |
+| healer | 32×32 armored-paladin south | idle + Solemn/Zealous charge/cast + Bonk zap |
 | ash-husk | custom still | `unit-ash-husk` (west.png) |
 | other trash | Kenney | ghost 121 |
 | Gate Warden / Ember / Matriarch | Kenney | brute 109 |

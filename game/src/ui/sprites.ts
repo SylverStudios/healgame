@@ -269,61 +269,72 @@ export function hurtAnimFrames(
 }
 
 /**
- * Party healer: native 32×32 armored-paladin sheet (one row).
- * Source: `art/source/armored-paladin/`. Facing authored three-quarter right —
- * CombatScene sets `fixedFacing` (no flipX).
+ * Party healer: native 32×32 armored-paladin, combat facing **south**.
+ * Source: `art/source/armored-paladin/`. CombatScene sets `fixedFacing` (no flipX).
  *
- * Layout: [0 idle][1–5 charge loop][6–12 cast-action release].
- * Charge = hand-glow build (charge-sheet.png cells 1–5). Cast-action = orb →
- * flash → recover (cast-action GIF frames 1–7 @ 32×32). Playback uses FE-style
- * exposure sheets — not equal frame times (see pixellab-unit-art skill).
+ * Cast pipeline (Method B Solemn / Zealous, 2026-07-19):
+ *   - Charge = looping climax strip while channeling (per cast style)
+ *   - Cast-action = one-shot release (per cast style), then idle loop
+ *   - Bonk = zap strip only
+ * Sheet.png remains a rest/preload still; charge/cast are individual PNGs.
  */
 export const HEALER_SHEET_TEXTURE_KEY = 'unit-healer';
 export const HEALER_SHEET_URL = 'assets/units/healer/sheet.png';
 export const HEALER_SHEET_FRAME_SIZE = 32;
 export const HEALER_SHEET_COLS = 13;
 
-/** Neutral standing pose used whenever the healer is not casting. */
+/** Neutral standing pose on the sheet (preload / fallback before idle anim). */
 export const HEALER_IDLE_FRAME = 0;
 
-/** Charge loop while a cast channels (sheet frames 1–5). */
-export const HEALER_CHARGE_FRAMES: readonly number[] = [1, 2, 3, 4, 5];
+/** Solemn vs Zealous cast body language — selected per spell id. */
+export type HealerCastStyle = 'solemn' | 'zealous';
+
 /**
- * Per-frame holds (ms) for the charge loop — dwell on the peak glow (index 3)
- * so the build-up reads heavier than the in-betweens.
+ * Map spell → cast style. Solemn-* → solemn; Zealous-* → zealous;
+ * Vowstrike Virtue → solemn, Reckoning → zealous; everything else → solemn.
+ */
+export function healerCastStyleForSpell(spellId: string): HealerCastStyle {
+  if (spellId.startsWith('zealous-') || spellId === 'vowstrike-vengeance') {
+    return 'zealous';
+  }
+  return 'solemn';
+}
+
+/**
+ * Charge loop while channeling (4 climax frames, both styles share exposure).
+ * Dwell on the deepest hold pose (index 2).
  */
 export const HEALER_CHARGE_FRAME_DURATIONS_MS: readonly number[] = [
-  100, // prep arms
-  117, // glow on
-  117, // glow grow
-  167, // peak charge hold (antic)
-  117, // settle before loop
+  120, // settle into coil/prayer
+  140, // breathe
+  180, // peak hold
+  140, // ease before loop
 ] as const;
 
-/** One-shot cast-action release (sheet frames 6–12). */
-export const HEALER_CAST_FRAMES: readonly number[] = [6, 7, 8, 9, 10, 11, 12];
 /**
- * FE-style exposure for the cast release: antic / orb build, flash smear,
- * contact hold with arms out, then recovery. Equal GIF timing reads floaty.
- * Ref: https://lost-worlds.neocities.org/blog/2024/10/20/fire-emblem-animation/
+ * One-shot release (9 frames charge-key → release climax). Shared exposure for
+ * both styles. Final frame is the contact hold; lead times so it begins near
+ * castFinished.
  */
 export const HEALER_CAST_FRAME_DURATIONS_MS: readonly number[] = [
-  100, // wind-up
-  83, // orb gather
-  133, // orb peak (antic before snap)
-  33, // flash smear (~2 @60Hz)
-  167, // contact / arms-out hold
-  67, // follow-through
-  83, // settle toward idle
+  40, // leave charge pose
+  40,
+  40,
+  50,
+  50,
+  60,
+  70,
+  90, // approach climax
+  167, // contact / widest silhouette hold
 ] as const;
 
 /**
- * Start the cast-action this many ms before `castFinished` so the flash/contact
- * lands near the heal resolve. Sum of holds through the flash frame (index 3).
+ * Start the cast-action this many ms before `castFinished` so the contact hold
+ * (last frame) begins near the heal resolve.
  */
 export const HEALER_CAST_RELEASE_LEAD_MS: number = HEALER_CAST_FRAME_DURATIONS_MS.slice(
   0,
-  4,
+  -1,
 ).reduce((sum, ms) => sum + ms, 0);
 
 /**
@@ -345,7 +356,12 @@ export const HEALER_ZAP_FRAME_DURATIONS_MS: readonly number[] = [
   50, 150, 267, 83, 167, 117, 100,
 ] as const;
 
-function healerFrameKey(strip: 'idle' | 'zap', index: number): string {
+export const HEALER_SOLEMN_CHARGE_ANIM_KEY = 'unit-healer-charge-solemn';
+export const HEALER_ZEALOUS_CHARGE_ANIM_KEY = 'unit-healer-charge-zealous';
+export const HEALER_SOLEMN_CAST_ANIM_KEY = 'unit-healer-cast-solemn';
+export const HEALER_ZEALOUS_CAST_ANIM_KEY = 'unit-healer-cast-zealous';
+
+function healerFrameKey(strip: string, index: number): string {
   return `unit-healer-${strip}-${index}`;
 }
 
@@ -353,7 +369,7 @@ function healerFrameUrl(dir: string, index: number): string {
   return `assets/units/healer/${dir}/${index}.png`;
 }
 
-/** Per-frame strip def for a healer body anim (idle loop or Bonk zap one-shot). */
+/** Per-frame strip def for a healer body anim (idle / zap / charge / cast). */
 export interface HealerStripAnimDef {
   animKey: string;
   frameCount: number;
@@ -382,13 +398,66 @@ export const HEALER_ZAP_ANIM: HealerStripAnimDef = {
   frameDurationsMs: HEALER_ZAP_FRAME_DURATIONS_MS,
 };
 
-/** BootScene preloads + registers both from this list (parallel to UNIT_ATTACK_ANIMS —
- *  kept separate because these key off `unitId: 'healer'` with loop semantics the merc
- *  strip type doesn't need). */
+export const HEALER_SOLEMN_CHARGE_ANIM: HealerStripAnimDef = {
+  animKey: HEALER_SOLEMN_CHARGE_ANIM_KEY,
+  frameCount: 4,
+  loop: true,
+  frameKey: (i) => healerFrameKey('charge-solemn', i),
+  frameUrl: (i) => healerFrameUrl('charge-solemn-south', i),
+  frameDurationsMs: HEALER_CHARGE_FRAME_DURATIONS_MS,
+};
+
+export const HEALER_ZEALOUS_CHARGE_ANIM: HealerStripAnimDef = {
+  animKey: HEALER_ZEALOUS_CHARGE_ANIM_KEY,
+  frameCount: 4,
+  loop: true,
+  frameKey: (i) => healerFrameKey('charge-zealous', i),
+  frameUrl: (i) => healerFrameUrl('charge-zealous-south', i),
+  frameDurationsMs: HEALER_CHARGE_FRAME_DURATIONS_MS,
+};
+
+export const HEALER_SOLEMN_CAST_ANIM: HealerStripAnimDef = {
+  animKey: HEALER_SOLEMN_CAST_ANIM_KEY,
+  frameCount: 9,
+  loop: false,
+  frameKey: (i) => healerFrameKey('cast-solemn', i),
+  frameUrl: (i) => healerFrameUrl('cast-solemn-south', i),
+  frameDurationsMs: HEALER_CAST_FRAME_DURATIONS_MS,
+};
+
+export const HEALER_ZEALOUS_CAST_ANIM: HealerStripAnimDef = {
+  animKey: HEALER_ZEALOUS_CAST_ANIM_KEY,
+  frameCount: 9,
+  loop: false,
+  frameKey: (i) => healerFrameKey('cast-zealous', i),
+  frameUrl: (i) => healerFrameUrl('cast-zealous-south', i),
+  frameDurationsMs: HEALER_CAST_FRAME_DURATIONS_MS,
+};
+
+/** BootScene preloads + registers all healer strips from this list. */
 export const HEALER_STRIP_ANIMS: readonly HealerStripAnimDef[] = [
   HEALER_IDLE_ANIM,
   HEALER_ZAP_ANIM,
+  HEALER_SOLEMN_CHARGE_ANIM,
+  HEALER_ZEALOUS_CHARGE_ANIM,
+  HEALER_SOLEMN_CAST_ANIM,
+  HEALER_ZEALOUS_CAST_ANIM,
 ];
+
+/** Anim keys for the active Solemn / Zealous cast pipeline. */
+export const HEALER_CAST_STYLE_ANIMS: Record<
+  HealerCastStyle,
+  { chargeAnimKey: string; castAnimKey: string }
+> = {
+  solemn: {
+    chargeAnimKey: HEALER_SOLEMN_CHARGE_ANIM_KEY,
+    castAnimKey: HEALER_SOLEMN_CAST_ANIM_KEY,
+  },
+  zealous: {
+    chargeAnimKey: HEALER_ZEALOUS_CHARGE_ANIM_KEY,
+    castAnimKey: HEALER_ZEALOUS_CAST_ANIM_KEY,
+  },
+};
 
 /** Phaser anim frame entries for a healer strip (skips duration ≤ 0). */
 export function healerStripAnimFrames(

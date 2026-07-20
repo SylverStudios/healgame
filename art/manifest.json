@@ -27,20 +27,10 @@
           "frames": 1,
           "note": "south combat facing (STYLE party exception); east.png mirrors for preload compat"
         },
-        "charge": {
-          "dir": "charge-east",
-          "frames": 5,
-          "loop": true,
-          "durations": "HEALER_CHARGE_FRAME_DURATIONS_MS"
-        },
-        "cast": {
-          "dir": "cast-east",
-          "frames": 7,
-          "durations": "HEALER_CAST_FRAME_DURATIONS_MS"
-        },
         "sheet": {
           "file": "sheet.png",
-          "frames": 13
+          "frames": 13,
+          "note": "legacy packed row kept for preload/rest; charge/cast are per-style dirs"
         },
         "idle": {
           "dir": "idle-south",
@@ -48,14 +38,14 @@
           "loop": true,
           "status": "live",
           "durations": "HEALER_IDLE_FRAME_DURATIONS_MS",
-          "note": "south breathing loop; exposure 220,180,250,180,220 — wire in 1B"
+          "note": "south breathing loop; exposure 220,180,250,180,220 \u2014 wire in 1B"
         },
         "attack": {
           "dir": "attack-south",
           "frames": 7,
           "status": "live",
           "durations": "HEALER_ZAP_FRAME_DURATIONS_MS",
-          "note": "Bonk zap south; exposure 50,150,267,83,167,117,100 — wire 1B"
+          "note": "Bonk zap south; exposure 50,150,267,83,167,117,100 \u2014 wire 1B"
         },
         "zap-vfx": {
           "dir": "zap-vfx",
@@ -63,6 +53,36 @@
           "status": "live",
           "durations": "ZAP_VFX_FRAME_DURATIONS_MS",
           "note": "pale-gold target impact; also sheet game/public/assets/zap-vfx.png (192x32); exposure 50,67,100,83,67,50"
+        },
+        "charge-solemn": {
+          "dir": "charge-solemn-south",
+          "frames": 4,
+          "loop": true,
+          "status": "live",
+          "durations": "HEALER_CHARGE_FRAME_DURATIONS_MS",
+          "note": "Solemn Method B climax loop; solemn-mend / solemn-vigil"
+        },
+        "charge-zealous": {
+          "dir": "charge-zealous-south",
+          "frames": 4,
+          "loop": true,
+          "status": "live",
+          "durations": "HEALER_CHARGE_FRAME_DURATIONS_MS",
+          "note": "Zealous Method B climax loop; zealous-mending / zealous-flare"
+        },
+        "cast-solemn": {
+          "dir": "cast-solemn-south",
+          "frames": 9,
+          "status": "live",
+          "durations": "HEALER_CAST_FRAME_DURATIONS_MS",
+          "note": "Solemn Method B release; vowstrike-virtue instant uses this too"
+        },
+        "cast-zealous": {
+          "dir": "cast-zealous-south",
+          "frames": 9,
+          "status": "live",
+          "durations": "HEALER_CAST_FRAME_DURATIONS_MS",
+          "note": "Zealous Method B forward release; vowstrike-vengeance instant too"
         }
       },
       "note": "Party STYLE exception: combat facing south (camera). Mercs remain east."

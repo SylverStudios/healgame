@@ -52,8 +52,8 @@ export class BootScene extends Phaser.Scene {
       frameWidth: HEAL_VFX_FRAME_SIZE,
       frameHeight: HEAL_VFX_FRAME_SIZE,
     });
-    // Chunk 1B: healer idle-south breathing loop + attack-south Bonk zap — one
-    // texture key per frame, like the merc attack strips (not part of sheet.png).
+    // Healer strips (idle, zap, Solemn/Zealous charge+cast) — one texture key
+    // per frame, like the merc attack strips (not packed into sheet.png).
     for (const def of HEALER_STRIP_ANIMS) {
       for (let i = 0; i < def.frameCount; i++) {
         this.load.image(def.frameKey(i), def.frameUrl(i));
@@ -127,7 +127,7 @@ export class BootScene extends Phaser.Scene {
     }
   }
 
-  /** Healer idle breathing loop (repeat: -1) + Bonk zap one-shot (repeat: 0). */
+  /** Healer idle/charge loops (repeat: -1) + zap/cast one-shots (repeat: 0). */
   private registerHealerStripAnims(): void {
     for (const def of HEALER_STRIP_ANIMS) {
       if (this.anims.exists(def.animKey)) continue;

@@ -14,17 +14,21 @@ import {
   frameForMobVisualKey,
   frameForUnit,
   HEALER_CAST_FRAME_DURATIONS_MS,
-  HEALER_CAST_FRAMES,
   HEALER_CAST_RELEASE_LEAD_MS,
+  HEALER_CAST_STYLE_ANIMS,
   HEALER_CHARGE_FRAME_DURATIONS_MS,
-  HEALER_CHARGE_FRAMES,
   HEALER_IDLE_ANIM,
   HEALER_IDLE_ANIM_KEY,
   HEALER_IDLE_FRAME_DURATIONS_MS,
+  HEALER_SOLEMN_CAST_ANIM,
+  HEALER_SOLEMN_CHARGE_ANIM,
   HEALER_STRIP_ANIMS,
+  HEALER_ZEALOUS_CAST_ANIM,
+  HEALER_ZEALOUS_CHARGE_ANIM,
   HEALER_ZAP_ANIM,
   HEALER_ZAP_ANIM_KEY,
   HEALER_ZAP_FRAME_DURATIONS_MS,
+  healerCastStyleForSpell,
   healerStripAnimFrames,
   hurtAnimFrames,
   hurtAnimKeyForUnit,
@@ -188,35 +192,51 @@ describe('tank / dps1 / dps2 hurt exposure sheets', () => {
   });
 });
 
-describe('healer charge / cast exposure sheets', () => {
+describe('healer charge / cast exposure sheets (Solemn / Zealous)', () => {
   it('keeps charge and cast strip lengths matched to their duration tables', () => {
-    expect(HEALER_CHARGE_FRAME_DURATIONS_MS.length).toBe(HEALER_CHARGE_FRAMES.length);
-    expect(HEALER_CAST_FRAME_DURATIONS_MS.length).toBe(HEALER_CAST_FRAMES.length);
+    expect(HEALER_CHARGE_FRAME_DURATIONS_MS.length).toBe(HEALER_SOLEMN_CHARGE_ANIM.frameCount);
+    expect(HEALER_CHARGE_FRAME_DURATIONS_MS.length).toBe(HEALER_ZEALOUS_CHARGE_ANIM.frameCount);
+    expect(HEALER_CAST_FRAME_DURATIONS_MS.length).toBe(HEALER_SOLEMN_CAST_ANIM.frameCount);
+    expect(HEALER_CAST_FRAME_DURATIONS_MS.length).toBe(HEALER_ZEALOUS_CAST_ANIM.frameCount);
   });
 
-  it('holds cast contact longer than the flash smear', () => {
-    // Sheet: wind-up, orb, orb-peak, flash, contact, follow, settle.
-    const flashMs = HEALER_CAST_FRAME_DURATIONS_MS[3]!;
-    const contactMs = HEALER_CAST_FRAME_DURATIONS_MS[4]!;
-    const orbPeakMs = HEALER_CAST_FRAME_DURATIONS_MS[2]!;
-    expect(flashMs).toBeLessThanOrEqual(50);
+  it('holds release contact longer than the approach frames', () => {
+    const contactMs = HEALER_CAST_FRAME_DURATIONS_MS[HEALER_CAST_FRAME_DURATIONS_MS.length - 1]!;
+    const approachMs = HEALER_CAST_FRAME_DURATIONS_MS[HEALER_CAST_FRAME_DURATIONS_MS.length - 2]!;
     expect(contactMs).toBeGreaterThanOrEqual(133);
-    expect(orbPeakMs).toBeGreaterThanOrEqual(100);
-    expect(contactMs).toBeGreaterThan(flashMs);
+    expect(contactMs).toBeGreaterThan(approachMs);
   });
 
   it('dwells on the peak charge frame longer than the in-betweens', () => {
-    const peakMs = HEALER_CHARGE_FRAME_DURATIONS_MS[3]!;
-    const growMs = HEALER_CHARGE_FRAME_DURATIONS_MS[2]!;
-    expect(peakMs).toBeGreaterThan(growMs);
+    const peakMs = HEALER_CHARGE_FRAME_DURATIONS_MS[2]!;
+    const settleMs = HEALER_CHARGE_FRAME_DURATIONS_MS[0]!;
+    expect(peakMs).toBeGreaterThan(settleMs);
   });
 
-  it('leads the cast-action so flash lands near castFinished', () => {
+  it('leads the cast-action so contact begins near castFinished', () => {
     expect(HEALER_CAST_RELEASE_LEAD_MS).toBe(
-      HEALER_CAST_FRAME_DURATIONS_MS.slice(0, 4).reduce((sum, ms) => sum + ms, 0),
+      HEALER_CAST_FRAME_DURATIONS_MS.slice(0, -1).reduce((sum, ms) => sum + ms, 0),
     );
     expect(HEALER_CAST_RELEASE_LEAD_MS).toBeGreaterThan(200);
     expect(HEALER_CAST_RELEASE_LEAD_MS).toBeLessThan(500);
+  });
+
+  it('maps solemn / zealous spells to the matching cast style', () => {
+    expect(healerCastStyleForSpell('solemn-mend')).toBe('solemn');
+    expect(healerCastStyleForSpell('solemn-vigil')).toBe('solemn');
+    expect(healerCastStyleForSpell('zealous-mending')).toBe('zealous');
+    expect(healerCastStyleForSpell('zealous-flare')).toBe('zealous');
+    expect(healerCastStyleForSpell('vowstrike-virtue')).toBe('solemn');
+    expect(healerCastStyleForSpell('vowstrike-vengeance')).toBe('zealous');
+  });
+
+  it('registers charge as loops and cast as one-shots for both styles', () => {
+    expect(HEALER_SOLEMN_CHARGE_ANIM.loop).toBe(true);
+    expect(HEALER_ZEALOUS_CHARGE_ANIM.loop).toBe(true);
+    expect(HEALER_SOLEMN_CAST_ANIM.loop).toBe(false);
+    expect(HEALER_ZEALOUS_CAST_ANIM.loop).toBe(false);
+    expect(HEALER_CAST_STYLE_ANIMS.solemn.chargeAnimKey).toBe(HEALER_SOLEMN_CHARGE_ANIM.animKey);
+    expect(HEALER_CAST_STYLE_ANIMS.zealous.castAnimKey).toBe(HEALER_ZEALOUS_CAST_ANIM.animKey);
   });
 });
 
@@ -253,6 +273,10 @@ describe('healer idle / zap exposure sheets (chunk 1B)', () => {
     expect(HEALER_STRIP_ANIMS.map((d) => d.animKey)).toEqual([
       HEALER_IDLE_ANIM_KEY,
       HEALER_ZAP_ANIM_KEY,
+      HEALER_SOLEMN_CHARGE_ANIM.animKey,
+      HEALER_ZEALOUS_CHARGE_ANIM.animKey,
+      HEALER_SOLEMN_CAST_ANIM.animKey,
+      HEALER_ZEALOUS_CAST_ANIM.animKey,
     ]);
   });
 
