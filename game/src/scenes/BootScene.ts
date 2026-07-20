@@ -29,6 +29,7 @@ import { battlefieldTexturesForVariant } from '../ui/battlefield';
 import { spellBarTextures } from '../ui/spellSprites';
 import { panelKitTextures } from '../ui/panels';
 import { portraitTextures } from '../ui/portraitSprites';
+import { treeUiTextures } from '../ui/treeSockets';
 import { fadeToScene } from '../ui/transitions';
 
 export class BootScene extends Phaser.Scene {
@@ -79,6 +80,11 @@ export class BootScene extends Phaser.Scene {
     // FE-style bust portraits (temp-art exception, bible item 5) — banter
     // bubbles, tutorial, combat result panel. See ui/portraitSprites.ts.
     for (const texture of portraitTextures()) {
+      this.load.image(texture.key, texture.url);
+    }
+    // Talent-tree node socket ring + edge-groove strip (temp-art exception,
+    // bible item 7) — TreeScene. See ui/treeSockets.ts.
+    for (const texture of treeUiTextures()) {
       this.load.image(texture.key, texture.url);
     }
     // Attack strips: one texture key per frame (not packed into Kenney).
