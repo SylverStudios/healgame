@@ -27,7 +27,7 @@ import { drawBuildGlyph } from '../ui/buildGlyph';
 import type { CombatResult, CombatSceneData } from './CombatScene';
 import type { DungeonDef } from '../data/content/types';
 import { loadTelemetry, recordReset, sendPlaytestMail } from '../telemetry';
-import { FONT, FONT_SIZE_SM, FONT_SIZE_LG, PALETTE_NUM } from '../ui/theme';
+import { FONT, FONT_SIZE_SM, FONT_SIZE_LG, PALETTE, PALETTE_NUM } from '../ui/theme';
 import { addBanner, addButton, addPanel } from '../ui/panels';
 import { COMBAT_ENTRY_FADE_OUT_MS, fadeInOnCreate, fadeToScene } from '../ui/transitions';
 
@@ -114,7 +114,18 @@ export class HubScene extends Phaser.Scene {
 
     // Chunk 4 (bible item 4): shared panel/button/banner kit — ui/panels.ts.
     addBanner(this, width / 2, 40, 240, 44);
-    this.add.text(width / 2, 40, 'Hub', { fontFamily: FONT, fontSize: FONT_SIZE_LG, color: TEXT_COLOR }).setOrigin(0.5);
+    // Chunk 9 (bible item 9): same wordmark accent as TutorialScene's title —
+    // gold text over a 1px-offset dark-shadow layer, see that scene for the
+    // full rationale. Kept minimal here since addBanner already frames it.
+    const HUB_TITLE_SHADOW_OFFSET = 2;
+    this.add
+      .text(width / 2 + HUB_TITLE_SHADOW_OFFSET, 40 + HUB_TITLE_SHADOW_OFFSET, 'Hub', {
+        fontFamily: FONT,
+        fontSize: FONT_SIZE_LG,
+        color: PALETTE.borderDark,
+      })
+      .setOrigin(0.5);
+    this.add.text(width / 2, 40, 'Hub', { fontFamily: FONT, fontSize: FONT_SIZE_LG, color: PALETTE.gold }).setOrigin(0.5);
 
     this.buildStats(save);
     this.buildNotices(notices);
