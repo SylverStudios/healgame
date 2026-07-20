@@ -557,6 +557,8 @@ const MOB_VISUAL_FRAMES = {
   'dirge-sovereign': FRAME.demon,
   'thorn-husk': FRAME.ghost,
   'thorn-matriarch': FRAME.brute,
+  'gloam-wretch': FRAME.ghost,
+  'veil-cantor': FRAME.demon,
 } as const satisfies Readonly<Record<MobVisualKey, number>>;
 
 /**

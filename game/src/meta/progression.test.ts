@@ -58,34 +58,47 @@ describe('applyCombatResult', () => {
     expect(notices).toEqual([]);
   });
 
-  it.each(['ash-gate', 'iron-pass', 'cinder-vault', 'verdant-rift', 'black-choir', 'the-maw'])(
-    'queues three deterministic relic offers on the first %s clear',
-    (encounterId) => {
-      const priorById: Record<string, string[]> = {
-        'ash-gate': [],
-        'iron-pass': ['ash-gate'],
-        'cinder-vault': ['ash-gate', 'iron-pass'],
-        'verdant-rift': ['ash-gate', 'iron-pass', 'cinder-vault'],
-        'black-choir': ['ash-gate', 'iron-pass', 'cinder-vault', 'verdant-rift'],
-        'the-maw': ['ash-gate', 'iron-pass', 'cinder-vault', 'verdant-rift', 'black-choir'],
-      };
-      const priorClears = priorById[encounterId] ?? [];
-      const expectedClears = [...priorClears, encounterId];
-      const s = save({ clearedDungeons: priorClears });
-      const notices = applyCombatResult(
-        s,
-        result({ status: 'victory', encounterId }),
-        () => 0,
-      );
-      expect(s.clearedDungeons).toEqual(expectedClears);
-      expect(s.pendingRelicOffers).toEqual([
-        'ember-ledger',
-        'triage-bell',
-        'still-reservoir',
-      ]);
-      expect(notices).toEqual([{ kind: 'firstClear', text: 'FIRST CLEAR — CHOOSE A RELIC' }]);
-    },
-  );
+  it.each([
+    'ash-gate',
+    'iron-pass',
+    'cinder-vault',
+    'verdant-rift',
+    'black-choir',
+    'gloam-sanctum',
+    'the-maw',
+  ])('queues three deterministic relic offers on the first %s clear', (encounterId) => {
+    const priorById: Record<string, string[]> = {
+      'ash-gate': [],
+      'iron-pass': ['ash-gate'],
+      'cinder-vault': ['ash-gate', 'iron-pass'],
+      'verdant-rift': ['ash-gate', 'iron-pass', 'cinder-vault'],
+      'black-choir': ['ash-gate', 'iron-pass', 'cinder-vault', 'verdant-rift'],
+      'gloam-sanctum': ['ash-gate', 'iron-pass', 'cinder-vault', 'verdant-rift', 'black-choir'],
+      'the-maw': [
+        'ash-gate',
+        'iron-pass',
+        'cinder-vault',
+        'verdant-rift',
+        'black-choir',
+        'gloam-sanctum',
+      ],
+    };
+    const priorClears = priorById[encounterId] ?? [];
+    const expectedClears = [...priorClears, encounterId];
+    const s = save({ clearedDungeons: priorClears });
+    const notices = applyCombatResult(
+      s,
+      result({ status: 'victory', encounterId }),
+      () => 0,
+    );
+    expect(s.clearedDungeons).toEqual(expectedClears);
+    expect(s.pendingRelicOffers).toEqual([
+      'ember-ledger',
+      'triage-bell',
+      'still-reservoir',
+    ]);
+    expect(notices).toEqual([{ kind: 'firstClear', text: 'FIRST CLEAR — CHOOSE A RELIC' }]);
+  });
 
   it('excludes owned relics from first-clear offers', () => {
     const s = save({ relicIds: ['ember-ledger'] });
@@ -258,11 +271,28 @@ describe('isMawUnlocked', () => {
     expect(isMawUnlocked(save({ clearedDungeons: ['ash-gate', 'iron-pass'] }))).toBe(false);
   });
 
-  it('is true once black-choir has been cleared', () => {
+  it('is still false after Black Choir alone — Gloam Sanctum gates The Maw', () => {
     expect(
       isMawUnlocked(
         save({
           clearedDungeons: ['ash-gate', 'iron-pass', 'cinder-vault', 'verdant-rift', 'black-choir'],
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it('is true once gloam-sanctum has been cleared', () => {
+    expect(
+      isMawUnlocked(
+        save({
+          clearedDungeons: [
+            'ash-gate',
+            'iron-pass',
+            'cinder-vault',
+            'verdant-rift',
+            'black-choir',
+            'gloam-sanctum',
+          ],
         }),
       ),
     ).toBe(true);
@@ -305,6 +335,7 @@ describe('isDungeonUnlocked', () => {
     expect(isDungeonUnlocked(fresh, 'cinder-vault')).toBe(false);
     expect(isDungeonUnlocked(fresh, 'verdant-rift')).toBe(false);
     expect(isDungeonUnlocked(fresh, 'black-choir')).toBe(false);
+    expect(isDungeonUnlocked(fresh, 'gloam-sanctum')).toBe(false);
     expect(isDungeonUnlocked(fresh, 'the-maw')).toBe(false);
     expect(isDungeonUnlocked(save({ clearedDungeons: ['ash-gate'] }), 'iron-pass')).toBe(true);
     expect(isDungeonUnlocked(save({ clearedDungeons: ['ash-gate'] }), 'the-maw')).toBe(false);
@@ -320,6 +351,27 @@ describe('isDungeonUnlocked', () => {
     expect(
       isDungeonUnlocked(
         save({ clearedDungeons: ['ash-gate', 'iron-pass', 'cinder-vault', 'verdant-rift', 'black-choir'] }),
+        'gloam-sanctum',
+      ),
+    ).toBe(true);
+    expect(
+      isDungeonUnlocked(
+        save({ clearedDungeons: ['ash-gate', 'iron-pass', 'cinder-vault', 'verdant-rift', 'black-choir'] }),
+        'the-maw',
+      ),
+    ).toBe(false);
+    expect(
+      isDungeonUnlocked(
+        save({
+          clearedDungeons: [
+            'ash-gate',
+            'iron-pass',
+            'cinder-vault',
+            'verdant-rift',
+            'black-choir',
+            'gloam-sanctum',
+          ],
+        }),
         'the-maw',
       ),
     ).toBe(true);
@@ -353,6 +405,7 @@ describe('currentChallengeDungeon', () => {
             'cinder-vault',
             'verdant-rift',
             'black-choir',
+            'gloam-sanctum',
             'the-maw',
           ],
         }),

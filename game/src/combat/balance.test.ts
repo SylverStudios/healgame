@@ -6,13 +6,23 @@ import {
   VIGIL_EFFICIENCY_LOADOUT,
   VIGIL_LOADOUT,
   VIGIL_MID_TREE_LOADOUT,
+  VIGIL_SHALLOW_CROWN_LOADOUT,
   VIGIL_VENGEANCE_LOADOUT,
   ZEALOT_LOADOUT,
   ZEALOT_MID_TREE_LOADOUT,
+  ZEALOT_SHALLOW_CROWN_LOADOUT,
   ZEALOT_VENGEANCE_LOADOUT,
   type BotRunOptions,
 } from './balanceBot';
-import { ASH_GATE, BLACK_CHOIR, CINDER_VAULT, IRON_PASS, THE_MAW, VERDANT_RIFT } from '../data/encounters';
+import {
+  ASH_GATE,
+  BLACK_CHOIR,
+  CINDER_VAULT,
+  GLOAM_SANCTUM,
+  IRON_PASS,
+  THE_MAW,
+  VERDANT_RIFT,
+} from '../data/encounters';
 import { SPELLS } from '../data/constants';
 import { RELICS } from '../data/relics';
 
@@ -20,7 +30,7 @@ import { RELICS } from '../data/relics';
  * Balance gates for poc-spec §4.1 ("threat is mana, not raw HPS") and §7
  * ("Dungeon 2 cannot be cleared"), extended by alpha-0.1-handoff §Balance gate
  * amendments for Iron Pass (Dungeon 2) + relics, mid-tier Cinder Vault /
- * Verdant Rift, and Black Choir / The Maw end-game gates.
+ * Verdant Rift, and Black Choir / Gloam Sanctum / The Maw end-game gates.
  * Alpha 0.2 (oathbound-depth-handoff §D9): all maxed builds are now crown kits
  * (oath × Vowstrike aspect × Wrath Ascendant); Black Choir is clearable.
  *
@@ -35,6 +45,8 @@ import { RELICS } from '../data/relics';
  *  10. Maxed crown kits clear Verdant Rift; Needle Gaze focus lands ≥1.
  *  11. Black Choir is clearable with all four oath×aspect crown kits; Soul Toll burns ≥1.
  *  12. Black Choir wipes oath-path kits that lack Vowstrike / Wrath / crown (tree-depth).
+ *  13. Gloam Sanctum clears with full crown kits; Null Psalm burns ≥1.
+ *  14. Gloam Sanctum wipes shallow crown kits that still clear Black Choir.
  */
 
 describe('Ash Gate difficulty shape (poc-spec §4.1)', () => {
@@ -184,6 +196,58 @@ describe('Black Choir is clearable with crown kits (Dungeon 5, oathbound-depth �
   it('wipes oath-path kits that stop before Vowstrike / Wrath / crown — later clears want the tree', () => {
     expect(runBuildBot(BLACK_CHOIR, VIGIL_MID_TREE_LOADOUT, 'disciplined').status).toBe('wipe');
     expect(runBuildBot(BLACK_CHOIR, ZEALOT_MID_TREE_LOADOUT, 'disciplined').status).toBe('wipe');
+  });
+
+  it('still clears with shallow crown kits — Gloam Sanctum is the deeper path check', () => {
+    expect(runBuildBot(BLACK_CHOIR, VIGIL_SHALLOW_CROWN_LOADOUT, 'disciplined').status).toBe('victory');
+    expect(runBuildBot(BLACK_CHOIR, ZEALOT_SHALLOW_CROWN_LOADOUT, 'disciplined').status).toBe('victory');
+  });
+});
+
+describe('Gloam Sanctum is harder than Black Choir (Dungeon 6, path-depth gate)', () => {
+  it('each of the four oath×aspect crown kits clears Gloam Sanctum with ≥2 alive', () => {
+    const vigilVirtue = runBuildBot(GLOAM_SANCTUM, VIGIL_LOADOUT, 'disciplined');
+    const vigilVengeance = runBuildBot(GLOAM_SANCTUM, VIGIL_VENGEANCE_LOADOUT, 'disciplined');
+    const zealotVirtue = runBuildBot(GLOAM_SANCTUM, ZEALOT_LOADOUT, 'disciplined');
+    const zealotVengeance = runBuildBot(GLOAM_SANCTUM, ZEALOT_VENGEANCE_LOADOUT, 'disciplined');
+
+    expect(vigilVirtue.status).toBe('victory');
+    expect(vigilVirtue.survivors).toBeGreaterThanOrEqual(2);
+
+    expect(vigilVengeance.status).toBe('victory');
+    expect(vigilVengeance.survivors).toBeGreaterThanOrEqual(2);
+
+    expect(zealotVirtue.status).toBe('victory');
+    expect(zealotVirtue.survivors).toBeGreaterThanOrEqual(2);
+
+    expect(zealotVengeance.status).toBe('victory');
+    expect(zealotVengeance.survivors).toBeGreaterThanOrEqual(2);
+  });
+
+  it('Null Psalm burns mana at least once across the crown kit runs', () => {
+    const vigilVirtue = runBuildBot(GLOAM_SANCTUM, VIGIL_LOADOUT, 'disciplined');
+    const vigilVengeance = runBuildBot(GLOAM_SANCTUM, VIGIL_VENGEANCE_LOADOUT, 'disciplined');
+    const zealotVirtue = runBuildBot(GLOAM_SANCTUM, ZEALOT_LOADOUT, 'disciplined');
+    const zealotVengeance = runBuildBot(GLOAM_SANCTUM, ZEALOT_VENGEANCE_LOADOUT, 'disciplined');
+    expect(
+      vigilVirtue.manaBurns +
+        vigilVengeance.manaBurns +
+        zealotVirtue.manaBurns +
+        zealotVengeance.manaBurns,
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  it('wipes shallow crown kits that still clear Black Choir — wants full path depth', () => {
+    expect(runBuildBot(GLOAM_SANCTUM, VIGIL_SHALLOW_CROWN_LOADOUT, 'disciplined').status).toBe('wipe');
+    expect(runBuildBot(GLOAM_SANCTUM, ZEALOT_SHALLOW_CROWN_LOADOUT, 'disciplined').status).toBe(
+      'wipe',
+    );
+  });
+
+  it('wipes mid-tree and Measured crown kits', () => {
+    expect(runBuildBot(GLOAM_SANCTUM, VIGIL_MID_TREE_LOADOUT, 'disciplined').status).toBe('wipe');
+    expect(runBuildBot(GLOAM_SANCTUM, ZEALOT_MID_TREE_LOADOUT, 'disciplined').status).toBe('wipe');
+    expect(runBuildBot(GLOAM_SANCTUM, VIGIL_EFFICIENCY_LOADOUT, 'disciplined').status).toBe('wipe');
   });
 });
 

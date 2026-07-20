@@ -15,6 +15,8 @@ export const MOB_VISUAL_KEYS = [
   'dirge-sovereign',
   'thorn-husk',
   'thorn-matriarch',
+  'gloam-wretch',
+  'veil-cantor',
 ] as const;
 export type MobVisualKey = (typeof MOB_VISUAL_KEYS)[number];
 

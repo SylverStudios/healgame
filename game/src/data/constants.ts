@@ -150,8 +150,8 @@ export const REWARDS = {
   /**
    * Fallback XP per kill when an encounter omits `xpPerEnemy`.
    * Live dungeons set their own rate (Ash Gate / Iron Pass / Cinder 1 →
-   * Verdant/Choir 2 → Maw 3) so mid clears don't double-level before the
-   * next boss.
+   * Verdant/Choir/Gloam 2 → Maw 3) so mid clears don't double-level before
+   * the next boss.
    */
   xpPerEnemy: 1,
 } as const;

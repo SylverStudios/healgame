@@ -10,6 +10,7 @@ export const VISUAL_KEYS = [
   'emberfall',
   'soul-toll',
   'needle-gaze',
+  'null-psalm',
   'ash-husk',
   'iron-husk',
   'gate-warden',
@@ -21,11 +22,14 @@ export const VISUAL_KEYS = [
   'dirge-sovereign',
   'thorn-husk',
   'thorn-matriarch',
+  'gloam-wretch',
+  'veil-cantor',
   'ash-gate',
   'iron-pass',
   'cinder-vault',
   'verdant-rift',
   'black-choir',
+  'gloam-sanctum',
   'the-maw',
 ] as const;
 
