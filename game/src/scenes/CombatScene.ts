@@ -105,7 +105,7 @@ const PARTY_MERC_WIDTH = 112;
 const PARTY_MERC_HEIGHT = 112;
 const PARTY_HEALER_WIDTH = 64;
 const PARTY_HEALER_HEIGHT = 64;
-const PARTY_TIGHT_MERC_WIDTH = 64; // native×2; dps move here once regenerated
+const PARTY_TIGHT_MERC_WIDTH = 64; // native×2; dps2 moves here once regenerated
 const PARTY_TIGHT_MERC_HEIGHT = 64;
 const PARTY_KENNEY_WIDTH = 48;
 const PARTY_KENNEY_HEIGHT = 48;
@@ -421,9 +421,9 @@ export class CombatScene extends Phaser.Scene {
         PARTY_SLOT_LEFT,
         PARTY_SLOT_RIGHT,
       );
-      // Healer/tank: tight 32→64. DPS: legacy padded 112 until regenerated.
+      // Healer/tank/dps1: tight 32→64. dps2: legacy padded 112 until regenerated.
       const isHealer = unit.role === 'healer';
-      const isTightMerc = unit.id === 'tank';
+      const isTightMerc = unit.id === 'tank' || unit.id === 'dps1';
       const presentation = presentationForUnit(unit);
       const isLegacyMerc = presentation.kind === 'texture' && !isTightMerc;
       const width = isHealer ? PARTY_HEALER_WIDTH : isTightMerc ? PARTY_TIGHT_MERC_WIDTH : isLegacyMerc ? PARTY_MERC_WIDTH : PARTY_KENNEY_WIDTH;

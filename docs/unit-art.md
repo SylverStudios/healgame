@@ -42,8 +42,12 @@ Everything else in the game stays temp art per CLAUDE.md.
   healer foot-pad ratio. Own exposure sheets: `TANK_ATTACK_FRAME_DURATIONS_MS`,
   `TANK_HURT_FRAME_DURATIONS_MS` (`sprites.ts`). Authoring cache:
   `artifacts/pixellab-tank-v2/` (frozen still also in `art/source/tank/`).
-- `game/public/assets/units/dps1/` — PixelLab melee DPS (`east.png` +
-  `attack-east/0–6.png`). Authoring cache: `artifacts/pixellab-starter-dps1/`.
+- `game/public/assets/units/dps1/` — tight 32×32 melee DPS (`east.png` +
+  `attack-east/0–6.png` + `hurt-east/0–4.png`). Displays at 64 with the
+  healer foot-pad ratio, same as tank. Own exposure sheets:
+  `DPS1_ATTACK_FRAME_DURATIONS_MS`, `DPS1_HURT_FRAME_DURATIONS_MS`
+  (`sprites.ts`). Authoring cache: `artifacts/pixellab-dps1-v2/` (source
+  still also in `art/source/dps1/`).
 - `game/public/assets/units/dps2/` — PixelLab ranger DPS (`east.png` +
   `attack-east/0–6.png`). Authoring cache: `artifacts/pixellab-starter-dps2/`.
 - `game/public/assets/units/ash-husk/` — PixelLab ash husk (`west.png` +
@@ -73,17 +77,20 @@ Everything else in the game stays temp art per CLAUDE.md.
 - **Attack strips**: BootScene loads `attack-east/0–6.png` per merc and
   registers Phaser anims (`unit-tank-attack`, `unit-dps1-attack`,
   `unit-dps2-attack`) with FE-style **exposure sheets** — not equal frame
-  durations. Legacy dps1/dps2 use `MERC_ATTACK_FRAME_DURATIONS_MS` (rest
-  duplicate frame 0 skipped). Tank has its own faster
-  `TANK_ATTACK_FRAME_DURATIONS_MS` (all 7 frames held). Timing model:
+  durations. Legacy dps2 stays on `MERC_ATTACK_FRAME_DURATIONS_MS` (rest
+  duplicate frame 0 skipped). Tank and dps1 have their own faster,
+  tight-32-native sheets — `TANK_ATTACK_FRAME_DURATIONS_MS`,
+  `DPS1_ATTACK_FRAME_DURATIONS_MS` (all 7 frames held). Timing model:
   [Unpacking Fire Emblem's animations](https://lost-worlds.neocities.org/blog/2024/10/20/fire-emblem-animation/).
   `UnitSprite.playAttack()` runs on tank shove / DPS jab, then restores the
   rest still.
-- **Hurt strips**: tank `hurt-east/0–4.png` is preloaded and Phaser-anim
-  registered the same way (`unit-tank-hurt`, `TANK_HURT_FRAME_DURATIONS_MS`
-  in `sprites.ts`, `UNIT_HURT_ANIMS` parallel to `UNIT_ATTACK_ANIMS`).
-  `UnitSprite.playHurt()` runs whenever a `damage` event lands on a unit with
-  a wired hurt strip (no-op otherwise), then restores the rest still.
+- **Hurt strips**: tank + dps1 `hurt-east/0–4.png` are preloaded and
+  Phaser-anim registered the same way (`unit-tank-hurt`, `unit-dps1-hurt`,
+  `TANK_HURT_FRAME_DURATIONS_MS` / `DPS1_HURT_FRAME_DURATIONS_MS` in
+  `sprites.ts`, `UNIT_HURT_ANIMS` parallel to `UNIT_ATTACK_ANIMS`). dps2
+  doesn't have one yet. `UnitSprite.playHurt()` runs whenever a `damage`
+  event lands on a unit with a wired hurt strip (no-op otherwise), then
+  restores the rest still.
 - **Healer sheet**: CombatScene special case — charge loop on `castStarted`
   (channeled), cast-action strip on `finishCast` / instant `playCastRelease`;
   cancel returns to idle. Not selected by `presentationForUnit`. Texture key
@@ -103,8 +110,8 @@ Everything else in the game stays temp art per CLAUDE.md.
   one-shot pale-gold impact played on the enemy target when Bonk's damage
   lands (`combatFx.showZapImpact`, mirrors `showHealSparkle`).
 - `pixelArt: true` in `main.ts` gives nearest-neighbor filtering game-wide.
-- Display sizes (`CombatScene.ts`): tight 32×32 party (healer, tank) at
-  **64** (2×); legacy padded mercs (dps1/dps2) **112**; Kenney party **48**;
+- Display sizes (`CombatScene.ts`): tight 32×32 party (healer, tank, dps1)
+  at **64** (2×); legacy padded merc (dps2) **112**; Kenney party **48**;
   PixelLab trash **72**, Kenney trash **32**; bosses **80** (Kenney today).
   Padded canvases use `bodyOffsetY` so painted feet meet `GROUND_Y`. HP/mana
   meters are capped at 72px wide so neighboring party bars don't overlap.
@@ -115,8 +122,8 @@ Everything else in the game stays temp art per CLAUDE.md.
 | Unit | Path | Asset |
 |------|------|-------|
 | tank | tight 32 still + attack + hurt | `unit-tank` + `unit-tank-attack` + `unit-tank-hurt` |
-| dps1 | custom still + attack | `unit-dps1` + `unit-dps1-attack` |
-| dps2 | custom still + attack | `unit-dps2` + `unit-dps2-attack` |
+| dps1 | tight 32 still + attack + hurt | `unit-dps1` + `unit-dps1-attack` + `unit-dps1-hurt` |
+| dps2 | legacy padded still + attack | `unit-dps2` + `unit-dps2-attack` |
 | healer | 32×32 armored-paladin sheet | `unit-healer` idle + charge loop + cast-action |
 | ash-husk | custom still | `unit-ash-husk` (west.png) |
 | other trash | Kenney | ghost 121 |

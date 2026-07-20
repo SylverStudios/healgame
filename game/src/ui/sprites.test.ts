@@ -5,6 +5,8 @@ import {
   ASH_HUSK_TEXTURE_KEY,
   attackAnimFrames,
   attackAnimKeyForUnit,
+  DPS1_ATTACK_FRAME_DURATIONS_MS,
+  DPS1_HURT_FRAME_DURATIONS_MS,
   DPS1_TEXTURE_KEY,
   DPS2_TEXTURE_KEY,
   frameForMobVisualKey,
@@ -92,9 +94,9 @@ describe('presentationForUnit', () => {
     expect(attackAnimKeyForUnit(catalogUnit('healer', 'healer'))).toBeUndefined();
   });
 
-  it('wires the hurt anim key for tank only', () => {
+  it('wires the hurt anim key for tank and dps1, not dps2', () => {
     expect(hurtAnimKeyForUnit(catalogUnit('tank', 'tank'))).toBe('unit-tank-hurt');
-    expect(hurtAnimKeyForUnit(catalogUnit('dps1', 'dps'))).toBeUndefined();
+    expect(hurtAnimKeyForUnit(catalogUnit('dps1', 'dps'))).toBe('unit-dps1-hurt');
     expect(hurtAnimKeyForUnit(catalogUnit('dps2', 'dps'))).toBeUndefined();
     expect(hurtAnimKeyForUnit(catalogUnit('healer', 'healer'))).toBeUndefined();
   });
@@ -132,20 +134,35 @@ describe('merc attack exposure sheet', () => {
     expect(new Set(TANK_ATTACK_FRAME_DURATIONS_MS).size).toBeGreaterThan(1);
   });
 
-  it('keeps dps1 / dps2 on the shared legacy merc exposure sheet', () => {
-    for (const def of UNIT_ATTACK_ANIMS.filter((d) => d.unitId !== 'tank')) {
-      expect(def.frameDurationsMs).toBe(MERC_ATTACK_FRAME_DURATIONS_MS);
-    }
+  it('gives dps1 its own tight 7-frame exposure sheet, not the shared merc one', () => {
+    const dps1Def = UNIT_ATTACK_ANIMS.find((def) => def.unitId === 'dps1')!;
+    expect(dps1Def.frameDurationsMs).toBe(DPS1_ATTACK_FRAME_DURATIONS_MS);
+    expect(dps1Def.frameDurationsMs.length).toBe(dps1Def.frameCount);
+    expect(dps1Def.frameCount).toBe(7);
+    expect(new Set(DPS1_ATTACK_FRAME_DURATIONS_MS).size).toBeGreaterThan(1);
+  });
+
+  it('keeps dps2 on the shared legacy merc exposure sheet', () => {
+    const dps2Def = UNIT_ATTACK_ANIMS.find((def) => def.unitId === 'dps2')!;
+    expect(dps2Def.frameDurationsMs).toBe(MERC_ATTACK_FRAME_DURATIONS_MS);
   });
 });
 
-describe('tank hurt exposure sheet', () => {
+describe('tank / dps1 hurt exposure sheets', () => {
   it('keeps the hurt strip length matched to its duration table (never equal times)', () => {
     const def = UNIT_HURT_ANIMS.find((d) => d.unitId === 'tank')!;
     expect(def.frameDurationsMs).toBe(TANK_HURT_FRAME_DURATIONS_MS);
     expect(TANK_HURT_FRAME_DURATIONS_MS.length).toBe(def.frameCount);
     expect(def.frameCount).toBe(5);
     expect(new Set(TANK_HURT_FRAME_DURATIONS_MS).size).toBeGreaterThan(1);
+  });
+
+  it('gives dps1 its own hurt exposure sheet matched to its duration table (never equal times)', () => {
+    const def = UNIT_HURT_ANIMS.find((d) => d.unitId === 'dps1')!;
+    expect(def.frameDurationsMs).toBe(DPS1_HURT_FRAME_DURATIONS_MS);
+    expect(DPS1_HURT_FRAME_DURATIONS_MS.length).toBe(def.frameCount);
+    expect(def.frameCount).toBe(5);
+    expect(new Set(DPS1_HURT_FRAME_DURATIONS_MS).size).toBeGreaterThan(1);
   });
 
   it('builds Phaser frames from the hurt exposure sheet', () => {

@@ -66,7 +66,7 @@ export interface UnitAttackAnimDef {
  */
 export interface UnitHurtAnimDef {
   /** Party unit id this strip belongs to. */
-  unitId: 'tank';
+  unitId: 'tank' | 'dps1';
   animKey: string;
   /** Rest still shown when not flinching. */
   restTextureKey: CustomUnitTextureKey;
@@ -99,7 +99,7 @@ export const MERC_ATTACK_FRAME_DURATIONS_MS: readonly number[] = [
 
 /**
  * Tank's own exposure sheet for its tight 32×32 attack strip (installed
- * separately from the legacy padded dps1/dps2 strips, which stay on
+ * separately from the legacy padded dps2 strip, which stays on
  * `MERC_ATTACK_FRAME_DURATIONS_MS`). Same 7-frame shape, faster overall read.
  */
 export const TANK_ATTACK_FRAME_DURATIONS_MS: readonly number[] = [
@@ -111,6 +111,21 @@ export const TANK_ATTACK_FRAME_DURATIONS_MS: readonly number[] = [
  * flinch, held recoil, then recover back to rest.
  */
 export const TANK_HURT_FRAME_DURATIONS_MS: readonly number[] = [50, 100, 150, 83, 100] as const;
+
+/**
+ * DPS1's own exposure sheet for its tight 32×32 attack strip (installed
+ * separately from the legacy padded dps2 strip, which stays on
+ * `MERC_ATTACK_FRAME_DURATIONS_MS`). Same 7-frame shape as the tank's.
+ */
+export const DPS1_ATTACK_FRAME_DURATIONS_MS: readonly number[] = [
+  50, 100, 33, 167, 67, 83, 100,
+] as const;
+
+/**
+ * DPS1's hurt reaction exposure sheet (5 frames): quick antic, snap into the
+ * flinch, held recoil, then recover back to rest.
+ */
+export const DPS1_HURT_FRAME_DURATIONS_MS: readonly number[] = [50, 100, 150, 83, 100] as const;
 
 /** Shared shape for building Phaser anim frame lists from a per-frame exposure sheet. */
 interface FrameStripSource {
@@ -171,7 +186,7 @@ export const UNIT_ATTACK_ANIMS: readonly UnitAttackAnimDef[] = [
     frameCount: 7,
     frameKey: (i) => attackFrameKey('dps1', i),
     frameUrl: (i) => attackFrameUrl('dps1', 'east', i),
-    frameDurationsMs: MERC_ATTACK_FRAME_DURATIONS_MS,
+    frameDurationsMs: DPS1_ATTACK_FRAME_DURATIONS_MS,
   },
   {
     unitId: 'dps2',
@@ -197,7 +212,7 @@ function hurtFrameUrl(slug: string, facing: 'east' | 'west', index: number): str
   return `assets/units/${slug}/hurt-${facing}/${index}.png`;
 }
 
-/** Tank's east hurt strip (5 frames). Other mercs don't have one yet. */
+/** Tank + dps1 east hurt strips (5 frames each). dps2 doesn't have one yet. */
 export const UNIT_HURT_ANIMS: readonly UnitHurtAnimDef[] = [
   {
     unitId: 'tank',
@@ -207,6 +222,15 @@ export const UNIT_HURT_ANIMS: readonly UnitHurtAnimDef[] = [
     frameKey: (i) => hurtFrameKey('tank', i),
     frameUrl: (i) => hurtFrameUrl('tank', 'east', i),
     frameDurationsMs: TANK_HURT_FRAME_DURATIONS_MS,
+  },
+  {
+    unitId: 'dps1',
+    animKey: 'unit-dps1-hurt',
+    restTextureKey: DPS1_TEXTURE_KEY,
+    frameCount: 5,
+    frameKey: (i) => hurtFrameKey('dps1', i),
+    frameUrl: (i) => hurtFrameUrl('dps1', 'east', i),
+    frameDurationsMs: DPS1_HURT_FRAME_DURATIONS_MS,
   },
 ] as const;
 
