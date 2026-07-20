@@ -14,6 +14,7 @@ import { buildCooldownTooltipLines } from './cooldownTooltip';
 import { buildSpellCard } from './spellCard';
 import { SpellTooltip } from './spellTooltip';
 import { glyphChar } from './glyph';
+import { FONT, FONT_SIZE_XS, FONT_SIZE_MD } from './theme';
 
 /** Alpha 0.2 §D8: compact width so up to 4 QWER columns fit on 960px.
  *  Shift+QWER major CDs sit in a matching row above (same finger columns). */
@@ -32,13 +33,18 @@ const BUTTON_DISABLED_ALPHA = 0.28;
 const ARMED_BORDER_COLOR = 0xf2c14e;
 const ARMED_BORDER_WIDTH = 3;
 
-/** Glyph: large single-char primary label (§D8 temp art exception). */
-const GLYPH_FONT = '22px monospace';
+/** Glyph: large single-char primary label (§D8 temp art exception). MD (24px)
+ *  — the button is only 100×52, but this is the primary visual, close to
+ *  its old 22px size. */
+const GLYPH_FONT_SIZE = FONT_SIZE_MD;
 const GLYPH_COLOR = '#e8d8c8';
-const COST_FONT = '10px monospace';
+/** XS (8px): cost/hotkey/timer text all live in a ≤52px-tall button
+ *  alongside the glyph and an 18×14 keycap chip — the SM (16px) snap would
+ *  overflow both. */
+const COST_FONT_SIZE = FONT_SIZE_XS;
 const COST_COLOR = '#a8c8f0';
 const COST_OOM_COLOR = '#e05a4e';
-const HOTKEY_FONT = '10px monospace';
+const HOTKEY_FONT_SIZE = FONT_SIZE_XS;
 const HOTKEY_COLOR = '#e8d8c8';
 /** Wide enough for two-char Shift labels (`sQ`); height stays compact. */
 const KEYCAP_WIDTH = 18;
@@ -50,10 +56,10 @@ const KEYCAP_BORDER = 0x8a7868;
  *  Shift row lines up with QWER columns. */
 const CD_BUTTON_WIDTH = BUTTON_WIDTH;
 const CD_BUTTON_HEIGHT = BUTTON_HEIGHT;
-const CD_GLYPH_FONT = '20px monospace';
-const CD_TIMER_FONT = '12px monospace';
+const CD_GLYPH_FONT_SIZE = FONT_SIZE_MD;
+const CD_TIMER_FONT_SIZE = FONT_SIZE_XS;
 const CD_TIMER_COLOR = '#a8c8f0';
-const SPELL_TIMER_FONT = '11px monospace';
+const SPELL_TIMER_FONT_SIZE = FONT_SIZE_XS;
 const SPELL_TIMER_COLOR = '#a8c8f0';
 
 class SpellButton {
@@ -110,8 +116,8 @@ class SpellButton {
 
     this.glyphText = scene.add
       .text(x, y - 5, glyphChar(spell), {
-        fontFamily: 'monospace',
-        fontSize: GLYPH_FONT,
+        fontFamily: FONT,
+        fontSize: GLYPH_FONT_SIZE,
         fontStyle: 'bold',
         color: GLYPH_COLOR,
         stroke: '#0a0605',
@@ -119,16 +125,16 @@ class SpellButton {
       })
       .setOrigin(0.5);
     this.costText = scene.add
-      .text(x, y + 15, `${spell.mana}m`, { fontFamily: 'monospace', fontSize: COST_FONT, color: COST_COLOR })
+      .text(x, y + 15, `${spell.mana}m`, { fontFamily: FONT, fontSize: COST_FONT_SIZE, color: COST_COLOR })
       .setOrigin(0.5);
     this.timerText = scene.add
-      .text(x, y + 15, '', { fontFamily: 'monospace', fontSize: SPELL_TIMER_FONT, color: SPELL_TIMER_COLOR })
+      .text(x, y + 15, '', { fontFamily: FONT, fontSize: SPELL_TIMER_FONT_SIZE, color: SPELL_TIMER_COLOR })
       .setOrigin(0.5)
       .setVisible(false);
     this.hotkeyText = scene.add
       .text(keycapX, keycapY, hotkeyLabel, {
-        fontFamily: 'monospace',
-        fontSize: HOTKEY_FONT,
+        fontFamily: FONT,
+        fontSize: HOTKEY_FONT_SIZE,
         color: HOTKEY_COLOR,
       })
       .setOrigin(0.5);
@@ -237,8 +243,8 @@ class CooldownButton {
 
     this.glyphText = scene.add
       .text(x, y - 5, glyphChar(def), {
-        fontFamily: 'monospace',
-        fontSize: CD_GLYPH_FONT,
+        fontFamily: FONT,
+        fontSize: CD_GLYPH_FONT_SIZE,
         fontStyle: 'bold',
         color: GLYPH_COLOR,
         stroke: '#0a0605',
@@ -246,13 +252,13 @@ class CooldownButton {
       })
       .setOrigin(0.5);
     this.timerText = scene.add
-      .text(x, y + 14, '', { fontFamily: 'monospace', fontSize: CD_TIMER_FONT, color: CD_TIMER_COLOR })
+      .text(x, y + 14, '', { fontFamily: FONT, fontSize: CD_TIMER_FONT_SIZE, color: CD_TIMER_COLOR })
       .setOrigin(0.5)
       .setVisible(false);
     this.hotkeyText = scene.add
       .text(keycapX, keycapY, hotkeyLabel, {
-        fontFamily: 'monospace',
-        fontSize: HOTKEY_FONT,
+        fontFamily: FONT,
+        fontSize: HOTKEY_FONT_SIZE,
         color: HOTKEY_COLOR,
       })
       .setOrigin(0.5);

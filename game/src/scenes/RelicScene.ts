@@ -3,7 +3,7 @@
  * is pending. Choosing one appends a permanent stat relic, clears the offer,
  * persists, and returns to the Hub.
  * No skip button — the player must pick. Cards use PixelLab relic icons +
- * monospace text; name accents keep role scales (grey defense, red offense,
+ * pixel-font text; name accents keep role scales (grey defense, red offense,
  * green healing).
  */
 
@@ -14,6 +14,7 @@ import { relicsById } from '../data/relics';
 import type { RelicDef } from '../combat/types';
 import { drawRunModGlyph } from '../ui/runModsBar';
 import { relicGlyphColor, relicGlyphColorCss } from '../ui/relicColors';
+import { FONT, FONT_SIZE_SM, FONT_SIZE_MD } from '../ui/theme';
 
 const BG_COLOR = 0x1a1210;
 const CARD_BG = 0x3a2a22;
@@ -21,7 +22,6 @@ const CARD_BG_HOVER = 0x4a3a2e;
 const BORDER_COLOR = 0x0a0605;
 const TEXT_COLOR = '#e8d8c8';
 const DIM_COLOR = '#a89888';
-const FONT = 'monospace';
 
 const CARD_WIDTH = 240;
 const CARD_HEIGHT = 320;
@@ -41,12 +41,12 @@ export class RelicScene extends Phaser.Scene {
     const { width, height } = this.scale;
 
     this.add
-      .text(width / 2, 48, 'Choose a Relic', { fontFamily: FONT, fontSize: '26px', color: TEXT_COLOR })
+      .text(width / 2, 48, 'Choose a Relic', { fontFamily: FONT, fontSize: FONT_SIZE_MD, color: TEXT_COLOR })
       .setOrigin(0.5);
     this.add
       .text(width / 2, 80, 'This choice is permanent for this save.', {
         fontFamily: FONT,
-        fontSize: '14px',
+        fontSize: FONT_SIZE_SM,
         color: DIM_COLOR,
       })
       .setOrigin(0.5);
@@ -75,7 +75,7 @@ export class RelicScene extends Phaser.Scene {
     this.add
       .text(x, y - CARD_HEIGHT / 2 + 28, relic.name, {
         fontFamily: FONT,
-        fontSize: '18px',
+        fontSize: FONT_SIZE_SM,
         color: relicGlyphColorCss(relic),
       })
       .setOrigin(0.5);
@@ -85,7 +85,7 @@ export class RelicScene extends Phaser.Scene {
     this.add
       .text(x, y - CARD_HEIGHT / 2 + 118, relic.description, {
         fontFamily: FONT,
-        fontSize: '14px',
+        fontSize: FONT_SIZE_SM,
         color: TEXT_COLOR,
         align: 'center',
         wordWrap: { width: DESC_WRAP_WIDTH },

@@ -2,8 +2,8 @@
  * A single combat unit rendered as a Tiny Dungeon tile (see ui/sprites.ts)
  * + name label + HP bar (+ mana bar for the healer) + optional
  * click-to-target marker. Bars/labels keep the temp-art style (flat bars,
- * monospace, dark palette); the unit body is a 16×16 pixel-art frame scaled
- * up with nearest-neighbor filtering (`pixelArt: true` in main.ts).
+ * pixel-font labels, dark palette); the unit body is a 16×16 pixel-art frame
+ * scaled up with nearest-neighbor filtering (`pixelArt: true` in main.ts).
  *
  * Chunk 2 (phase-2-handoff): all visuals live inside a Phaser Container
  * anchored at the unit's fixed "home" position, so a single tween on the
@@ -18,6 +18,7 @@ import Phaser from 'phaser';
 import type { Unit } from '../combat/types';
 import { Bar } from './bar';
 import { UNIT_TEXTURE_KEY } from './sprites';
+import { FONT, FONT_SIZE_XS, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG } from './theme';
 
 /** Lerp between two 0xRRGGBB colors at `t` in [0, 1] — used by boss telegraph tint cues. */
 function interpolateColor(fromHex: number, toHex: number, t: number): number {
@@ -51,9 +52,11 @@ const DEAD_SCALE = 0.85;
 /** v0.3 §Coyote: downed-but-savable (dying) — urgent red, still fully targetable. */
 const DYING_TINT = 0xcc4433;
 
-const NAME_FONT = '11px monospace';
+const NAME_FONT_SIZE = FONT_SIZE_SM;
 const NAME_COLOR = '#d8c8b8';
-const HP_FONT = '10px monospace';
+/** XS (8px), not the SM snap: HP_TEXT_HEIGHT below reserves exactly 14px for
+ *  this line before the mana bar starts — a 16px line would encroach on it. */
+const HP_FONT_SIZE = FONT_SIZE_XS;
 const HP_COLOR = '#e8d8c8';
 
 const DAMAGE_FLASH_COLOR = 0xff3b30;
@@ -102,19 +105,20 @@ const DAMAGE_FLOAT_DURATION_MS = 550;
 /** `+N` heal floats linger longer so the basic heal reads as satisfying juice. */
 const HEAL_FLOAT_RISE_DISTANCE = 36;
 const HEAL_FLOAT_DURATION_MS = 980;
-const FLOAT_FONT = 'monospace';
 const FLOAT_DEPTH = 50;
 
-/** Map heal/damage amount → float font size (handoff §L). */
+/**
+ * Map heal/damage amount → float font size (handoff §L), snapped to the
+ * pixel font's density tiers. The original scale had 5 distinct steps
+ * (18/20/24/28/32); snapping collapses the middle and top pairs to 3 steps
+ * (16/24/32) since 20≈24 and 28≈32 both round to the same bucket — still
+ * monotonic, still reads as "small hit vs big hit."
+ */
 function floatFontPx(amount: number): string {
   const a = Math.abs(amount);
-  let px = 18;
-  if (a <= 1) px = 18;
-  else if (a <= 2) px = 20;
-  else if (a <= 4) px = 24;
-  else if (a <= 6) px = 28;
-  else px = 32;
-  return `${px}px`;
+  if (a <= 1) return FONT_SIZE_SM;
+  if (a <= 4) return FONT_SIZE_MD;
+  return FONT_SIZE_LG;
 }
 
 /**
@@ -292,7 +296,7 @@ export class UnitSprite {
       this.nameText = null;
     } else {
       this.nameText = scene.add
-        .text(0, this.bodyRestY, unit.name, { fontFamily: NAME_FONT, color: NAME_COLOR })
+        .text(0, this.bodyRestY, unit.name, { fontFamily: FONT, fontSize: NAME_FONT_SIZE, color: NAME_COLOR })
         .setStroke('#0a0605', 3)
         .setOrigin(0.5)
         .setDepth(1);
@@ -304,7 +308,7 @@ export class UnitSprite {
     this.hpBar = new Bar(scene, -meterHalf, hpY, this.meterWidth, HP_BAR_HEIGHT, HP_FILL_COLOR);
     this.hpBar.addToContainer(this.container);
     this.hpText = scene.add
-      .text(0, hpY - HP_BAR_HEIGHT / 2 - HP_TEXT_GAP, '', { fontFamily: HP_FONT, color: HP_COLOR })
+      .text(0, hpY - HP_BAR_HEIGHT / 2 - HP_TEXT_GAP, '', { fontFamily: FONT, fontSize: HP_FONT_SIZE, color: HP_COLOR })
       .setOrigin(0.5, 1);
     this.container.add(this.hpText);
 
@@ -313,7 +317,11 @@ export class UnitSprite {
       this.manaBar = new Bar(scene, -meterHalf, manaY, this.meterWidth, MANA_BAR_HEIGHT, MANA_FILL_COLOR);
       this.manaBar.addToContainer(this.container);
       this.manaText = scene.add
-        .text(0, manaY - MANA_BAR_HEIGHT / 2 - HP_TEXT_GAP, '', { fontFamily: HP_FONT, color: '#a8c8f0' })
+        .text(0, manaY - MANA_BAR_HEIGHT / 2 - HP_TEXT_GAP, '', {
+          fontFamily: FONT,
+          fontSize: HP_FONT_SIZE,
+          color: '#a8c8f0',
+        })
         .setOrigin(0.5, 1);
       this.container.add(this.manaText);
       this.manaBarY = manaY;
@@ -511,7 +519,7 @@ export class UnitSprite {
     durationMs: number,
   ): void {
     const obj = this.scene.add
-      .text(this.homeX, this.homeY, text, { fontFamily: FLOAT_FONT, fontSize, color })
+      .text(this.homeX, this.homeY, text, { fontFamily: FONT, fontSize, color })
       .setStroke(FLOAT_STROKE_COLOR, FLOAT_STROKE_WIDTH)
       .setOrigin(0.5)
       .setDepth(FLOAT_DEPTH);

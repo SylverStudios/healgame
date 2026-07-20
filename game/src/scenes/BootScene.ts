@@ -24,6 +24,7 @@ import {
 } from '../ui/sprites';
 import { RELIC_TEXTURE_IDS, relicTextureKey, relicTextureUrl } from '../ui/relicSprites';
 import { initMusic, MUSIC_ASSET_KEY, MUSIC_URL } from '../ui/music';
+import { fontsReady } from '../ui/theme';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -68,11 +69,17 @@ export class BootScene extends Phaser.Scene {
     this.registerUnitAttackAnims();
     const save = loadSave();
     initMusic(this.game, save.musicVolumePct);
-    if (save.tutorialDone) {
-      this.scene.start(SceneKeys.Hub);
-    } else {
-      this.scene.start(SceneKeys.Tutorial);
-    }
+    // fontsReady (ui/theme.ts) started loading the pixel font as early as
+    // the module graph linked — well before this preload/create pair ran —
+    // so in practice this resolves immediately here; it only actually waits
+    // on a slow/cold font load, and only up to its own 2s safety timeout.
+    void fontsReady.then(() => {
+      if (save.tutorialDone) {
+        this.scene.start(SceneKeys.Hub);
+      } else {
+        this.scene.start(SceneKeys.Tutorial);
+      }
+    });
   }
 
   /** One-shot attack anims for PixelLab mercs — shared via the game AnimationManager. */

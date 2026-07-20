@@ -24,6 +24,7 @@ import { drawBuildGlyph } from '../ui/buildGlyph';
 import { costLabel, grantSpellEyebrow, spotMetaSuffix } from '../ui/treeSpotMeta';
 import { allocatedTalentPoints, availableTalentPoints } from '../meta/progression';
 import { levelForXp } from '../data/constants';
+import { FONT, FONT_SIZE_XS, FONT_SIZE_SM, FONT_SIZE_MD } from '../ui/theme';
 import {
   buildGlyphFromTree,
   layoutFromGrid,
@@ -66,7 +67,6 @@ const OWNED_COLOR = '#7ad67a';
 /** Rank-pip filled color (hex, matches OWNED_COLOR string above). */
 const OWNED_COLOR_HEX = 0x7ad67a;
 const DANGER_COLOR = '#e05a4e';
-const FONT = 'monospace';
 
 const NODE_RADIUS = 20;
 /** Hit/tooltip extent — matches the circular node diameter. */
@@ -206,7 +206,7 @@ export class TreeScene extends Phaser.Scene {
     this.add
       .text(width / 2, 14, 'TALENT TREE', {
         fontFamily: FONT,
-        fontSize: '20px',
+        fontSize: FONT_SIZE_MD,
         fontStyle: 'bold',
         color: '#fff2df',
         stroke: '#0a0605',
@@ -215,7 +215,7 @@ export class TreeScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(HUD_DEPTH);
     this.headerText = this.add
-      .text(width / 2, 36, '', { fontFamily: FONT, fontSize: '12px', color: ACCENT_COLOR })
+      .text(width / 2, 36, '', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: ACCENT_COLOR })
       .setOrigin(0.5)
       .setDepth(HUD_DEPTH);
 
@@ -226,7 +226,7 @@ export class TreeScene extends Phaser.Scene {
     this.statusText = this.add
       .text(width / 2, 52, '', {
         fontFamily: FONT,
-        fontSize: '11px',
+        fontSize: FONT_SIZE_SM,
         color: TEXT_COLOR,
         align: 'center',
         wordWrap: { width: 700 },
@@ -237,7 +237,7 @@ export class TreeScene extends Phaser.Scene {
     this.feedbackText = this.add
       .text(width / 2, 66, '', {
         fontFamily: FONT,
-        fontSize: '11px',
+        fontSize: FONT_SIZE_SM,
         color: DANGER_COLOR,
         align: 'center',
       })
@@ -257,10 +257,13 @@ export class TreeScene extends Phaser.Scene {
 
   /** Static labels/frame for the build-glyph corner preview — drawn once. */
   private buildGlyphPreviewChrome(): void {
+    // XS (8px), not the SM snap: this label sits 6px above the preview box's
+    // top edge (60 vs GLYPH_PREVIEW_Y=96, H=60 ⇒ box top at 66) — SM would
+    // grow into the box.
     this.add
       .text(GLYPH_PREVIEW_X, 60, 'BUILD', {
         fontFamily: FONT,
-        fontSize: '10px',
+        fontSize: FONT_SIZE_XS,
         color: DIM_COLOR,
       })
       .setOrigin(0.5)
@@ -294,7 +297,7 @@ export class TreeScene extends Phaser.Scene {
       const label = this.add
         .text(x + LEGEND_SWATCH_LEN + 6, LEGEND_Y, entry.label, {
           fontFamily: FONT,
-          fontSize: '10px',
+          fontSize: FONT_SIZE_SM,
           color: DIM_COLOR,
         })
         .setOrigin(0, 0.5)
@@ -458,7 +461,7 @@ export class TreeScene extends Phaser.Scene {
     const glyphText = this.add
       .text(pos.x, pos.y - (spot.chainLength > 1 ? 2 : 0), glyph, {
         fontFamily: FONT,
-        fontSize: '18px',
+        fontSize: FONT_SIZE_SM,
         fontStyle: 'bold',
         color: glyphColor,
         stroke: '#0a0605',
@@ -482,10 +485,13 @@ export class TreeScene extends Phaser.Scene {
         extras.push(pip);
       }
     } else if (spot.status === 'exclusive-locked') {
+      // XS (8px), not SM: this mark sits right at the node edge (r=20,
+      // GRID_ROW_HEIGHT=70 between rows) alongside pips/the level tag below —
+      // SM would start crowding neighboring on-node annotations.
       const lockMark = this.add
         .text(pos.x, pos.y + 11, '×', {
           fontFamily: FONT,
-          fontSize: '11px',
+          fontSize: FONT_SIZE_XS,
           color: DANGER_COLOR,
         })
         .setOrigin(0.5)
@@ -504,10 +510,13 @@ export class TreeScene extends Phaser.Scene {
     // addition to reading `locked`/`unaffordable` like any other gate.
     if (spot.next?.minLevel !== undefined && spot.status !== 'complete') {
       const levelLocked = levelForXp(this.save.xp) < spot.next.minLevel;
+      // XS (8px), not SM: sits just below the node (pos.y + NODE_RADIUS + 9)
+      // with only GRID_ROW_HEIGHT=70 between lattice rows — SM risks
+      // crowding the next row's node.
       const tag = this.add
         .text(pos.x, pos.y + NODE_RADIUS + 9, `Lv ${spot.next.minLevel}`, {
           fontFamily: FONT,
-          fontSize: '10px',
+          fontSize: FONT_SIZE_XS,
           color: levelLocked ? DANGER_COLOR : DIM_COLOR,
         })
         .setOrigin(0.5)
@@ -647,7 +656,7 @@ export class TreeScene extends Phaser.Scene {
       .setDepth(HUD_DEPTH)
       .setName('treeBack');
     this.add
-      .text(x, y, 'Back', { fontFamily: FONT, fontSize: '14px', color: TEXT_COLOR })
+      .text(x, y, 'Back', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: TEXT_COLOR })
       .setOrigin(0.5)
       .setDepth(HUD_DEPTH);
     rect.on('pointerdown', () => this.scene.start(SceneKeys.Hub));
