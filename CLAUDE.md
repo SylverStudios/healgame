@@ -96,8 +96,10 @@ game/src/
   renders a layered battlefield (`ui/battlefield.ts`,
   `assets/battlefields/ashgate/`): code-drawn sky gradient/silhouette/ember
   haze plus PixelLab structure props and platform slices under the
-  party/enemy lines — only the Ash Gate variant exists, reused by every
-  encounter until per-dungeon variants land; and combat controls use
+  party/enemy lines; the remaining 5 dungeons (Iron Pass, Cinder Vault,
+  Verdant Rift, Black Choir, The Maw) reuse the same composition via
+  `create_object_state` recolors, resolved per-encounter through
+  `battlefieldForEncounter()`; and combat controls use
   pixel-art chrome (`assets/ui/`): spell/cooldown button frames, keycap
   chips, the player cast-bar frame, and 16×16 spell/cooldown icons
   (registry in `ui/spellSprites.ts`, glyph-char fallback for unmapped
