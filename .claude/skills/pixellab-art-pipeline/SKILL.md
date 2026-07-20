@@ -150,6 +150,45 @@ frame). Wiring contract: [`../pixellab-unit-art/wiring.md`](../pixellab-unit-art
   color count), `crop` (density/anchor), `sheet`, `diff` (pixel-compare two
   PNGs), `audit` (whole manifest). Eyeballs are only for style and motion.
 
+## Cast / holdable-pose generation (learned 2026-07-19)
+
+For healer charge/release (and any boss special windup+release) where the
+**climax silhouette is the product**, prefer **Method B** over text-only:
+
+| | Method A — text-only v3 | Method B — keys + interpolate |
+|---|---|---|
+| How | `animate_character` + `action_description` from idle | Author climax with `create_character_state`, then `custom_start_frame_url` + `end_frame_url` |
+| Cost | **1 gen / direction** | State: **~20–40 gens** (full 4/8-dir rebuild) + **1 gen / strip** |
+| When | Cheap scouting, VFX pulse, simple strikes | Holdable charge climax, philosophy poses, release contact |
+
+**Best practices (effective):**
+
+1. **Scout cheap, lock expensive.** Explore motion ideas with 1-gen v3
+   strips. Only call `create_character_state` after the user likes a pose
+   direction — never mint a batch of states “just to compare.”
+2. **Count our actions, not the account delta.** `get_balance`
+   `generations_used` is shared across agents/sessions. Report cost as
+   `N × quoted cost` for the calls *this* agent made; do not attribute the
+   whole balance drop to one exploration.
+3. **Method B strip recipe:**
+   - Charge windup: idle → charge-key (`end_frame` = approved key south)
+   - Charge hold: optional pulse loop *on the key state* (start ≈ end)
+   - Release: charge-key → release-key → idle (do **not** start release
+     from idle with prose that “assumes” the charge pose)
+4. **Facing readability.** Depth-heavy poses (“arms behind the body”,
+   side-profile coils) sing in **east** and muddle in **south**. When combat
+   facing is south (healer), rewrite the pose for south-readable cues:
+   extreme lean, fists cocked high beside shoulders, cape flare — not true
+   behind-body occlusion. Side-view keys are proof-of-concept only unless
+   that facing ships.
+5. **User choice (2026-07-19 exploration):** Method B strips preferred over
+   Method A for Solemn/Zealous charge+release; ship **south**. Zealous
+   release south is the weak link — touch up for expressiveness rather than
+   switching to east.
+
+Healer Solemn/Zealous prompt notes + artifact paths:
+[`../pixellab-unit-art/healer-animation-prompts.md`](../pixellab-unit-art/healer-animation-prompts.md).
+
 ## Quality bar (before handoff)
 
 - Passes `validate --size <native>`: exact tier canvas, transparent bg.
