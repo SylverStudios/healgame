@@ -60,6 +60,7 @@ import { drawBuildGlyph } from '../ui/buildGlyph';
 import { detectCloseCall, pickBanterLine, type BanterSpeaker, type BanterTrigger } from '../data/banter';
 import { showSpeechBubble } from '../ui/speechBubble';
 import { portraitTextureKey, revealResultPortrait } from '../ui/portraitSprites';
+import { chunkyWipeIn, fadeToScene } from '../ui/transitions';
 import { MOB_REGISTRY } from '../data/mobs';
 import { ENEMY_ABILITY_REGISTRY } from '../data/enemyAbilities';
 import type { BossTelegraphCue } from '../data/content/types';
@@ -208,8 +209,7 @@ function slotX(index: number, count: number, left: number, right: number): numbe
 
 /** Home Y for a unit of `height` so its bottom edge (feet) sits on GROUND_Y — units have
  *  different heights (mercs 112 / healer 64 / trash 72 / Kenney smaller), so their container
- *  centers (which is what x/y position) differ even though they all read as standing on
- *  one ground line. */
+ *  centers (which is what x/y position) differ even though they all read as standing on one line. */
 function groundAnchorY(height: number): number {
   return GROUND_Y - height / 2;
 }
@@ -360,12 +360,12 @@ export class CombatScene extends Phaser.Scene {
     this.lastHealerMana = this.engine.state.party.find((u) => u.role === 'healer')?.mana ?? null;
 
     this.syncView();
+    chunkyWipeIn(this, VIEW_WIDTH, VIEW_HEIGHT); // chunk 6: "into battle" reveal
   }
 
-  /** Data-driven wind-up cue (handoff "Boss telegraphs") for this encounter's boss ability,
-   *  looked up from the same authoring catalogs the content pipeline compiled from — the
-   *  compiled EncounterDef/BossCastDef never carries this field (presentation-only, and the
-   *  engine stays untouched), so it's resolved here via the boss's stable mobId. */
+  /** Data-driven wind-up cue (handoff "Boss telegraphs") for this encounter's boss ability, looked
+   *  up from the same authoring catalogs the content pipeline compiled from — the compiled
+   *  EncounterDef/BossCastDef never carries this field (presentation-only, engine untouched). */
   private resolveBossTelegraphCue(): BossTelegraphCue {
     const bossMob = MOB_REGISTRY[this.encounter.boss.id];
     const abilityId = bossMob?.abilityIds[0];
@@ -1173,7 +1173,7 @@ export class CombatScene extends Phaser.Scene {
       .setAlpha(0)
       .on('pointerdown', () => {
         const combatResult: CombatResult = { encounterId: this.sceneData.encounterId, status, xp };
-        this.scene.start(this.sceneData.returnTo, { combatResult });
+        fadeToScene(this, this.sceneData.returnTo, { combatResult });
       });
     const returnFrame = addButton(this, centerX, centerY + 105, 180, 40, {
       fillColor: PALETTE_NUM.panelLight,

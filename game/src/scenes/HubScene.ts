@@ -29,6 +29,7 @@ import type { DungeonDef } from '../data/content/types';
 import { loadTelemetry, recordReset, sendPlaytestMail } from '../telemetry';
 import { FONT, FONT_SIZE_SM, FONT_SIZE_LG, PALETTE_NUM } from '../ui/theme';
 import { addBanner, addButton, addPanel } from '../ui/panels';
+import { COMBAT_ENTRY_FADE_OUT_MS, fadeInOnCreate, fadeToScene } from '../ui/transitions';
 
 interface HubSceneData {
   combatResult?: CombatResult;
@@ -102,9 +103,14 @@ export class HubScene extends Phaser.Scene {
     }
 
     if (save.pendingRelicOffers.length > 0) {
-      this.scene.start(SceneKeys.Relic);
+      fadeToScene(this, SceneKeys.Relic);
       return;
     }
+
+    // Chunk 6 (bible item 6): fade in — only once we know Hub is actually
+    // going to render (the pendingRelicOffers redirect above never shows
+    // Hub content, so it skips this).
+    fadeInOnCreate(this);
 
     // Chunk 4 (bible item 4): shared panel/button/banner kit — ui/panels.ts.
     addBanner(this, width / 2, 40, 240, 44);
@@ -197,17 +203,17 @@ export class HubScene extends Phaser.Scene {
     // Meta destinations stay above the dungeon stack so a long unlock list
     // never pushes Talent Tree / Spellbook off the 540px canvas.
     this.makeButton(centerX - 160, metaButtonY, 280, META_BUTTON_H, 'Talent Tree', () => {
-      this.scene.start(SceneKeys.Tree);
+      fadeToScene(this, SceneKeys.Tree);
     }, 'hubTree');
     this.makeButton(centerX + 160, metaButtonY, 280, META_BUTTON_H, 'Spellbook', () => {
-      this.scene.start(SceneKeys.Loadout);
+      fadeToScene(this, SceneKeys.Loadout);
     }, 'hubLoadout');
     // v0.3 chunk H: small Settings entry — sits in the unused margin to the
     // right of the meta-button row (right edge of Spellbook is centerX+300,
     // well clear of the canvas edge at 960) so it never competes with the
     // dungeon stack or notice-count-dependent vertical layout above.
     this.makeButton(width - 16 - SETTINGS_BUTTON_W / 2, metaButtonY, SETTINGS_BUTTON_W, SETTINGS_BUTTON_H, 'Settings', () => {
-      this.scene.start(SceneKeys.Settings);
+      fadeToScene(this, SceneKeys.Settings);
     }, 'hubSettings');
 
     const dungeonStartY = metaButtonY + 52;
@@ -221,7 +227,11 @@ export class HubScene extends Phaser.Scene {
           loadout: loadoutFromSave(save),
           returnTo: SceneKeys.Hub,
         };
-        this.scene.start(SceneKeys.Combat, combatData);
+        // Chunk 6: shorter fade-out here — CombatScene.create() plays the
+        // chunky "into battle" wipe reveal (ui/transitions.ts chunkyWipeIn)
+        // instead of a plain fadeInOnCreate, so the two together stay under
+        // the 400ms transition budget.
+        fadeToScene(this, SceneKeys.Combat, combatData, COMBAT_ENTRY_FADE_OUT_MS);
       });
     });
 
@@ -426,7 +436,7 @@ export class HubScene extends Phaser.Scene {
   private confirmWipe(): void {
     recordReset();
     resetSave();
-    this.scene.start(SceneKeys.Tutorial);
+    fadeToScene(this, SceneKeys.Tutorial);
   }
 
   private makeButton(

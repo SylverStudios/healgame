@@ -16,6 +16,7 @@ import { drawRunModGlyph } from '../ui/runModsBar';
 import { relicGlyphColor, relicGlyphColorCss } from '../ui/relicColors';
 import { FONT, FONT_SIZE_SM, FONT_SIZE_MD } from '../ui/theme';
 import { addBanner, addPanel } from '../ui/panels';
+import { fadeInOnCreate, fadeToScene } from '../ui/transitions';
 
 const BG_COLOR = 0x1a1210;
 const CARD_BG = 0x3a2a22;
@@ -55,9 +56,13 @@ export class RelicScene extends Phaser.Scene {
 
     const offers = relicsById(loadSave().pendingRelicOffers);
     if (offers.length === 0) {
-      this.scene.start(SceneKeys.Hub);
+      fadeToScene(this, SceneKeys.Hub);
       return;
     }
+
+    // Chunk 6 (bible item 6): fade in — only once we know Relic is actually
+    // going to render (the empty-offers redirect above never shows content).
+    fadeInOnCreate(this);
 
     const y = height / 2 + 20;
     offers.forEach((relic, i) => {
@@ -113,6 +118,6 @@ export class RelicScene extends Phaser.Scene {
     if (!save.relicIds.includes(relic.id)) save.relicIds.push(relic.id);
     save.pendingRelicOffers = [];
     saveGame(save);
-    this.scene.start(SceneKeys.Hub);
+    fadeToScene(this, SceneKeys.Hub);
   }
 }

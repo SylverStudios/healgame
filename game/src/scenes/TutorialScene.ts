@@ -14,6 +14,7 @@ import type { CombatSceneData } from './CombatScene';
 import { FONT, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG, PALETTE_NUM } from '../ui/theme';
 import { addButton, addPanel } from '../ui/panels';
 import { drawFramedPortrait, PORTRAIT_FRAME_DISPLAY_SIZE } from '../ui/portraitSprites';
+import { COMBAT_ENTRY_FADE_OUT_MS, fadeInOnCreate, fadeToScene } from '../ui/transitions';
 
 const BG_COLOR = 0x1a1210;
 const BUTTON_COLOR = 0x3a2a22;
@@ -34,6 +35,8 @@ export class TutorialScene extends Phaser.Scene {
   create(): void {
     const { width, height } = this.scale;
     this.cameras.main.setBackgroundColor(BG_COLOR);
+    // Chunk 6 (bible item 6): fade in on scene entry.
+    fadeInOnCreate(this);
 
     this.add
       .text(width / 2, 60, 'healgame', { fontFamily: FONT, fontSize: FONT_SIZE_LG, color: TEXT_COLOR })
@@ -110,6 +113,9 @@ export class TutorialScene extends Phaser.Scene {
       loadout: loadoutFromSave(save),
       returnTo: SceneKeys.Hub,
     };
-    this.scene.start(SceneKeys.Combat, combatData);
+    // Chunk 6: same shorter fade-out + CombatScene chunky wipe-in as the
+    // Hub dungeon-list entry (docs/ui-theme-handoff.md "into battle" beat
+    // applies to every combat entry, not just the Hub one).
+    fadeToScene(this, SceneKeys.Combat, combatData, COMBAT_ENTRY_FADE_OUT_MS);
   }
 }

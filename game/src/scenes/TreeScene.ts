@@ -39,6 +39,7 @@ import {
   type TreeState,
   type TreeView,
 } from '../tree';
+import { fadeInOnCreate, fadeToScene } from '../ui/transitions';
 
 const BG_COLOR = 0x1a1210;
 const NODE_BG_LOCKED = 0x241a15;
@@ -185,6 +186,8 @@ export class TreeScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(BG_COLOR);
+    // Chunk 6 (bible item 6): fade in on scene entry.
+    fadeInOnCreate(this);
     this.save = loadSave();
     this.treeState = treeStateFromLegacy(this.save.treeRanks, availableTalentPoints(this.save));
     this.armedSpotId = null;
@@ -659,6 +662,6 @@ export class TreeScene extends Phaser.Scene {
       .text(x, y, 'Back', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: TEXT_COLOR })
       .setOrigin(0.5)
       .setDepth(HUD_DEPTH);
-    rect.on('pointerdown', () => this.scene.start(SceneKeys.Hub));
+    rect.on('pointerdown', () => fadeToScene(this, SceneKeys.Hub));
   }
 }
