@@ -200,12 +200,37 @@ export const BACKDROP_DEPTH_STRUCTURE = -4;
 export const BACKDROP_DEPTH_HAZE = -2;
 export const BACKDROP_DEPTH_PLATFORM = -1;
 
+/** Structure props (gate arch + wall fragments) render at full native detail
+ *  and contrast, which at their display size (600x400 for the arch alone)
+ *  competed with the 32px units for the eye. Rather than rescale the art
+ *  (banned — see the file header's density-rule note: texture pixels are
+ *  never rescaled beyond the pinned 2x), dim it so it reads as recessed
+ *  scenery behind a clearly brighter stage. Platform slices stay full
+ *  strength — that's the stage, not the backdrop. */
+const STRUCTURE_ALPHA = 0.4;
+
 /** How much the wall-fragment props overlap the gate arch's outer edge — the
  *  arch renders as a self-contained opaque diorama (see pixellab-1/README.md
  *  "gate-arch has no alpha channel"), so the fragments both extend the ruins
  *  to the screen edges *and* mask that seam. Every variant's gate-arch is a
  *  recolor of the same source object, so it shares this property. */
 const WALL_FRAGMENT_OVERLAP_PX = 100;
+
+/** Vertical offset from `groundY` to the platform image's center — which is
+ *  also its widest row (the platform art is a symmetric isometric disk;
+ *  `platform.png`'s alpha silhouette is widest at its own vertical midpoint,
+ *  confirmed by inspecting the source PNG). Units must stand here, not at
+ *  `groundY` itself, or they read as standing on the disk's back rim instead
+ *  of its widest visible surface. Exported so `CombatScene`'s unit-foot
+ *  anchor (`groundAnchorY`) can share this single offset with platform
+ *  placement below instead of duplicating the magic number. */
+export const PLATFORM_STANCE_Y_OFFSET = 30;
+
+/** Y a unit's feet should sit at so they stand across the platform's widest
+ *  point, given the same `groundY` passed to {@link buildBattlefield}. */
+export function platformStanceY(groundY: number): number {
+  return groundY + PLATFORM_STANCE_Y_OFFSET;
+}
 
 /**
  * Image-layer placement for `textures` given the combat view's frozen layout
@@ -236,7 +261,7 @@ export function battlefieldImageLayouts(
 
   const platformW = platform.nativeWidth * 2;
   const platformH = platform.nativeHeight * 2;
-  const platformY = groundY + 30;
+  const platformY = platformStanceY(groundY);
 
   return [
     {
@@ -373,6 +398,7 @@ export function buildBattlefield(
       .setDisplaySize(layout.displayWidth, layout.displayHeight)
       .setDepth(layout.depth);
     if (layout.flipX === true) image.setFlipX(true);
+    if (layout.depth === BACKDROP_DEPTH_STRUCTURE) image.setAlpha(STRUCTURE_ALPHA);
   }
 }
 

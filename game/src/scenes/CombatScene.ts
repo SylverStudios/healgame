@@ -22,7 +22,7 @@ import { getEncounterById } from '../data/encounters';
 import { GCD_MS, SPELLS } from '../data/constants';
 import { Bar } from '../ui/bar';
 import { UnitSprite } from '../ui/unitSprite';
-import { battlefieldForEncounter, buildBattlefield } from '../ui/battlefield';
+import { battlefieldForEncounter, buildBattlefield, platformStanceY } from '../ui/battlefield';
 import {
   attackAnimKeyForUnit,
   HEALER_CAST_RELEASE_LEAD_MS,
@@ -42,6 +42,11 @@ import {
 import { SpellBar } from '../ui/spellBar';
 import { CAST_BAR_FRAME_TEXTURE_KEY } from '../ui/spellSprites';
 import { addBanner, addPanel, addButton } from '../ui/panels';
+import {
+  OVERLAY_DEPTH, OVERLAY_ALPHA, OVERLAY_FADE_MS, PANEL_WIDTH, PANEL_HEIGHT, PANEL_SLIDE_OFFSET,
+  PANEL_SLIDE_DELAY_MS, PANEL_SLIDE_MS, TITLE_DELAY_MS, TITLE_REVEAL_MS, XP_DELAY_MS, XP_REVEAL_MS,
+  GLYPH_DELAY_MS, GLYPH_REVEAL_MS, GLYPH_CELL, GLYPH_COLOR, RETURN_DELAY_MS, RETURN_REVEAL_MS,
+} from '../ui/resultPanel';
 import { CombatLog } from '../ui/combatLog';
 import { FONT, FONT_SIZE_XS, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG, PALETTE_NUM } from '../ui/theme';
 import {
@@ -167,29 +172,8 @@ const TOAST_FONT_SIZE = FONT_SIZE_SM;
 const TOAST_COLOR = '#e8d8c8';
 const TOAST_FADE_MS = 1500;
 
-const OVERLAY_DEPTH = 1000;
-const OVERLAY_ALPHA = 0.85;
-const OVERLAY_FADE_MS = 300;
-
-// Wipe/victory run summary panel (locked: docs/v0.3-handoff.md "Wipe / victory
-// summary") — short slide-in transition (~0.5-1.0s total) over the dimmed-but-
-// visible party, then outcome + XP + build glyph reveal in sequence, Return
-// last (~1s in, safely inside journey's 2s poll cadence).
-const PANEL_WIDTH = 420;
-const PANEL_HEIGHT = 260;
-const PANEL_SLIDE_OFFSET = 50;
-const PANEL_SLIDE_DELAY_MS = 120;
-const PANEL_SLIDE_MS = 500;
-const TITLE_DELAY_MS = 520;
-const TITLE_REVEAL_MS = 220;
-const XP_DELAY_MS = 660;
-const XP_REVEAL_MS = 220;
-const GLYPH_DELAY_MS = 780;
-const GLYPH_REVEAL_MS = 240;
-const GLYPH_CELL = 20;
-const GLYPH_COLOR = 0xfff2df;
-const RETURN_DELAY_MS = 940;
-const RETURN_REVEAL_MS = 220;
+// Wipe/victory run summary panel layout/timing constants moved to
+// ui/resultPanel.ts (max-lines cap) — see that file for the choreography note.
 
 // v0.3 chunk G: party banter (docs/v0.3-handoff.md "Banter"). Bubble anchor Y is the
 // speaker's home Y minus enough clearance to clear its always-on overlay stack (HP bar +
@@ -208,11 +192,12 @@ function slotX(index: number, count: number, left: number, right: number): numbe
   return left + ((right - left) * index) / (count - 1);
 }
 
-/** Home Y for a unit of `height` so its bottom edge (feet) sits on GROUND_Y — units have
- *  different heights (mercs 112 / healer 64 / trash 72 / Kenney smaller), so their container
- *  centers (which is what x/y position) differ even though they all read as standing on one line. */
+/** Home Y for a unit of `height` so its bottom edge (feet) sits at the platform's widest
+ *  point (platformStanceY, not GROUND_Y — that still anchors the arch/haze backdrop math
+ *  in battlefield.ts) — units have different heights, so their centers differ even though
+ *  they all read as standing on one line. */
 function groundAnchorY(height: number): number {
-  return GROUND_Y - height / 2;
+  return platformStanceY(GROUND_Y) - height / 2;
 }
 
 /** combatEnded fires only on a real end, but its status field is the full CombatStatus union. */
