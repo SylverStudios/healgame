@@ -71,8 +71,8 @@ export class TutorialScene extends Phaser.Scene {
       'In combat: click an ally to target them, then click a heal (or press its',
       'QWER key). Bonk (Q) hits the front enemy — no target click needed.',
       '',
-      "Ash Gate will wipe your party the first time through — that's expected.",
-      'XP from every enemy kill is kept even if you wipe.',
+      'Good luck out there — enjoy the WoW dungeon-healer experience.',
+      'XP from every enemy kill is kept, so nothing is ever wasted.',
     ].join('\n');
 
     // Chunk 4 (bible item 4): copy panel — ui/panels.ts.
