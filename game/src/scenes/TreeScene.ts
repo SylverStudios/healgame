@@ -268,7 +268,9 @@ export class TreeScene extends Phaser.Scene {
 
     this.tooltip = new SpellTooltip(this, { screenWidth: width, depth: TOOLTIP_DEPTH });
 
-    this.buildBackButton(75, 26);
+    // Top-right, not top-left: the oath/relic strip (syncRunModsBar) grows
+    // rightward from the left margin and was colliding with Back here.
+    this.buildBackButton(width - 75, 26);
     this.buildGlyphPreviewChrome();
     this.buildEdgeLegend();
     this.render();
