@@ -14,6 +14,14 @@ import { buildCooldownTooltipLines } from './cooldownTooltip';
 import { buildSpellCard } from './spellCard';
 import { SpellTooltip } from './spellTooltip';
 import { glyphChar } from './glyph';
+import { FONT, FONT_SIZE_XS, FONT_SIZE_MD, PALETTE_NUM } from './theme';
+import {
+  BUTTON_FRAME_TEXTURE_KEY,
+  KEYCAP_FRAME_TEXTURE_KEY,
+  SPELL_ICON_SIZE,
+  cooldownIconTextureKey,
+  spellIconTextureKey,
+} from './spellSprites';
 
 /** Alpha 0.2 §D8: compact width so up to 4 QWER columns fit on 960px.
  *  Shift+QWER major CDs sit in a matching row above (same finger columns). */
@@ -32,13 +40,18 @@ const BUTTON_DISABLED_ALPHA = 0.28;
 const ARMED_BORDER_COLOR = 0xf2c14e;
 const ARMED_BORDER_WIDTH = 3;
 
-/** Glyph: large single-char primary label (§D8 temp art exception). */
-const GLYPH_FONT = '22px monospace';
+/** Glyph: large single-char primary label (§D8 temp art exception). MD (24px)
+ *  — the button is only 100×52, but this is the primary visual, close to
+ *  its old 22px size. */
+const GLYPH_FONT_SIZE = FONT_SIZE_MD;
 const GLYPH_COLOR = '#e8d8c8';
-const COST_FONT = '10px monospace';
+/** XS (8px): cost/hotkey/timer text all live in a ≤52px-tall button
+ *  alongside the glyph and an 18×14 keycap chip — the SM (16px) snap would
+ *  overflow both. */
+const COST_FONT_SIZE = FONT_SIZE_XS;
 const COST_COLOR = '#a8c8f0';
 const COST_OOM_COLOR = '#e05a4e';
-const HOTKEY_FONT = '10px monospace';
+const HOTKEY_FONT_SIZE = FONT_SIZE_XS;
 const HOTKEY_COLOR = '#e8d8c8';
 /** Wide enough for two-char Shift labels (`sQ`); height stays compact. */
 const KEYCAP_WIDTH = 18;
@@ -50,11 +63,52 @@ const KEYCAP_BORDER = 0x8a7868;
  *  Shift row lines up with QWER columns. */
 const CD_BUTTON_WIDTH = BUTTON_WIDTH;
 const CD_BUTTON_HEIGHT = BUTTON_HEIGHT;
-const CD_GLYPH_FONT = '20px monospace';
-const CD_TIMER_FONT = '12px monospace';
+const CD_GLYPH_FONT_SIZE = FONT_SIZE_MD;
+const CD_TIMER_FONT_SIZE = FONT_SIZE_XS;
 const CD_TIMER_COLOR = '#a8c8f0';
-const SPELL_TIMER_FONT = '11px monospace';
+const SPELL_TIMER_FONT_SIZE = FONT_SIZE_XS;
 const SPELL_TIMER_COLOR = '#a8c8f0';
+
+/**
+ * Pixel-art button frame image centered at (x,y), sized to the button
+ * footprint — or null when BootScene hasn't loaded it (fallback: callers
+ * keep the flat rect + stroke look on their own `bg`). Same convention as
+ * `runModsBar.ts`'s relic-icon fallback (`scene.textures.exists(key)`).
+ */
+function addButtonFrame(scene: Phaser.Scene, x: number, y: number): Phaser.GameObjects.Image | null {
+  if (!scene.textures.exists(BUTTON_FRAME_TEXTURE_KEY)) return null;
+  return scene.add
+    .image(x, y, BUTTON_FRAME_TEXTURE_KEY)
+    .setOrigin(0.5)
+    .setDisplaySize(BUTTON_WIDTH, BUTTON_HEIGHT);
+}
+
+/** Keycap chip: pixel-art image when loaded, else the original flat rect + stroke. */
+function addKeycap(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+): Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle {
+  if (scene.textures.exists(KEYCAP_FRAME_TEXTURE_KEY)) {
+    return scene.add
+      .image(x, y, KEYCAP_FRAME_TEXTURE_KEY)
+      .setOrigin(0.5)
+      .setDisplaySize(KEYCAP_WIDTH, KEYCAP_HEIGHT);
+  }
+  return scene.add.rectangle(x, y, KEYCAP_WIDTH, KEYCAP_HEIGHT, KEYCAP_BG).setStrokeStyle(1, KEYCAP_BORDER);
+}
+
+/** Real spell/cooldown icon image when BootScene loaded it for this id, else
+ *  null — callers keep the existing `glyphChar()` text visible as the
+ *  fallback primary label (§D8 temp-art exception; chunk 3 upgrades it
+ *  where art exists without removing the fallback path). */
+function addActionIcon(scene: Phaser.Scene, x: number, y: number, textureKey: string): Phaser.GameObjects.Image | null {
+  if (!scene.textures.exists(textureKey)) return null;
+  return scene.add
+    .image(x, y, textureKey)
+    .setOrigin(0.5)
+    .setDisplaySize(SPELL_ICON_SIZE * 2, SPELL_ICON_SIZE * 2);
+}
 
 class SpellButton {
   readonly spellId: string;
@@ -64,9 +118,11 @@ class SpellButton {
   readonly topY: number;
 
   private readonly bg: Phaser.GameObjects.Rectangle;
-  private readonly keycap: Phaser.GameObjects.Rectangle;
-  /** Large glyph char — primary visual (§D8). */
+  private readonly frame: Phaser.GameObjects.Image | null;
+  private readonly keycap: Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle;
+  /** Large glyph char — primary visual (§D8), hidden once a real icon loads. */
   private readonly glyphText: Phaser.GameObjects.Text;
+  private readonly iconImage: Phaser.GameObjects.Image | null;
   private readonly costText: Phaser.GameObjects.Text;
   private readonly hotkeyText: Phaser.GameObjects.Text;
   private readonly timerText: Phaser.GameObjects.Text;
@@ -91,11 +147,21 @@ class SpellButton {
     this.centerX = x;
     this.topY = y - BUTTON_HEIGHT / 2;
 
+    // Hit area + interactivity (journey targets `combatSpell:<id>` here) stays
+    // a full-size rectangle regardless of the frame art: when the frame image
+    // loaded, this rect goes fill/stroke-invisible (the frame supplies the
+    // normal-state look) but keeps its stroke free for the armed gold accent
+    // (setArmed below) — same object, same name, same 100×52 hit box either way.
+    this.frame = addButtonFrame(scene, x, y);
     this.bg = scene.add
       .rectangle(x, y, BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_BG_COLOR)
-      .setStrokeStyle(BUTTON_BORDER_WIDTH, BUTTON_BORDER_COLOR)
       .setInteractive({ useHandCursor: true })
       .setName(`combatSpell:${spell.id}`);
+    if (this.frame) {
+      this.bg.setFillStyle(BUTTON_BG_COLOR, 0).setStrokeStyle(0);
+    } else {
+      this.bg.setStrokeStyle(BUTTON_BORDER_WIDTH, BUTTON_BORDER_COLOR);
+    }
     this.bg.on('pointerdown', () => {
       if (this.enabled && !this.onSpellCooldown) onClick(this.spellId);
     });
@@ -104,31 +170,31 @@ class SpellButton {
 
     const keycapX = x - BUTTON_WIDTH / 2 + 6 + KEYCAP_WIDTH / 2;
     const keycapY = y - BUTTON_HEIGHT / 2 + 6 + KEYCAP_HEIGHT / 2;
-    this.keycap = scene.add
-      .rectangle(keycapX, keycapY, KEYCAP_WIDTH, KEYCAP_HEIGHT, KEYCAP_BG)
-      .setStrokeStyle(1, KEYCAP_BORDER);
+    this.keycap = addKeycap(scene, keycapX, keycapY);
 
     this.glyphText = scene.add
       .text(x, y - 5, glyphChar(spell), {
-        fontFamily: 'monospace',
-        fontSize: GLYPH_FONT,
+        fontFamily: FONT,
+        fontSize: GLYPH_FONT_SIZE,
         fontStyle: 'bold',
         color: GLYPH_COLOR,
         stroke: '#0a0605',
         strokeThickness: 2,
       })
       .setOrigin(0.5);
+    this.iconImage = addActionIcon(scene, x, y - 5, spellIconTextureKey(spell.id));
+    if (this.iconImage) this.glyphText.setVisible(false);
     this.costText = scene.add
-      .text(x, y + 15, `${spell.mana}m`, { fontFamily: 'monospace', fontSize: COST_FONT, color: COST_COLOR })
+      .text(x, y + 15, `${spell.mana}m`, { fontFamily: FONT, fontSize: COST_FONT_SIZE, color: COST_COLOR })
       .setOrigin(0.5);
     this.timerText = scene.add
-      .text(x, y + 15, '', { fontFamily: 'monospace', fontSize: SPELL_TIMER_FONT, color: SPELL_TIMER_COLOR })
+      .text(x, y + 15, '', { fontFamily: FONT, fontSize: SPELL_TIMER_FONT_SIZE, color: SPELL_TIMER_COLOR })
       .setOrigin(0.5)
       .setVisible(false);
     this.hotkeyText = scene.add
       .text(keycapX, keycapY, hotkeyLabel, {
-        fontFamily: 'monospace',
-        fontSize: HOTKEY_FONT,
+        fontFamily: FONT,
+        fontSize: HOTKEY_FONT_SIZE,
         color: HOTKEY_COLOR,
       })
       .setOrigin(0.5);
@@ -156,25 +222,39 @@ class SpellButton {
 
   private refreshAlpha(canAfford: boolean): void {
     const alpha = this.enabled && !this.onSpellCooldown ? 1 : BUTTON_DISABLED_ALPHA;
-    this.bg.setFillStyle(canAfford ? BUTTON_BG_COLOR : BUTTON_BG_OOM_COLOR);
+    if (this.frame) {
+      // Frame art supplies the normal-state border/fill; OOM reads as a
+      // crimson tint on the frame instead of swapping the (now-invisible)
+      // rect's fill color (which would also clobber its 0-alpha fill).
+      this.frame.setTint(canAfford ? 0xffffff : PALETTE_NUM.danger);
+      this.frame.setAlpha(alpha);
+    } else {
+      this.bg.setFillStyle(canAfford ? BUTTON_BG_COLOR : BUTTON_BG_OOM_COLOR);
+    }
     this.bg.setAlpha(alpha);
     this.keycap.setAlpha(alpha);
     this.glyphText.setAlpha(alpha);
+    this.iconImage?.setAlpha(alpha);
     this.costText.setAlpha(canAfford ? alpha : Math.max(alpha, 0.55));
     this.costText.setColor(canAfford ? COST_COLOR : COST_OOM_COLOR);
     this.hotkeyText.setAlpha(alpha);
     this.timerText.setAlpha(alpha);
   }
 
-  /** Thicker accent stroke while a synergy buffing this spell is armed; default border otherwise. */
+  /** Thicker accent stroke while a synergy buffing this spell is armed; default border otherwise.
+   *  Drawn on `bg` either way — when the frame art is loaded, `bg`'s fill/stroke
+   *  are otherwise invisible (see constructor), so only this gold accent shows. */
   setArmed(armed: boolean): void {
     if (armed === this.armed) return;
     this.armed = armed;
-    this.bg.setStrokeStyle(armed ? ARMED_BORDER_WIDTH : BUTTON_BORDER_WIDTH, armed ? ARMED_BORDER_COLOR : BUTTON_BORDER_COLOR);
+    const normalWidth = this.frame ? 0 : BUTTON_BORDER_WIDTH;
+    this.bg.setStrokeStyle(armed ? ARMED_BORDER_WIDTH : normalWidth, armed ? ARMED_BORDER_COLOR : BUTTON_BORDER_COLOR);
   }
 
   destroy(): void {
     this.bg.destroy();
+    this.frame?.destroy();
+    this.iconImage?.destroy();
     this.keycap.destroy();
     this.glyphText.destroy();
     this.costText.destroy();
@@ -195,9 +275,11 @@ class CooldownButton {
   readonly topY: number;
 
   private readonly bg: Phaser.GameObjects.Rectangle;
-  private readonly keycap: Phaser.GameObjects.Rectangle;
-  /** Large glyph char — primary visual (§D8 temp art exception). */
+  private readonly frame: Phaser.GameObjects.Image | null;
+  private readonly keycap: Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle;
+  /** Large glyph char — primary visual (§D8 temp art exception), hidden once a real icon loads. */
   private readonly glyphText: Phaser.GameObjects.Text;
+  private readonly iconImage: Phaser.GameObjects.Image | null;
   private readonly timerText: Phaser.GameObjects.Text;
   private readonly hotkeyText: Phaser.GameObjects.Text;
   private ready = true;
@@ -218,11 +300,18 @@ class CooldownButton {
     this.centerX = x;
     this.topY = y - CD_BUTTON_HEIGHT / 2;
 
+    // See SpellButton constructor: same frame/bg split — bg keeps the full
+    // hit area + `combatCooldown:<id>` name regardless of frame art.
+    this.frame = addButtonFrame(scene, x, y);
     this.bg = scene.add
       .rectangle(x, y, CD_BUTTON_WIDTH, CD_BUTTON_HEIGHT, BUTTON_BG_COLOR)
-      .setStrokeStyle(BUTTON_BORDER_WIDTH, BUTTON_BORDER_COLOR)
       .setInteractive({ useHandCursor: true })
       .setName(`combatCooldown:${def.id}`);
+    if (this.frame) {
+      this.bg.setFillStyle(BUTTON_BG_COLOR, 0).setStrokeStyle(0);
+    } else {
+      this.bg.setStrokeStyle(BUTTON_BORDER_WIDTH, BUTTON_BORDER_COLOR);
+    }
     this.bg.on('pointerdown', () => {
       if (this.ready && this.combatRunning) onClick(this.cooldownId);
     });
@@ -231,28 +320,28 @@ class CooldownButton {
 
     const keycapX = x - CD_BUTTON_WIDTH / 2 + 6 + KEYCAP_WIDTH / 2;
     const keycapY = y - CD_BUTTON_HEIGHT / 2 + 6 + KEYCAP_HEIGHT / 2;
-    this.keycap = scene.add
-      .rectangle(keycapX, keycapY, KEYCAP_WIDTH, KEYCAP_HEIGHT, KEYCAP_BG)
-      .setStrokeStyle(1, KEYCAP_BORDER);
+    this.keycap = addKeycap(scene, keycapX, keycapY);
 
     this.glyphText = scene.add
       .text(x, y - 5, glyphChar(def), {
-        fontFamily: 'monospace',
-        fontSize: CD_GLYPH_FONT,
+        fontFamily: FONT,
+        fontSize: CD_GLYPH_FONT_SIZE,
         fontStyle: 'bold',
         color: GLYPH_COLOR,
         stroke: '#0a0605',
         strokeThickness: 2,
       })
       .setOrigin(0.5);
+    this.iconImage = addActionIcon(scene, x, y - 5, cooldownIconTextureKey(def.id));
+    if (this.iconImage) this.glyphText.setVisible(false);
     this.timerText = scene.add
-      .text(x, y + 14, '', { fontFamily: 'monospace', fontSize: CD_TIMER_FONT, color: CD_TIMER_COLOR })
+      .text(x, y + 14, '', { fontFamily: FONT, fontSize: CD_TIMER_FONT_SIZE, color: CD_TIMER_COLOR })
       .setOrigin(0.5)
       .setVisible(false);
     this.hotkeyText = scene.add
       .text(keycapX, keycapY, hotkeyLabel, {
-        fontFamily: 'monospace',
-        fontSize: HOTKEY_FONT,
+        fontFamily: FONT,
+        fontSize: HOTKEY_FONT_SIZE,
         color: HOTKEY_COLOR,
       })
       .setOrigin(0.5);
@@ -268,7 +357,8 @@ class CooldownButton {
     const armed = state.activeRemainingMs > 0;
     if (armed !== this.armed) {
       this.armed = armed;
-      this.bg.setStrokeStyle(armed ? ARMED_BORDER_WIDTH : BUTTON_BORDER_WIDTH, armed ? ARMED_BORDER_COLOR : BUTTON_BORDER_COLOR);
+      const normalWidth = this.frame ? 0 : BUTTON_BORDER_WIDTH;
+      this.bg.setStrokeStyle(armed ? ARMED_BORDER_WIDTH : normalWidth, armed ? ARMED_BORDER_COLOR : BUTTON_BORDER_COLOR);
     }
   }
 
@@ -280,14 +370,18 @@ class CooldownButton {
   private updateAvailability(): void {
     const alpha = this.ready && this.combatRunning ? 1 : BUTTON_DISABLED_ALPHA;
     this.bg.setAlpha(alpha);
+    this.frame?.setAlpha(alpha);
     this.keycap.setAlpha(alpha);
     this.glyphText.setAlpha(alpha);
+    this.iconImage?.setAlpha(alpha);
     this.timerText.setAlpha(this.combatRunning ? 1 : BUTTON_DISABLED_ALPHA);
     this.hotkeyText.setAlpha(alpha);
   }
 
   destroy(): void {
     this.bg.destroy();
+    this.frame?.destroy();
+    this.iconImage?.destroy();
     this.keycap.destroy();
     this.glyphText.destroy();
     this.timerText.destroy();

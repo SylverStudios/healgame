@@ -3,13 +3,13 @@
  */
 
 import Phaser from 'phaser';
+import { FONT, FONT_SIZE_SM } from './theme';
 
 const TOGGLE_WIDTH = 56;
 const TOGGLE_HEIGHT = 32;
 const BG_COLOR = 0x3a2a22;
 const BORDER_COLOR = 0x0a0605;
 const LABEL_COLOR = '#e8d8c8';
-const FONT = 'monospace';
 
 export class PaceToggle {
   private readonly bg: Phaser.GameObjects.Rectangle;
@@ -29,7 +29,7 @@ export class PaceToggle {
     this.label = scene.add
       .text(x + TOGGLE_WIDTH / 2, y - TOGGLE_HEIGHT / 2, '1x', {
         fontFamily: FONT,
-        fontSize: '14px',
+        fontSize: FONT_SIZE_SM,
         color: LABEL_COLOR,
       })
       .setOrigin(0.5)

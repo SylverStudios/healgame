@@ -5,6 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>healgame</title>
     <style>
+      /* HealgameIron: weathered iron dark-fantasy pixel font (8px-native
+       * glyphs; art/source/fonts/, artifacts/pixellab-2/). font-display:
+       * block gives main.ts's document.fonts.load() a clean window to land
+       * the font before any Phaser text renders — see main.ts's boot gate. */
+      @font-face {
+        font-family: 'HealgameIron';
+        src: url('/assets/fonts/healgame-iron-regular.ttf') format('truetype');
+        font-weight: 400;
+        font-style: normal;
+        font-display: block;
+      }
+      @font-face {
+        font-family: 'HealgameIron';
+        src: url('/assets/fonts/healgame-iron-bold.ttf') format('truetype');
+        font-weight: 700;
+        font-style: normal;
+        font-display: block;
+      }
       html,
       body {
         margin: 0;
