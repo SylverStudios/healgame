@@ -11,10 +11,11 @@ import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { loadSave, pushRecentRun, resetSave, saveGame, type SaveData } from '../save/save';
 import {
-  applyCombatResult,
   availableTalentPoints,
   currentChallengeDungeon,
   isDungeonUnlocked,
+  takeHubCombatResult,
+  type HubCombatSceneData,
   type HubNotice,
 } from '../meta/progression';
 import { loadoutFromSave } from '../data/talentTree';
@@ -24,16 +25,14 @@ import { ORDERED_DUNGEONS, hubDungeonTargetName } from '../data/dungeons';
 import { RunModsBar } from '../ui/runModsBar';
 import { buildRunSummary, hasBuildGlyph, runRecordFromSummary } from '../ui/runSummary';
 import { drawBuildGlyph } from '../ui/buildGlyph';
-import type { CombatResult, CombatSceneData } from './CombatScene';
+import type { CombatSceneData } from './CombatScene';
 import type { DungeonDef } from '../data/content/types';
 import { loadTelemetry, recordReset, sendPlaytestMail } from '../telemetry';
 import { FONT, FONT_SIZE_SM, FONT_SIZE_LG, PALETTE, PALETTE_NUM } from '../ui/theme';
 import { addBanner, addButton, addPanel } from '../ui/panels';
 import { COMBAT_ENTRY_FADE_OUT_MS, fadeInOnCreate, fadeToScene } from '../ui/transitions';
 
-interface HubSceneData {
-  combatResult?: CombatResult;
-}
+type HubSceneData = HubCombatSceneData;
 
 const BG_COLOR = 0x1a1210;
 const BUTTON_COLOR = 0x3a2a22;
@@ -90,15 +89,26 @@ export class HubScene extends Phaser.Scene {
 
     const save = loadSave();
     let notices: HubNotice[] = [];
-    if (this.sceneData.combatResult) {
-      const result = this.sceneData.combatResult;
-      notices = applyCombatResult(save, result);
-      // Same place XP is already banked (applyCombatResult above) — persist the
+    // Capture before takeHubCombatResult consumes the one-shot payload — Phaser
+    // sticky scene data would otherwise re-apply this on Tree→Hub return.
+    const combatResult = this.sceneData.combatResult;
+    const settled = takeHubCombatResult(save, this.sceneData);
+    notices = settled.notices;
+    this.sceneData = settled.sceneData;
+    // Systems.start only overwrites settings.data when the next start() passes
+    // a truthy data object; clear the sticky copy so bare Hub restarts are idle.
+    this.sys.settings.data = settled.sceneData;
+    if (combatResult) {
+      // Same place XP is already banked (takeHubCombatResult above) — persist the
       // run exactly once. Rebuilt from the same pure buildRunSummary() CombatScene
       // used for its panel + save.treeRanks (unchanged since combat ended), so the
       // stored glyph matches the one the player just saw (v0.3 chunk E).
-      const summary = buildRunSummary({ status: result.status, xp: result.xp, treeRanks: save.treeRanks });
-      pushRecentRun(save, runRecordFromSummary(summary, result.encounterId));
+      const summary = buildRunSummary({
+        status: combatResult.status,
+        xp: combatResult.xp,
+        treeRanks: save.treeRanks,
+      });
+      pushRecentRun(save, runRecordFromSummary(summary, combatResult.encounterId));
       saveGame(save);
     }
 

@@ -56,7 +56,7 @@ export class RelicScene extends Phaser.Scene {
 
     const offers = relicsById(loadSave().pendingRelicOffers);
     if (offers.length === 0) {
-      fadeToScene(this, SceneKeys.Hub);
+      fadeToScene(this, SceneKeys.Hub, {});
       return;
     }
 
@@ -118,6 +118,6 @@ export class RelicScene extends Phaser.Scene {
     if (!save.relicIds.includes(relic.id)) save.relicIds.push(relic.id);
     save.pendingRelicOffers = [];
     saveGame(save);
-    fadeToScene(this, SceneKeys.Hub);
+    fadeToScene(this, SceneKeys.Hub, {});
   }
 }

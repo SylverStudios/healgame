@@ -9,6 +9,8 @@ import {
   isIronPassUnlocked,
   isMawUnlocked,
   manaBonusesForLevel,
+  takeHubCombatResult,
+  type HubCombatSceneData,
 } from './progression';
 import { newSaveData, type SaveData } from '../save/save';
 import { LEVEL_MANA, levelForXp, SPELLS, XP_LEVEL_2_THRESHOLD, xpForLevel } from '../data/constants';
@@ -145,6 +147,62 @@ describe('XP levels and talent capacity', () => {
     const s = save({ xp: 150, treeRanks: { 'deep-reserves': 4 } });
     expect(allocatedTalentPoints(s)).toBe(4);
     expect(availableTalentPoints(s)).toBe(2);
+  });
+});
+
+describe('takeHubCombatResult (Wave 0 — sticky Phaser scene data)', () => {
+  /**
+   * Phaser Systems.start only replaces settings.data when the next start()
+   * passes a truthy data object. Tree→Hub used to call start(Hub) with no
+   * data, so Hub re-received the post-combat combatResult and re-banked XP:
+   * leave tree → suddenly leveled / another talent point. This helper is the
+   * pure settle step Hub must use (and write back) so Tree and Hub agree.
+   */
+  it('re-applying the same combatResult without consuming disagrees Hub vs Tree points', () => {
+    // Fresh save, one wipe worth enough XP to hit level 2 then level 3 on a
+    // second bank of the same payload (10 → L2, +10 → still L2, needs the
+    // double-apply from L2 threshold to L3: start at 0, grant 30 once → L3;
+    // grant 30 again → L4). Use 30 so one sticky re-apply changes points.
+    const s = save({ xp: 0, unlockedSpells: ['solemn-mend'] });
+    const combatResult = result({ xp: 30 });
+
+    applyCombatResult(s, combatResult);
+    const treePointsAfterCombat = availableTalentPoints(s);
+    expect(levelForXp(s.xp)).toBe(3);
+    expect(treePointsAfterCombat).toBe(3);
+
+    // Sticky Hub re-entry (pre-fix): same combatResult fed again.
+    applyCombatResult(s, combatResult);
+    const hubPointsAfterTreeReturn = availableTalentPoints(s);
+    expect(levelForXp(s.xp)).toBe(4);
+    expect(hubPointsAfterTreeReturn).toBe(4);
+    // Tree opened on the post-combat save; Hub after leave shows a new point.
+    expect(hubPointsAfterTreeReturn).not.toBe(treePointsAfterCombat);
+  });
+
+  it('consumes combatResult so a Tree→Hub round-trip keeps Hub/Tree talent points aligned', () => {
+    const s = save({ xp: 0, unlockedSpells: ['solemn-mend'] });
+    let sceneData: HubCombatSceneData = { combatResult: result({ xp: 30 }) };
+
+    const first = takeHubCombatResult(s, sceneData);
+    sceneData = first.sceneData;
+    expect(first.notices.some((n) => n.kind === 'levelUp')).toBe(true);
+    expect(sceneData.combatResult).toBeUndefined();
+
+    const pointsWhenTreeCanOpen = availableTalentPoints(s);
+    expect(levelForXp(s.xp)).toBe(3);
+    expect(pointsWhenTreeCanOpen).toBe(3);
+
+    // Tree loads the same save — must match Hub at the moment Tree is openable.
+    expect(availableTalentPoints({ xp: s.xp, treeRanks: s.treeRanks })).toBe(pointsWhenTreeCanOpen);
+
+    // Leave Tree → Hub with consumed (empty) scene data, even if Phaser would
+    // have sticky-replayed the old payload without this consume write-back.
+    const second = takeHubCombatResult(s, sceneData);
+    expect(second.notices).toEqual([]);
+    expect(s.xp).toBe(30);
+    expect(availableTalentPoints(s)).toBe(pointsWhenTreeCanOpen);
+    expect(levelForXp(s.xp)).toBe(3);
   });
 });
 
