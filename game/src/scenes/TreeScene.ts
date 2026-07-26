@@ -733,6 +733,8 @@ export class TreeScene extends Phaser.Scene {
       .text(x, y, 'Back', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: TEXT_COLOR })
       .setOrigin(0.5)
       .setDepth(HUD_DEPTH);
-    rect.on('pointerdown', () => fadeToScene(this, SceneKeys.Hub));
+    // Pass {} so Phaser overwrites Hub's sticky settings.data (a bare start()
+    // would re-feed a leftover combatResult and re-bank XP — see takeHubCombatResult).
+    rect.on('pointerdown', () => fadeToScene(this, SceneKeys.Hub, {}));
   }
 }

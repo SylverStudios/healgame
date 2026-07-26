@@ -74,6 +74,35 @@ export function applyCombatResult(
   return notices;
 }
 
+/** Optional one-shot payload Hub receives from Combat via Phaser scene data. */
+export type HubCombatSceneData = {
+  combatResult?: CombatResult;
+};
+
+/**
+ * Hub post-combat entry: bank XP/rewards from a one-shot `combatResult`, then
+ * return empty scene data.
+ *
+ * Phaser keeps `settings.data` when `scene.start(key)` is called without a
+ * new data object (`Systems.start`: only assigns when `data` is truthy). Tree /
+ * Relic / Loadout / Settings all return to Hub with no data, so a leftover
+ * `combatResult` would re-bank the same XP — Hub and Tree then disagree about
+ * level / talent points after the player leaves the tree. Callers must write
+ * the returned `sceneData` back into Hub's scene payload (and
+ * `sys.settings.data`) so the consume sticks.
+ */
+export function takeHubCombatResult(
+  save: SaveData,
+  sceneData: HubCombatSceneData,
+  // eslint-disable-next-line no-restricted-properties -- injection seam matches applyCombatResult
+  random: () => number = Math.random,
+): { notices: HubNotice[]; sceneData: HubCombatSceneData } {
+  const notices = sceneData.combatResult
+    ? applyCombatResult(save, sceneData.combatResult, random)
+    : [];
+  return { notices, sceneData: {} };
+}
+
 /**
  * Resolved fight kit. Alias of `CombatMods` — spells already have castMod
  * baked in; the engine never sees tree layout or castMod nodes.
