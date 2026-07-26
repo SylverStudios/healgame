@@ -33,11 +33,14 @@ const DESC_WRAP_WIDTH = CARD_WIDTH - 32;
 const GLYPH_RADIUS = 32;
 
 export class RelicScene extends Phaser.Scene {
+  private picked = false;
+
   constructor() {
     super(SceneKeys.Relic);
   }
 
   create(): void {
+    this.picked = false;
     this.cameras.main.setBackgroundColor(BG_COLOR);
     const { width, height } = this.scale;
 
@@ -113,8 +116,11 @@ export class RelicScene extends Phaser.Scene {
   }
 
   private pick(relic: RelicDef): void {
+    if (this.picked) return;
     const save = loadSave();
     if (!save.pendingRelicOffers.includes(relic.id)) return;
+    this.picked = true;
+    this.input.enabled = false;
     if (!save.relicIds.includes(relic.id)) save.relicIds.push(relic.id);
     save.pendingRelicOffers = [];
     saveGame(save);
