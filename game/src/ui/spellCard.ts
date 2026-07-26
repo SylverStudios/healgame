@@ -7,6 +7,7 @@
 import type { SpellDef } from '../combat/types';
 import type { CombatMods } from '../data/talentTree';
 import { spellById } from '../data/spells';
+import { manaCostDigits } from './manaAffordance';
 
 export type SpellEffectTone = 'heal' | 'damage';
 
@@ -17,7 +18,7 @@ export interface SpellCardModel {
   name: string;
   effect: string;
   effectTone: SpellEffectTone;
-  /** Mana cost digits only; UI prefixes with COST. */
+  /** Mana cost digits only; UI draws the blue orb (never `Nm` / `(m)`). */
   cost: string;
   cast: string;
   /** Null → UI shows an em-dash so the CD slot never jumps. */
@@ -113,7 +114,7 @@ export function buildSpellCard(spell: SpellDef, options: BuildSpellCardOptions =
     name: spell.name,
     effect,
     effectTone,
-    cost: String(spell.mana),
+    cost: manaCostDigits(spell.mana),
     cast: formatCast(spell.castMs),
     cooldown: formatCooldown(spell.cooldownMs),
     description: description && description.length > 0 ? description : null,
