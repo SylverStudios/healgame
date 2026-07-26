@@ -28,6 +28,8 @@ describe('buildSpellCard', () => {
       notes: [],
       eyebrow: null,
     });
+    // Digits only — UI draws the blue orb; never `3m` / `(3m)`.
+    expect(card.cost).not.toMatch(/m/);
   });
 
   it('formats a damage spell with cooldown and cast-buff note', () => {
