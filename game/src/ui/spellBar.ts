@@ -1,9 +1,10 @@
 /**
  * Bottom row of spell buttons (poc-spec §4: click ally -> click spell/hotkey).
- * One button per unlocked spell; dimmed + crimson cost when mana is short;
- * dimmed when nothing is targeted or combat ended.
+ * One button per unlocked spell; dimmed + crimson orb/digits when mana is
+ * short; dimmed when nothing is targeted or combat ended.
  * Alpha 0.2 §D8: glyph (single char) is the primary label; full name + stats
  * live in the hover tooltip. Compact sizing to fit up to 8 buttons on 960px.
+ * Wave 2: cost is blue orb + digits (never `Nm` / `(m)`).
  */
 
 import Phaser from 'phaser';
@@ -14,7 +15,11 @@ import { buildCooldownTooltipLines } from './cooldownTooltip';
 import { buildSpellCard } from './spellCard';
 import { SpellTooltip } from './spellTooltip';
 import { glyphChar } from './glyph';
-import { FONT, FONT_SIZE_XS, FONT_SIZE_MD, PALETTE_NUM } from './theme';
+import {
+  addManaCostAffordance,
+  type ManaCostAffordance,
+} from './manaAffordance';
+import { FONT, FONT_SIZE_XS, FONT_SIZE_MD, PALETTE, PALETTE_NUM } from './theme';
 import {
   BUTTON_FRAME_TEXTURE_KEY,
   KEYCAP_FRAME_TEXTURE_KEY,
@@ -49,8 +54,6 @@ const GLYPH_COLOR = '#e8d8c8';
  *  alongside the glyph and an 18×14 keycap chip — the SM (16px) snap would
  *  overflow both. */
 const COST_FONT_SIZE = FONT_SIZE_XS;
-const COST_COLOR = '#a8c8f0';
-const COST_OOM_COLOR = '#e05a4e';
 const HOTKEY_FONT_SIZE = FONT_SIZE_XS;
 const HOTKEY_COLOR = '#e8d8c8';
 /** Wide enough for two-char Shift labels (`sQ`); height stays compact. */
@@ -65,9 +68,9 @@ const CD_BUTTON_WIDTH = BUTTON_WIDTH;
 const CD_BUTTON_HEIGHT = BUTTON_HEIGHT;
 const CD_GLYPH_FONT_SIZE = FONT_SIZE_MD;
 const CD_TIMER_FONT_SIZE = FONT_SIZE_XS;
-const CD_TIMER_COLOR = '#a8c8f0';
+const CD_TIMER_COLOR = PALETTE.mana;
 const SPELL_TIMER_FONT_SIZE = FONT_SIZE_XS;
-const SPELL_TIMER_COLOR = '#a8c8f0';
+const SPELL_TIMER_COLOR = PALETTE.mana;
 
 /**
  * Pixel-art button frame image centered at (x,y), sized to the button
@@ -123,7 +126,7 @@ class SpellButton {
   /** Large glyph char — primary visual (§D8), hidden once a real icon loads. */
   private readonly glyphText: Phaser.GameObjects.Text;
   private readonly iconImage: Phaser.GameObjects.Image | null;
-  private readonly costText: Phaser.GameObjects.Text;
+  private readonly cost: ManaCostAffordance;
   private readonly hotkeyText: Phaser.GameObjects.Text;
   private readonly timerText: Phaser.GameObjects.Text;
   private enabled = true;
@@ -184,9 +187,9 @@ class SpellButton {
       .setOrigin(0.5);
     this.iconImage = addActionIcon(scene, x, y - 5, spellIconTextureKey(spell.id));
     if (this.iconImage) this.glyphText.setVisible(false);
-    this.costText = scene.add
-      .text(x, y + 15, `${spell.mana}m`, { fontFamily: FONT, fontSize: COST_FONT_SIZE, color: COST_COLOR })
-      .setOrigin(0.5);
+    this.cost = addManaCostAffordance(scene, x, y + 15, spell.mana, {
+      fontSize: COST_FONT_SIZE,
+    });
     this.timerText = scene.add
       .text(x, y + 15, '', { fontFamily: FONT, fontSize: SPELL_TIMER_FONT_SIZE, color: SPELL_TIMER_COLOR })
       .setOrigin(0.5)
@@ -213,9 +216,11 @@ class SpellButton {
     this.timerText.setVisible(this.onSpellCooldown);
     if (this.onSpellCooldown) {
       this.timerText.setText(`${Math.ceil(remainingMs / 1000)}s`);
-      this.costText.setVisible(false);
+      this.cost.orb.setVisible(false);
+      this.cost.text.setVisible(false);
     } else {
-      this.costText.setVisible(true);
+      this.cost.orb.setVisible(true);
+      this.cost.text.setVisible(true);
     }
     this.refreshAlpha(this.lastCanAfford);
   }
@@ -235,8 +240,10 @@ class SpellButton {
     this.keycap.setAlpha(alpha);
     this.glyphText.setAlpha(alpha);
     this.iconImage?.setAlpha(alpha);
-    this.costText.setAlpha(canAfford ? alpha : Math.max(alpha, 0.55));
-    this.costText.setColor(canAfford ? COST_COLOR : COST_OOM_COLOR);
+    const costAlpha = canAfford ? alpha : Math.max(alpha, 0.55);
+    this.cost.orb.setAlpha(costAlpha);
+    this.cost.text.setAlpha(costAlpha);
+    this.cost.setCost(this.mana, canAfford);
     this.hotkeyText.setAlpha(alpha);
     this.timerText.setAlpha(alpha);
   }
@@ -257,7 +264,7 @@ class SpellButton {
     this.iconImage?.destroy();
     this.keycap.destroy();
     this.glyphText.destroy();
-    this.costText.destroy();
+    this.cost.destroy();
     this.timerText.destroy();
     this.hotkeyText.destroy();
   }

@@ -8,6 +8,7 @@
 
 import Phaser from 'phaser';
 import type { SpellCardModel } from './spellCard';
+import { MANA_BLUE_CSS } from './manaAffordance';
 import { FONT, FONT_SIZE_XS, FONT_SIZE_SM } from './theme';
 import { TOOLTIP_CORNER_NATIVE_SIZE, TOOLTIP_CORNER_TEXTURE_KEY } from './spellSprites';
 
@@ -40,7 +41,6 @@ const NAME_LINE_COLOR = '#e8d8c8';
 const LABEL_COLOR = '#8a7868';
 const HEAL_COLOR = '#7ad67a';
 const DAMAGE_COLOR = '#e0a06a';
-const MANA_COLOR = '#a8c8f0';
 const TEMPO_COLOR = '#d8c8b8';
 const DESC_COLOR = '#a89888';
 const SYNERGY_LINE_COLOR = '#f2c14e';
@@ -150,7 +150,7 @@ export class SpellTooltip {
 
     const colWidth = Math.floor(Math.max(contentWidth, MIN_CARD_WIDTH - PADDING * 2) / 3);
     const stripTop = cursorY;
-    const costH = this.addStatColumn(PADDING, stripTop, 'COST', card.cost, MANA_COLOR, colWidth);
+    const costH = this.addStatColumn(PADDING, stripTop, 'COST', card.cost, MANA_BLUE_CSS, colWidth);
     const castH = this.addStatColumn(
       PADDING + colWidth,
       stripTop,
