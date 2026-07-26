@@ -9,6 +9,15 @@ import { makeTestEncounter, TEST_SPELLS } from './testFixtures';
  * AND starting mana. Everything else about the engine is unchanged.
  */
 describe('CombatEngine constructor options', () => {
+  it('spawns party with role display names (ids stay stable)', () => {
+    const engine = new CombatEngine(makeTestEncounter(), TEST_SPELLS);
+    const byId = Object.fromEntries(engine.state.party.map((u) => [u.id, u]));
+    expect(byId.tank).toMatchObject({ id: 'tank', name: 'Guardian', role: 'tank' });
+    expect(byId.dps1).toMatchObject({ id: 'dps1', name: 'Butcher', role: 'dps' });
+    expect(byId.dps2).toMatchObject({ id: 'dps2', name: 'Eagle Eye', role: 'dps' });
+    expect(byId.healer).toMatchObject({ id: 'healer', name: 'Healer', role: 'healer' });
+  });
+
   it('defaults to no bonus when options are omitted (backward compatible)', () => {
     const engine = new CombatEngine(makeTestEncounter(), TEST_SPELLS);
     const healer = engine.state.party.find((u) => u.id === 'healer')!;

@@ -444,7 +444,7 @@ export class CombatScene extends Phaser.Scene {
               }
             : { frame: presentation.frame }),
         showMana: isHealer,
-        showName: false,
+        showName: true,
         clickable: true,
         onClick: (id) => this.onAllyClick(id),
         facing: 'right',
