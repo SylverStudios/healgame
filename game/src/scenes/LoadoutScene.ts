@@ -133,7 +133,7 @@ export class LoadoutScene extends Phaser.Scene {
     }
 
     this.makeButton(width / 2, height - 40, 200, 44, 'Back', () => {
-      fadeToScene(this, SceneKeys.Hub);
+      fadeToScene(this, SceneKeys.Hub, {});
     }, 'loadoutBack');
   }
 

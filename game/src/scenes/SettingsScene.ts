@@ -120,7 +120,7 @@ export class SettingsScene extends Phaser.Scene {
       200,
       44,
       'Back',
-      () => fadeToScene(this, SceneKeys.Hub),
+      () => fadeToScene(this, SceneKeys.Hub, {}),
       'settingsBack',
     );
   }
