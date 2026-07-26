@@ -1,27 +1,39 @@
 /**
- * Party banter — line tables + pure trigger helpers (v0.3 chunk G; locked
- * design in docs/v0.3-handoff.md "Banter" / "Close call (banter trigger)").
- * Pure, deterministic, Phaser-free (hard rule: nothing under src/data/ may
- * import Phaser or read time/randomness) — CombatScene renders the picked
- * line in a speech bubble (ui/speechBubble.ts) and owns all trigger timing
- * (once-per-fight latches, when to fire relative to the result transition).
+ * Party banter — line tables + pure trigger helpers (v0.3 chunk G; Wave 1
+ * coaching triggers). Pure, deterministic, Phaser-free (hard rule: nothing
+ * under src/data/ may import Phaser or read time/randomness) — CombatScene
+ * renders the picked line in a speech bubble (ui/speechBubble.ts) and owns
+ * all trigger timing (once-per-fight latches, when to fire).
  *
- * Locked triggers/speakers (the only combos the scene actually fires):
- *   close-call → healer, wipe → tank, victory → healer.
+ * Locked triggers/speakers the scene is expected to fire:
+ *   close-call → healer, wipe → tank, victory → healer,
+ *   idle-coach → healer, tank-coach → tank,
+ *   low-mana → healer, oom → healer (hasBonkOnBar branches the line list).
  * The other (trigger, speaker) combos are filled in below too so
  * pickBanterLine is total over its pinned signature and never throws — they
- * are not wired up by the scene.
+ * are not necessarily wired up by the scene.
  */
 
-export type BanterTrigger = 'close-call' | 'wipe' | 'victory';
+export type BanterTrigger =
+  | 'close-call'
+  | 'wipe'
+  | 'victory'
+  | 'idle-coach'
+  | 'tank-coach'
+  | 'low-mana'
+  | 'oom';
 export type BanterSpeaker = 'healer' | 'tank';
 
 type HealerVoice = 'vigil' | 'zealot' | 'neutral';
 
 /**
- * Dark-fantasy, oath-flavored, no meme comedy (handoff "Banter"). Lines stay
- * under ~40 chars so the speech bubble stays small. Vigil reads solemn/grave,
- * Zealot reads fervent/zealous, neutral (no subclass sworn yet) reads devout.
+ * Dark-fantasy, oath-flavored, no meme comedy. Lines stay under ~40 chars so
+ * the speech bubble stays small. Vigil reads solemn/grave, Zealot reads
+ * fervent/zealous, neutral (no subclass sworn yet) reads devout.
+ *
+ * For `'oom'`, these tables are the no-Bonk / dry-wait lines. Bonk-on-bar
+ * variants live in HEALER_OOM_BONK_LINES and are selected when
+ * `hasBonkOnBar === true`.
  */
 const HEALER_LINES: Record<BanterTrigger, Record<HealerVoice, readonly string[]>> = {
   'close-call': {
@@ -70,6 +82,95 @@ const HEALER_LINES: Record<BanterTrigger, Record<HealerVoice, readonly string[]>
       'We walk on, together.',
     ],
   },
+  'idle-coach': {
+    vigil: [
+      'The vow waits on your hand.',
+      'Cast. Mercy does not idle.',
+      'Speak the light — begin.',
+      'Your spells sleep. Wake them.',
+    ],
+    zealot: [
+      'Burn! Do not stand idle!',
+      'The flame begs a spell!',
+      'Strike with light — NOW!',
+      'Idle hands shame the altar!',
+    ],
+    neutral: [
+      'Use a spell. Begin.',
+      'Mercy waits on your cast.',
+      'The light needs your hand.',
+      'Do not idle — heal them.',
+    ],
+  },
+  'tank-coach': {
+    // Off-design combo — tank-coach's spoken line belongs to the tank.
+    vigil: ['The wall needs my hand.', 'I should mark the tank.'],
+    zealot: ['The wall burns — heal it!', 'Flame the tank — now!'],
+    neutral: ['The tank needs healing.', 'Help the wall. Heal them.'],
+  },
+  'low-mana': {
+    vigil: [
+      'Mana thins. Pace the vow.',
+      'Watch the blue. Spend wisely.',
+      'The well runs low. Careful.',
+      'Conserve. Mercy must last.',
+    ],
+    zealot: [
+      'Flame fades — spend with fire!',
+      'Blue drains! Make each burn!',
+      'Mana wanes — no waste!',
+      'The well shrinks. Burn wisely!',
+    ],
+    neutral: [
+      'Mana runs low. Pace it.',
+      'Watch the blue bar.',
+      'Spend carefully — mana dips.',
+      'The well thins. Slow down.',
+    ],
+  },
+  oom: {
+    // No Bonk on bar (or hasBonkOnBar omitted) — dry / wait for mana.
+    vigil: [
+      'Dry. Wait for the well.',
+      'Empty. Hold for mana.',
+      'No mana left. Endure.',
+      'The well is dry. Wait.',
+    ],
+    zealot: [
+      'Empty! The flame starves!',
+      'Dry as ash — wait!',
+      'No fuel. Hold the line!',
+      'The well is spent. Wait!',
+    ],
+    neutral: [
+      'Out of mana. Wait.',
+      'Dry. Mana must return.',
+      'Empty. Hold for now.',
+      'No mana. Endure.',
+    ],
+  },
+};
+
+/** Healer `'oom'` lines when Bonk is on the action bar — point at the free stick hit. */
+const HEALER_OOM_BONK_LINES: Record<HealerVoice, readonly string[]> = {
+  vigil: [
+    'Bonk them. Mana will return.',
+    'Swing Bonk while I refill.',
+    'Use Bonk — free stick hit.',
+    'Bonk. Wait for the well.',
+  ],
+  zealot: [
+    'Bonk! Strike while I burn!',
+    'Bonk them — free wrath!',
+    'Swing Bonk! Mana returns!',
+    'Bonk now — the well refills!',
+  ],
+  neutral: [
+    'Use Bonk while mana returns.',
+    'Bonk them — it costs nothing.',
+    'Swing Bonk. Wait for mana.',
+    'Bonk. Free hit. Then heal.',
+  ],
 };
 
 /** Tank has no subclass — gruff/stoic, same voice regardless of trigger. */
@@ -85,6 +186,18 @@ const TANK_LINES: Record<BanterTrigger, readonly string[]> = {
   ],
   // Off-design combo — victory's spoken line belongs to the healer.
   victory: ['Line held.', 'Ground kept.', 'They broke first.'],
+  // Off-design combo — idle-coach belongs to the healer.
+  'idle-coach': ['Waiting on you, healer.', 'Spells idle. Move.', 'Wall holds. Cast already.'],
+  'tank-coach': [
+    'Click me. I need healing.',
+    "Select me — I'm fading.",
+    'Heal me. Click the tank.',
+    'Tab to me. Patch this up.',
+    'Point at me. Heal. Now.',
+  ],
+  // Off-design — low-mana / oom belong to the healer.
+  'low-mana': ['Blue runs thin. Pace it.', 'Mana dips. Be careful.', 'Watch your well, healer.'],
+  oom: ['Dry well. Hold the line.', 'No mana. Endure.', 'Empty. We wait.'],
 };
 
 /** Clamps a raw [0,1) rng draw to a valid array index — safe even at the r=1 edge. */
@@ -97,17 +210,27 @@ function pickIndex(rng: () => number, length: number): number {
  * Picks one banter line for (trigger, speaker, subclass). `rng` is optional and, per the
  * pinned contract, defaults to a deterministic first-line pick (`() => 0`) so data/ stays
  * time/randomness-free on its own — the scene passes `Math.random` for real in-game variety.
+ *
+ * `hasBonkOnBar` only affects `'oom'` + healer: `true` selects Bonk-tip lines; omitted/false
+ * selects dry-wait lines. Ignored for every other trigger/speaker combo.
  */
 export function pickBanterLine(args: {
   trigger: BanterTrigger;
   speaker: BanterSpeaker;
   subclass: 'vigil' | 'zealot' | null;
+  /** Meaningful only for `'oom'` + healer — Bonk tip vs dry-wait line lists. */
+  hasBonkOnBar?: boolean;
   /** Inject for tests; default deterministic pick by index (first line). */
   rng?: () => number;
 }): string {
-  const { trigger, speaker, subclass, rng = () => 0 } = args;
+  const { trigger, speaker, subclass, hasBonkOnBar, rng = () => 0 } = args;
+  const voice: HealerVoice = subclass ?? 'neutral';
   const lines =
-    speaker === 'healer' ? HEALER_LINES[trigger][subclass ?? 'neutral'] : TANK_LINES[trigger];
+    speaker === 'healer'
+      ? trigger === 'oom' && hasBonkOnBar === true
+        ? HEALER_OOM_BONK_LINES[voice]
+        : HEALER_LINES[trigger][voice]
+      : TANK_LINES[trigger];
   return lines[pickIndex(rng, lines.length)]!;
 }
 
@@ -136,4 +259,58 @@ function isAtOrBelowCloseCallThreshold(unit: CloseCallUnit): boolean {
 export function detectCloseCall(units: readonly CloseCallUnit[], alreadyFired: boolean): boolean {
   if (alreadyFired) return false;
   return units.some((unit) => unit.alive && isAtOrBelowCloseCallThreshold(unit));
+}
+
+// ---- first-fight coaching detectors ----------------------------------------
+
+/** ~20s of combat/sim time, healer issued no spell/CD yet. */
+export const IDLE_COACH_MS = 20_000;
+
+/**
+ * True when combat has run at least {@link IDLE_COACH_MS} without the healer issuing any
+ * spell or CD command, and the idle-coach line has not already fired this fight.
+ * Caller owns the latch + `healerHasActed` / elapsed tracking.
+ */
+export function detectIdleCoach(args: {
+  elapsedCombatMs: number;
+  healerHasActed: boolean; // any spell or CD command issued
+  alreadyFired: boolean;
+}): boolean {
+  if (args.alreadyFired || args.healerHasActed) return false;
+  return args.elapsedCombatMs >= IDLE_COACH_MS;
+}
+
+/**
+ * Tank low HP + healer has never landed a heal this fight.
+ * Threshold: integer-safe ≤35% HP (`hp * 100 <= maxHp * 35`). Dead tank never qualifies.
+ */
+export function detectTankCoach(args: {
+  tank: { alive: boolean; hp: number; maxHp: number };
+  healerHasHealed: boolean;
+  alreadyFired: boolean;
+}): boolean {
+  if (args.alreadyFired || args.healerHasHealed || !args.tank.alive) return false;
+  return args.tank.hp * 100 <= args.tank.maxHp * 35;
+}
+
+/**
+ * Low mana (not empty). Threshold: mana > 0 AND integer-safe ≤25%
+ * (`mana * 100 <= maxMana * 25`).
+ */
+export function detectLowMana(args: {
+  mana: number;
+  maxMana: number;
+  alreadyFired: boolean;
+}): boolean {
+  if (args.alreadyFired || args.mana <= 0) return false;
+  return args.mana * 100 <= args.maxMana * 25;
+}
+
+/** OOM. True when mana <= 0 and the oom line has not already fired this fight. */
+export function detectOom(args: {
+  mana: number;
+  alreadyFired: boolean;
+}): boolean {
+  if (args.alreadyFired) return false;
+  return args.mana <= 0;
 }

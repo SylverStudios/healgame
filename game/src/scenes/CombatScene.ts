@@ -68,7 +68,12 @@ import type { CombatMods } from '../data/talentTree';
 import { beginRun, finalizeRun, recordPress, type PressSource } from '../telemetry';
 import { buildRunSummary, hasBuildGlyph } from '../ui/runSummary';
 import { drawBuildGlyph } from '../ui/buildGlyph';
-import { detectCloseCall, pickBanterLine, type BanterSpeaker, type BanterTrigger } from '../data/banter';
+import { pickBanterLine, type BanterSpeaker, type BanterTrigger } from '../data/banter';
+import {
+  freshMidCombatBanterLatches,
+  pickMidCombatBanter,
+  type MidCombatBanterLatches,
+} from '../ui/midCombatBanter';
 import { showSpeechBubble } from '../ui/speechBubble';
 import { portraitTextureKey, revealResultPortrait } from '../ui/portraitSprites';
 import { chunkyWipeIn, fadeToScene } from '../ui/transitions';
@@ -172,16 +177,9 @@ const TOAST_FONT_SIZE = FONT_SIZE_SM;
 const TOAST_COLOR = '#e8d8c8';
 const TOAST_FADE_MS = 1500;
 
-// Wipe/victory run summary panel layout/timing constants moved to
-// ui/resultPanel.ts (max-lines cap) — see that file for the choreography note.
-
-// v0.3 chunk G: party banter (docs/v0.3-handoff.md "Banter"). Bubble anchor Y is the
-// speaker's home Y minus enough clearance to clear its always-on overlay stack (HP bar +
-// number line, plus the mana bar + number line for the healer) — showSpeechBubble adds its
-// own small gap above that anchor for the tail.
-/** Clears the shared party display height + healer mana bar stack above GROUND_Y. */
+// Wipe/victory panel constants: ui/resultPanel.ts (max-lines).
+// Banter Y offsets clear HP/mana bars; showSpeechBubble adds its own tail gap.
 const BANTER_HEALER_Y_OFFSET = 100;
-/** Clears the taller PixelLab tank body + HP bar stack above GROUND_Y. */
 const BANTER_TANK_Y_OFFSET = 80;
 
 // ---- helpers ----------------------------------------------------------------
@@ -251,8 +249,12 @@ export class CombatScene extends Phaser.Scene {
   private lastHealerMana: number | null = null;
 
   private resultShown = false;
-  /** v0.3 chunk G: once-per-combat latch fed to data/banter's detectCloseCall. */
-  private closeCallFired = false;
+  /** Once-per-fight mid-combat banter latches (close-call + Wave 1 coaching). */
+  private banterLatches: MidCombatBanterLatches = freshMidCombatBanterLatches();
+  /** Spell/CD command issued this fight (even if rejected) — gates idle-coach. */
+  private healerHasActed = false;
+  /** Heal event applied this fight (healer-cast only; overheal counts) — gates tank-coach. */
+  private healerHasHealed = false;
   /** Loaded once in create(); reused at result time for treeRanks (build glyph) — save.treeRanks
    *  cannot change mid-combat, so no need to reload. */
   private save!: SaveData;
@@ -264,7 +266,9 @@ export class CombatScene extends Phaser.Scene {
   init(data: CombatSceneData): void {
     this.sceneData = data;
     this.resultShown = false;
-    this.closeCallFired = false;
+    this.banterLatches = freshMidCombatBanterLatches();
+    this.healerHasActed = false;
+    this.healerHasHealed = false;
     this.partySprites = new Map();
     this.enemySprites = new Map();
     this.unitNames = new Map();
@@ -444,7 +448,7 @@ export class CombatScene extends Phaser.Scene {
               }
             : { frame: presentation.frame }),
         showMana: isHealer,
-        showName: false,
+        showName: true,
         clickable: true,
         onClick: (id) => this.onAllyClick(id),
         facing: 'right',
@@ -653,6 +657,7 @@ export class CombatScene extends Phaser.Scene {
 
   private onSpellCast(spellId: string, source: PressSource): void {
     if (this.engine.state.status !== 'running') return;
+    this.healerHasActed = true; // idle-coach: command issued even if cast rejected
     recordPress(spellId, source);
     this.engine.castSpell(spellId);
     this.syncView();
@@ -663,6 +668,7 @@ export class CombatScene extends Phaser.Scene {
   private onCooldownActivate(cooldownId: string, source: PressSource): void {
     if (this.engine.state.status !== 'running') return;
     // Count the press even when the CD is still ticking — balance cares about spam.
+    this.healerHasActed = true; // idle-coach: key/click counts as a command
     recordPress(cooldownId, source);
     const cooldown = this.engine.state.cooldowns.find((state) => state.id === cooldownId);
     if (!cooldown || cooldown.remainingCooldownMs > 0) return;
@@ -712,6 +718,7 @@ export class CombatScene extends Phaser.Scene {
           break;
         }
         case 'heal': {
+          this.healerHasHealed = true; // tank-coach: heal event = healer heal applied
           const target = this.findSprite(event.targetId);
           // Float shows the full cast (applied + overheal) so overheal still reads as a big heal.
           const rawHeal = event.amount + event.overheal;
@@ -910,12 +917,19 @@ export class CombatScene extends Phaser.Scene {
     for (const unit of state.enemies) this.enemySprites.get(unit.id)?.update(unit);
     for (const [id, sprite] of this.partySprites) sprite.setTargeted(id === state.targetId);
 
-    // v0.3 chunk G: close-call fires mid-combat, the instant any living ally's HP snapshot
-    // crosses the threshold (handoff "Close call") — only while still fighting, so it never
-    // races the wipe/victory bubble fired from showResultOverlay() below.
-    if (state.status === 'running' && detectCloseCall(state.party, this.closeCallFired)) {
-      this.closeCallFired = true;
-      this.fireBanterBubble('close-call', 'healer');
+    // Mid-combat banter (sim-time elapsedMs; one/frame). Wipe/victory: showResultOverlay.
+    if (state.status === 'running') {
+      const pick = pickMidCombatBanter({
+        party: state.party,
+        latches: this.banterLatches,
+        elapsedCombatMs: this.elapsedMs,
+        healerHasActed: this.healerHasActed,
+        healerHasHealed: this.healerHasHealed,
+      });
+      if (pick) {
+        this.banterLatches = pick.latches;
+        this.fireBanterBubble(pick.trigger, pick.speaker);
+      }
     }
 
     this.syncPlayerCastBar(state);
@@ -1035,11 +1049,7 @@ export class CombatScene extends Phaser.Scene {
 
   // ---- end of combat -------------------------------------------------------------
 
-  /**
-   * v0.3 chunk G: shows one speech bubble (chunk 5: + speaker bust) above `speaker`'s sprite
-   * with a banter line for (trigger, speaker) — subclass comes from the already-loaded save,
-   * never read from tree/save internals here. No-op if the speaker's sprite is gone (safe).
-   */
+  /** Speech bubble above speaker; `'oom'` branches on Bonk-on-bar. No-op if sprite gone. */
   private fireBanterBubble(trigger: BanterTrigger, speaker: BanterSpeaker): void {
     const sprite = this.partySprites.get(speaker);
     if (!sprite) return;
@@ -1048,6 +1058,7 @@ export class CombatScene extends Phaser.Scene {
       trigger,
       speaker,
       subclass: this.save.subclass,
+      hasBonkOnBar: this.sceneData.loadout.spells.some((s) => s.id === SPELLS.bonk.id),
       rng: Math.random,
     });
     showSpeechBubble(this, {
@@ -1056,19 +1067,11 @@ export class CombatScene extends Phaser.Scene {
       text: line,
       viewWidth: VIEW_WIDTH,
       viewHeight: VIEW_HEIGHT,
-      portraitTextureKey: portraitTextureKey(speaker), // chunk 5: no-op if texture missing.
+      portraitTextureKey: portraitTextureKey(speaker),
     });
   }
 
-  /**
-   * Wipe/victory result flow: a short slide-in transition into a run summary
-   * panel (outcome, XP gained this run, build glyph of the lit tree path),
-   * replacing the old instant overlay. Persists the run exactly once via
-   * pushRecentRun/saveGame in HubScene (same place the run's XP is already
-   * banked into save.xp) — CombatScene only *shows* the summary; see
-   * HubScene.create() for the persisted RunRecord, built from the same pure
-   * buildRunSummary() so the stored glyph matches the one shown here.
-   */
+  /** Wipe/victory summary panel; HubScene banks XP / persists the RunRecord. */
   private showResultOverlay(status: 'victory' | 'wipe'): void {
     if (this.resultShown) return;
     this.resultShown = true;

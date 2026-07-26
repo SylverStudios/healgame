@@ -220,9 +220,9 @@ export class CombatEngine {
     const dpsHp = PARTY.dpsMaxHp + this.relicStats.maxHp.dps;
     const healerHp = PARTY.healerMaxHp + this.relicStats.maxHp.healer;
     this.party = [
-      { id: 'tank', name: 'Tank', role: 'tank', hp: tankHp, maxHp: tankHp, mana: 0, maxMana: 0, alive: true },
-      { id: 'dps1', name: 'DPS 1', role: 'dps', hp: dpsHp, maxHp: dpsHp, mana: 0, maxMana: 0, alive: true },
-      { id: 'dps2', name: 'DPS 2', role: 'dps', hp: dpsHp, maxHp: dpsHp, mana: 0, maxMana: 0, alive: true },
+      { id: 'tank', name: 'Guardian', role: 'tank', hp: tankHp, maxHp: tankHp, mana: 0, maxMana: 0, alive: true },
+      { id: 'dps1', name: 'Butcher', role: 'dps', hp: dpsHp, maxHp: dpsHp, mana: 0, maxMana: 0, alive: true },
+      { id: 'dps2', name: 'Eagle Eye', role: 'dps', hp: dpsHp, maxHp: dpsHp, mana: 0, maxMana: 0, alive: true },
       {
         id: 'healer',
         name: 'Healer',
