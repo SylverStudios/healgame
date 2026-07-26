@@ -31,6 +31,13 @@ import {
 } from '../ui/sprites';
 import { RELIC_TEXTURE_IDS, relicTextureKey, relicTextureUrl } from '../ui/relicSprites';
 import { initMusic, MUSIC_ASSET_KEY, MUSIC_URL } from '../ui/music';
+import { fontsReady } from '../ui/theme';
+import { allBattlefieldTextures } from '../ui/battlefield';
+import { spellBarTextures } from '../ui/spellSprites';
+import { panelKitTextures } from '../ui/panels';
+import { portraitTextures } from '../ui/portraitSprites';
+import { treeUiTextures } from '../ui/treeSockets';
+import { fadeToScene } from '../ui/transitions';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -73,6 +80,33 @@ export class BootScene extends Phaser.Scene {
     for (const id of RELIC_TEXTURE_IDS) {
       this.load.image(relicTextureKey(id), relicTextureUrl(id));
     }
+    // Per-dungeon combat battlefields (temp-art exception): backdrop
+    // structure props + platform slice per variant, deduped across all 6
+    // dungeon ids (chunk 8) — see ui/battlefield.ts.
+    for (const texture of allBattlefieldTextures()) {
+      this.load.image(texture.key, texture.url);
+    }
+    // Spell-bar/HUD framing kit + spell/cooldown icons (temp-art exception,
+    // bible item 3) — see ui/spellSprites.ts.
+    for (const texture of spellBarTextures()) {
+      this.load.image(texture.key, texture.url);
+    }
+    // Meta-scene panel/button/banner kit (temp-art exception, bible item 4)
+    // — Hub/Tutorial/Loadout/Relic/Settings + combat result overlay/wave
+    // banner. See ui/panels.ts.
+    for (const texture of panelKitTextures()) {
+      this.load.image(texture.key, texture.url);
+    }
+    // FE-style bust portraits (temp-art exception, bible item 5) — banter
+    // bubbles, tutorial, combat result panel. See ui/portraitSprites.ts.
+    for (const texture of portraitTextures()) {
+      this.load.image(texture.key, texture.url);
+    }
+    // Talent-tree node socket ring + edge-groove strip (temp-art exception,
+    // bible item 7) — TreeScene. See ui/treeSockets.ts.
+    for (const texture of treeUiTextures()) {
+      this.load.image(texture.key, texture.url);
+    }
     // Attack strips: one texture key per frame (not packed into Kenney).
     for (const def of UNIT_ATTACK_ANIMS) {
       for (let i = 0; i < def.frameCount; i++) {
@@ -95,11 +129,19 @@ export class BootScene extends Phaser.Scene {
     this.registerHealerStripAnims();
     const save = loadSave();
     initMusic(this.game, save.musicVolumePct);
-    if (save.tutorialDone) {
-      this.scene.start(SceneKeys.Hub);
-    } else {
-      this.scene.start(SceneKeys.Tutorial);
-    }
+    // fontsReady (ui/theme.ts) started loading the pixel font as early as
+    // the module graph linked — well before this preload/create pair ran —
+    // so in practice this resolves immediately here; it only actually waits
+    // on a slow/cold font load, and only up to its own 2s safety timeout.
+    void fontsReady.then(() => {
+      // Chunk 6 (bible item 6): fade instead of a hard cut — target scenes
+      // fade back in via fadeInOnCreate() at the top of their own create().
+      if (save.tutorialDone) {
+        fadeToScene(this, SceneKeys.Hub);
+      } else {
+        fadeToScene(this, SceneKeys.Tutorial);
+      }
+    });
   }
 
   /** One-shot attack anims for PixelLab mercs — shared via the game AnimationManager. */

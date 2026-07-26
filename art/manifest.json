@@ -331,5 +331,31 @@
       "strips": {},
       "note": "colossal tier; special: extinction"
     }
+  ],
+  "battlefields": [
+    {
+      "slug": "ashgate",
+      "comment": "Combat battlefield set-dressing (chunk 2, ui-theme phase). Not unit art: no strips/facing; audit tool ignores this array. Ledger: artifacts/pixellab-1/README.md.",
+      "status": "live",
+      "assetsDir": "game/public/assets/battlefields/ashgate",
+      "sourceDir": "art/source/battlefields/ashgate",
+      "textures": {
+        "gate-arch": {
+          "file": "gate-arch.png",
+          "nativeSize": "300x200",
+          "note": "opaque diorama, seam masked by wall fragments"
+        },
+        "wall-fragment": {
+          "file": "wall-fragment.png",
+          "nativeSize": "140x110",
+          "note": "mirrored left/right via flipX (env prop, not facing-authored)"
+        },
+        "platform": {
+          "file": "platform.png",
+          "nativeSize": "170x40",
+          "note": "FE-style plinth, one texture both lines"
+        }
+      }
+    }
   ]
 }

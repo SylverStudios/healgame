@@ -10,6 +10,14 @@ import { SettingsScene } from './scenes/SettingsScene';
 import { installTestHooks } from './debug/testHooks';
 import { installPlaytimeTracker } from './telemetry';
 
+// Game construction stays fully synchronous (unchanged boot timing —
+// journey.mjs's reload/settle waits are tuned against this). The pixel
+// font's load is kicked off as a side effect of importing ui/theme
+// (transitively, via the scene imports above) the moment this module
+// evaluates — see ui/theme.ts's `fontsReady`. BootScene.create() awaits it
+// before starting the first text-rendering scene (Tutorial/Hub), running it
+// in parallel with BootScene's own sprite/audio preload instead of
+// serializing in front of the whole boot.
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',

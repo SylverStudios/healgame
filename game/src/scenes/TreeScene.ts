@@ -24,6 +24,19 @@ import { drawBuildGlyph } from '../ui/buildGlyph';
 import { costLabel, grantSpellEyebrow, spotMetaSuffix } from '../ui/treeSpotMeta';
 import { allocatedTalentPoints, availableTalentPoints } from '../meta/progression';
 import { levelForXp } from '../data/constants';
+import { FONT, FONT_SIZE_XS, FONT_SIZE_SM, FONT_SIZE_MD, PALETTE, PALETTE_NUM } from '../ui/theme';
+import {
+  EDGE_LOCKED,
+  EDGE_TRAVERSED,
+  drawEdgeStrip,
+  drawSocketRing,
+  edgeAlpha,
+  edgeDisplayWeight,
+  edgeTint,
+  edgeUsesTexturedStrip,
+  socketRingTint,
+  socketVisualState,
+} from '../ui/treeSockets';
 import {
   buildGlyphFromTree,
   layoutFromGrid,
@@ -34,43 +47,47 @@ import {
   type SpotDef,
   type SpotPosition,
   type SpotView,
-  type TreeEdge,
   type TreeState,
   type TreeView,
 } from '../tree';
+import { fadeInOnCreate, fadeToScene } from '../ui/transitions';
 
-const BG_COLOR = 0x1a1210;
-const NODE_BG_LOCKED = 0x241a15;
-const NODE_BG_AFFORDABLE = 0x3a2a22;
+// Colors below alias `ui/theme.ts`'s PALETTE/PALETTE_NUM (handoff "Locked
+// decisions": new work imports the shared palette instead of local hex
+// consts). `NODE_BG_OWNED` has no PALETTE_NUM equivalent (a distinct
+// dark-green node fill not reused elsewhere) and stays a local const per the
+// same "only migrate where it doesn't change semantics" rule that keeps the
+// four-state EDGE_* palette in `ui/treeSockets.ts` instead of PALETTE_NUM.
+const BG_COLOR = PALETTE_NUM.bg;
+const NODE_BG_LOCKED = PALETTE_NUM.panel;
+const NODE_BG_AFFORDABLE = PALETTE_NUM.panelLight;
 const NODE_BG_OWNED = 0x2a3a2a;
-const BORDER_COLOR = 0x0a0605;
-const BUTTON_COLOR = 0x3a2a22;
-const ACCENT_HEX = 0xf2c14e;
-const ARM_HEX = 0xe05a4e;
+const BORDER_COLOR = PALETTE_NUM.borderDark;
+const BUTTON_COLOR = PALETTE_NUM.panelLight;
+const ACCENT_HEX = PALETTE_NUM.gold;
+const ARM_HEX = PALETTE_NUM.danger;
 
-/**
- * v0.3 lattice edge palette — four visually distinct states (handoff §Done-6,
- * "Lattice tree" locked choice): traversed is the bright "lit path", locked
- * is a clearly dead branch (dark red + a broken line / X), available and
- * inactive fall between at decreasing intensity.
- */
-const EDGE_TRAVERSED = 0xfff2df;
-const EDGE_AVAILABLE = 0xc79a52;
-const EDGE_INACTIVE = 0x4a3a30;
-const EDGE_LOCKED = 0x8a2a20;
-
-const TEXT_COLOR = '#e8d8c8';
-const DIM_COLOR = '#a89888';
-const ACCENT_COLOR = '#f2c14e';
-const OWNED_COLOR = '#7ad67a';
+// `: string` annotations below are load-bearing: `PALETTE` is declared
+// `as const` in theme.ts, so a bare `const X = PALETTE.foo` infers X's exact
+// literal type instead of widening to `string` (unlike the old raw string
+// literals here, which widened automatically) — without the annotation,
+// `let glyphColor = DIM_COLOR` below would infer a single-literal type and
+// reject every other palette string it's later reassigned to.
+const TEXT_COLOR: string = PALETTE.text;
+const DIM_COLOR: string = PALETTE.dim;
+const ACCENT_COLOR: string = PALETTE.gold;
+const OWNED_COLOR: string = PALETTE.health;
 /** Rank-pip filled color (hex, matches OWNED_COLOR string above). */
-const OWNED_COLOR_HEX = 0x7ad67a;
-const DANGER_COLOR = '#e05a4e';
-const FONT = 'monospace';
+const OWNED_COLOR_HEX = PALETTE_NUM.health;
+const DANGER_COLOR: string = PALETTE.danger;
 
 const NODE_RADIUS = 20;
 /** Hit/tooltip extent — matches the circular node diameter. */
 const NODE_SIZE = NODE_RADIUS * 2;
+/** Socket ring display size — exactly `NODE_SIZE` (the frozen node hit-area
+ *  diameter), so the generated bezel sits flush against the node circle's
+ *  edge like a coin rim (chunk 7, bible item 7). */
+const SOCKET_RING_DISPLAY_SIZE = NODE_SIZE;
 
 /**
  * v0.3 lattice layout (chunk D): every spot's pixel position is a linear
@@ -185,6 +202,8 @@ export class TreeScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(BG_COLOR);
+    // Chunk 6 (bible item 6): fade in on scene entry.
+    fadeInOnCreate(this);
     this.save = loadSave();
     this.treeState = treeStateFromLegacy(this.save.treeRanks, availableTalentPoints(this.save));
     this.armedSpotId = null;
@@ -206,7 +225,7 @@ export class TreeScene extends Phaser.Scene {
     this.add
       .text(width / 2, 14, 'TALENT TREE', {
         fontFamily: FONT,
-        fontSize: '20px',
+        fontSize: FONT_SIZE_MD,
         fontStyle: 'bold',
         color: '#fff2df',
         stroke: '#0a0605',
@@ -215,7 +234,7 @@ export class TreeScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(HUD_DEPTH);
     this.headerText = this.add
-      .text(width / 2, 36, '', { fontFamily: FONT, fontSize: '12px', color: ACCENT_COLOR })
+      .text(width / 2, 36, '', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: ACCENT_COLOR })
       .setOrigin(0.5)
       .setDepth(HUD_DEPTH);
 
@@ -226,7 +245,7 @@ export class TreeScene extends Phaser.Scene {
     this.statusText = this.add
       .text(width / 2, 52, '', {
         fontFamily: FONT,
-        fontSize: '11px',
+        fontSize: FONT_SIZE_SM,
         color: TEXT_COLOR,
         align: 'center',
         wordWrap: { width: 700 },
@@ -237,7 +256,7 @@ export class TreeScene extends Phaser.Scene {
     this.feedbackText = this.add
       .text(width / 2, 66, '', {
         fontFamily: FONT,
-        fontSize: '11px',
+        fontSize: FONT_SIZE_SM,
         color: DANGER_COLOR,
         align: 'center',
       })
@@ -249,7 +268,9 @@ export class TreeScene extends Phaser.Scene {
 
     this.tooltip = new SpellTooltip(this, { screenWidth: width, depth: TOOLTIP_DEPTH });
 
-    this.buildBackButton(75, 26);
+    // Top-right, not top-left: the oath/relic strip (syncRunModsBar) grows
+    // rightward from the left margin and was colliding with Back here.
+    this.buildBackButton(width - 75, 26);
     this.buildGlyphPreviewChrome();
     this.buildEdgeLegend();
     this.render();
@@ -257,10 +278,13 @@ export class TreeScene extends Phaser.Scene {
 
   /** Static labels/frame for the build-glyph corner preview — drawn once. */
   private buildGlyphPreviewChrome(): void {
+    // XS (8px), not the SM snap: this label sits 6px above the preview box's
+    // top edge (60 vs GLYPH_PREVIEW_Y=96, H=60 ⇒ box top at 66) — SM would
+    // grow into the box.
     this.add
       .text(GLYPH_PREVIEW_X, 60, 'BUILD', {
         fontFamily: FONT,
-        fontSize: '10px',
+        fontSize: FONT_SIZE_XS,
         color: DIM_COLOR,
       })
       .setOrigin(0.5)
@@ -271,20 +295,18 @@ export class TreeScene extends Phaser.Scene {
       .setDepth(HUD_DEPTH);
   }
 
-  /** Static bottom legend mapping edge color/style to meaning — drawn once. */
+  /** Static bottom legend mapping edge color/style to meaning — drawn once.
+   *  Swatches stay plain `Graphics` lines (the shared color/weight/alpha
+   *  come from `ui/treeSockets.ts` so the legend can never drift from the
+   *  live edges): at 18px long they're too short for the textured strip to
+   *  read as anything but noise — same "thin element stays unframed" call
+   *  chunk 3/4 made for micro-bars/the settings slider track. */
   private buildEdgeLegend(): void {
     const graphics = this.add.graphics().setDepth(HUD_DEPTH);
     let x = 200;
     for (const entry of EDGE_LEGEND) {
-      const color =
-        entry.state === 'traversed'
-          ? EDGE_TRAVERSED
-          : entry.state === 'available'
-            ? EDGE_AVAILABLE
-            : entry.state === 'locked'
-              ? EDGE_LOCKED
-              : EDGE_INACTIVE;
-      const width = entry.state === 'traversed' ? 4 : entry.state === 'locked' ? 2 : entry.state === 'available' ? 2 : 1;
+      const color = edgeTint(entry.state);
+      const width = edgeDisplayWeight(entry.state);
       graphics.lineStyle(width, color, 1);
       graphics.lineBetween(x, LEGEND_Y, x + LEGEND_SWATCH_LEN, LEGEND_Y);
       if (entry.state === 'locked') {
@@ -294,7 +316,7 @@ export class TreeScene extends Phaser.Scene {
       const label = this.add
         .text(x + LEGEND_SWATCH_LEN + 6, LEGEND_Y, entry.label, {
           fontFamily: FONT,
-          fontSize: '10px',
+          fontSize: FONT_SIZE_SM,
           color: DIM_COLOR,
         })
         .setOrigin(0, 0.5)
@@ -341,52 +363,71 @@ export class TreeScene extends Phaser.Scene {
     this.renderGlyphPreview(treeView);
   }
 
-  /** Edge color/weight/decoration by `EdgeState` — see EDGE_* constants. Traversed
-   *  (the lit path) draws last so it stays visible over crossing dim/locked lines. */
+  /**
+   * Edge color/weight/decoration by `EdgeState` (`ui/treeSockets.ts`'s
+   * `edgeTint`/`edgeDisplayWeight`/`edgeAlpha`). Traversed/available/the
+   * locked segments draw as a rotated, length-stretched edge-groove strip
+   * (`drawEdgeStrip`) tinted per state; `inactive` stays a plain thin
+   * `Graphics` line (bible §5 judgment call — a textured line at 1px reads
+   * as noise, not detail, matching chunk 3/4's precedent for very thin
+   * elements). Any state falls back to the original flat line if the strip
+   * texture isn't loaded. Traversed (the lit path) draws last so it stays
+   * visible over crossing dim/locked lines; the locked dead-branch X mark
+   * draws in a final pass over everything so it's never obscured by a
+   * later-drawn strip. */
   private renderEdges(treeView: TreeView): void {
     const graphics = this.add.graphics();
     this.nodesContainer.add(graphics);
 
     const drawOrder: EdgeState[] = ['inactive', 'available', 'locked', 'traversed'];
+    const lockedMidpoints: SpotPosition[] = [];
     for (const state of drawOrder) {
       for (const edge of treeView.edges) {
         if (edge.state !== state) continue;
         const fromPos = TREE_POSITIONS.get(edge.fromSpotId);
         const toPos = TREE_POSITIONS.get(edge.toSpotId);
         if (!fromPos || !toPos) continue;
-        this.drawEdge(graphics, edge, fromPos, toPos);
+        this.drawEdgeLine(graphics, state, fromPos, toPos);
+        if (state === 'locked') {
+          lockedMidpoints.push({ x: (fromPos.x + toPos.x) / 2, y: (fromPos.y + toPos.y) / 2 });
+        }
       }
     }
+
+    if (lockedMidpoints.length > 0) this.drawLockedMarks(lockedMidpoints);
   }
 
-  private drawEdge(
+  /** Draws one edge's line/strip (no dead-branch decoration — see
+   *  `drawLockedMarks` for the X marks, drawn in a separate final pass). */
+  private drawEdgeLine(
     graphics: Phaser.GameObjects.Graphics,
-    edge: TreeEdge,
+    state: EdgeState,
     fromPos: SpotPosition,
     toPos: SpotPosition,
   ): void {
-    switch (edge.state) {
-      case 'traversed':
-        graphics.lineStyle(4, EDGE_TRAVERSED, 1);
-        graphics.lineBetween(fromPos.x, fromPos.y, toPos.x, toPos.y);
-        return;
-      case 'available':
-        graphics.lineStyle(2, EDGE_AVAILABLE, 0.7);
-        graphics.lineBetween(fromPos.x, fromPos.y, toPos.x, toPos.y);
-        return;
-      case 'inactive':
-        graphics.lineStyle(1, EDGE_INACTIVE, 0.45);
-        graphics.lineBetween(fromPos.x, fromPos.y, toPos.x, toPos.y);
-        return;
-      case 'locked':
-        this.drawLockedEdge(graphics, fromPos, toPos);
-        return;
+    if (!edgeUsesTexturedStrip(state)) {
+      graphics.lineStyle(edgeDisplayWeight(state), edgeTint(state), edgeAlpha(state));
+      graphics.lineBetween(fromPos.x, fromPos.y, toPos.x, toPos.y);
+      return;
+    }
+    if (state === 'locked') {
+      this.drawLockedSegments(graphics, fromPos, toPos);
+      return;
+    }
+    const weight = edgeDisplayWeight(state);
+    const tint = edgeTint(state);
+    const alpha = edgeAlpha(state);
+    const strip = drawEdgeStrip(this, this.nodesContainer, fromPos.x, fromPos.y, toPos.x, toPos.y, weight, tint, alpha);
+    if (!strip) {
+      graphics.lineStyle(weight, tint, alpha);
+      graphics.lineBetween(fromPos.x, fromPos.y, toPos.x, toPos.y);
     }
   }
 
-  /** Locked/destroyed edge: dark red, with a visible break + X at the midpoint
-   *  so a dead branch reads as "clearly dead" rather than merely dim. */
-  private drawLockedEdge(
+  /** Locked/destroyed edge: dark red groove strip, broken at the midpoint
+   *  (a visible gap) so a dead branch reads as "clearly dead" rather than
+   *  merely dim — the X mark itself is drawn later by `drawLockedMarks`. */
+  private drawLockedSegments(
     graphics: Phaser.GameObjects.Graphics,
     fromPos: SpotPosition,
     toPos: SpotPosition,
@@ -404,19 +445,38 @@ export class TreeScene extends Phaser.Scene {
     const farX = midX + ux * gap;
     const farY = midY + uy * gap;
 
-    graphics.lineStyle(2, EDGE_LOCKED, 0.85);
-    graphics.lineBetween(fromPos.x, fromPos.y, nearX, nearY);
-    graphics.lineBetween(farX, farY, toPos.x, toPos.y);
+    const weight = edgeDisplayWeight('locked');
+    const tint = edgeTint('locked');
+    const alpha = edgeAlpha('locked');
 
-    graphics.lineStyle(2, EDGE_LOCKED, 1);
-    graphics.lineBetween(midX - 6, midY - 6, midX + 6, midY + 6);
-    graphics.lineBetween(midX - 6, midY + 6, midX + 6, midY - 6);
+    const near = drawEdgeStrip(this, this.nodesContainer, fromPos.x, fromPos.y, nearX, nearY, weight, tint, alpha);
+    const far = drawEdgeStrip(this, this.nodesContainer, farX, farY, toPos.x, toPos.y, weight, tint, alpha);
+    if (!near || !far) {
+      graphics.lineStyle(weight, tint, alpha);
+      if (!near) graphics.lineBetween(fromPos.x, fromPos.y, nearX, nearY);
+      if (!far) graphics.lineBetween(farX, farY, toPos.x, toPos.y);
+    }
+  }
+
+  /** Final pass: draws every locked edge's midpoint X in one `Graphics`
+   *  object added last, so the dead-branch cue always sits on top of every
+   *  strip/line drawn this frame — the critical gameplay signal (bible §5:
+   *  "don't lose it") can never end up obscured by draw-order accidents. */
+  private drawLockedMarks(midpoints: readonly SpotPosition[]): void {
+    const marks = this.add.graphics();
+    this.nodesContainer.add(marks);
+    marks.lineStyle(2, EDGE_LOCKED, 1);
+    for (const { x, y } of midpoints) {
+      marks.lineBetween(x - 6, y - 6, x + 6, y + 6);
+      marks.lineBetween(x - 6, y + 6, x + 6, y - 6);
+    }
   }
 
   private renderSpotBox(spot: SpotView, pos: SpotPosition): void {
     const isArmed = this.armedSpotId === spot.id;
     const purchasable = spot.status === 'affordable';
     const owned = spot.owned.length > 0;
+    const visualState = socketVisualState(spot.status, owned, isArmed);
 
     let bgColor = NODE_BG_LOCKED;
     let borderColor = BORDER_COLOR;
@@ -440,13 +500,29 @@ export class TreeScene extends Phaser.Scene {
       glyphColor = OWNED_COLOR;
     }
 
-    // Round node — glyph is the icon; name / cost / description live in the hover tooltip.
+    // Round node fill — glyph is the icon; name / cost / description live in
+    // the hover tooltip. Added to the container immediately (not batched
+    // into `extras` below) so the socket ring drawn right after it stacks
+    // correctly on top; the ring supplies the border art when its texture is
+    // loaded, so `bg`'s own stroke only fires as a fallback (mirrors
+    // `ui/panels.ts`'s `Frame` — framed pieces skip the flat-rect stroke).
     const bg = this.add
       .circle(pos.x, pos.y, NODE_RADIUS, bgColor)
-      .setStrokeStyle(2, borderColor)
       .setAlpha(alpha)
       .setInteractive({ useHandCursor: purchasable })
       .setName(`treeNode:${spot.id}`);
+    this.nodesContainer.add(bg);
+
+    const ring = drawSocketRing(
+      this,
+      this.nodesContainer,
+      pos.x,
+      pos.y,
+      SOCKET_RING_DISPLAY_SIZE,
+      socketRingTint(visualState),
+      alpha,
+    );
+    if (!ring) bg.setStrokeStyle(2, borderColor);
 
     bg.on('pointerover', () => this.showTooltip(spot, pos));
     bg.on('pointerout', () => this.hideTooltip());
@@ -458,7 +534,7 @@ export class TreeScene extends Phaser.Scene {
     const glyphText = this.add
       .text(pos.x, pos.y - (spot.chainLength > 1 ? 2 : 0), glyph, {
         fontFamily: FONT,
-        fontSize: '18px',
+        fontSize: FONT_SIZE_SM,
         fontStyle: 'bold',
         color: glyphColor,
         stroke: '#0a0605',
@@ -466,8 +542,9 @@ export class TreeScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setAlpha(alpha);
+    this.nodesContainer.add(glyphText);
 
-    const extras: Phaser.GameObjects.GameObject[] = [bg, glyphText];
+    const extras: Phaser.GameObjects.GameObject[] = [];
 
     // Rank pips for multi-rank spots (replaces on-node cost/rank text).
     if (spot.chainLength > 1) {
@@ -482,10 +559,13 @@ export class TreeScene extends Phaser.Scene {
         extras.push(pip);
       }
     } else if (spot.status === 'exclusive-locked') {
+      // XS (8px), not SM: this mark sits right at the node edge (r=20,
+      // GRID_ROW_HEIGHT=70 between rows) alongside pips/the level tag below —
+      // SM would start crowding neighboring on-node annotations.
       const lockMark = this.add
         .text(pos.x, pos.y + 11, '×', {
           fontFamily: FONT,
-          fontSize: '11px',
+          fontSize: FONT_SIZE_XS,
           color: DANGER_COLOR,
         })
         .setOrigin(0.5)
@@ -504,10 +584,13 @@ export class TreeScene extends Phaser.Scene {
     // addition to reading `locked`/`unaffordable` like any other gate.
     if (spot.next?.minLevel !== undefined && spot.status !== 'complete') {
       const levelLocked = levelForXp(this.save.xp) < spot.next.minLevel;
+      // XS (8px), not SM: sits just below the node (pos.y + NODE_RADIUS + 9)
+      // with only GRID_ROW_HEIGHT=70 between lattice rows — SM risks
+      // crowding the next row's node.
       const tag = this.add
         .text(pos.x, pos.y + NODE_RADIUS + 9, `Lv ${spot.next.minLevel}`, {
           fontFamily: FONT,
-          fontSize: '10px',
+          fontSize: FONT_SIZE_XS,
           color: levelLocked ? DANGER_COLOR : DIM_COLOR,
         })
         .setOrigin(0.5)
@@ -647,9 +730,9 @@ export class TreeScene extends Phaser.Scene {
       .setDepth(HUD_DEPTH)
       .setName('treeBack');
     this.add
-      .text(x, y, 'Back', { fontFamily: FONT, fontSize: '14px', color: TEXT_COLOR })
+      .text(x, y, 'Back', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: TEXT_COLOR })
       .setOrigin(0.5)
       .setDepth(HUD_DEPTH);
-    rect.on('pointerdown', () => this.scene.start(SceneKeys.Hub));
+    rect.on('pointerdown', () => fadeToScene(this, SceneKeys.Hub));
   }
 }

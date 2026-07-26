@@ -22,6 +22,7 @@ import { getEncounterById } from '../data/encounters';
 import { GCD_MS, SPELLS } from '../data/constants';
 import { Bar } from '../ui/bar';
 import { UnitSprite } from '../ui/unitSprite';
+import { battlefieldForEncounter, buildBattlefield, platformStanceY } from '../ui/battlefield';
 import {
   attackAnimKeyForUnit,
   HEALER_CAST_RELEASE_LEAD_MS,
@@ -39,7 +40,15 @@ import {
   presentationForUnit,
 } from '../ui/sprites';
 import { SpellBar } from '../ui/spellBar';
+import { CAST_BAR_FRAME_TEXTURE_KEY } from '../ui/spellSprites';
+import { addBanner, addPanel, addButton } from '../ui/panels';
+import {
+  OVERLAY_DEPTH, OVERLAY_ALPHA, OVERLAY_FADE_MS, PANEL_WIDTH, PANEL_HEIGHT, PANEL_SLIDE_OFFSET,
+  PANEL_SLIDE_DELAY_MS, PANEL_SLIDE_MS, TITLE_DELAY_MS, TITLE_REVEAL_MS, XP_DELAY_MS, XP_REVEAL_MS,
+  GLYPH_DELAY_MS, GLYPH_REVEAL_MS, GLYPH_CELL, GLYPH_COLOR, RETURN_DELAY_MS, RETURN_REVEAL_MS,
+} from '../ui/resultPanel';
 import { CombatLog } from '../ui/combatLog';
+import { FONT, FONT_SIZE_XS, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG, PALETTE_NUM } from '../ui/theme';
 import {
   ManaSpendAura,
   shakeBossImpact,
@@ -61,6 +70,8 @@ import { buildRunSummary, hasBuildGlyph } from '../ui/runSummary';
 import { drawBuildGlyph } from '../ui/buildGlyph';
 import { detectCloseCall, pickBanterLine, type BanterSpeaker, type BanterTrigger } from '../data/banter';
 import { showSpeechBubble } from '../ui/speechBubble';
+import { portraitTextureKey, revealResultPortrait } from '../ui/portraitSprites';
+import { chunkyWipeIn, fadeToScene } from '../ui/transitions';
 import { MOB_REGISTRY } from '../data/mobs';
 import { ENEMY_ABILITY_REGISTRY } from '../data/enemyAbilities';
 import type { BossTelegraphCue } from '../data/content/types';
@@ -93,9 +104,6 @@ const PARTY_SLOT_LEFT = 80;
 const PARTY_SLOT_RIGHT = 380;
 const ENEMY_SLOT_LEFT = 580;
 const ENEMY_SLOT_RIGHT = 880;
-const GROUND_LINE_COLOR = 0x3a2a22;
-const GROUND_LINE_WIDTH = 2;
-const GROUND_LINE_MARGIN = 40;
 
 /** Engine party order is tank → dps1 → dps2 → healer (unchanged); visual left→right
  *  order is healer · dps2 · dps1 · tank so the tank stands nearest the enemy line
@@ -160,36 +168,12 @@ const PACE_TOGGLE_Y = VIEW_HEIGHT - 8;
 
 /** Cast-cancel toast (handoff §D UI row): short-lived line just above the player cast bar. */
 const TOAST_Y = 368;
-const TOAST_FONT = 'monospace';
-const TOAST_FONT_SIZE = '14px';
+const TOAST_FONT_SIZE = FONT_SIZE_SM;
 const TOAST_COLOR = '#e8d8c8';
 const TOAST_FADE_MS = 1500;
 
-const OVERLAY_DEPTH = 1000;
-const OVERLAY_ALPHA = 0.85;
-const OVERLAY_FADE_MS = 300;
-
-// Wipe/victory run summary panel (locked: docs/v0.3-handoff.md "Wipe / victory
-// summary") — short slide-in transition (~0.5-1.0s total) over the dimmed-but-
-// visible party, then outcome + XP + build glyph reveal in sequence, Return
-// last (~1s in, safely inside journey's 2s poll cadence).
-const PANEL_WIDTH = 420;
-const PANEL_HEIGHT = 260;
-const PANEL_SLIDE_OFFSET = 50;
-const PANEL_SLIDE_DELAY_MS = 120;
-const PANEL_SLIDE_MS = 500;
-const TITLE_DELAY_MS = 520;
-const TITLE_REVEAL_MS = 220;
-const XP_DELAY_MS = 660;
-const XP_REVEAL_MS = 220;
-const GLYPH_DELAY_MS = 780;
-const GLYPH_REVEAL_MS = 240;
-const GLYPH_CELL = 20;
-const GLYPH_COLOR = 0xfff2df;
-const RETURN_DELAY_MS = 940;
-const RETURN_REVEAL_MS = 220;
-
-const HUD_FONT = 'monospace';
+// Wipe/victory run summary panel layout/timing constants moved to
+// ui/resultPanel.ts (max-lines cap) — see that file for the choreography note.
 
 // v0.3 chunk G: party banter (docs/v0.3-handoff.md "Banter"). Bubble anchor Y is the
 // speaker's home Y minus enough clearance to clear its always-on overlay stack (HP bar +
@@ -208,12 +192,12 @@ function slotX(index: number, count: number, left: number, right: number): numbe
   return left + ((right - left) * index) / (count - 1);
 }
 
-/** Home Y for a unit of `height` so its bottom edge (feet) sits on GROUND_Y — units have
- *  different heights (mercs 112 / healer 64 / trash 72 / Kenney smaller), so their container
- *  centers (which is what x/y position) differ even though they all read as standing on
- *  one ground line. */
+/** Home Y for a unit of `height` so its bottom edge (feet) sits at the platform's widest
+ *  point (platformStanceY, not GROUND_Y — that still anchors the arch/haze backdrop math
+ *  in battlefield.ts) — units have different heights, so their centers differ even though
+ *  they all read as standing on one line. */
 function groundAnchorY(height: number): number {
-  return GROUND_Y - height / 2;
+  return platformStanceY(GROUND_Y) - height / 2;
 }
 
 /** combatEnded fires only on a real end, but its status field is the full CombatStatus union. */
@@ -316,7 +300,13 @@ export class CombatScene extends Phaser.Scene {
       relics: relicsById(save.relicIds),
     });
 
-    this.buildGroundLine();
+    buildBattlefield(this, battlefieldForEncounter(this.sceneData.encounterId), {
+      viewWidth: VIEW_WIDTH,
+      viewHeight: VIEW_HEIGHT,
+      groundY: GROUND_Y,
+      partyCenterX: (PARTY_SLOT_LEFT + PARTY_SLOT_RIGHT) / 2,
+      enemyCenterX: (ENEMY_SLOT_LEFT + ENEMY_SLOT_RIGHT) / 2,
+    });
     this.buildPartySprites();
     this.rebuildEnemies(this.engine.state.enemies);
     this.buildHud();
@@ -356,12 +346,12 @@ export class CombatScene extends Phaser.Scene {
     this.lastHealerMana = this.engine.state.party.find((u) => u.role === 'healer')?.mana ?? null;
 
     this.syncView();
+    chunkyWipeIn(this, VIEW_WIDTH, VIEW_HEIGHT); // chunk 6: "into battle" reveal
   }
 
-  /** Data-driven wind-up cue (handoff "Boss telegraphs") for this encounter's boss ability,
-   *  looked up from the same authoring catalogs the content pipeline compiled from — the
-   *  compiled EncounterDef/BossCastDef never carries this field (presentation-only, and the
-   *  engine stays untouched), so it's resolved here via the boss's stable mobId. */
+  /** Data-driven wind-up cue (handoff "Boss telegraphs") for this encounter's boss ability, looked
+   *  up from the same authoring catalogs the content pipeline compiled from — the compiled
+   *  EncounterDef/BossCastDef never carries this field (presentation-only, engine untouched). */
   private resolveBossTelegraphCue(): BossTelegraphCue {
     const bossMob = MOB_REGISTRY[this.encounter.boss.id];
     const abilityId = bossMob?.abilityIds[0];
@@ -396,20 +386,6 @@ export class CombatScene extends Phaser.Scene {
   }
 
   // ---- setup --------------------------------------------------------------
-
-  /** One flat line under the battle line so the facing line reads as standing on shared
-   *  ground (handoff §A, optional) — drawn once behind everything else, no animation. */
-  private buildGroundLine(): void {
-    this.add
-      .rectangle(
-        VIEW_WIDTH / 2,
-        GROUND_Y,
-        ENEMY_SLOT_RIGHT - PARTY_SLOT_LEFT + GROUND_LINE_MARGIN * 2,
-        GROUND_LINE_WIDTH,
-        GROUND_LINE_COLOR,
-      )
-      .setDepth(-1);
-  }
 
   private buildPartySprites(): void {
     const party = this.engine.state.party;
@@ -520,15 +496,15 @@ export class CombatScene extends Phaser.Scene {
 
   private buildHud(): void {
     this.waveText = this.add
-      .text(VIEW_WIDTH / 2, WAVE_TEXT_Y, '', { fontFamily: HUD_FONT, fontSize: '16px', color: '#e8d8c8' })
+      .text(VIEW_WIDTH / 2, WAVE_TEXT_Y, '', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: '#e8d8c8' })
       .setOrigin(0.5, 0);
     this.rewardsText = this.add
-      .text(REWARDS_X, REWARDS_Y, '', { fontFamily: HUD_FONT, fontSize: '14px', color: '#f2c14e' })
+      .text(REWARDS_X, REWARDS_Y, '', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: '#f2c14e' })
       .setOrigin(0, 0);
     this.focusCalloutText = this.add
       .text(VIEW_WIDTH / 2, FOCUS_CALLOUT_Y, '', {
-        fontFamily: HUD_FONT,
-        fontSize: '15px',
+        fontFamily: FONT,
+        fontSize: FONT_SIZE_SM,
         color: '#e05a4e',
       })
       .setStroke('#0a0605', 3)
@@ -536,14 +512,15 @@ export class CombatScene extends Phaser.Scene {
       .setDepth(90)
       .setVisible(false);
 
-    const bannerBg = this.add
-      .rectangle(0, 0, WAVE_BANNER_WIDTH, WAVE_BANNER_HEIGHT, 0x241a15, 0.92)
-      .setStrokeStyle(2, 0x8a7868);
+    // Chunk 4 (bible item 4): shared panel/button/banner kit — ui/panels.ts.
+    // Local (0,0) position: this frame's own container is re-parented into
+    // `waveBanner` below, which owns the on-screen position + show/hide tween.
+    const bannerFrame = addBanner(this, 0, 0, WAVE_BANNER_WIDTH, WAVE_BANNER_HEIGHT, { fillAlpha: 0.92 });
     this.waveBannerText = this.add
-      .text(0, 0, '', { fontFamily: HUD_FONT, fontSize: '22px', color: '#e8d8c8' })
+      .text(0, 0, '', { fontFamily: FONT, fontSize: FONT_SIZE_MD, color: '#e8d8c8' })
       .setOrigin(0.5);
     this.waveBanner = this.add
-      .container(VIEW_WIDTH / 2, WAVE_BANNER_Y, [bannerBg, this.waveBannerText])
+      .container(VIEW_WIDTH / 2, WAVE_BANNER_Y, [bannerFrame.container, this.waveBannerText])
       .setDepth(80)
       .setAlpha(0);
   }
@@ -552,6 +529,9 @@ export class CombatScene extends Phaser.Scene {
     const centerX = VIEW_WIDTH / 2;
 
     const playerBarX = centerX - PLAYER_CAST_BAR_WIDTH / 2;
+    // Framed (chunk 3, bible item 3) — GCD sliver and boss cast sliver stay
+    // unframed (too thin to read a border at their height; see pixellab-3
+    // ledger). `undefined` keeps Bar's own default bg color.
     this.playerCastBar = new Bar(
       this,
       playerBarX,
@@ -559,10 +539,12 @@ export class CombatScene extends Phaser.Scene {
       PLAYER_CAST_BAR_WIDTH,
       PLAYER_CAST_BAR_HEIGHT,
       PLAYER_CAST_FILL_COLOR,
+      undefined,
+      CAST_BAR_FRAME_TEXTURE_KEY,
     );
     this.playerCastBar.setVisible(false);
     this.playerCastLabel = this.add
-      .text(centerX, PLAYER_CAST_BAR_Y, '', { fontFamily: HUD_FONT, fontSize: '13px', color: '#1a1210' })
+      .text(centerX, PLAYER_CAST_BAR_Y, '', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: '#1a1210' })
       .setOrigin(0.5)
       .setVisible(false);
 
@@ -570,11 +552,14 @@ export class CombatScene extends Phaser.Scene {
     this.gcdBar = new Bar(this, playerBarX, gcdY, PLAYER_CAST_BAR_WIDTH, GCD_BAR_HEIGHT, GCD_FILL_COLOR);
     this.gcdBar.setVisible(false);
 
+    // XS (8px), not the SM snap: this label sits just above the spell-bar
+    // buttons (queuedY ≈ 419 vs button tops ≈ 420 — see SPELL_BAR_Y comment
+    // above) with almost no clearance; a 16px line would clip into the row.
     const queuedY = gcdY + GCD_BAR_HEIGHT / 2 + QUEUED_SPELL_GAP;
     this.queuedSpellLabel = this.add
       .text(centerX, queuedY, '', {
-        fontFamily: HUD_FONT,
-        fontSize: '12px',
+        fontFamily: FONT,
+        fontSize: FONT_SIZE_XS,
         color: QUEUED_SPELL_COLOR,
       })
       .setOrigin(0.5)
@@ -598,7 +583,7 @@ export class CombatScene extends Phaser.Scene {
   /** Short-lived status line for castCancelled (handoff §D) — only toast source in the scene. */
   private buildToast(): void {
     this.toastText = this.add
-      .text(VIEW_WIDTH / 2, TOAST_Y, '', { fontFamily: TOAST_FONT, fontSize: TOAST_FONT_SIZE, color: TOAST_COLOR })
+      .text(VIEW_WIDTH / 2, TOAST_Y, '', { fontFamily: FONT, fontSize: TOAST_FONT_SIZE, color: TOAST_COLOR })
       .setOrigin(0.5)
       .setAlpha(0);
   }
@@ -1051,10 +1036,9 @@ export class CombatScene extends Phaser.Scene {
   // ---- end of combat -------------------------------------------------------------
 
   /**
-   * v0.3 chunk G: shows one speech bubble above `speaker`'s sprite with a banter line for
-   * (trigger, speaker) — subclass comes from the already-loaded save (`this.save.subclass`),
-   * never read from tree/save internals here. No-op if the speaker's sprite is gone (never
-   * happens for tank/healer, who persist for the whole fight, but keeps this call site safe).
+   * v0.3 chunk G: shows one speech bubble (chunk 5: + speaker bust) above `speaker`'s sprite
+   * with a banter line for (trigger, speaker) — subclass comes from the already-loaded save,
+   * never read from tree/save internals here. No-op if the speaker's sprite is gone (safe).
    */
   private fireBanterBubble(trigger: BanterTrigger, speaker: BanterSpeaker): void {
     const sprite = this.partySprites.get(speaker);
@@ -1072,6 +1056,7 @@ export class CombatScene extends Phaser.Scene {
       text: line,
       viewWidth: VIEW_WIDTH,
       viewHeight: VIEW_HEIGHT,
+      portraitTextureKey: portraitTextureKey(speaker), // chunk 5: no-op if texture missing.
     });
   }
 
@@ -1108,13 +1093,16 @@ export class CombatScene extends Phaser.Scene {
       .setAlpha(0);
     this.tweens.add({ targets: backdrop, alpha: OVERLAY_ALPHA, duration: OVERLAY_FADE_MS });
 
-    const panel = this.add
-      .rectangle(centerX, centerY - PANEL_SLIDE_OFFSET, PANEL_WIDTH, PANEL_HEIGHT, 0x241a15, 0.96)
-      .setStrokeStyle(2, 0x8a7868)
-      .setDepth(OVERLAY_DEPTH + 1)
-      .setAlpha(0);
+    // Chunk 4 (bible item 4): framed result panel — ui/panels.ts. The panel's
+    // own Container is what the existing slide-in tween drives (y + alpha),
+    // same choreography as the old flat rect.
+    const panel = addPanel(this, centerX, centerY - PANEL_SLIDE_OFFSET, PANEL_WIDTH, PANEL_HEIGHT, {
+      fillAlpha: 0.96,
+      depth: OVERLAY_DEPTH + 1,
+    });
+    panel.container.setAlpha(0);
     this.tweens.add({
-      targets: panel,
+      targets: panel.container,
       y: centerY,
       alpha: 1,
       delay: PANEL_SLIDE_DELAY_MS,
@@ -1122,11 +1110,13 @@ export class CombatScene extends Phaser.Scene {
       ease: 'Quad.easeOut',
     });
 
+    revealResultPortrait(this, status, centerX, centerY, PANEL_WIDTH, OVERLAY_DEPTH + 2, { delay: TITLE_DELAY_MS, duration: TITLE_REVEAL_MS }); // chunk 5 bust
+
     if (summary.outcomeLabel !== null) {
       const titleText = this.add
         .text(centerX, centerY - 80, summary.outcomeLabel, {
-          fontFamily: HUD_FONT,
-          fontSize: '36px',
+          fontFamily: FONT,
+          fontSize: FONT_SIZE_LG,
           color: '#f2c14e',
         })
         .setOrigin(0.5)
@@ -1137,8 +1127,8 @@ export class CombatScene extends Phaser.Scene {
 
     const xpText = this.add
       .text(centerX, centerY - 28, `XP +${summary.xpGained}`, {
-        fontFamily: HUD_FONT,
-        fontSize: '18px',
+        fontFamily: FONT,
+        fontSize: FONT_SIZE_SM,
         color: '#e8d8c8',
       })
       .setOrigin(0.5)
@@ -1148,7 +1138,7 @@ export class CombatScene extends Phaser.Scene {
 
     if (hasBuildGlyph(summary.glyph)) {
       const glyphLabel = this.add
-        .text(centerX, centerY + 8, 'BUILD', { fontFamily: HUD_FONT, fontSize: '11px', color: '#a89888' })
+        .text(centerX, centerY + 8, 'BUILD', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: '#a89888' })
         .setOrigin(0.5)
         .setDepth(OVERLAY_DEPTH + 2)
         .setAlpha(0);
@@ -1168,6 +1158,8 @@ export class CombatScene extends Phaser.Scene {
       });
     }
 
+    // combatReturn keeps its exact original rect (hit area/name unchanged) —
+    // ui/panels.ts draws framed chrome around it (chunk-3 SpellButton pattern).
     const returnButton = this.add
       .rectangle(centerX, centerY + 105, 180, 40, 0x3a2a22)
       .setStrokeStyle(1, 0x0a0605)
@@ -1177,11 +1169,17 @@ export class CombatScene extends Phaser.Scene {
       .setAlpha(0)
       .on('pointerdown', () => {
         const combatResult: CombatResult = { encounterId: this.sceneData.encounterId, status, xp };
-        this.scene.start(this.sceneData.returnTo, { combatResult });
+        fadeToScene(this, this.sceneData.returnTo, { combatResult });
       });
+    const returnFrame = addButton(this, centerX, centerY + 105, 180, 40, {
+      fillColor: PALETTE_NUM.panelLight,
+      depth: OVERLAY_DEPTH + 2,
+      hitRect: returnButton,
+    });
+    returnFrame.container.setAlpha(0);
 
     const returnText = this.add
-      .text(centerX, centerY + 105, 'Return', { fontFamily: HUD_FONT, fontSize: '16px', color: '#e8d8c8' })
+      .text(centerX, centerY + 105, 'Return', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: '#e8d8c8' })
       .setOrigin(0.5)
       .setDepth(OVERLAY_DEPTH + 3)
       .setAlpha(0);
@@ -1189,7 +1187,7 @@ export class CombatScene extends Phaser.Scene {
     // All result objects (especially combatReturn) exist immediately; only
     // their presentation is staged, so semantic journey lookup remains stable.
     this.tweens.add({
-      targets: [returnButton, returnText],
+      targets: [returnButton, returnFrame.container, returnText],
       alpha: 1,
       delay: RETURN_DELAY_MS,
       duration: RETURN_REVEAL_MS,

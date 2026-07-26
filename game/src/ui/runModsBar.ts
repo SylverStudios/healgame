@@ -8,6 +8,7 @@ import Phaser from 'phaser';
 import type { RunModDisplay, RunModKind } from '../data/runMods';
 import { relicGlyphColorById } from './relicColors';
 import { relicTextureKey } from './relicSprites';
+import { FONT, FONT_SIZE_SM } from './theme';
 
 /** Half of the on-screen relic icon (64→32 display = 1:1 of the 32px art grid). */
 const ICON_RADIUS = 16;
@@ -24,7 +25,6 @@ const TOOLTIP_DESC_COLOR = '#e8d8c8';
 const TOOLTIP_KIND_COLOR = '#a89888';
 const TOOLTIP_MAX_WIDTH = 220;
 const TOOLTIP_DEPTH = 300;
-const FONT = 'monospace';
 
 /** Oath diamonds keep distinct subclass hues; relics use role scales. */
 const OATH_GLYPH_COLOR: Record<string, number> = {
@@ -101,17 +101,17 @@ export class RunModsBar {
       .setStrokeStyle(1, TOOLTIP_BORDER);
     this.kindText = scene.add.text(0, 0, '', {
       fontFamily: FONT,
-      fontSize: '11px',
+      fontSize: FONT_SIZE_SM,
       color: TOOLTIP_KIND_COLOR,
     });
     this.nameText = scene.add.text(0, 0, '', {
       fontFamily: FONT,
-      fontSize: '14px',
+      fontSize: FONT_SIZE_SM,
       color: TOOLTIP_NAME_COLOR,
     });
     this.descText = scene.add.text(0, 0, '', {
       fontFamily: FONT,
-      fontSize: '12px',
+      fontSize: FONT_SIZE_SM,
       color: TOOLTIP_DESC_COLOR,
       wordWrap: { width: TOOLTIP_MAX_WIDTH },
     });

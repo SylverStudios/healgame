@@ -61,7 +61,9 @@ game/src/
   save/     SaveData + localStorage wrapper (injectable store for tests)
   scenes/   Phaser scenes; keys in scenes/keys.ts; CombatScene exports
             CombatSceneData / CombatResult
-  ui/       placeholder widgets (Bar, UnitSprite, SpellBar)
+  ui/       themed presentation widgets (Bar, UnitSprite, SpellBar, panels,
+            battlefield, transitions, portraits, tree sockets — see the
+            temp-art exception list above for what's generated vs code-drawn)
   debug/    journey test hooks (`window.__healgame.locate` / `list`)
   scripts/  verify.mjs (quality gate), smoke.mjs, journey.mjs (Playwright 1.49.1)
 ```
@@ -81,17 +83,48 @@ game/src/
 - **Pure logic first**: meta/combat/tree behavior lives in tested pure
   functions; scenes are thin wiring that call them and `saveGame()`
   immediately after any mutation. New logic gets colocated `*.test.ts`.
-- **Temp art only, few exceptions**: combat units render Kenney Tiny Dungeon
-  16×16 tiles (CC0; sheet in `game/public/assets/`, unit→tile mapping in
-  `game/src/ui/sprites.ts`, `pixelArt: true`) plus PixelLab party/trash
-  stills; the party healer is the 32×32 armored-paladin sheet
-  (`assets/units/healer/`, source in `art/source/armored-paladin/`); heal
-  VFX uses the user-authored sheet (`heal-vfx.png`); relic icons are
-  hand-authored 32×32 stills (`assets/relics/`, `ui/relicSprites.ts`); and
-  background audio is a placeholder generated loop (`assets/audio/`, see its
-  README). Target density for new character art is **32×32** (bosses may be
-  larger canvases at the same density). Everything else stays rects, bars,
-  monospace text, dark palette (`#1a1210` bg) — reject polish creep.
+- **Temp art only, few exceptions**: the exceptions below are the only
+  departures from flat rects/bars/monospace/`#1a1210` bg — reject polish
+  creep anywhere else.
+  - Combat units render Kenney Tiny Dungeon 16×16 tiles (CC0; sheet in
+    `game/public/assets/`, unit→tile mapping in `game/src/ui/sprites.ts`,
+    `pixelArt: true`) plus PixelLab party/trash stills; the party healer is
+    the 32×32 armored-paladin sheet (`assets/units/healer/`, source in
+    `art/source/armored-paladin/`). Target density for new character art is
+    **32×32** (bosses may be larger canvases at the same density).
+  - Heal VFX uses the user-authored sheet (`heal-vfx.png`).
+  - Relic icons are hand-authored 32×32 stills (`assets/relics/`,
+    `ui/relicSprites.ts`).
+  - Background audio is a placeholder generated loop (`assets/audio/`, see
+    its README).
+  - UI/HUD text renders in the bundled 16px-native pixel font
+    (`HealgameIron`, `game/public/assets/fonts/`, loaded via `ui/theme.ts`
+    `fontsReady`) — digits currently fall back to monospace, and the debug
+    combat log (`ui/combatLog.ts`) intentionally stays monospace.
+  - Combat renders a layered battlefield (`ui/battlefield.ts`,
+    `assets/battlefields/<dungeonId>/`): code-drawn sky gradient/silhouette/
+    ember haze plus PixelLab structure props and platform slices under the
+    party/enemy lines. All 6 dungeons have their own variant — Ash Gate is
+    the original; Iron Pass, Cinder Vault, Verdant Rift, Black Choir, and
+    The Maw are `create_object_state` recolors of it — resolved
+    per-encounter through `battlefieldForEncounter()`.
+  - Combat controls use pixel-art chrome (`assets/ui/`): spell/cooldown
+    button frames, keycap chips, the player cast-bar frame, and 16×16
+    spell/cooldown icons (registry in `ui/spellSprites.ts`, glyph-char
+    fallback for unmapped ids).
+  - Meta scenes + the combat result overlay use the shared
+    panel/button/banner chrome (`ui/panels.ts`: code-drawn corner brackets +
+    a PixelLab iron edge band, `assets/ui/panels/`), including the Tutorial
+    and Hub title wordmarks (gold text + offset shadow, no new assets).
+  - Party bust portraits (`assets/units/portraits/`, `ui/portraitSprites.ts`)
+    show beside banter bubbles, on the tutorial screen, and on the combat
+    result panel (victory=healer, wipe=tank).
+  - Talent-tree node sockets are a PixelLab 20×20 bezel ring tinted per
+    state (`ui/treeSockets.ts`, `assets/ui/tree/socket-ring.png`); edges are
+    a PixelLab 48×8 groove strip stretched/rotated per edge and tinted per
+    `EdgeState` (`assets/ui/tree/edge-strip.png`).
+  - Scene changes fade via `ui/transitions.ts` (camera fade, or a blocky
+    Rectangle-grid wipe entering combat) — code-only, no new assets.
 - **Scope discipline**: reject additions outside the active planning handoff
   (or, if none, outside what [`docs/CHANGELOG.md`](docs/CHANGELOG.md) and
   [`docs/poc-qa.md`](docs/poc-qa.md) already shipped). poc-spec §9 is the PoC

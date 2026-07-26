@@ -4,7 +4,7 @@
  * dungeons from a vertical challenge list (current uncleared dungeon marked
  * CURRENT). Talent Tree / Spellbook sit above the dungeon stack. Run mods
  * (oath + relics) live in the shared top-left RunModsBar. Temp art only —
- * panels + text buttons, dark palette, monospace.
+ * panels + text buttons, dark palette, pixel font (ui/theme.ts).
  */
 
 import Phaser from 'phaser';
@@ -27,6 +27,9 @@ import { drawBuildGlyph } from '../ui/buildGlyph';
 import type { CombatResult, CombatSceneData } from './CombatScene';
 import type { DungeonDef } from '../data/content/types';
 import { loadTelemetry, recordReset, sendPlaytestMail } from '../telemetry';
+import { FONT, FONT_SIZE_SM, FONT_SIZE_LG, PALETTE, PALETTE_NUM } from '../ui/theme';
+import { addBanner, addButton, addPanel } from '../ui/panels';
+import { COMBAT_ENTRY_FADE_OUT_MS, fadeInOnCreate, fadeToScene } from '../ui/transitions';
 
 interface HubSceneData {
   combatResult?: CombatResult;
@@ -43,7 +46,6 @@ const ACCENT_COLOR = '#f2c14e';
 const DIM_COLOR = '#a89888';
 const DANGER_COLOR = '#e05a4e';
 const CLEARED_COLOR = '#7ad67a';
-const FONT = 'monospace';
 
 /** Wide enough for full dungeon names without spilling; vertical stack only. */
 const DUNGEON_BUTTON_WIDTH = 440;
@@ -101,11 +103,29 @@ export class HubScene extends Phaser.Scene {
     }
 
     if (save.pendingRelicOffers.length > 0) {
-      this.scene.start(SceneKeys.Relic);
+      fadeToScene(this, SceneKeys.Relic);
       return;
     }
 
-    this.add.text(width / 2, 40, 'Hub', { fontFamily: FONT, fontSize: '28px', color: TEXT_COLOR }).setOrigin(0.5);
+    // Chunk 6 (bible item 6): fade in — only once we know Hub is actually
+    // going to render (the pendingRelicOffers redirect above never shows
+    // Hub content, so it skips this).
+    fadeInOnCreate(this);
+
+    // Chunk 4 (bible item 4): shared panel/button/banner kit — ui/panels.ts.
+    addBanner(this, width / 2, 40, 240, 44);
+    // Chunk 9 (bible item 9): same wordmark accent as TutorialScene's title —
+    // gold text over a 1px-offset dark-shadow layer, see that scene for the
+    // full rationale. Kept minimal here since addBanner already frames it.
+    const HUB_TITLE_SHADOW_OFFSET = 2;
+    this.add
+      .text(width / 2 + HUB_TITLE_SHADOW_OFFSET, 40 + HUB_TITLE_SHADOW_OFFSET, 'Hub', {
+        fontFamily: FONT,
+        fontSize: FONT_SIZE_LG,
+        color: PALETTE.borderDark,
+      })
+      .setOrigin(0.5);
+    this.add.text(width / 2, 40, 'Hub', { fontFamily: FONT, fontSize: FONT_SIZE_LG, color: PALETTE.gold }).setOrigin(0.5);
 
     this.buildStats(save);
     this.buildNotices(notices);
@@ -130,11 +150,11 @@ export class HubScene extends Phaser.Scene {
     if (hasBuildGlyph(last.glyph)) {
       drawBuildGlyph(this, last.glyph, { x, y, cell: 6, color: 0xfff2df }).setDepth(5);
       this.add
-        .text(x, y + 22, `+${last.xpGained} xp`, { fontFamily: FONT, fontSize: '11px', color: outcomeColor })
+        .text(x, y + 22, `+${last.xpGained} xp`, { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: outcomeColor })
         .setOrigin(0.5, 0);
     } else {
       this.add
-        .text(x, y, `+${last.xpGained} xp`, { fontFamily: FONT, fontSize: '11px', color: outcomeColor })
+        .text(x, y, `+${last.xpGained} xp`, { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: outcomeColor })
         .setOrigin(0.5, 0);
     }
   }
@@ -146,17 +166,20 @@ export class HubScene extends Phaser.Scene {
     const nextLevelXp = xpForLevel(level + 1);
     const xpLine = `XP ${save.xp}/${nextLevelXp} → Level ${level + 1}${hasZealous ? '' : ` + ${SPELLS.zealousMending.name}`}`;
 
+    // Chunk 4: hub stats block gets a light frame (bible item 4 "hub stats
+    // block if it helps") — sized around the two text lines below.
+    addPanel(this, width / 2, 94, 560, 56, { size: 'sm' });
     this.add
       .text(width / 2, 82, `Level ${level}   •   Talent Points ${availableTalentPoints(save)} unplaced`, {
         fontFamily: FONT,
-        fontSize: '15px',
+        fontSize: FONT_SIZE_SM,
         color: TEXT_COLOR,
       })
       .setOrigin(0.5);
     this.add
       .text(width / 2, 106, xpLine, {
         fontFamily: FONT,
-        fontSize: '13px',
+        fontSize: FONT_SIZE_SM,
         color: hasZealous ? DIM_COLOR : ACCENT_COLOR,
       })
       .setOrigin(0.5);
@@ -165,11 +188,9 @@ export class HubScene extends Phaser.Scene {
   private buildNotices(notices: HubNotice[]): void {
     notices.forEach((notice, i) => {
       const y = NOTICE_START_Y + i * NOTICE_ROW_H;
+      addPanel(this, this.scale.width / 2, y, 440, NOTICE_H, { size: 'sm', fillColor: NOTICE_BG_COLOR });
       this.add
-        .rectangle(this.scale.width / 2, y, 440, NOTICE_H, NOTICE_BG_COLOR)
-        .setStrokeStyle(1, BORDER_COLOR);
-      this.add
-        .text(this.scale.width / 2, y, notice.text, { fontFamily: FONT, fontSize: '14px', color: ACCENT_COLOR })
+        .text(this.scale.width / 2, y, notice.text, { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: ACCENT_COLOR })
         .setOrigin(0.5);
     });
   }
@@ -193,17 +214,17 @@ export class HubScene extends Phaser.Scene {
     // Meta destinations stay above the dungeon stack so a long unlock list
     // never pushes Talent Tree / Spellbook off the 540px canvas.
     this.makeButton(centerX - 160, metaButtonY, 280, META_BUTTON_H, 'Talent Tree', () => {
-      this.scene.start(SceneKeys.Tree);
+      fadeToScene(this, SceneKeys.Tree);
     }, 'hubTree');
     this.makeButton(centerX + 160, metaButtonY, 280, META_BUTTON_H, 'Spellbook', () => {
-      this.scene.start(SceneKeys.Loadout);
+      fadeToScene(this, SceneKeys.Loadout);
     }, 'hubLoadout');
     // v0.3 chunk H: small Settings entry — sits in the unused margin to the
     // right of the meta-button row (right edge of Spellbook is centerX+300,
     // well clear of the canvas edge at 960) so it never competes with the
     // dungeon stack or notice-count-dependent vertical layout above.
     this.makeButton(width - 16 - SETTINGS_BUTTON_W / 2, metaButtonY, SETTINGS_BUTTON_W, SETTINGS_BUTTON_H, 'Settings', () => {
-      this.scene.start(SceneKeys.Settings);
+      fadeToScene(this, SceneKeys.Settings);
     }, 'hubSettings');
 
     const dungeonStartY = metaButtonY + 52;
@@ -217,7 +238,11 @@ export class HubScene extends Phaser.Scene {
           loadout: loadoutFromSave(save),
           returnTo: SceneKeys.Hub,
         };
-        this.scene.start(SceneKeys.Combat, combatData);
+        // Chunk 6: shorter fade-out here — CombatScene.create() plays the
+        // chunky "into battle" wipe reveal (ui/transitions.ts chunkyWipeIn)
+        // instead of a plain fadeInOnCreate, so the two together stay under
+        // the 400ms transition budget.
+        fadeToScene(this, SceneKeys.Combat, combatData, COMBAT_ENTRY_FADE_OUT_MS);
       });
     });
 
@@ -231,7 +256,7 @@ export class HubScene extends Phaser.Scene {
     this.feedbackLabel = this.add
       .text(x, y, '✨ Send Aaron feedback', {
         fontFamily: FONT,
-        fontSize: '13px',
+        fontSize: FONT_SIZE_SM,
         color: DIM_COLOR,
       })
       .setOrigin(0, 0.5)
@@ -259,7 +284,7 @@ export class HubScene extends Phaser.Scene {
     this.statusText = this.add
       .text(this.scale.width / 2, this.scale.height - 48, text, {
         fontFamily: FONT,
-        fontSize: '12px',
+        fontSize: FONT_SIZE_SM,
         color,
       })
       .setOrigin(0.5);
@@ -282,13 +307,20 @@ export class HubScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
       .setName(hubDungeonTargetName(dungeon.id));
     rect.on('pointerdown', onClick);
+    // Chunk 4: framed row — CURRENT keeps its gold-outline accent (state
+    // 'current'), now drawn by ui/panels.ts instead of the rect's own stroke.
+    addButton(this, x, y, DUNGEON_BUTTON_WIDTH, DUNGEON_BUTTON_HEIGHT, {
+      fillColor: bgColor,
+      state: isCurrent ? 'current' : 'normal',
+      hitRect: rect,
+    });
 
     const orderLabel = dungeon.order === 1 ? '' : ` · ${dungeon.order}`;
     const titleColor = isCurrent ? ACCENT_COLOR : TEXT_COLOR;
     this.add
       .text(x - DUNGEON_BUTTON_WIDTH / 2 + 16, y, `${dungeon.name}${orderLabel}`, {
         fontFamily: FONT,
-        fontSize: '16px',
+        fontSize: FONT_SIZE_SM,
         color: titleColor,
       })
       .setOrigin(0, 0.5);
@@ -297,7 +329,7 @@ export class HubScene extends Phaser.Scene {
       this.add
         .text(x + DUNGEON_BUTTON_WIDTH / 2 - 14, y, 'CURRENT', {
           fontFamily: FONT,
-          fontSize: '12px',
+          fontSize: FONT_SIZE_SM,
           fontStyle: 'bold',
           color: ACCENT_COLOR,
         })
@@ -306,7 +338,7 @@ export class HubScene extends Phaser.Scene {
       this.add
         .text(x + DUNGEON_BUTTON_WIDTH / 2 - 14, y, 'cleared', {
           fontFamily: FONT,
-          fontSize: '12px',
+          fontSize: FONT_SIZE_SM,
           color: CLEARED_COLOR,
         })
         .setOrigin(1, 0.5);
@@ -315,7 +347,7 @@ export class HubScene extends Phaser.Scene {
 
   private buildRestartControl(x: number, y: number): void {
     this.restartLabel = this.add
-      .text(x, y, 'Restart (wipe save)', { fontFamily: FONT, fontSize: '14px', color: DIM_COLOR })
+      .text(x, y, 'Restart (wipe save)', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: DIM_COLOR })
       .setOrigin(1, 0.5)
       .setInteractive({ useHandCursor: true })
       .setName('hubRestart');
@@ -352,7 +384,7 @@ export class HubScene extends Phaser.Scene {
     const prompt = this.add
       .text(cx, promptY, 'Please send Aaron feedback first?', {
         fontFamily: FONT,
-        fontSize: '13px',
+        fontSize: FONT_SIZE_SM,
         color: ACCENT_COLOR,
       })
       .setOrigin(0.5)
@@ -361,7 +393,7 @@ export class HubScene extends Phaser.Scene {
     const sendThenWipe = this.add
       .text(cx - 180, optionsY, 'Send, then wipe', {
         fontFamily: FONT,
-        fontSize: '13px',
+        fontSize: FONT_SIZE_SM,
         color: TEXT_COLOR,
       })
       .setOrigin(0.5)
@@ -374,7 +406,7 @@ export class HubScene extends Phaser.Scene {
     const wipeOnly = this.add
       .text(cx, optionsY, 'Wipe without sending', {
         fontFamily: FONT,
-        fontSize: '13px',
+        fontSize: FONT_SIZE_SM,
         color: DANGER_COLOR,
       })
       .setOrigin(0.5)
@@ -385,7 +417,7 @@ export class HubScene extends Phaser.Scene {
     const cancel = this.add
       .text(cx + 180, optionsY, 'Cancel', {
         fontFamily: FONT,
-        fontSize: '13px',
+        fontSize: FONT_SIZE_SM,
         color: DIM_COLOR,
       })
       .setOrigin(0.5)
@@ -415,7 +447,7 @@ export class HubScene extends Phaser.Scene {
   private confirmWipe(): void {
     recordReset();
     resetSave();
-    this.scene.start(SceneKeys.Tutorial);
+    fadeToScene(this, SceneKeys.Tutorial);
   }
 
   private makeButton(
@@ -432,10 +464,11 @@ export class HubScene extends Phaser.Scene {
       .setStrokeStyle(2, BORDER_COLOR)
       .setInteractive({ useHandCursor: true })
       .setName(name);
+    addButton(this, x, y, w, h, { fillColor: PALETTE_NUM.panelLight, hitRect: rect });
     this.add
       .text(x, y, label, {
         fontFamily: FONT,
-        fontSize: '18px',
+        fontSize: FONT_SIZE_SM,
         color: TEXT_COLOR,
         wordWrap: { width: w - 24 },
         align: 'center',
