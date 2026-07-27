@@ -189,11 +189,11 @@ const TANK_LINES: Record<BanterTrigger, readonly string[]> = {
   // Off-design combo — idle-coach belongs to the healer.
   'idle-coach': ['Waiting on you, healer.', 'Spells idle. Move.', 'Wall holds. Cast already.'],
   'tank-coach': [
-    'Click me. I need healing.',
-    "Select me — I'm fading.",
-    'Heal me. Click the tank.',
-    'Tab to me. Patch this up.',
-    'Point at me. Heal. Now.',
+    "I'm open — don't let me fall!",
+    "Mercy — that's YOUR job!",
+    "Wall's cracking. Hold me up!",
+    "Heal me — the line fails!",
+    "I'm fading. Mercy, healer!",
   ],
   // Off-design — low-mana / oom belong to the healer.
   'low-mana': ['Blue runs thin. Pace it.', 'Mana dips. Be careful.', 'Watch your well, healer.'],

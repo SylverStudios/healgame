@@ -85,10 +85,53 @@ describe('pickBanterLine', () => {
     ).toBe('The vow waits on your hand.');
   });
 
-  it('tank-coach tank tells the player to click/select them', () => {
-    const line = pickBanterLine({ trigger: 'tank-coach', speaker: 'tank', subclass: null });
-    expect(line).toBe('Click me. I need healing.');
-    expect(/click|select|tab|point/i.test(line)).toBe(true);
+  it('tank-coach asks the healer for mercy in-character — no UI verbs', () => {
+    const first = pickBanterLine({ trigger: 'tank-coach', speaker: 'tank', subclass: null });
+    expect(first).toBe("I'm open — don't let me fall!");
+
+    // Forbidden UI-tutorial verbs (Wave 3b); keep coaching in-world.
+    const uiVerb = /\b(click|select|mouse|button|press|player|tab)\b|point at/i;
+    // In-character address / heal plea language.
+    const inCharacter = /you|your|mercy|heal|open|fall|wall/i;
+
+    const lines = new Set<string>();
+    for (let i = 0; i < 5; i++) {
+      lines.add(
+        pickBanterLine({
+          trigger: 'tank-coach',
+          speaker: 'tank',
+          subclass: null,
+          rng: () => i / 5,
+        }),
+      );
+    }
+    expect(lines.size).toBe(5);
+    for (const line of lines) {
+      expect(uiVerb.test(line)).toBe(false);
+      expect(inCharacter.test(line)).toBe(true);
+    }
+  });
+
+  it('idle-coach and tank-coach tables never use UI tutorial verbs', () => {
+    const uiVerb = /\b(click|select|mouse|button|press|player|tab)\b|point at/i;
+    const coaches = ['idle-coach', 'tank-coach'] as const;
+    const speakers = ['healer', 'tank'] as const;
+    const subclasses = ['vigil', 'zealot', null] as const;
+    for (const trigger of coaches) {
+      for (const speaker of speakers) {
+        for (const subclass of subclasses) {
+          for (let i = 0; i < 8; i++) {
+            const line = pickBanterLine({
+              trigger,
+              speaker,
+              subclass,
+              rng: () => i / 8,
+            });
+            expect(uiVerb.test(line), `${trigger}/${speaker}: ${line}`).toBe(false);
+          }
+        }
+      }
+    }
   });
 
   it('low-mana healer warns about pacing / the blue bar', () => {
