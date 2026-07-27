@@ -58,6 +58,7 @@ import {
   showHealSparkle,
   showZapImpact,
 } from '../ui/combatFx';
+import { castBarShakeOffset } from '../ui/castBarShake';
 import { PaceToggle } from '../ui/paceToggle';
 import { loadSave, saveGame, type SaveData } from '../save/save';
 import { relicsById } from '../data/relics';
@@ -1015,19 +1016,22 @@ export class CombatScene extends Phaser.Scene {
 
   /** v0.3 chunk F: unlabeled sliver tracks the boss sprite's position (always the sole enemy
    *  during a boss cast) instead of a fixed top-of-screen bar — the boss's own telegraph cue
-   *  (glow/raise/pulse) is the primary teach; the combat log still names the ability. */
+   *  (glow/raise/pulse) is the primary teach; the combat log still names the ability.
+   *  Wave 3 / PR2 2A: bar shakes harder as fill approaches full (hit imminent). */
   private syncBossCastBar(state: CombatState): void {
     const cast = state.bossCast;
     if (cast) {
+      const fillProgress = cast.totalMs > 0 ? 1 - cast.remainingMs / cast.totalMs : 0;
       const bossUnit = state.enemies.find((u) => u.role === 'boss');
       const bossSprite = bossUnit ? this.findSprite(bossUnit.id) : undefined;
       if (bossSprite) {
+        const { dx, dy } = castBarShakeOffset(fillProgress, this.elapsedMs);
         this.bossCastBar.setPosition(
-          bossSprite.getHomeX() - BOSS_CAST_BAR_WIDTH / 2,
-          bossSprite.getHomeY() - BOSS_UNIT_HEIGHT / 2 - BOSS_CAST_BAR_GAP,
+          bossSprite.getHomeX() - BOSS_CAST_BAR_WIDTH / 2 + dx,
+          bossSprite.getHomeY() - BOSS_UNIT_HEIGHT / 2 - BOSS_CAST_BAR_GAP + dy,
         );
       }
-      this.bossCastBar.setRatio(1 - cast.remainingMs / cast.totalMs);
+      this.bossCastBar.setRatio(fillProgress);
       this.bossCastBar.setVisible(true);
     } else {
       this.bossCastBar.setVisible(false);

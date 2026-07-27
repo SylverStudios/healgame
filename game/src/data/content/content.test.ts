@@ -50,7 +50,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
       cast: {
         name: 'Bonehowl',
         castMs: 10_000,
-        firstCastAtMs: 3000,
+        firstCastAtMs: 2000,
         intervalMs: 12_000,
         partyDamage: 4,
       },
@@ -119,8 +119,8 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
       cast: {
         kind: 'tunnelVision',
         name: 'Tunnel Vision',
-        telegraphMs: 3000,
-        firstCastAtMs: 7000,
+        telegraphMs: 5000,
+        firstCastAtMs: 5000,
         intervalMs: 20_000,
         channelMs: 11_000,
         tickMs: 1000,

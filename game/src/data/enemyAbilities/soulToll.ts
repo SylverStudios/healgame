@@ -4,6 +4,10 @@ import type { EnemyAbilityDef } from '../content/types';
  * Black Choir boss mechanic: party spike plus healer mana burn.
  * Tuned so maxed crown kits clear with disciplined healing; mid-tree
  * (oath path without Vowstrike/crown) should wipe — a real tree-depth check.
+ *
+ * Wave 3 / PR2 2A: cast timing left unchanged — lengthening castMs destabilized
+ * the shallow-crown clear / mid-tree wipe gates (PR3 retunes mid-ladder).
+ * Shared cast-bar shake still applies via CombatScene.
  */
 export const SOUL_TOLL = {
   id: 'soul-toll',

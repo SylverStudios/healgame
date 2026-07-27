@@ -4,6 +4,9 @@ import type { EnemyAbilityDef } from '../content/types';
  * Gloam Sanctum boss mechanic: Soul Toll with an earlier first cast and tighter
  * cadence. Full Patient / Fervent crown kits clear; shallow crown (Vowstrike +
  * Wrath + Crown without path depth) that still clears Black Choir wipes here.
+ *
+ * Wave 3 / PR2 2A: cast timing left unchanged — same gate sensitivity as Soul
+ * Toll (PR3 retunes). Shared cast-bar shake still applies via CombatScene.
  */
 export const NULL_PSALM = {
   id: 'null-psalm',

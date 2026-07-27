@@ -4,8 +4,10 @@ export const TUNNEL_VISION = {
   id: 'tunnel-vision',
   name: 'Tunnel Vision',
   kind: 'tunnelVision',
-  telegraphMs: 3_000,
-  firstCastAtMs: 7_000,
+  // Wave 3 / PR2 2A: longer readable telegraph (~1.7×) + earlier first cast so the
+  // shared cast bar has room to grow before the focus channel starts.
+  telegraphMs: 5_000,
+  firstCastAtMs: 5_000,
   intervalMs: 20_000,
   channelMs: 11_000,
   tickMs: 1_000,
