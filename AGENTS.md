@@ -91,3 +91,21 @@ agents should prefer `verify`.
   | Save shape | `save.ts` header + `poc-qa.md` note; bump version per CLAUDE.md |
   | Scene layout / interactive targets | `setName` on the object + journey by name ([`docs/semantic-targets.md`](docs/semantic-targets.md)); do not reintroduce a coordinate `UI` table |
   | Phase complete | Append `poc-qa.md`; prepend `CHANGELOG.md`; delete planning handoff |
+
+## Cursor Cloud specific instructions
+
+Client-only Phaser + Vite browser game under `game/`; no backend, DB, or Docker.
+Standard commands live in [`CLAUDE.md`](CLAUDE.md) (run from `game/`); the
+quality gate is `npm run verify` / `verify:fast`.
+
+- Dependencies are refreshed automatically on startup (the update script runs
+  `npm install` in `game/` plus `npx playwright install chromium`). You do not
+  need to reinstall.
+- Playwright Chromium is required only for the `smoke` and `journey` stages of
+  `npm run verify`; `npm run dev`, `typecheck`, `lint`, `test`, and `build` do
+  not need it.
+- Run/play: `npm run dev` serves the game at http://localhost:5173 (Vite,
+  viewport 960×540). New saves route through the Tutorial ("Learn Solemn Mend")
+  into Ash Gate combat; returning saves boot to the Hub. Progress persists in
+  browser `localStorage` (`healgame-save-v8`) — clear it to replay the tutorial.
+- The pod runs Node 22; CI pins Node 20. Both work for this repo.
