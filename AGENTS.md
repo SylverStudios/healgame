@@ -1,6 +1,6 @@
 # AGENTS.md — healgame documentation system
 
-Status: current · Authority: doc conventions for all agents · Last verified: 2026-07-17
+Status: current · Authority: doc conventions for all agents · Last verified: 2026-07-27
 
 
 How we keep docs trustworthy. Operating rules for the game itself live in
@@ -73,6 +73,7 @@ agents should prefer `verify`.
 | Research | `docs/research/` |
 | Art ops | `docs/unit-art.md` |
 | Long-term design | `docs/GDD.md` |
+| GitHub auto-merge (ops) | [`docs/github-automerge.md`](docs/github-automerge.md) — repo Allow auto-merge ≠ merge on ready; need per-PR `--auto` |
 
 ## Doc hygiene
 
