@@ -5,8 +5,9 @@ export const NEEDLE_GAZE = {
   id: 'needle-gaze',
   name: 'Needle Gaze',
   kind: 'tunnelVision',
-  telegraphMs: 2_500,
-  firstCastAtMs: 4_500,
+  // Wave 3 / PR2 2A: longer telegraph (~1.8×) + earlier first cast for readable wind-up.
+  telegraphMs: 4_500,
+  firstCastAtMs: 3_000,
   intervalMs: 20_000,
   channelMs: 9_000,
   tickMs: 1_000,

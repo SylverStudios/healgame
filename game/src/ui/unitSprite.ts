@@ -17,6 +17,11 @@
 import Phaser from 'phaser';
 import type { Unit } from '../combat/types';
 import { Bar } from './bar';
+import {
+  drawBossFocusReticle,
+  FOCUS_RETICLE_MIN_ALPHA,
+  FOCUS_RETICLE_PULSE_MS,
+} from './bossFocusReticle';
 import { UNIT_TEXTURE_KEY } from './sprites';
 import { FONT, FONT_SIZE_XS, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG } from './theme';
 
@@ -117,19 +122,6 @@ function floatFontPx(amount: number): string {
   if (a <= 4) return FONT_SIZE_MD;
   return FONT_SIZE_LG;
 }
-
-/**
- * Boss-focus marker: a crimson crosshair hovering above the unit during
- * Tunnel Vision. Its ring-and-reticle silhouette stays unmistakably distinct
- * from the player's gold chevron/halo when both target the same ally.
- */
-const FOCUS_MARKER_RADIUS = 7;
-const FOCUS_MARKER_ARM = 11;
-/** Gap between the heal-target chevron's slot and the focus brand. */
-const FOCUS_MARKER_GAP = 6;
-const FOCUS_MARKER_COLOR = 0xc23b22;
-const FOCUS_MARKER_MIN_ALPHA = 0.35;
-const FOCUS_PULSE_MS = 450;
 
 const HALO_FILL_COLOR = 0xf2c14e;
 const HALO_FILL_ALPHA = 0.28;
@@ -235,7 +227,7 @@ export class UnitSprite {
   private readonly targetMarker: Phaser.GameObjects.Triangle;
   /** Ember/iron ellipse under the unit's feet when targeted (handoff §M). */
   private readonly targetHalo: Phaser.GameObjects.Ellipse;
-  /** Crimson crosshair shown while a boss focus channel targets this unit. */
+  /** Giant crimson reticle + beady eyes while a boss focus channel targets this unit. */
   private readonly bossFocusMarker: Phaser.GameObjects.Graphics;
 
   /** Standalone floating texts (hit markers / heal floats) not parented to the container. */
@@ -404,14 +396,11 @@ export class UnitSprite {
       .setVisible(false);
     this.container.add(this.targetMarker);
 
-    // Above the chevron's slot so a heal-targeted AND boss-focused unit shows both.
-    const focusY = markerTipY - TARGET_MARKER_HEIGHT - FOCUS_MARKER_GAP - FOCUS_MARKER_ARM;
-    this.bossFocusMarker = scene.add.graphics().setPosition(0, focusY).setVisible(false);
-    this.bossFocusMarker.lineStyle(2, FOCUS_MARKER_COLOR, 1);
-    this.bossFocusMarker.strokeCircle(0, 0, FOCUS_MARKER_RADIUS);
-    this.bossFocusMarker.lineBetween(-FOCUS_MARKER_ARM, 0, FOCUS_MARKER_ARM, 0);
-    this.bossFocusMarker.lineBetween(0, -FOCUS_MARKER_ARM, 0, FOCUS_MARKER_ARM);
-    this.bossFocusMarker.fillStyle(FOCUS_MARKER_COLOR, 1).fillCircle(0, 0, 2);
+    // Wave 3 / PR2 2B: giant reticle + two red beady eyes centered on the ally
+    // body (may occlude bars/neighbors — clarity over neatness). Distinct from
+    // the gold heal-target chevron/halo. Drawn last so it sits on top in-container.
+    this.bossFocusMarker = scene.add.graphics().setPosition(0, this.bodyRestY).setVisible(false);
+    drawBossFocusReticle(this.bossFocusMarker);
     this.container.add(this.bossFocusMarker);
 
     const feetY = y + height / 2;
@@ -485,17 +474,18 @@ export class UnitSprite {
     this.targetHalo.setVisible(isTargeted && this.alive);
   }
 
-  /** Show/hide the crimson boss-focus crosshair (Tunnel Vision channel), with a slow alpha pulse. */
+  /** Show/hide the giant boss-focus reticle + eyes (Tunnel Vision channel), with a slow alpha pulse. */
   setBossFocused(isFocused: boolean): void {
     this.scene.tweens.killTweensOf(this.bossFocusMarker);
     this.bossFocusMarker.setAlpha(1);
     const show = isFocused && this.alive;
     this.bossFocusMarker.setVisible(show);
     if (show) {
+      this.container.bringToTop(this.bossFocusMarker);
       this.scene.tweens.add({
         targets: this.bossFocusMarker,
-        alpha: FOCUS_MARKER_MIN_ALPHA,
-        duration: FOCUS_PULSE_MS,
+        alpha: FOCUS_RETICLE_MIN_ALPHA,
+        duration: FOCUS_RETICLE_PULSE_MS,
         yoyo: true,
         repeat: -1,
       });
