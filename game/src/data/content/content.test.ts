@@ -121,7 +121,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
         name: 'Tunnel Vision',
         telegraphMs: 5000,
         firstCastAtMs: 5000,
-        intervalMs: 20_000,
+        intervalMs: 16_000,
         channelMs: 11_000,
         tickMs: 1000,
         damagePerTick: 2,

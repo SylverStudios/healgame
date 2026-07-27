@@ -372,13 +372,13 @@ describe('IRON_PASS data sanity', () => {
     ]);
   });
 
-  it('has a boss cast of kind tunnelVision with the drafted cadence', () => {
+  it('has a boss cast of kind tunnelVision with the PR3 tuned cadence', () => {
     const cast = IRON_PASS.boss.cast;
     expect(cast?.name).toBe('Tunnel Vision');
     if (!cast || cast.kind !== 'tunnelVision') throw new Error('Tunnel Vision must be a tunnelVision cast');
     expect(cast.telegraphMs).toBe(5000);
     expect(cast.firstCastAtMs).toBe(5000);
-    expect(cast.intervalMs).toBe(20_000);
+    expect(cast.intervalMs).toBe(16_000);
     expect(cast.channelMs).toBe(11_000);
     expect(cast.tickMs).toBe(1000);
     expect(cast.damagePerTick).toBe(2);

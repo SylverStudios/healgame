@@ -1,6 +1,6 @@
 # QA log — journey checklist & verification
 
-Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-19
+Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-27
 
 Ship summary (newest first): [`CHANGELOG.md`](./CHANGELOG.md).
 
@@ -9,6 +9,36 @@ enforced by automated gates. Later Alpha sections below amend the baseline
 (Phase 2+ subclass UX, mid dungeons, CDs, relics, loadout, etc.).
 
 ---
+
+# Playtest Wave 3 PR3 — Iron/Cinder mid-ladder tune (2026-07-27)
+
+Status: current · Last verified: 2026-07-27
+
+Bot-tuned with `npm run content -- balance` after PR2 telegraph-length changes.
+Goal: Iron Pass and Cinder Vault stay clearable for maxed crown kits but stop
+feeling like free farms. Data-only changes:
+
+| Field | Old | New | Evidence |
+|---|---:|---:|---|
+| Tunnel Vision `intervalMs` | 20000 | 16000 | Iron focus landings rose from 3/3/6/4/4 to 4/4/8/5/5; efficiency Vigil now clears with 2 survivors, 45 heals, 165s |
+| Emberfall `intervalMs` | 18000 | 16000 | Cinder efficiency Vigil sees 11 DoTs in a long 2-survivor scrape |
+| Cinder Wraith `autoDamage` | 2 | 3 | Cinder normal crown kits still clear; Zealot Vengeance mana falls 28→18 with 37→46 heals |
+| Needle Gaze `intervalMs` | 20000 | 18000 | Light Verdant follow-on so the next rung does not feel easier; all maxed kits still clear with 3–4 focuses |
+
+Baseline → after highlights:
+
+- Iron Pass: 5/5 maxed wins both before/after. Vigil Virtue mana 33→18,
+  heals 21→25; Vigil efficiency survivors 3→2, heals 37→45, duration
+  147s→165s; Zealot Virtue focus 4→5 and mana 8→5.
+- Cinder Vault: 5/5 maxed wins both before/after. Vigil efficiency survivors
+  3→2, heals 21→54, duration 99s→209s, DoTs 3→11; Zealot Vengeance mana
+  28→18 and heals 37→46.
+- Ash Gate first-run gates remain unchanged; Black Choir/Gloam data untouched;
+  The Maw remains unwinnable for maxed crown bots.
+
+Pinned in `combat/balance.test.ts`: target dungeons still require victories,
+while the efficiency crown routes are asserted as scrape clears instead of
+≥3-alive cruise clears.
 
 # Gloam Sanctum (Dungeon 6) — 2026-07-19
 
