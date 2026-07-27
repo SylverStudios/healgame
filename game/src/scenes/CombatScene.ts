@@ -150,11 +150,8 @@ const PLAYER_CAST_BAR_HEIGHT = 20;
 /** Above the Shift+QWER CD row (buttons top ~420 when SPELL_BAR_Y=508) so keycaps don't overlap. */
 const PLAYER_CAST_BAR_Y = 392;
 const PLAYER_CAST_FILL_COLOR = 0xf2c14e;
-const GCD_BAR_HEIGHT = 4;
-const GCD_BAR_GAP = 3;
-const GCD_FILL_COLOR = 0x8a7868;
-/** One-line "next: …" under the GCD sliver when a spell is queued. */
-const QUEUED_SPELL_GAP = 10;
+/** One-line "next: …" under the cast bar when a spell is queued. */
+const QUEUED_SPELL_GAP = 6;
 const QUEUED_SPELL_COLOR = '#a89888';
 
 // v0.3 chunk F "Boss telegraphs": the named cast bar is demoted — an unlabeled
@@ -215,7 +212,6 @@ export class CombatScene extends Phaser.Scene {
 
   private playerCastBar!: Bar;
   private playerCastLabel!: Phaser.GameObjects.Text;
-  private gcdBar!: Bar;
   private queuedSpellLabel!: Phaser.GameObjects.Text;
   /** Demoted per v0.3 chunk F: unlabeled sliver near the boss, not a named top bar. */
   private bossCastBar!: Bar;
@@ -533,9 +529,10 @@ export class CombatScene extends Phaser.Scene {
     const centerX = VIEW_WIDTH / 2;
 
     const playerBarX = centerX - PLAYER_CAST_BAR_WIDTH / 2;
-    // Framed (chunk 3, bible item 3) — GCD sliver and boss cast sliver stay
-    // unframed (too thin to read a border at their height; see pixellab-3
-    // ledger). `undefined` keeps Bar's own default bg color.
+    // Framed (chunk 3, bible item 3) — boss cast sliver stays unframed (too
+    // thin to read a border at its height; see pixellab-3 ledger). `undefined`
+    // keeps Bar's own default bg color. GCD feedback is the radial wipe on
+    // spell buttons (Wave 3), not a thin under-cast sliver.
     this.playerCastBar = new Bar(
       this,
       playerBarX,
@@ -552,14 +549,10 @@ export class CombatScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setVisible(false);
 
-    const gcdY = PLAYER_CAST_BAR_Y + PLAYER_CAST_BAR_HEIGHT / 2 + GCD_BAR_GAP + GCD_BAR_HEIGHT / 2;
-    this.gcdBar = new Bar(this, playerBarX, gcdY, PLAYER_CAST_BAR_WIDTH, GCD_BAR_HEIGHT, GCD_FILL_COLOR);
-    this.gcdBar.setVisible(false);
-
     // XS (8px), not the SM snap: this label sits just above the spell-bar
-    // buttons (queuedY ≈ 419 vs button tops ≈ 420 — see SPELL_BAR_Y comment
+    // buttons (queuedY ≈ 411 vs button tops ≈ 420 — see SPELL_BAR_Y comment
     // above) with almost no clearance; a 16px line would clip into the row.
-    const queuedY = gcdY + GCD_BAR_HEIGHT / 2 + QUEUED_SPELL_GAP;
+    const queuedY = PLAYER_CAST_BAR_Y + PLAYER_CAST_BAR_HEIGHT / 2 + QUEUED_SPELL_GAP;
     this.queuedSpellLabel = this.add
       .text(centerX, queuedY, '', {
         fontFamily: FONT,
@@ -945,6 +938,7 @@ export class CombatScene extends Phaser.Scene {
     this.spellBar.setArmedSpellIds(state.armedBuffedSpellIds);
     this.spellBar.updateCooldowns(state.cooldowns);
     this.spellBar.updateSpellCooldowns(state.spellCooldowns);
+    this.spellBar.setGcd(state.gcdRemainingMs, GCD_MS);
     this.syncHealerRune(state);
     this.syncManaAura();
 
@@ -1009,13 +1003,6 @@ export class CombatScene extends Phaser.Scene {
     } else {
       this.playerCastBar.setVisible(false);
       this.playerCastLabel.setVisible(false);
-    }
-
-    if (state.gcdRemainingMs > 0) {
-      this.gcdBar.setRatio(1 - state.gcdRemainingMs / GCD_MS);
-      this.gcdBar.setVisible(true);
-    } else {
-      this.gcdBar.setVisible(false);
     }
 
     if (state.queuedSpellId) {

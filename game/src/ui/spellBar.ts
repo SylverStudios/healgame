@@ -19,6 +19,7 @@ import {
   addManaCostAffordance,
   type ManaCostAffordance,
 } from './manaAffordance';
+import { GcdWipeOverlay } from './gcdWipe';
 import { FONT, FONT_SIZE_XS, FONT_SIZE_MD, PALETTE, PALETTE_NUM } from './theme';
 import {
   BUTTON_FRAME_TEXTURE_KEY,
@@ -27,6 +28,10 @@ import {
   cooldownIconTextureKey,
   spellIconTextureKey,
 } from './spellSprites';
+
+/** Wipe sits above icon/orbs; keycap + hotkey stay above the pie for readability. */
+const GCD_WIPE_DEPTH = 1;
+const KEYCAP_ABOVE_WIPE_DEPTH = 2;
 
 /** Alpha 0.2 §D8: compact width so up to 4 QWER columns fit on 960px.
  *  Shift+QWER major CDs sit in a matching row above (same finger columns). */
@@ -129,6 +134,7 @@ class SpellButton {
   private readonly cost: ManaCostAffordance;
   private readonly hotkeyText: Phaser.GameObjects.Text;
   private readonly timerText: Phaser.GameObjects.Text;
+  private readonly gcdWipe: GcdWipeOverlay;
   private enabled = true;
   private armed = false;
   private onSpellCooldown = false;
@@ -201,6 +207,17 @@ class SpellButton {
         color: HOTKEY_COLOR,
       })
       .setOrigin(0.5);
+
+    // Wave 3: radial GCD wipe on the button face (icons/orbs underneath).
+    this.gcdWipe = new GcdWipeOverlay(scene, x, y, BUTTON_WIDTH, BUTTON_HEIGHT);
+    this.gcdWipe.setDepth(GCD_WIPE_DEPTH);
+    this.keycap.setDepth(KEYCAP_ABOVE_WIPE_DEPTH);
+    this.hotkeyText.setDepth(KEYCAP_ABOVE_WIPE_DEPTH);
+  }
+
+  /** Engine GCD remaining → pie wipe (presentation only). */
+  setGcd(remainingMs: number, gcdMs: number): void {
+    this.gcdWipe.setGcd(remainingMs, gcdMs);
   }
 
   /** Enabled = clickable (running + target + affordable + not on personal CD). OOM paints crimson. */
@@ -259,6 +276,7 @@ class SpellButton {
   }
 
   destroy(): void {
+    this.gcdWipe.destroy();
     this.bg.destroy();
     this.frame?.destroy();
     this.iconImage?.destroy();
@@ -275,6 +293,7 @@ class SpellButton {
  * while on cooldown, dimmed alpha while on cooldown, gold accent border while
  * buff is active. Clicking while on cooldown is a no-op — `ready` gates it.
  * Lives on the Shift+QWER row above the spell buttons (same finger columns).
+ * Major CDs are off-GCD in the engine — no GCD wipe on this row.
  */
 class CooldownButton {
   readonly cooldownId: string;
@@ -497,6 +516,15 @@ export class SpellBar {
       const state = states.find((s) => s.spellId === button.spellId);
       button.setSpellCooldown(state?.remainingMs ?? 0);
     }
+  }
+
+  /**
+   * Per-frame GCD radial wipe on spell buttons (Wave 3). Major CD row is
+   * skipped — `activateCooldown` is off-GCD. Source: engine `gcdRemainingMs`
+   * + `GCD_MS` (presentation only).
+   */
+  setGcd(remainingMs: number, gcdMs: number): void {
+    for (const button of this.buttons) button.setGcd(remainingMs, gcdMs);
   }
 
   destroy(): void {
