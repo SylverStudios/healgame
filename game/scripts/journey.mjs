@@ -432,7 +432,7 @@ try {
   await shot(page, 'tree-vigil-branch-owned');
 
   await clickNamed(page, 'treeBack');
-  await page.waitForTimeout(600);
+  await waitForNamed(page, 'runMod:vigil-oath');
   check((await locate(page, 'runMod:vigil-oath')) !== null, 'hub run-mods bar shows sworn oath');
   await shot(page, 'hub-with-oath');
 
@@ -612,7 +612,8 @@ try {
   check(save.musicVolumePct === 50, 'seeded save starts at the default 50% music volume');
 
   await clickNamed(page, 'hubSettings');
-  await page.waitForTimeout(400);
+  await waitForNamed(page, 'settingsVolumeSlider');
+  await waitForNamed(page, 'settingsBack');
   check((await locate(page, 'settingsVolumeSlider')) !== null, 'Settings scene shows the volume slider track');
   check((await locate(page, 'settingsBack')) !== null, 'Settings scene shows Back');
   await shot(page, 'settings-scene');
@@ -631,14 +632,14 @@ try {
   // a hard-coded layout coordinate — it must match SettingsScene.ts's
   // TRACK_WIDTH/2 (400/2) so the click lands on the track's left edge (0%).
   const SETTINGS_TRACK_HALF_WIDTH = 200;
-  const sliderPos = await locate(page, 'settingsVolumeSlider');
+  const sliderPos = await waitForNamed(page, 'settingsVolumeSlider');
   await page.mouse.click(sliderPos.x - SETTINGS_TRACK_HALF_WIDTH, sliderPos.y);
   await page.waitForTimeout(300);
   save = await readSave(page);
   check(save.musicVolumePct === 0, `clicking the track's left edge sets musicVolumePct to 0 (got ${save.musicVolumePct})`);
 
   await clickNamed(page, 'settingsBack');
-  await page.waitForTimeout(400);
+  await waitForNamed(page, 'hubSettings');
   check((await locate(page, 'hubSettings')) !== null, 'settingsBack returns to Hub (hubSettings visible again)');
   await shot(page, 'hub-after-settings');
 } finally {
