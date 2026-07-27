@@ -26,9 +26,15 @@ gh pr merge <n> --auto --merge  # queue (or merge now if checks already green)
 
 Notes:
 
-- If required checks are already green, `--auto` usually merges **immediately**
-  (you may not see a lingering `autoMergeRequest` afterward).
-- If checks are still running, `--auto` waits until they pass, then merges.
+- If **required** checks are already green, `--auto` usually merges
+  **immediately** (you may not see a lingering `autoMergeRequest` afterward).
+- If required checks are still running, `--auto` waits until they pass, then
+  merges.
+- **healgame currently has no branch rulesets / required status checks on
+  `main`.** In that configuration, `gh pr merge --auto --merge` can land
+  **before** `verify` finishes (observed on the doc PR that added this file).
+  Do not treat a successful merge as proof CI was green — check the Actions
+  run, or keep merging only after `verify` succeeds locally / on the PR.
 - Prefer `--merge` / `--squash` / `--rebase` explicitly so the method is pinned.
 - This repo has `delete_branch_on_merge: true`.
 
