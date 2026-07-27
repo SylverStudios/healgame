@@ -61,21 +61,31 @@ const SAVE_KEY = 'healgame-save-v8';
 const locate = (page, name) =>
   page.evaluate((n) => window.__healgame?.locate(n) ?? null, name);
 
-async function clickNamed(page, name) {
-  const pos = await locate(page, name);
-  if (!pos) {
-    const names = await page.evaluate(() => window.__healgame?.list() ?? []);
-    throw new Error(`no visible target "${name}"; visible: ${names.join(', ')}`);
+/**
+ * Poll until `name` is locatable. Scene fades are ~180ms out + create, but CI
+ * runners can miss a fixed 500ms sleep (Stage Relic: Relic→Hub / Hub→Tree).
+ * Default budget covers a slow fade plus create with headroom.
+ */
+async function waitForNamed(page, name, timeoutMs = 5_000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const pos = await locate(page, name);
+    if (pos) return pos;
+    await page.waitForTimeout(50);
   }
+  const names = await page.evaluate(() => window.__healgame?.list() ?? []);
+  throw new Error(
+    `timed out after ${timeoutMs}ms waiting for "${name}"; visible: ${names.join(', ')}`,
+  );
+}
+
+async function clickNamed(page, name) {
+  const pos = await waitForNamed(page, name);
   await page.mouse.click(pos.x, pos.y);
 }
 
 async function hoverNamed(page, name) {
-  const pos = await locate(page, name);
-  if (!pos) {
-    const names = await page.evaluate(() => window.__healgame?.list() ?? []);
-    throw new Error(`no visible target "${name}"; visible: ${names.join(', ')}`);
-  }
+  const pos = await waitForNamed(page, name);
   await page.mouse.move(pos.x, pos.y);
 }
 
@@ -315,10 +325,13 @@ try {
   check(save?.pendingRelicOffers.length === 3 && save?.relicIds.length === 0, 'seeded state: pick pending, nothing chosen yet');
   await shot(page, 'relic-scene-cards');
 
-  const card2 = await locate(page, 'relicCard:triage-bell'); // 2nd of 3 — see data/relics.ts RELICS order
-  check(card2 !== null, 'RelicScene exposes relicCard:triage-bell');
+  await waitForNamed(page, 'relicCard:triage-bell'); // 2nd of 3 — see data/relics.ts RELICS order
+  check((await locate(page, 'relicCard:triage-bell')) !== null, 'RelicScene exposes relicCard:triage-bell');
   await clickNamed(page, 'relicCard:triage-bell');
-  await page.waitForTimeout(500);
+  // Wait for Hub (not a fixed sleep): fadeOut ~180ms + Hub create must finish
+  // before runMod:/hubTree exist — CI was failing the soft check + treeBack click
+  // when a 500ms sleep lost the race.
+  await waitForNamed(page, 'runMod:triage-bell');
   save = await readSave(page);
   check(save?.relicIds.includes('triage-bell'), 'picking card 2 appends the relic');
   check(save?.pendingRelicOffers.length === 0, 'relic pick clears the pending offer');
@@ -327,9 +340,8 @@ try {
 
   // Second hub visit (real scene nav, not just a reload): still hub, never re-offered.
   await clickNamed(page, 'hubTree');
-  await page.waitForTimeout(500);
-  await clickNamed(page, 'treeBack');
-  await page.waitForTimeout(500);
+  await clickNamed(page, 'treeBack'); // waits for Tree create (treeBack) then Hub return
+  await waitForNamed(page, 'hubTree');
   save = await readSave(page);
   check(save?.relicIds.includes('triage-bell') && save?.pendingRelicOffers.length === 0, 'relic choice persists across a second hub visit');
   await shot(page, 'hub-relic-not-reoffered');
@@ -420,7 +432,7 @@ try {
   await shot(page, 'tree-vigil-branch-owned');
 
   await clickNamed(page, 'treeBack');
-  await page.waitForTimeout(600);
+  await waitForNamed(page, 'runMod:vigil-oath');
   check((await locate(page, 'runMod:vigil-oath')) !== null, 'hub run-mods bar shows sworn oath');
   await shot(page, 'hub-with-oath');
 
@@ -600,7 +612,8 @@ try {
   check(save.musicVolumePct === 50, 'seeded save starts at the default 50% music volume');
 
   await clickNamed(page, 'hubSettings');
-  await page.waitForTimeout(400);
+  await waitForNamed(page, 'settingsVolumeSlider');
+  await waitForNamed(page, 'settingsBack');
   check((await locate(page, 'settingsVolumeSlider')) !== null, 'Settings scene shows the volume slider track');
   check((await locate(page, 'settingsBack')) !== null, 'Settings scene shows Back');
   await shot(page, 'settings-scene');
@@ -619,14 +632,14 @@ try {
   // a hard-coded layout coordinate — it must match SettingsScene.ts's
   // TRACK_WIDTH/2 (400/2) so the click lands on the track's left edge (0%).
   const SETTINGS_TRACK_HALF_WIDTH = 200;
-  const sliderPos = await locate(page, 'settingsVolumeSlider');
+  const sliderPos = await waitForNamed(page, 'settingsVolumeSlider');
   await page.mouse.click(sliderPos.x - SETTINGS_TRACK_HALF_WIDTH, sliderPos.y);
   await page.waitForTimeout(300);
   save = await readSave(page);
   check(save.musicVolumePct === 0, `clicking the track's left edge sets musicVolumePct to 0 (got ${save.musicVolumePct})`);
 
   await clickNamed(page, 'settingsBack');
-  await page.waitForTimeout(400);
+  await waitForNamed(page, 'hubSettings');
   check((await locate(page, 'hubSettings')) !== null, 'settingsBack returns to Hub (hubSettings visible again)');
   await shot(page, 'hub-after-settings');
 } finally {

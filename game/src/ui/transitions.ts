@@ -16,9 +16,9 @@
  *
  * Total transition time stays under the 400ms budget end to end: a plain
  * fade is ~180ms out + ~180ms in (360ms); the combat-entry seam uses a
- * shorter ~150ms fade-out feeding a ~250ms chunky reveal (400ms). journey's
- * poll loop has ~700ms+ slack per tick, so this is comfortably inside safe
- * margin even before accounting for the locked 400ms spec.
+ * shorter ~150ms fade-out feeding a ~250ms chunky reveal (400ms). journey
+ * waits for semantic targets via `waitForNamed` (not fixed sleeps) after
+ * these seams, so slow CI runners still clear the gate.
  *
  * No Phaser NineSlice / postFX pipelines here (chunks 3/4 already found
  * NineSlice WebGL-only and this project runs `Phaser.AUTO`, which can fall
@@ -69,6 +69,11 @@ export function fadeToScene(
   durationMs: number = FADE_OUT_MS,
 ): void {
   const camera = scene.cameras.main;
+  // Single-flight: a second fadeToScene before the first fade-out completes
+  // would otherwise stack `once` handlers and double-`start` the next scene
+  // (Hub→Relic redirect + pick, or rapid meta-button clicks). Drop only this
+  // event — fade-in uses `camerafadeincomplete`.
+  camera.off('camerafadeoutcomplete');
   camera.once('camerafadeoutcomplete', () => {
     scene.scene.start(key, data);
   });
