@@ -6,13 +6,11 @@ export const EMBERFALL = {
   name: 'Emberfall',
   kind: 'partyDoT',
   // Wave 3 / PR2 2A: longer cast wind-up (~1.6×) for readable bar shake; party DoT
-  // needs no eye reticle (chunk 2B). intervalMs bumped so post-cast gap stays near
-  // pre-2A and the efficiency-kit clear gate still holds.
+  // needs no eye reticle (chunk 2B). PR3 tightens cadence for mid-ladder pressure.
   castMs: 6_500,
   firstCastAtMs: 5_000,
-  intervalMs: 18_000,
-  // Same total party damage as the old 3×2 chunk (6), but half-second ticks of 1
-  // so the burn reads as a steady fire instead of three heavy hits.
+  intervalMs: 16_000,
+  // Wave 3 PR3: more frequent burn pressure for the mid-ladder tune.
   durationMs: 3_000,
   tickMs: 500,
   damagePerTick: 1,

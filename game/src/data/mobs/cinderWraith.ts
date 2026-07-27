@@ -5,7 +5,7 @@ export const CINDER_WRAITH = {
   name: 'Cinder Wraith',
   tags: ['trash'],
   hp: 14,
-  autoDamage: 2,
+  autoDamage: 3,
   swingIntervalMs: 3_000,
   abilityIds: [],
   visualKey: 'cinder-wraith',

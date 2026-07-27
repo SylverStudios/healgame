@@ -39,9 +39,11 @@ import { RELICS } from '../data/relics';
  *   3. Ash Gate, disciplined healing on the starting kit → never a comfortable clear.
  *   4. Ash Gate, maxed crown kits → victory, ≥3 alive.
  *   5. Bonehowl lands ≥1 in a winning Ash Gate run.
- *   6–7. Maxed crown kits clear Iron Pass; Tunnel Vision + CDs fire.
+ *   6–7. Maxed crown kits clear Iron Pass; Tunnel Vision + CDs fire, while
+ *        the efficiency crown route no longer cruises.
  *   8. Maxed crown kits (+ relics) wipe on The Maw.
- *   9. Maxed crown kits clear Cinder Vault; Emberfall lands ≥1.
+ *   9. Maxed crown kits clear Cinder Vault; Emberfall lands ≥1, while the
+ *      efficiency crown route no longer cruises.
  *  10. Maxed crown kits clear Verdant Rift; Needle Gaze focus lands ≥1.
  *  11. Black Choir is clearable with all four oath×aspect crown kits; Soul Toll burns ≥1.
  *  12. Black Choir wipes oath-path kits that lack Vowstrike / Wrath / crown (tree-depth).
@@ -97,15 +99,15 @@ describe('Iron Pass difficulty shape (alpha-0.1-handoff §D2/§D3, chunk 9a)', (
     const run = runBuildBot(IRON_PASS, VIGIL_LOADOUT, 'disciplined');
     expect(run.status).toBe('victory');
     expect(run.survivors).toBeGreaterThanOrEqual(3);
-    expect(run.bossFocusStarted).toBeGreaterThanOrEqual(1);
+    expect(run.bossFocusStarted).toBeGreaterThanOrEqual(4);
     expect(run.cdActivations).toBeGreaterThanOrEqual(1);
   });
 
-  it('the Vigil efficiency crown build also clears Iron Pass', () => {
+  it('the Vigil efficiency crown build also clears Iron Pass as a scrape, not a cruise', () => {
     const run = runBuildBot(IRON_PASS, VIGIL_EFFICIENCY_LOADOUT, 'disciplined');
     expect(run.status).toBe('victory');
-    expect(run.survivors).toBeGreaterThanOrEqual(3);
-    expect(run.bossFocusStarted).toBeGreaterThanOrEqual(1);
+    expect(run.survivors).toBeLessThanOrEqual(2);
+    expect(run.bossFocusStarted).toBeGreaterThanOrEqual(6);
     expect(run.cdActivations).toBeGreaterThanOrEqual(1);
   });
 
@@ -113,6 +115,7 @@ describe('Iron Pass difficulty shape (alpha-0.1-handoff §D2/§D3, chunk 9a)', (
     const run = runBuildBot(IRON_PASS, ZEALOT_LOADOUT, 'disciplined');
     expect(run.status).toBe('victory');
     expect(run.survivors).toBeGreaterThanOrEqual(3);
+    expect(run.bossFocusStarted).toBeGreaterThanOrEqual(4);
     expect(run.cdActivations).toBeGreaterThanOrEqual(1);
   });
 });
@@ -125,11 +128,11 @@ describe('Cinder Vault difficulty shape (mid-tier Dungeon 3)', () => {
     expect(run.partyDoTStarted).toBeGreaterThanOrEqual(1);
   });
 
-  it('the Vigil efficiency crown build also clears Cinder Vault', () => {
+  it('the Vigil efficiency crown build also clears Cinder Vault as a scrape, not a cruise', () => {
     const run = runBuildBot(CINDER_VAULT, VIGIL_EFFICIENCY_LOADOUT, 'disciplined');
     expect(run.status).toBe('victory');
-    expect(run.survivors).toBeGreaterThanOrEqual(3);
-    expect(run.partyDoTStarted).toBeGreaterThanOrEqual(1);
+    expect(run.survivors).toBeLessThanOrEqual(2);
+    expect(run.partyDoTStarted).toBeGreaterThanOrEqual(4);
   });
 
   it('a maxed Zealot crown build clears Cinder Vault with disciplined play', () => {
