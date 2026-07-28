@@ -1,9 +1,10 @@
 /**
  * A single combat unit rendered as a Tiny Dungeon tile (see ui/sprites.ts)
- * + name label + HP bar (+ mana bar for the healer) + optional
- * click-to-target marker. Bars/labels keep the temp-art style (flat bars,
- * pixel-font labels, dark palette); the unit body is a 16×16 pixel-art frame
- * scaled up with nearest-neighbor filtering (`pixelArt: true` in main.ts).
+ * + name label + HP bar (+ mana bar for the healer) + optional heal-target
+ * halo (gold/holy ring above the head). Bars/labels keep the temp-art style
+ * (flat bars, pixel-font labels, dark palette); the unit body is a 16×16
+ * pixel-art frame scaled up with nearest-neighbor filtering (`pixelArt: true`
+ * in main.ts).
  *
  * Chunk 2 (phase-2-handoff): all visuals live inside a Phaser Container
  * anchored at the unit's fixed "home" position, so a single tween on the
@@ -69,14 +70,6 @@ const HEAL_FLASH_COLOR = 0x3ce06a;
 const FLASH_ALPHA = 0.65;
 const FLASH_DURATION_MS = 260;
 
-const TARGET_MARKER_WIDTH = 10;
-const TARGET_MARKER_HEIGHT = 8;
-/** Gap between the topmost bar's number line and the marker's tip. */
-const TARGET_MARKER_GAP = 8;
-/** Extra clearance for the number-line text glyphs above the topmost bar (10px font). */
-const TARGET_MARKER_TEXT_CLEARANCE = 12;
-const TARGET_MARKER_COLOR = 0xf2c14e;
-
 /** Locked visual decisions (phase-2-handoff): lunge 12px, out 90ms / back 120ms.
  *  Used by Kenney enemies / boss / healer — PixelLab party mercs play attack strips in place. */
 const LUNGE_DISTANCE = 12;
@@ -123,12 +116,17 @@ function floatFontPx(amount: number): string {
   return FONT_SIZE_LG;
 }
 
+/** Wave 3b: diegetic gold/holy heal-target halo above the head (not a feet ring). */
 const HALO_FILL_COLOR = 0xf2c14e;
-const HALO_FILL_ALPHA = 0.28;
-const HALO_STROKE_COLOR = 0x8a7868;
-const HALO_WIDTH = 52;
-const HALO_HEIGHT = 14;
-const HALO_DEPTH = -2;
+const HALO_FILL_ALPHA = 0.38;
+const HALO_STROKE_COLOR = 0xffe08a;
+const HALO_STROKE_WIDTH = 2;
+const HALO_STROKE_ALPHA = 0.95;
+/** Base oval size; width also scales with body (~0.55×). Flatter than a circle = classic halo. */
+const HALO_WIDTH = 34;
+const HALO_HEIGHT = 12;
+/** Lift above the body crown so the ring reads as a blessing, not a hat. */
+const HALO_ABOVE_CROWN = 8;
 const DAMAGE_FLOAT_COLOR = '#e05a4e';
 /** Brighter mint so heal numbers pop against the ash background. */
 const HEAL_FLOAT_COLOR = '#5dff7a';
@@ -224,8 +222,7 @@ export class UnitSprite {
   private readonly hpText: Phaser.GameObjects.Text;
   private readonly manaBar: Bar | null;
   private readonly manaText: Phaser.GameObjects.Text | null;
-  private readonly targetMarker: Phaser.GameObjects.Triangle;
-  /** Ember/iron ellipse under the unit's feet when targeted (handoff §M). */
+  /** Gold/holy oval above the head while this unit is the heal target. */
   private readonly targetHalo: Phaser.GameObjects.Ellipse;
   /** Giant crimson reticle + beady eyes while a boss focus channel targets this unit. */
   private readonly bossFocusMarker: Phaser.GameObjects.Graphics;
@@ -368,48 +365,22 @@ export class UnitSprite {
       this.manaBarY = null;
     }
 
-    // Downward-pointing chevron centered above the topmost bar (mana bar + its
-    // number line when present, else the HP bar + its number line) — in the old
-    // vertical roster a left-of-rect chevron pointed unambiguously at one row,
-    // but in a horizontal facing line it reads as pointing at whichever
-    // neighbor sits to its left. Above-the-bars is unambiguous at any spacing.
-    const topBarTextY = showMana
-      ? hpY - HP_BAR_HEIGHT / 2 - HP_TEXT_HEIGHT - MANA_BAR_GAP - MANA_BAR_HEIGHT - HP_TEXT_GAP
-      : hpY - HP_BAR_HEIGHT / 2 - HP_TEXT_GAP;
-    const markerTipY = topBarTextY - TARGET_MARKER_TEXT_CLEARANCE - TARGET_MARKER_GAP;
-    // Position (0, markerTipY) places the shape's local origin; the 3 points below are
-    // relative to THAT origin (0,0), matching the pre-side-view marker's pattern — they
-    // must not also carry markerTipY, or the offset compounds through Phaser's own
-    // bounding-box-based origin math into a much larger on-screen gap than intended.
-    this.targetMarker = scene.add
-      .triangle(
-        0,
-        markerTipY,
-        -TARGET_MARKER_WIDTH / 2,
-        -TARGET_MARKER_HEIGHT,
-        TARGET_MARKER_WIDTH / 2,
-        -TARGET_MARKER_HEIGHT,
-        0,
-        0,
-        TARGET_MARKER_COLOR,
-      )
+    // Wave 3b: gold/holy heal-target halo above the head (container-local so it
+    // tracks lunges). Chevron removed — halo alone is the selection cue; stays
+    // visually distinct from the crimson boss-focus reticle below.
+    const crownY = this.bodyRestY - height / 2;
+    const haloWidth = Math.max(HALO_WIDTH, Math.round(width * 0.55));
+    this.targetHalo = scene.add
+      .ellipse(0, crownY - HALO_ABOVE_CROWN, haloWidth, HALO_HEIGHT, HALO_FILL_COLOR, HALO_FILL_ALPHA)
+      .setStrokeStyle(HALO_STROKE_WIDTH, HALO_STROKE_COLOR, HALO_STROKE_ALPHA)
       .setVisible(false);
-    this.container.add(this.targetMarker);
+    this.container.add(this.targetHalo);
 
-    // Wave 3 / PR2 2B: giant reticle + two red beady eyes centered on the ally
-    // body (may occlude bars/neighbors — clarity over neatness). Distinct from
-    // the gold heal-target chevron/halo. Drawn last so it sits on top in-container.
+    // Wave 3 / PR2 2B: giant reticle + beady eyes centered on the ally body.
+    // Distinct from the gold heal-target halo. Added last so danger sits on top.
     this.bossFocusMarker = scene.add.graphics().setPosition(0, this.bodyRestY).setVisible(false);
     drawBossFocusReticle(this.bossFocusMarker);
     this.container.add(this.bossFocusMarker);
-
-    const feetY = y + height / 2;
-    const haloWidth = Math.max(HALO_WIDTH, Math.round(width * 0.85));
-    this.targetHalo = scene.add
-      .ellipse(x, feetY + 4, haloWidth, HALO_HEIGHT, HALO_FILL_COLOR, HALO_FILL_ALPHA)
-      .setStrokeStyle(1, HALO_STROKE_COLOR)
-      .setDepth(HALO_DEPTH)
-      .setVisible(false);
 
     // Healer breathing loop starts immediately at rest; charge/cast/zap stop it
     // and restore it on completion (see restoreRestPose / returnToIdle below).
@@ -461,7 +432,6 @@ export class UnitSprite {
       this.body.setDisplaySize(this.width * DEAD_SCALE, this.height * DEAD_SCALE);
       this.hpBar.setVisible(false);
       this.manaBar?.setVisible(false);
-      this.targetMarker.setVisible(false);
       this.targetHalo.setVisible(false);
       // Engine ends the channel on target death (bossFocusEnded), but hide
       // defensively so a dead unit never wears the brand for a frame.
@@ -470,8 +440,16 @@ export class UnitSprite {
   }
 
   setTargeted(isTargeted: boolean): void {
-    this.targetMarker.setVisible(isTargeted && this.alive);
-    this.targetHalo.setVisible(isTargeted && this.alive);
+    const show = isTargeted && this.alive;
+    this.targetHalo.setVisible(show);
+    if (show) {
+      // Halo above bars/body; if boss focus is also on, keep crimson danger on top
+      // without hiding the gold ring (both stay visible — separate cues).
+      this.container.bringToTop(this.targetHalo);
+      if (this.bossFocusMarker.visible) {
+        this.container.bringToTop(this.bossFocusMarker);
+      }
+    }
   }
 
   /** Show/hide the giant boss-focus reticle + eyes (Tunnel Vision channel), with a slow alpha pulse. */
@@ -888,7 +866,7 @@ export class UnitSprite {
       float.destroy();
     }
     this.activeFloats.clear();
-    this.targetHalo.destroy();
+    // Halo is a container child — destroyed with the container (no feet-scene object).
     this.container.destroy();
   }
 }
