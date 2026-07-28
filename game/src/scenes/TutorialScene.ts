@@ -1,7 +1,7 @@
 /**
  * First scene a new player sees (poc-spec §3): a one-click "learn your heal"
- * moment, then straight into Ash Gate for the expected first wipe. Temp art
- * only — panels + text buttons, dark palette, pixel font.
+ * moment, then straight into Ash Gate. Temp art only — panels + text buttons,
+ * dark palette, pixel font.
  */
 
 import Phaser from 'phaser';
@@ -71,7 +71,7 @@ export class TutorialScene extends Phaser.Scene {
       'In combat: click an ally to target them, then click a heal (or press its',
       'QWER key). Bonk (Q) hits the front enemy — no target click needed.',
       '',
-      'Good luck out there — enjoy the WoW dungeon-healer experience.',
+      'The Ash Gate waits. Hold the line.',
       'XP from every enemy kill is kept, so nothing is ever wasted.',
     ].join('\n');
 

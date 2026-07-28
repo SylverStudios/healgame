@@ -2,7 +2,9 @@
 
 ![healgame concept art — healer and warband on a battle line](assets/healer-game.png)
 
-Status: current · Authority: repo landing / vibe · Last verified: 2026-07-17
+[![play — live demo](https://img.shields.io/badge/play-live%20demo-1a1210?style=flat-square&labelColor=3a2a22&color=f2c14e)](https://astounding-blancmange-940175.netlify.app/)
+
+Status: current · Authority: repo landing / vibe · Last verified: 2026-07-27
 
 A healer-focused indie game inspired by *Master Healer Kale with useless party*, rebuilt around exclusive builds, readable casting, and old-school MMO healing — in a heavy-metal dark fantasy skin.
 
@@ -56,7 +58,7 @@ Doc conventions + authority: [`AGENTS.md`](AGENTS.md). Operating rules:
 
 ## In one breath
 
-Oathbound only · tutorial Bonk + Solemn Mend · expected wipe · XP levels + talent
-tree · ruby oath in the talent tree (rival LOCKED, visible) · Ash Gate → Iron
-Pass → mid dungeons → Black Choir → unwinnable Maw · major CDs + relics + QWER
-loadout · single local save · restart only
+Oathbound only · tutorial Bonk + Solemn Mend · XP levels + talent tree · ruby
+oath in the talent tree (rival LOCKED, visible) · Ash Gate → Iron Pass → mid
+dungeons → Black Choir → unwinnable Maw · major CDs + relics + QWER loadout ·
+single local save · restart only
