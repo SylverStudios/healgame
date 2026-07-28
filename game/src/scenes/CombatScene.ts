@@ -276,12 +276,15 @@ export class CombatScene extends Phaser.Scene {
 
     const spells = this.sceneData.loadout.spells;
 
-    // Loaded once up front: permanent relics feed the engine at construction, and
-    // the same save is reused below for the pace toggle (avoids a second
-    // redundant loadSave() call).
+    // Loaded once: relics feed engine + reused for pace toggle (avoids a second loadSave() call).
     const save = loadSave();
     this.save = save;
     beginRun(this.sceneData.encounterId, save);
+
+    const relicsList = relicsById(save.relicIds);
+    const relicBonusHealing = relicsList
+      .flatMap((r) => r.effects)
+      .reduce((s, e) => s + (e.kind === 'bonusHealing' ? e.amount : 0), 0);
 
     this.engine = new CombatEngine(encounter, spells, {
       bonusMaxMana: this.sceneData.loadout.bonusMaxMana,
@@ -293,7 +296,7 @@ export class CombatScene extends Phaser.Scene {
       missingHealthPctBonuses: this.sceneData.loadout.missingHealthPctBonuses,
       fullHealthBonuses: this.sceneData.loadout.fullHealthBonuses,
       cooldowns: this.sceneData.loadout.cooldowns,
-      relics: relicsById(save.relicIds),
+      relics: relicsList,
     });
 
     buildBattlefield(this, battlefieldForEncounter(this.sceneData.encounterId), {
@@ -319,6 +322,10 @@ export class CombatScene extends Phaser.Scene {
       VIEW_WIDTH,
       this.sceneData.loadout.cooldowns,
       (cooldownId) => this.onCooldownActivate(cooldownId, 'click'),
+      {
+        ...(relicBonusHealing > 0 ? { bonusHealing: relicBonusHealing } : {}),
+        getActiveFlatHealBonus: (spellId) => this.computeActiveFlatHealBonus(spellId),
+      },
     );
     this.registerHotkeys(spells, this.sceneData.loadout.cooldowns);
     this.registerEscapeKey();
@@ -387,8 +394,7 @@ export class CombatScene extends Phaser.Scene {
     const party = this.engine.state.party;
     party.forEach((unit) => {
       this.unitNames.set(unit.id, unit.name);
-      // Presentation-only slot: visual order (healer·dps2·dps1·tank) is looked up by unit
-      // id, not array index — the engine's party array order is unchanged (handoff §B).
+      // Visual order is healer·dps2·dps1·tank; engine party order unchanged (handoff §B).
       const visualIndex = PARTY_VISUAL_ORDER.indexOf(unit.id);
       const x = slotX(
         visualIndex >= 0 ? visualIndex : 0,
@@ -525,10 +531,7 @@ export class CombatScene extends Phaser.Scene {
     const centerX = VIEW_WIDTH / 2;
 
     const playerBarX = centerX - PLAYER_CAST_BAR_WIDTH / 2;
-    // Framed (chunk 3, bible item 3) — boss cast sliver stays unframed (too
-    // thin to read a border at its height; see pixellab-3 ledger). `undefined`
-    // keeps Bar's own default bg color. GCD feedback is the radial wipe on
-    // spell buttons (Wave 3), not a thin under-cast sliver.
+    // Player bar is framed; boss sliver stays unframed (too thin). GCD is the radial wipe on buttons.
     this.playerCastBar = new Bar(
       this,
       playerBarX,
@@ -545,9 +548,6 @@ export class CombatScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setVisible(false);
 
-    // XS (8px), not the SM snap: this label sits just above the spell-bar
-    // buttons (queuedY ≈ 411 vs button tops ≈ 420 — see SPELL_BAR_Y comment
-    // above) with almost no clearance; a 16px line would clip into the row.
     const queuedY = PLAYER_CAST_BAR_Y + PLAYER_CAST_BAR_HEIGHT / 2 + QUEUED_SPELL_GAP;
     this.queuedSpellLabel = this.add
       .text(centerX, queuedY, '', {
@@ -558,9 +558,7 @@ export class CombatScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setVisible(false);
 
-    // v0.3 chunk F: unlabeled sliver, repositioned above the boss sprite each frame in
-    // syncBossCastBar() — initial position here is a placeholder, overwritten before it
-    // is ever shown (bossCastBar only becomes visible once state.bossCast is non-null).
+    // Boss cast: unlabeled sliver; initial position is a placeholder (syncBossCastBar repositions each frame).
     this.bossCastBar = new Bar(
       this,
       centerX - BOSS_CAST_BAR_WIDTH / 2,
@@ -721,9 +719,7 @@ export class CombatScene extends Phaser.Scene {
           target?.flashHeal();
           target?.spawnHealFloat(rawHeal);
           if (target) {
-            // v0.3 chunk F "Heal target sparkle": heal-vfx.png replaces the ground ripple as
-            // the primary heal-land read — ripple + particles + sparkle all firing together
-            // read as noise, and the sparkle centers on the unit rather than the ground.
+            // Sparkle centers on unit; quieter than ripple + particles combo.
             showHealSparkle(this, target.getHomeX(), target.getHomeY());
             showHealParticles(this, target.getHomeX(), target.getHomeY());
             shakeHealImpact(this);
@@ -955,6 +951,23 @@ export class CombatScene extends Phaser.Scene {
     this.rewardsText.setText(`XP ${xp}`);
   }
 
+  /** Active flat heal bonus right now: open healBonus CD windows + armed synergy bonuses for spellId. */
+  private computeActiveFlatHealBonus(spellId: string): number {
+    const { state } = this.engine;
+    const cdBonus = state.cooldowns
+      .filter((s) => s.activeRemainingMs > 0)
+      .reduce((sum, s) => {
+        const def = this.sceneData.loadout.cooldowns.find((c) => c.id === s.id);
+        return sum + (def?.effect.kind === 'healBonus' ? def.effect.bonusHeal : 0);
+      }, 0);
+    const synergyBonus = state.armedBuffedSpellIds.includes(spellId)
+      ? this.sceneData.loadout.synergies
+          .filter((s) => s.buffedSpellId === spellId)
+          .reduce((sum, s) => sum + s.bonusHeal, 0)
+      : 0;
+    return cdBonus + synergyBonus;
+  }
+
   private syncHealerRune(state: CombatState): void {
     const armed = state.armedBuffedSpellIds.length > 0;
     const healerSprite = this.partySprites.get('healer');
@@ -1016,10 +1029,7 @@ export class CombatScene extends Phaser.Scene {
     }
   }
 
-  /** v0.3 chunk F: unlabeled sliver tracks the boss sprite's position (always the sole enemy
-   *  during a boss cast) instead of a fixed top-of-screen bar — the boss's own telegraph cue
-   *  (glow/raise/pulse) is the primary teach; the combat log still names the ability.
-   *  Wave 3 / PR2 2A: bar shakes harder as fill approaches full (hit imminent). */
+  /** Boss cast bar: unlabeled sliver above boss sprite; shakes harder as fill nears full. */
   private syncBossCastBar(state: CombatState): void {
     const cast = state.bossCast;
     if (cast) {
@@ -1074,12 +1084,7 @@ export class CombatScene extends Phaser.Scene {
     const centerX = VIEW_WIDTH / 2;
     const centerY = VIEW_HEIGHT / 2;
 
-    // ---- transition started ----
-    // Party sprites are still on screen underneath everything added below
-    // (only alpha-dimmed by the backdrop, never hidden/destroyed) — chunk G's wipe/victory
-    // speech bubble fires right here, before the panel's backdrop/slide-in tweens begin, so
-    // it's on screen and already fading in while sprites are still fully visible (locked
-    // triggers: wipe → tank, victory → healer — see docs/v0.3-handoff.md "Banter").
+    // Banter fires before panel tweens: bubble visible while party sprites are still fully up.
     this.fireBanterBubble(status === 'wipe' ? 'wipe' : 'victory', status === 'wipe' ? 'tank' : 'healer');
 
     const backdrop = this.add
@@ -1089,9 +1094,7 @@ export class CombatScene extends Phaser.Scene {
       .setAlpha(0);
     this.tweens.add({ targets: backdrop, alpha: OVERLAY_ALPHA, duration: OVERLAY_FADE_MS });
 
-    // Chunk 4 (bible item 4): framed result panel — ui/panels.ts. The panel's
-    // own Container is what the existing slide-in tween drives (y + alpha),
-    // same choreography as the old flat rect.
+    // Framed result panel (ui/panels.ts); container drives slide-in tween.
     const panel = addPanel(this, centerX, centerY - PANEL_SLIDE_OFFSET, PANEL_WIDTH, PANEL_HEIGHT, {
       fillAlpha: 0.96,
       depth: OVERLAY_DEPTH + 1,

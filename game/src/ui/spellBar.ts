@@ -415,6 +415,18 @@ class CooldownButton {
   }
 }
 
+/** Options for wiring live combat bonuses into hover tooltips. */
+export interface SpellBarHealBonusOptions {
+  /** Sum of all relic `bonusHealing` effects active this fight. */
+  bonusHealing?: number;
+  /**
+   * Returns the sum of flat heal bonuses unconditionally active for `spellId`
+   * right now: open healBonus CD windows + armed synergy bonuses for this
+   * spell. Called once per tooltip show; may read engine state.
+   */
+  getActiveFlatHealBonus?: (spellId: string) => number;
+}
+
 /** Two-row action bar: QWER spells on the bottom, Shift+QWER major CDs above
  *  (same finger columns). Empty CD row is omitted entirely when the loadout
  *  grants none. */
@@ -433,13 +445,25 @@ export class SpellBar {
     screenWidth = 960,
     cooldowns: CooldownDef[] = [],
     onCooldownClick: (cooldownId: string) => void = () => {},
+    healBonusOptions: SpellBarHealBonusOptions = {},
   ) {
     this.tooltip = new SpellTooltip(scene, screenWidth);
 
     const showTooltip = (spellId: string, buttonCenterX: number, buttonTopY: number): void => {
       const spell = spells.find((s) => s.id === spellId);
       if (!spell) return;
-      this.tooltip.showCard(buttonCenterX, buttonTopY, buildSpellCard(spell, { loadout }));
+      const activeFlatHealBonus = healBonusOptions.getActiveFlatHealBonus?.(spellId) ?? 0;
+      this.tooltip.showCard(
+        buttonCenterX,
+        buttonTopY,
+        buildSpellCard(spell, {
+          loadout,
+          ...(healBonusOptions.bonusHealing !== undefined
+            ? { bonusHealing: healBonusOptions.bonusHealing }
+            : {}),
+          ...(activeFlatHealBonus > 0 ? { activeFlatHealBonus } : {}),
+        }),
+      );
     };
     const hideTooltip = (): void => this.tooltip.hide();
     const showCooldownTooltip = (cooldownId: string, buttonCenterX: number, buttonTopY: number): void => {

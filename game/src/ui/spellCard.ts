@@ -33,6 +33,23 @@ export interface BuildSpellCardOptions {
   /** Overrides SpellDef.description when set (talent flavor, etc.). */
   description?: string | null;
   eyebrow?: string | null;
+  /**
+   * Sum of all relic `bonusHealing` effects active this fight. Folded into the
+   * combined (+N) on heal spells. Pass 0 or omit when no relics apply.
+   */
+  bonusHealing?: number;
+  /**
+   * Override for the catalog base heal value (talent-baked delta fallback).
+   * When omitted, the catalog is queried by spell id via spellById(). Supply
+   * this when the caller already has the catalog value to avoid a second lookup.
+   */
+  catalogHeal?: number;
+  /**
+   * Sum of flat heal bonuses that are unconditionally active right now: open
+   * healBonus CD windows + bonusHeal of every armed synergy targeting this
+   * spell. NOT for target-conditional bonuses (missing/full-health).
+   */
+  activeFlatHealBonus?: number;
 }
 
 function formatCast(castMs: number): string {
@@ -44,11 +61,27 @@ function formatCooldown(cooldownMs: number | undefined): string | null {
   return `${(cooldownMs / 1000).toFixed(0)}s`;
 }
 
-function effectLine(spell: SpellDef): { text: string; tone: SpellEffectTone } {
+/**
+ * Combined flat bonus to show in the parenthetical: relic bonusHealing +
+ * talent-baked delta (loadout heal minus catalog base) + active flat buffs.
+ * Returns 0 for damage spells (bonus is irrelevant to the damage line).
+ */
+function combinedHealBonus(spell: SpellDef, options: BuildSpellCardOptions): number {
+  if ((spell.damage ?? 0) > 0 || spell.heal <= 0) return 0;
+  const relicBonus = options.bonusHealing ?? 0;
+  const catalogBase = options.catalogHeal ?? spellById(spell.id)?.heal ?? spell.heal;
+  const talentBaked = Math.max(0, spell.heal - catalogBase);
+  const activeFlat = options.activeFlatHealBonus ?? 0;
+  return relicBonus + talentBaked + activeFlat;
+}
+
+function effectLine(spell: SpellDef, options: BuildSpellCardOptions): { text: string; tone: SpellEffectTone } {
   if ((spell.damage ?? 0) > 0) {
     return { text: `Damage front ${spell.damage}`, tone: 'damage' };
   }
-  return { text: `Heal target ${spell.heal}`, tone: 'heal' };
+  const bonus = combinedHealBonus(spell, options);
+  const bonusStr = bonus > 0 ? ` (+${bonus})` : '';
+  return { text: `Heal target ${spell.heal}${bonusStr}`, tone: 'heal' };
 }
 
 function spellName(id: string, loadout: CombatMods): string {
@@ -101,7 +134,7 @@ function loadoutNotes(spell: SpellDef, loadout: CombatMods): string[] {
 
 /** Builds the slot-card model for one spell (combat hover or tree unlock). */
 export function buildSpellCard(spell: SpellDef, options: BuildSpellCardOptions = {}): SpellCardModel {
-  const { text: effect, tone: effectTone } = effectLine(spell);
+  const { text: effect, tone: effectTone } = effectLine(spell, options);
   const description =
     options.description !== undefined ? options.description : (spell.description ?? null);
   const notes = [
