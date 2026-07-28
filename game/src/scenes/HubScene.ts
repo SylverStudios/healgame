@@ -29,7 +29,7 @@ import type { CombatSceneData } from './CombatScene';
 import type { DungeonDef } from '../data/content/types';
 import { loadTelemetry, recordReset, sendPlaytestMail } from '../telemetry';
 import { FONT, FONT_SIZE_SM, FONT_SIZE_LG, PALETTE, PALETTE_NUM } from '../ui/theme';
-import { addBanner, addButton, addPanel } from '../ui/panels';
+import { addBanner, addButton, addPanel, type FrameState } from '../ui/panels';
 import { COMBAT_ENTRY_FADE_OUT_MS, fadeInOnCreate, fadeToScene } from '../ui/transitions';
 
 type HubSceneData = HubCombatSceneData;
@@ -180,7 +180,7 @@ export class HubScene extends Phaser.Scene {
     // block if it helps") — sized around the two text lines below.
     addPanel(this, width / 2, 94, 560, 56, { size: 'sm' });
     this.add
-      .text(width / 2, 82, `Level ${level}   •   Talent Points ${availableTalentPoints(save)} unplaced`, {
+      .text(width / 2, 82, `Level ${level}`, {
         fontFamily: FONT,
         fontSize: FONT_SIZE_SM,
         color: TEXT_COLOR,
@@ -223,9 +223,16 @@ export class HubScene extends Phaser.Scene {
 
     // Meta destinations stay above the dungeon stack so a long unlock list
     // never pushes Talent Tree / Spellbook off the 540px canvas.
-    this.makeButton(centerX - 160, metaButtonY, 280, META_BUTTON_H, 'Talent Tree', () => {
-      fadeToScene(this, SceneKeys.Tree);
-    }, 'hubTree');
+    const unspent = availableTalentPoints(save);
+    const treeHighlight = unspent > 0
+      ? { frameState: 'current' as FrameState, labelColor: ACCENT_COLOR, fillColor: BUTTON_CURRENT_COLOR }
+      : undefined;
+    this.makeButton(centerX - 160, metaButtonY, 280, META_BUTTON_H,
+      unspent > 0 ? `Talent Tree  •  ${unspent}` : 'Talent Tree',
+      () => { fadeToScene(this, SceneKeys.Tree); },
+      'hubTree',
+      treeHighlight,
+    );
     this.makeButton(centerX + 160, metaButtonY, 280, META_BUTTON_H, 'Spellbook', () => {
       fadeToScene(this, SceneKeys.Loadout);
     }, 'hubLoadout');
@@ -468,18 +475,23 @@ export class HubScene extends Phaser.Scene {
     label: string,
     onClick: () => void,
     name: string,
+    opts: { frameState?: FrameState; labelColor?: string; fillColor?: number } = {},
   ): void {
     const rect = this.add
       .rectangle(x, y, w, h, BUTTON_COLOR)
       .setStrokeStyle(2, BORDER_COLOR)
       .setInteractive({ useHandCursor: true })
       .setName(name);
-    addButton(this, x, y, w, h, { fillColor: PALETTE_NUM.panelLight, hitRect: rect });
+    addButton(this, x, y, w, h, {
+      fillColor: opts.fillColor ?? PALETTE_NUM.panelLight,
+      state: opts.frameState ?? 'normal',
+      hitRect: rect,
+    });
     this.add
       .text(x, y, label, {
         fontFamily: FONT,
         fontSize: FONT_SIZE_SM,
-        color: TEXT_COLOR,
+        color: opts.labelColor ?? TEXT_COLOR,
         wordWrap: { width: w - 24 },
         align: 'center',
       })

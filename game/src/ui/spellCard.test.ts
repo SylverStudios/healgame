@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SPELLS } from '../data/constants';
+import type { SpellDef } from '../combat/types';
 import type { CombatMods } from '../data/talentTree';
 import { buildSpellCard } from './spellCard';
 
@@ -69,5 +70,52 @@ describe('buildSpellCard', () => {
     expect(card.name).toBe('Solemn Vigil');
     expect(card.effect).toBe('Heal target 6');
     expect(card.description).toBe('Swear the Vigil oath (locks out the Zealot).');
+  });
+});
+
+describe('buildSpellCard (+N) heal bonus', () => {
+  it('shows no (+N) when no bonus applies', () => {
+    const card = buildSpellCard(SPELLS.solemnMend);
+    expect(card.effect).toBe('Heal target 4');
+  });
+
+  it('adds (+N) for relic bonusHealing only', () => {
+    const card = buildSpellCard(SPELLS.solemnMend, { bonusHealing: 1 });
+    expect(card.effect).toBe('Heal target 4 (+1)');
+  });
+
+  it('adds (+N) for talent-baked heal delta (loadout heal > catalog base)', () => {
+    // Talent bumps solemn-mend from catalog 4 → 6; delta = 2.
+    // Effect line always shows catalog base: Heal target 4 (+2).
+    const talentSpell: SpellDef = { ...SPELLS.solemnMend, heal: 6 };
+    const card = buildSpellCard(talentSpell);
+    expect(card.effect).toBe('Heal target 4 (+2)');
+  });
+
+  it('combines relic + talent-baked + activeFlatHealBonus into a single (+N)', () => {
+    // talent: 6 - 4 = 2; relic: 1; activeFlat: 3 → combined 6
+    const talentSpell: SpellDef = { ...SPELLS.solemnMend, heal: 6 };
+    const card = buildSpellCard(talentSpell, { bonusHealing: 1, activeFlatHealBonus: 3 });
+    expect(card.effect).toBe('Heal target 4 (+6)');
+  });
+
+  it('leaves damage spell effect unchanged when bonusHealing is set', () => {
+    const card = buildSpellCard(SPELLS.vowstrikeVirtue, { bonusHealing: 5, activeFlatHealBonus: 2 });
+    expect(card.effect).toBe('Damage front 5');
+  });
+
+  it('does not include target-conditional bonuses (missing/full health) in (+N)', () => {
+    const loadout: CombatMods = {
+      ...emptyLoadout,
+      spells: [SPELLS.solemnMend],
+      missingHealthBonuses: [{ spellId: SPELLS.solemnMend.id, healPer10PctMissing: 2 }],
+      fullHealthBonuses: [{ spellId: SPELLS.solemnMend.id, hpPctAtLeast: 80, bonusHeal: 1 }],
+    };
+    const card = buildSpellCard(SPELLS.solemnMend, { loadout });
+    // No relic / talent / activeFlat passed → no (+N)
+    expect(card.effect).toBe('Heal target 4');
+    // Conditional bonuses still appear in notes
+    expect(card.notes.some((n) => n.includes('missing'))).toBe(true);
+    expect(card.notes.some((n) => n.includes('80%'))).toBe(true);
   });
 });
