@@ -27,7 +27,7 @@ const SOUND_UNLOCKED_EVENT = 'unlocked';
 
 export const MUSIC_ASSET_KEY = 'bg-music';
 /** Single source of truth for the audio file path — see file header. */
-export const MUSIC_URL = 'assets/audio/stock-ambient-loop.wav';
+export const MUSIC_URL = 'assets/audio/supervirus-bg-music.mp3';
 
 let activeGame: Phaser.Game | null = null;
 let activeSound: Phaser.Sound.BaseSound | null = null;
