@@ -79,9 +79,11 @@ function effectLine(spell: SpellDef, options: BuildSpellCardOptions): { text: st
   if ((spell.damage ?? 0) > 0) {
     return { text: `Damage front ${spell.damage}`, tone: 'damage' };
   }
+  // Always show catalog base heal; talent-baked deltas fold into (+N).
+  const catalogBase = options.catalogHeal ?? spellById(spell.id)?.heal ?? spell.heal;
   const bonus = combinedHealBonus(spell, options);
   const bonusStr = bonus > 0 ? ` (+${bonus})` : '';
-  return { text: `Heal target ${spell.heal}${bonusStr}`, tone: 'heal' };
+  return { text: `Heal target ${catalogBase}${bonusStr}`, tone: 'heal' };
 }
 
 function spellName(id: string, loadout: CombatMods): string {

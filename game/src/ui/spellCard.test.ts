@@ -85,17 +85,18 @@ describe('buildSpellCard (+N) heal bonus', () => {
   });
 
   it('adds (+N) for talent-baked heal delta (loadout heal > catalog base)', () => {
-    // Talent bumps solemn-mend from catalog 4 → 6; delta = 2
+    // Talent bumps solemn-mend from catalog 4 → 6; delta = 2.
+    // Effect line always shows catalog base: Heal target 4 (+2).
     const talentSpell: SpellDef = { ...SPELLS.solemnMend, heal: 6 };
     const card = buildSpellCard(talentSpell);
-    expect(card.effect).toBe('Heal target 6 (+2)');
+    expect(card.effect).toBe('Heal target 4 (+2)');
   });
 
   it('combines relic + talent-baked + activeFlatHealBonus into a single (+N)', () => {
     // talent: 6 - 4 = 2; relic: 1; activeFlat: 3 → combined 6
     const talentSpell: SpellDef = { ...SPELLS.solemnMend, heal: 6 };
     const card = buildSpellCard(talentSpell, { bonusHealing: 1, activeFlatHealBonus: 3 });
-    expect(card.effect).toBe('Heal target 6 (+6)');
+    expect(card.effect).toBe('Heal target 4 (+6)');
   });
 
   it('leaves damage spell effect unchanged when bonusHealing is set', () => {
