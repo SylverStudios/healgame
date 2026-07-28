@@ -11,6 +11,7 @@
 
 import { buildGlyphFromTree, type BuildGlyph } from '../tree';
 import { ownedIdsFromLegacyRanks, TALENT_TREE } from '../data/talentTree';
+import { levelForXp } from '../data/constants';
 import type { RunRecord, SavedGlyph } from '../save/save';
 
 export interface RunSummaryViewModel {
@@ -23,6 +24,18 @@ export interface RunSummaryViewModel {
   /** engine.rewards.xp at combat end — accrues per kill, survives wipes. */
   xpGained: number;
   glyph: BuildGlyph;
+  /** Whether this fight caused at least one level gain. */
+  leveledUp: boolean;
+  /** Player level computed from XP before this fight. */
+  levelBefore: number;
+  /** Player level computed from XP after this fight. */
+  levelAfter: number;
+  /**
+   * Human-readable level-up status. `"Level N → M"` when leveled (covers
+   * multi-level jumps); `"No level-up"` when the fight didn't cross a
+   * threshold.
+   */
+  levelUpLabel: string | null;
 }
 
 /** True when the lit path has at least one edge to draw (any owned tree progress). */
@@ -35,14 +48,32 @@ export function buildRunSummary(args: {
   status: 'victory' | 'wipe';
   xp: number;
   treeRanks: Record<string, number>;
+  /**
+   * Player's total XP at the start of this fight (before rewards). Defaults
+   * to 0 when omitted so existing callers that have not yet been updated
+   * continue to type-check; level-up fields will be inaccurate until the
+   * caller is updated to pass the real pre-fight XP.
+   */
+  preFightXp?: number;
 }): RunSummaryViewModel {
   const owned = new Set(ownedIdsFromLegacyRanks(args.treeRanks));
   const glyph = buildGlyphFromTree(TALENT_TREE, owned);
+
+  const preFightXp = args.preFightXp ?? 0;
+  const levelBefore = levelForXp(preFightXp);
+  const levelAfter = levelForXp(preFightXp + args.xp);
+  const leveledUp = levelAfter > levelBefore;
+  const levelUpLabel = leveledUp ? `Level ${levelBefore} → ${levelAfter}` : 'No level-up';
+
   return {
     outcome: args.status,
     outcomeLabel: args.status === 'victory' ? 'VICTORY' : null,
     xpGained: args.xp,
     glyph,
+    leveledUp,
+    levelBefore,
+    levelAfter,
+    levelUpLabel,
   };
 }
 
