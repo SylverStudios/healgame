@@ -42,7 +42,7 @@ import { addBanner, addPanel, addButton } from '../ui/panels';
 import {
   OVERLAY_DEPTH, OVERLAY_ALPHA, OVERLAY_FADE_MS, PANEL_WIDTH, PANEL_HEIGHT, PANEL_SLIDE_OFFSET,
   PANEL_SLIDE_DELAY_MS, PANEL_SLIDE_MS, TITLE_DELAY_MS, TITLE_REVEAL_MS, XP_DELAY_MS, XP_REVEAL_MS,
-  GLYPH_DELAY_MS, GLYPH_REVEAL_MS, GLYPH_CELL, GLYPH_COLOR, RETURN_DELAY_MS, RETURN_REVEAL_MS,
+  LEVEL_UP_DELAY_MS, LEVEL_UP_REVEAL_MS, GLYPH_DELAY_MS, GLYPH_REVEAL_MS, GLYPH_CELL, GLYPH_COLOR, RETURN_DELAY_MS, RETURN_REVEAL_MS,
 } from '../ui/resultPanel';
 import { CombatLog } from '../ui/combatLog';
 import { FONT, FONT_SIZE_XS, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG, PALETTE_NUM } from '../ui/theme';
@@ -1070,7 +1070,7 @@ export class CombatScene extends Phaser.Scene {
     this.resultShown = true;
 
     const { xp } = this.engine.rewards;
-    const summary = buildRunSummary({ status, xp, treeRanks: this.save.treeRanks });
+    const summary = buildRunSummary({ status, xp, treeRanks: this.save.treeRanks, preFightXp: this.save.xp });
     const centerX = VIEW_WIDTH / 2;
     const centerY = VIEW_HEIGHT / 2;
 
@@ -1131,6 +1131,12 @@ export class CombatScene extends Phaser.Scene {
       .setDepth(OVERLAY_DEPTH + 2)
       .setAlpha(0);
     this.tweens.add({ targets: xpText, alpha: 1, delay: XP_DELAY_MS, duration: XP_REVEAL_MS });
+
+    if (summary.levelUpLabel !== null) {
+      const lvlText = this.add.text(centerX, centerY - 50, summary.levelUpLabel,
+        { fontFamily: FONT, fontSize: FONT_SIZE_XS, color: '#a89888' }).setOrigin(0.5).setDepth(OVERLAY_DEPTH + 2).setAlpha(0);
+      this.tweens.add({ targets: lvlText, alpha: 1, delay: LEVEL_UP_DELAY_MS, duration: LEVEL_UP_REVEAL_MS });
+    }
 
     if (hasBuildGlyph(summary.glyph)) {
       const glyphLabel = this.add

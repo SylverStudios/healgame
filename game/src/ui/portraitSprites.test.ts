@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PORTRAIT_UNIT_IDS, portraitTextureKey, portraitTextureUrl, portraitTextures } from './portraitSprites';
+import { PORTRAIT_UNIT_IDS, portraitTextureKey, portraitTextureUrl, portraitTextures, resultPortraitUnit } from './portraitSprites';
 
 describe('portraitSprites', () => {
   it('covers healer + tank (BanterSpeaker values) plus both DPS slots', () => {
@@ -23,5 +23,15 @@ describe('portraitSprites', () => {
     for (const id of PORTRAIT_UNIT_IDS) {
       expect(keys).toContain(portraitTextureKey(id));
     }
+  });
+});
+
+describe('resultPortraitUnit', () => {
+  it('returns healer on victory', () => {
+    expect(resultPortraitUnit('victory')).toBe('healer');
+  });
+
+  it('returns healer on wipe (result bust is always the healer)', () => {
+    expect(resultPortraitUnit('wipe')).toBe('healer');
   });
 });

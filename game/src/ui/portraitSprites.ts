@@ -4,7 +4,7 @@
  * Presentation-only — party identity lives in data/ (banter.ts's
  * BanterSpeaker, save/loadout); this module only maps a unit/speaker id to
  * a texture. Shown beside banter speech bubbles, on the tutorial screen,
- * and on the combat result panel (victory = healer, wipe = tank).
+ * and on the combat result panel (healer on both victory and wipe).
  *
  * Registry mirrors relicSprites.ts/spellSprites.ts's pattern: BootScene
  * preloads every id below; callers check `scene.textures.exists(...)` and
@@ -16,6 +16,8 @@
  * 'sm' frame + portrait Image" inset both TutorialScene and CombatScene's
  * result overlay draw, factored out once instead of duplicated twice (the
  * duplication originally pushed CombatScene.ts over eslint's max-lines cap).
+ * `resultPortraitUnit` picks the result-bust unit id — always 'healer' on
+ * both victory and wipe (the result panel represents the healer's journey).
  */
 
 import Phaser from 'phaser';
@@ -116,12 +118,23 @@ export function resultPortraitPosition(centerX: number, centerY: number, panelWi
 }
 
 /**
- * CombatScene's `showResultOverlay` in one call: healer bust on victory, tank bust on wipe
- * (the locked banter triggers), positioned via `resultPortraitPosition`, revealed with the
- * caller's own stagger timing. Bundling the whole "which speaker / where / when" decision
- * here (rather than in CombatScene.ts, this module's only caller for it) keeps that file's
- * showResultOverlay wiring to a single line — CombatScene.ts sits right at eslint's
- * max-lines cap, so every chunk touching it has to budget lines carefully.
+ * Pure unit-choice for the result-overlay bust: always 'healer' on both victory
+ * and wipe — the result panel represents the healer's journey regardless of
+ * outcome. (Banter speakers are a separate concern: wipe banter fires from the
+ * tank, victory banter from the healer — that is unchanged.)
+ */
+export function resultPortraitUnit(_status: 'victory' | 'wipe'): string {
+  return 'healer';
+}
+
+/**
+ * CombatScene's `showResultOverlay` in one call: healer bust on both victory and
+ * wipe, positioned via `resultPortraitPosition`, revealed with the caller's own
+ * stagger timing. Bundling the whole "which unit / where / when" decision here
+ * (rather than in CombatScene.ts, this module's only caller for it) keeps that
+ * file's showResultOverlay wiring to a single line — CombatScene.ts sits right
+ * at eslint's max-lines cap, so every chunk touching it has to budget lines
+ * carefully.
  */
 export function revealResultPortrait(
   scene: Phaser.Scene,
@@ -133,5 +146,5 @@ export function revealResultPortrait(
   reveal: { delay: number; duration: number },
 ): void {
   const pos = resultPortraitPosition(centerX, centerY, panelWidth);
-  revealFramedPortrait(scene, pos.x, pos.y, status === 'wipe' ? 'tank' : 'healer', depth, reveal);
+  revealFramedPortrait(scene, pos.x, pos.y, resultPortraitUnit(status), depth, reveal);
 }
