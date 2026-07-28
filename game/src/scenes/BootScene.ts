@@ -19,6 +19,9 @@ import {
   TANK_TEXTURE_URL,
   UNIT_ATTACK_ANIMS,
   UNIT_HURT_ANIMS,
+  ARROW_HIT_FRAME_SIZE,
+  ARROW_HIT_TEXTURE_KEY,
+  ARROW_HIT_URL,
   ZAP_VFX_FRAME_SIZE,
   ZAP_VFX_TEXTURE_KEY,
   ZAP_VFX_URL,
@@ -70,6 +73,11 @@ export class BootScene extends Phaser.Scene {
     this.load.spritesheet(ZAP_VFX_TEXTURE_KEY, ZAP_VFX_URL, {
       frameWidth: ZAP_VFX_FRAME_SIZE,
       frameHeight: ZAP_VFX_FRAME_SIZE,
+    });
+    // Archer (dps2) stuck-arrow hit VFX — presentation-only; see arrowHitFx.ts.
+    this.load.spritesheet(ARROW_HIT_TEXTURE_KEY, ARROW_HIT_URL, {
+      frameWidth: ARROW_HIT_FRAME_SIZE,
+      frameHeight: ARROW_HIT_FRAME_SIZE,
     });
     // PixelLab stills — single images, authored facing (no flipX at draw time).
     this.load.image(TANK_TEXTURE_KEY, TANK_TEXTURE_URL);

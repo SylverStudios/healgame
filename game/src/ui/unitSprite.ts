@@ -67,8 +67,8 @@ const HP_COLOR = '#e8d8c8';
 
 const DAMAGE_FLASH_COLOR = 0xff3b30;
 const HEAL_FLASH_COLOR = 0x3ce06a;
-const FLASH_ALPHA = 0.65;
-const FLASH_DURATION_MS = 260;
+const CAST_FLASH_COLOR = 0xf2c14e;
+const FLASH_DURATION_MS = 180;
 
 /** Locked visual decisions (phase-2-handoff): lunge 12px, out 90ms / back 120ms.
  *  Used by Kenney enemies / boss / healer — PixelLab party mercs play attack strips in place. */
@@ -248,6 +248,9 @@ export class UnitSprite {
   /** v0.3 chunk F: boss telegraph state — a repeating tween drives tint/scale/offset each tick. */
   private telegraphActive = false;
   private telegraphTween: Phaser.Tweens.Tween | null = null;
+  /** Hit/cast juice owns body tint briefly — syncFromUnit must not clearTint mid-flash. */
+  private flashActive = false;
+  private flashTween: Phaser.Tweens.Tween | null = null;
 
   constructor(unit: Unit, config: UnitSpriteConfig) {
     const { scene, x, y, width, height, showMana, clickable, onClick, facing } = config;
@@ -411,7 +414,7 @@ export class UnitSprite {
         // v0.3 §Coyote: a dying unit is downed but savable — death visuals (tint/shrink below)
         // wait for true death (`alive` flipping), which the engine defers past the grace window.
         if (unit.dying) this.body.setTint(DYING_TINT);
-        else this.body.clearTint();
+        else if (!this.flashActive) this.body.clearTint();
         this.body.setAlpha(1);
         // setDisplaySize (not setScale) — the image is already scaled up from its 16×16 source
         // frame, so raw scale values would shrink it to tile size.
@@ -421,6 +424,7 @@ export class UnitSprite {
       this.manaBar?.setVisible(true);
     } else {
       this.stopTelegraph();
+      this.clearFlash();
       this.pendingCharge = false;
       this.stopChargeCycle();
       this.releaseActive = false;
@@ -646,7 +650,7 @@ export class UnitSprite {
 
   /** Brief ember flash when the healer begins a cast (handoff §N). */
   flashCast(): void {
-    this.flash(0xf2c14e);
+    this.flash(CAST_FLASH_COLOR);
   }
 
   /** Brief red flash for a damage event on this unit. */
@@ -659,16 +663,32 @@ export class UnitSprite {
     this.flash(HEAL_FLASH_COLOR);
   }
 
+  /**
+   * Tint only opaque body pixels — never a full-box rectangle (that reads as a
+   * yellow/red/green square around transparent sprite padding).
+   */
   private flash(color: number): void {
-    const overlay = this.scene.add
-      .rectangle(this.homeX, this.homeY, this.width, this.height, color, FLASH_ALPHA)
-      .setDepth(10);
-    this.scene.tweens.add({
-      targets: overlay,
-      alpha: 0,
+    if (this.telegraphActive) return;
+    this.flashTween?.remove();
+    this.flashActive = true;
+    this.body.setTint(color);
+    const proxy = { t: 1 };
+    this.flashTween = this.scene.tweens.add({
+      targets: proxy,
+      t: 0,
       duration: FLASH_DURATION_MS,
-      onComplete: () => overlay.destroy(),
+      onComplete: () => {
+        this.flashTween = null;
+        this.flashActive = false;
+        if (!this.telegraphActive) this.body.clearTint();
+      },
     });
+  }
+
+  private clearFlash(): void {
+    this.flashTween?.remove();
+    this.flashTween = null;
+    this.flashActive = false;
   }
 
   // ---- Healer charge / cast-action (no-op without casterAnim) ----------------------------
@@ -858,6 +878,7 @@ export class UnitSprite {
     this.body.stop();
     this.telegraphTween?.remove();
     this.telegraphTween = null;
+    this.clearFlash();
     this.pendingCharge = false;
     this.stopChargeCycle();
     this.releaseActive = false;
