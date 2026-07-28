@@ -133,6 +133,20 @@ export const DPS1_HURT_FRAME_DURATIONS_MS: readonly number[] = [50, 100, 150, 83
 export const DPS2_ATTACK_FRAME_DURATIONS_MS: readonly number[] = [
   50, 100, 33, 167, 67, 83, 100,
 ] as const;
+/**
+ * First frame where the bow arm is clearly raised east (snap into draw).
+ * Stuck-arrow VFX plays just after this frame completes.
+ */
+export const DPS2_ATTACK_BOW_RAISED_FRAME_INDEX = 2;
+/**
+ * Delay stuck-arrow hit presentation until just after the bow-raised snap
+ * (start of the held-draw frame). Engine damage is instant; this is
+ * presentation-only — mirrors healer zap impact lead.
+ */
+export const DPS2_ARROW_HIT_LEAD_MS: number = DPS2_ATTACK_FRAME_DURATIONS_MS.slice(
+  0,
+  DPS2_ATTACK_BOW_RAISED_FRAME_INDEX + 1,
+).reduce((sum, ms) => sum + ms, 0);
 
 /**
  * DPS2's hurt reaction exposure sheet (5 frames): quick antic, snap into the
@@ -527,6 +541,22 @@ export const ZAP_VFX_FRAME_SIZE = 32;
 export const ZAP_VFX_FRAME_COUNT = 6;
 /** Per-frame holds: quick pop, brief dwell on the flash, fade. Not equal times. */
 export const ZAP_VFX_FRAME_DURATIONS_MS: readonly number[] = [50, 67, 100, 83, 67, 50] as const;
+
+/**
+ * Archer (dps2) stuck-arrow hit VFX — packed row: flight · embed · burst×4
+ * (192×32 = 6 frames of 32×32). Presentation-only; see `arrowHitFx.ts`.
+ * Flight frame is kept in the sheet for regen/reference; runtime plays embed
+ * + burst at the target (no on-screen travel — suggests near-instant flight).
+ */
+export const ARROW_HIT_TEXTURE_KEY = 'arrow-hit';
+export const ARROW_HIT_URL = 'assets/arrow-hit.png';
+export const ARROW_HIT_FRAME_SIZE = 32;
+export const ARROW_HIT_FLIGHT_FRAME = 0;
+export const ARROW_HIT_EMBED_FRAME = 1;
+export const ARROW_HIT_BURST_FRAME_START = 2;
+export const ARROW_HIT_BURST_FRAME_COUNT = 4;
+/** Per-frame holds for the pale ash burst — not equal times. */
+export const ARROW_HIT_BURST_DURATIONS_MS: readonly number[] = [50, 67, 83, 67] as const;
 
 const FRAME = {
   wizard: 84, // purple robed caster — the player healer

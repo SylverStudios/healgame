@@ -50,6 +50,10 @@ import {
   UNIT_HURT_ANIMS,
   ZAP_VFX_FRAME_COUNT,
   ZAP_VFX_FRAME_DURATIONS_MS,
+  ARROW_HIT_BURST_FRAME_COUNT,
+  ARROW_HIT_BURST_DURATIONS_MS,
+  DPS2_ARROW_HIT_LEAD_MS,
+  DPS2_ATTACK_BOW_RAISED_FRAME_INDEX,
 } from './sprites';
 
 function catalogUnit(id: string, role: UnitRole, mobId?: string) {
@@ -332,6 +336,22 @@ describe('healer idle / zap exposure sheets (chunk 1B)', () => {
 
   it('keeps the zap impact VFX exposure sheet matched to its frame count', () => {
     expect(ZAP_VFX_FRAME_DURATIONS_MS.length).toBe(ZAP_VFX_FRAME_COUNT);
+  });
+
+  it('keeps the arrow-hit burst exposure sheet matched and uneven', () => {
+    expect(ARROW_HIT_BURST_DURATIONS_MS.length).toBe(ARROW_HIT_BURST_FRAME_COUNT);
+    expect(new Set(ARROW_HIT_BURST_DURATIONS_MS).size).toBeGreaterThan(1);
+  });
+
+  it('delays the stuck-arrow VFX until just after the bow-raised attack frame', () => {
+    expect(DPS2_ATTACK_BOW_RAISED_FRAME_INDEX).toBe(2);
+    expect(DPS2_ARROW_HIT_LEAD_MS).toBe(
+      DPS2_ATTACK_FRAME_DURATIONS_MS.slice(0, DPS2_ATTACK_BOW_RAISED_FRAME_INDEX + 1).reduce(
+        (sum, ms) => sum + ms,
+        0,
+      ),
+    );
+    expect(DPS2_ARROW_HIT_LEAD_MS).toBe(183);
   });
 });
 

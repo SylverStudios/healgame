@@ -1,9 +1,6 @@
 /**
- * Chunk 2 — the facing-line combat view (poc-spec §4). Drives the pure
- * CombatEngine from update()/advance(delta) and renders its state with
- * geometric temp art only (tech-options.md "Temp art plan"): colored rects,
- * flat bars, text. Party on the left facing right, current wave/boss on the
- * right facing left, spell bar + cast bars along the bottom/top.
+ * Facing-line combat view (poc-spec §4). Drives CombatEngine via
+ * update()/advance(delta); party left / enemies right; spell bar along bottom.
  */
 
 import Phaser from 'phaser';
@@ -59,6 +56,7 @@ import {
   showZapImpact,
 } from '../ui/combatFx';
 import { castBarShakeOffset } from '../ui/castBarShake';
+import { showArrowHit } from '../ui/arrowHitFx';
 import { PaceToggle } from '../ui/paceToggle';
 import { loadSave, saveGame, type SaveData } from '../save/save';
 import { relicsById } from '../data/relics';
@@ -101,10 +99,7 @@ export interface CombatResult {
 const VIEW_WIDTH = 960;
 const VIEW_HEIGHT = 540;
 
-// Side-view facing line (side-view-layout-handoff §A/§C): party on the left
-// facing right, enemies on the right facing left, everyone bottom-aligned to
-// one shared ground Y (units have different heights, so their container
-// centers differ — see groundAnchorY()).
+// Side-view facing line: party left, enemies right, shared ground Y (see groundAnchorY).
 const GROUND_Y = 340;
 const PARTY_SLOT_LEFT = 80;
 const PARTY_SLOT_RIGHT = 380;
@@ -694,17 +689,24 @@ export class CombatScene extends Phaser.Scene {
             });
             pendingHealerImpact = null;
           } else {
-            victim?.flashDamage();
-            victim?.spawnDamageFloat(event.amount);
-            victim?.playHurt(); // no-op unless UNIT_HURT_ANIMS wires this unit
             if (attacker) {
-              const attackerUnit = this.engine.state.party.find((u) => u.id === event.sourceId);
-              if (attackerUnit?.role === 'tank' || attackerUnit?.role === 'dps') {
-                attacker.playAttack();
-              } else {
-                attacker.lunge(victim?.getHomeX() ?? attacker.getHomeX());
-              }
+              const au = this.engine.state.party.find((u) => u.id === event.sourceId);
+              if (au?.role === 'tank' || au?.role === 'dps') attacker.playAttack();
+              else attacker.lunge(victim?.getHomeX() ?? attacker.getHomeX());
             }
+            const applyHit = () => {
+              victim?.flashDamage();
+              victim?.spawnDamageFloat(event.amount);
+              victim?.playHurt();
+            };
+            // presentation: archer stuck-arrow VFX (optional)
+            if (event.sourceId === 'dps2' && victim) {
+              showArrowHit(this, {
+                targetX: victim.getHomeX(),
+                targetY: victim.getHomeY(),
+                onContact: applyHit,
+              });
+            } else applyHit();
           }
           this.combatLog.push(
             `${this.formatTimestamp()} ${this.resolveUnitName(event.sourceId)} hits ${this.resolveUnitName(event.targetId)} -${event.amount}`,
@@ -1178,8 +1180,7 @@ export class CombatScene extends Phaser.Scene {
       .setDepth(OVERLAY_DEPTH + 3)
       .setAlpha(0);
 
-    // All result objects (especially combatReturn) exist immediately; only
-    // their presentation is staged, so semantic journey lookup remains stable.
+    // combatReturn exists immediately; only alpha is staged (journey-stable).
     this.tweens.add({
       targets: [returnButton, returnFrame.container, returnText],
       alpha: 1,

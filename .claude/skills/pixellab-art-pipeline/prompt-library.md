@@ -181,3 +181,38 @@ healer zap and boss specials that need a target read:
   `animate_object`, or RetroDiffusion / hand-author like heal-vfx.
 - Zap impact: small pale-gold spark burst, clearly weaker than the green
   heal sparkle. Keep palette family per STYLE.md.
+
+### VFX — archer stuck-arrow hit
+
+Approved 2026-07-27. Source: `art/source/arrow-hit/`. Runtime sheet:
+`game/public/assets/arrow-hit.png` (flight · embed · burst×4). Presentation
+helper: `game/src/ui/arrowHitFx.ts`.
+
+Horizontal embed on purpose — vertical stubs read as ground-planted; the
+side-impact read needs the shaft still pointing east into the enemy.
+
+#### Flight still (approved)
+
+Tool: `create_image_pixen` · 32×32 · `no_background=true` · `view=side` ·
+`direction=east` · `outline=single color black outline` · `detail=low detail`
+
+> Simple dark-fantasy war arrow in side view pointing east, short iron head, plain wooden shaft, small fletching, single-color black outline, chunky 32px Fire Emblem GBA battle-sprite pixels, transparent background, readable silhouette, grim iron and ash wood, not cute, not cartoonish, no character, no hand, no bow
+
+- Job id: `1234ebf7-242a-4cbd-b2c8-02d9fa554c31`
+- Shipped file: `art/source/arrow-hit/flight.png` (draft-a-flight)
+
+#### Embed / contact still (approved — H-manual)
+
+Deterministic tip-clip of the approved flight still (not a fresh gen): clear
+columns `x ≥ 18`, add 2–3 pale dust pixels at the cut. Keeps exact A palette
+and horizontal east orientation.
+
+- Shipped file: `art/source/arrow-hit/embed.png`
+
+#### Burst motion (approved — hand ash chips)
+
+4 frames of sparse pale bone/ash woodchip pixels radiating from center then
+fading. Prefer Phaser-layered stills over `animate_image` (animate morphs the
+stub). Proposed exposures: **50, 67, 83, 67** ms.
+
+- Shipped files: `art/source/arrow-hit/burst/0.png` … `3.png`
