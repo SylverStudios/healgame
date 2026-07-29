@@ -46,6 +46,8 @@ const R_INNER = 55;
 const R1 = 115;
 /** Ring-2 spoke radius (offense / vowstrike-s1 / bonk-s1 / CDs / big-heal-s1 / heal-s2). */
 const R2 = 190;
+/** Ring-3 spoke radius (heal-s3 / offense-s2 / crown-wrath / crown-waters). */
+const R3 = 255;
 /** Circle node visual half-size — matches lattice TreeScene. */
 const NODE_RADIUS = 20;
 /** Gap between node edge and tooltip panel edge. */
@@ -129,6 +131,16 @@ const DISPLAY_SPOTS: readonly DisplaySpot[] = (() => {
   add('liturgy',      false, ['liturgy'],                                              p(R2, 135));
   add('big-heal-s1',  true,  ['big-heal-s1-prepared',      'big-heal-s1-thrifty'],    p(R2, 180));
   add('heal-s2',      true,  ['heal-s2-fast',              'heal-s2-slow'],            p(R2, 225));
+
+  // Ring 3 — 4 display spots (minLevel 10), placed outside Ring-2 neighbors
+  // heal-s3: continues the heal line (heal-s2 lives at 225°)
+  add('heal-s3',    true,  ['heal-s3-committed', 'heal-s3-thrifty'],  p(R3, 225));
+  // offense-s2: above, between bonk-s1 (0°) and vowstrike-s1 (315°)
+  add('offense-s2', true,  ['offense-s2-a', 'offense-s2-b'],          p(R3, 315));
+  // crown-waters: outside still-waters (45°). R3=255 keeps it visible at y≈449.
+  add('crown-waters', false, ['crown-waters'],                          p(R3, 40));
+  // crown-wrath: outside wrath (90°). Use shorter radius (r=225) so node stays above bottom edge.
+  add('crown-wrath',  false, ['crown-wrath'],                           polar(WHEEL_CX, WHEEL_CY, 225, 80));
 
   return spots;
 })();
@@ -374,6 +386,7 @@ export class RadialTreeScene extends Phaser.Scene {
     rings.strokeCircle(WHEEL_CX, WHEEL_CY, R_INNER + NODE_RADIUS + 7);
     rings.strokeCircle(WHEEL_CX, WHEEL_CY, R1 + NODE_RADIUS + 9);
     rings.strokeCircle(WHEEL_CX, WHEEL_CY, R2 + NODE_RADIUS + 9);
+    rings.strokeCircle(WHEEL_CX, WHEEL_CY, R3 + NODE_RADIUS + 9);
 
     // ── Spoke guide lines (centre → each non-root position) ──────────────
     const spokes = this.add.graphics().setDepth(1);
@@ -396,6 +409,15 @@ export class RadialTreeScene extends Phaser.Scene {
       .setDepth(HUD_DEPTH);
     this.add
       .text(ringLabelX, WHEEL_CY - (R2 - R1) / 2 - R1 / 2, 'Ring 2\nLv 5+', {
+        fontFamily: FONT,
+        fontSize: FONT_SIZE_XS,
+        color: DIM_COLOR,
+        align: 'right',
+      })
+      .setOrigin(1, 0.5)
+      .setDepth(HUD_DEPTH);
+    this.add
+      .text(ringLabelX, WHEEL_CY - (R3 - R2) / 2 - R2 / 2, 'Ring 3\nLv 10+', {
         fontFamily: FONT,
         fontSize: FONT_SIZE_XS,
         color: DIM_COLOR,

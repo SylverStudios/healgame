@@ -129,6 +129,10 @@ function applyEffectToMods(
           spell.heal = Math.max(0, spell.heal + effect.healDelta);
         if (effect.damageDelta !== undefined)
           spell.damage = Math.max(0, (spell.damage ?? 0) + effect.damageDelta);
+        if (effect.cooldownMsDelta !== undefined && spell.cooldownMs !== undefined)
+          spell.cooldownMs = Math.max(0, spell.cooldownMs + effect.cooldownMsDelta);
+        if (effect.castBuffCapDelta !== undefined && spell.castBuff?.kind === 'stackNextHealPotencyPct')
+          spell.castBuff = { ...spell.castBuff, cap: Math.max(1, spell.castBuff.cap + effect.castBuffCapDelta) };
       }
       break;
     }
@@ -168,6 +172,32 @@ function applyEffectToMods(
     case 'manaSynergy':
       // Engine support deferred to Chunk 4; data stored in tree, no CombatMods entry yet.
       break;
+
+    case 'upgradeCooldown': {
+      const cd = cooldownMap.get(effect.cooldownId);
+      if (!cd) break; // requires grantCooldown in the same resolve pass; no-op if absent
+      const cdEffect = cd.effect;
+      if (effect.healBonusDelta !== undefined && cdEffect.kind === 'healBonus') {
+        cooldownMap.set(effect.cooldownId, {
+          ...cd,
+          effect: { ...cdEffect, bonusHeal: cdEffect.bonusHeal + effect.healBonusDelta },
+        });
+      }
+      if (effect.durationMsDelta !== undefined && cdEffect.kind !== 'freeNextHeal') {
+        const timedEffect = cdEffect as { kind: string; durationMs: number };
+        cooldownMap.set(effect.cooldownId, {
+          ...cd,
+          effect: { ...cdEffect, durationMs: Math.max(0, timedEffect.durationMs + effect.durationMsDelta) } as typeof cdEffect,
+        });
+      }
+      if (effect.cooldownMsDelta !== undefined) {
+        cooldownMap.set(effect.cooldownId, {
+          ...cd,
+          cooldownMs: Math.max(0, cd.cooldownMs + effect.cooldownMsDelta),
+        });
+      }
+      break;
+    }
   }
 }
 

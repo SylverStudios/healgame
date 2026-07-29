@@ -35,8 +35,11 @@ export type RadialTreeEffect =
   | { kind: 'grantCooldown'; cooldownId: string }
   /**
    * Bake stat delta into a spell at loadout time.
-   * `damageDelta` is radial-only (not in the lattice castMod).
+   * `damageDelta` / `cooldownMsDelta` / `castBuffCapDelta` are radial-only.
    * Applied only if the spell is already in the loadout.
+   * `cooldownMsDelta`: added to `spell.cooldownMs` (clamped to 0 minimum).
+   * `castBuffCapDelta`: added to `spell.castBuff.cap` when the buff is
+   *   `stackNextHealPotencyPct` (Blessed Bonk stack cap).
    */
   | {
       kind: 'castMod';
@@ -45,6 +48,8 @@ export type RadialTreeEffect =
       manaDelta?: number;
       healDelta?: number;
       damageDelta?: number;
+      cooldownMsDelta?: number;
+      castBuffCapDelta?: number;
     }
   /** Arms a bonus heal when triggerSpellId completes and buffedSpellId fires next. */
   | { kind: 'synergy'; triggerSpellId: string; buffedSpellId: string; bonusHeal: number }
@@ -56,7 +61,22 @@ export type RadialTreeEffect =
   /** Flat bonus heal per 10% of target's HP missing. */
   | { kind: 'missingHealthBonus'; spellId: string; healPer10PctMissing: number }
   /** Bonus max mana. */
-  | { kind: 'bonusMaxMana'; amount: number };
+  | { kind: 'bonusMaxMana'; amount: number }
+  /**
+   * Upgrade an already-granted cooldown at loadout time.
+   * The cooldown must have been granted by a prior `grantCooldown` effect in
+   * the same resolve pass (ring 3 crown nodes require the ring 2 CD node).
+   * `healBonusDelta`: added to `healBonus.bonusHeal` on a `healBonus` cooldown.
+   * `durationMsDelta`: added to `durationMs` on any timed-effect cooldown.
+   * `cooldownMsDelta`: added to the cooldown's own `cooldownMs` (negative = shorter).
+   */
+  | {
+      kind: 'upgradeCooldown';
+      cooldownId: string;
+      healBonusDelta?: number;
+      durationMsDelta?: number;
+      cooldownMsDelta?: number;
+    };
 
 /** Content payload attached to each radial tree node (opaque to the tree service). */
 export interface RadialTreeContent {
@@ -88,6 +108,9 @@ export const RADIAL_CHOICE_TABLE: Record<string, ChoiceEntry> = {
   'vowstrike-s1': { a: 'vowstrike-s1-absolution', b: 'vowstrike-s1-reckoning' },
   'big-heal-s1': { a: 'big-heal-s1-prepared', b: 'big-heal-s1-thrifty' },
   'heal-s2': { a: 'heal-s2-fast', b: 'heal-s2-slow' },
+  // Ring 3
+  'heal-s3': { a: 'heal-s3-committed', b: 'heal-s3-thrifty' },
+  'offense-s2': { a: 'offense-s2-a', b: 'offense-s2-b' },
 };
 
 /** Free starter spots (cost 0; excluded from talent-point accounting). */
@@ -428,6 +451,144 @@ const healS2Slow = radialSpot(
 );
 
 // ---------------------------------------------------------------------------
+// Ring 3 — minLevel 10, cost 1 talent each
+// ---------------------------------------------------------------------------
+
+// heal-s3: further identity spike on the heal specialization line.
+// A = "Burning Faith" — +2 heal on your specialized heal (bigger committed hit).
+// B = "Thrifty Grace" — -1 mana on your specialized heal (sustain path).
+
+const healS3Committed = radialSpot(
+  'heal-s3-committed',
+  {
+    name: 'Burning Faith',
+    glyph: '!',
+    description: 'Your specialized Heal gains +2 heal. Commit, hit hard. Locks Thrifty Grace.',
+    effects: [
+      { kind: 'castMod', spellId: 'zealous-heal', healDelta: 2 },
+      { kind: 'castMod', spellId: 'solemn-heal', healDelta: 2 },
+    ],
+  },
+  {
+    exclusiveGroup: 'heal-s3',
+    minLevel: 10,
+    requires: { mode: 'any', nodes: ['heal-s2-fast', 'heal-s2-slow'] },
+  },
+);
+
+const healS3Thrifty = radialSpot(
+  'heal-s3-thrifty',
+  {
+    name: 'Thrifty Grace',
+    glyph: 'G',
+    description: 'Your specialized Heal costs 1 less mana. Sustain longer, heal often. Locks Burning Faith.',
+    effects: [
+      { kind: 'castMod', spellId: 'zealous-heal', manaDelta: -1 },
+      { kind: 'castMod', spellId: 'solemn-heal', manaDelta: -1 },
+    ],
+  },
+  {
+    exclusiveGroup: 'heal-s3',
+    minLevel: 10,
+    requires: { mode: 'any', nodes: ['heal-s2-fast', 'heal-s2-slow'] },
+  },
+);
+
+// offense-s2: further upgrade on the chosen offense line.
+// A = "Swift Conviction" — Vowstrike: -2s CD; Bonk: +1 damage.
+// B = "Crushing Blow"   — Vowstrike: +2 damage; Bonk: +1 Blessed Bonk stack cap.
+
+const offenseS2A = radialSpot(
+  'offense-s2-a',
+  {
+    name: 'Swift Conviction',
+    glyph: 'S',
+    description: 'Vowstrike: \u22122s cooldown. Bonk: +1 damage. Locks Crushing Blow.',
+    effects: [
+      { kind: 'castMod', spellId: 'vowstrike', cooldownMsDelta: -2000 },
+      { kind: 'castMod', spellId: 'vowstrike-absolution', cooldownMsDelta: -2000 },
+      { kind: 'castMod', spellId: 'vowstrike-reckoning', cooldownMsDelta: -2000 },
+      { kind: 'castMod', spellId: 'bonk', damageDelta: 1 },
+      { kind: 'castMod', spellId: 'mana-bonk', damageDelta: 1 },
+      { kind: 'castMod', spellId: 'blessed-bonk', damageDelta: 1 },
+    ],
+  },
+  {
+    exclusiveGroup: 'offense-s2',
+    minLevel: 10,
+    requires: {
+      mode: 'any',
+      nodes: [
+        'vowstrike-s1-absolution',
+        'vowstrike-s1-reckoning',
+        'bonk-s1-mana',
+        'bonk-s1-blessed',
+      ],
+    },
+  },
+);
+
+const offenseS2B = radialSpot(
+  'offense-s2-b',
+  {
+    name: 'Crushing Blow',
+    glyph: 'C',
+    description: 'Vowstrike: +2 damage. Bonk: +1 Blessed Bonk stack cap (cap 4). Locks Swift Conviction.',
+    effects: [
+      { kind: 'castMod', spellId: 'vowstrike', damageDelta: 2 },
+      { kind: 'castMod', spellId: 'vowstrike-absolution', damageDelta: 2 },
+      { kind: 'castMod', spellId: 'vowstrike-reckoning', damageDelta: 2 },
+      { kind: 'castMod', spellId: 'blessed-bonk', castBuffCapDelta: 1 },
+    ],
+  },
+  {
+    exclusiveGroup: 'offense-s2',
+    minLevel: 10,
+    requires: {
+      mode: 'any',
+      nodes: [
+        'vowstrike-s1-absolution',
+        'vowstrike-s1-reckoning',
+        'bonk-s1-mana',
+        'bonk-s1-blessed',
+      ],
+    },
+  },
+);
+
+// crown-wrath: upgrade Wrath Ascendant to grant +3 to heals (up from +2).
+
+const crownWrath = radialSpot(
+  'crown-wrath',
+  {
+    name: 'Wrath Crowned',
+    glyph: 'W',
+    description: 'Wrath Ascendant now grants +3 to heals (up from +2) during its window.',
+    effects: [{ kind: 'upgradeCooldown', cooldownId: 'wrath-ascendant', healBonusDelta: 1 }],
+  },
+  {
+    minLevel: 10,
+    requires: { mode: 'all', nodes: ['wrath'] },
+  },
+);
+
+// crown-waters: reduce Still Waters cooldown to 45s (from 60s).
+
+const crownWaters = radialSpot(
+  'crown-waters',
+  {
+    name: 'Blessed Reservoir',
+    glyph: 'R',
+    description: "Still Waters' cooldown is reduced to 45s (from 60s). The panic button recharges faster.",
+    effects: [{ kind: 'upgradeCooldown', cooldownId: 'still-waters', cooldownMsDelta: -15000 }],
+  },
+  {
+    minLevel: 10,
+    requires: { mode: 'all', nodes: ['still-waters'] },
+  },
+);
+
+// ---------------------------------------------------------------------------
 // Assemble RADIAL_TREE
 // ---------------------------------------------------------------------------
 
@@ -456,6 +617,13 @@ const ALL_SPOTS = [
   bigHealS1Thrifty,
   healS2Fast,
   healS2Slow,
+  // Ring 3
+  healS3Committed,
+  healS3Thrifty,
+  offenseS2A,
+  offenseS2B,
+  crownWrath,
+  crownWaters,
 ];
 
 export const RADIAL_TREE: TreeConfig = {

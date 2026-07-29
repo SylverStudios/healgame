@@ -258,7 +258,7 @@ try {
   await clickNamed(page, 'tutorialLearn');
   await page.waitForTimeout(800);
   let save = await readSave(page);
-  check(save?.version === 8, 'new saves are written as v8');
+  check(save?.version === 9, 'new saves are written as v9');
   check(save?.tutorialDone === true, 'tutorial click sets tutorialDone');
   check(save?.unlockedSpells.includes('solemn-mend') === true, 'Solemn Mend unlocked via tutorial');
   check(save?.unlockedSpells.includes('bonk') === true, 'Bonk is unlocked from the start');
@@ -643,6 +643,63 @@ try {
   await waitForNamed(page, 'hubSettings');
   check((await locate(page, 'hubSettings')) !== null, 'settingsBack returns to Hub (hubSettings visible again)');
   await shot(page, 'hub-after-settings');
+
+  // ---- Stage Radial: radial mode → Hub → Tree → Mend → heal-s1 specialize ----
+  console.log('Stage Radial: radial mode → buy Mend → specialize Heal via A/B modal → assert bar');
+  await seedSave(page, {
+    version: 9,
+    progressionMode: 'radial',
+    tutorialDone: true,
+    xp: 10,  // level 2 → 2 talent points (buy Mend + heal-s1 specialization)
+    unlockedSpells: ['heal', 'bonk'],
+    actionBar: ['heal', 'bonk', '', ''],
+    treeRanks: { heal: 1, bonk: 1 },
+    subclass: null,
+    clearedDungeons: [],
+    combatPaceTenths: 10,
+    relicIds: [],
+    pendingRelicOffers: [],
+    musicVolumePct: 50,
+    recentRuns: [],
+  });
+  save = await readSave(page);
+  check(save?.progressionMode === 'radial', 'seeded save is in radial mode');
+  await shot(page, 'hub-radial-mode');
+
+  // Hub → RadialTreeScene (hubTree routes to RadialTree when progressionMode='radial')
+  await clickNamed(page, 'hubTree');
+  await waitForNamed(page, 'treeNode:mend');
+  await shot(page, 'radial-tree-scene');
+
+  // Buy Mend (Ring 1 direct purchase, 1 talent point)
+  await clickNamed(page, 'treeNode:mend');
+  await page.waitForTimeout(400);
+  save = await readSave(page);
+  check(save?.treeRanks?.['mend'] === 1, 'bought Mend from radial tree');
+  check(save?.unlockedSpells?.includes('mend') === true, 'mend now in unlockedSpells');
+  check(save?.actionBar?.includes('mend') === true, 'mend placed on action bar');
+
+  // Specialize Heal via A/B modal (treeNode:heal-s1 opens the choice modal)
+  await clickNamed(page, 'treeNode:heal-s1');
+  await waitForNamed(page, 'treeChoice:a');
+  await shot(page, 'radial-heal-s1-modal');
+  check((await locate(page, 'treeChoice:a')) !== null, 'heal-s1 modal shows option A');
+  check((await locate(page, 'treeChoice:b')) !== null, 'heal-s1 modal shows option B');
+
+  // Pick option A (Zealous Heal)
+  await clickNamed(page, 'treeChoice:a');
+  await page.waitForTimeout(400);
+  save = await readSave(page);
+  check(save?.treeRanks?.['heal-s1-zealous'] === 1, 'heal-s1-zealous purchased in treeRanks');
+  check(save?.unlockedSpells?.includes('zealous-heal') === true, 'zealous-heal in unlockedSpells');
+  check(save?.unlockedSpells?.includes('heal') === false, 'plain heal removed from unlockedSpells after specialization');
+  check(save?.actionBar?.includes('zealous-heal') === true, 'zealous-heal placed in the heal slot on action bar');
+  check(save?.actionBar?.includes('heal') === false, 'plain heal removed from action bar after specialization');
+  await shot(page, 'radial-tree-after-specialize');
+
+  await clickNamed(page, 'treeBack');
+  await waitForNamed(page, 'hubTree');
+  await shot(page, 'hub-after-radial-tree');
 } finally {
   await browser?.close();
   if (preview) {

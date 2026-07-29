@@ -341,3 +341,190 @@ describe('RADIAL_TREE config', () => {
     expect(ranks['big-heal']).toBe(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 10. Ring 3 nodes (minLevel 10)
+// ---------------------------------------------------------------------------
+
+describe('Ring 3 — heal-s3', () => {
+  /** Save at level 10 with heal-s1 + heal-s2 already owned. */
+  function ring3HealSave() {
+    const save = {
+      xp: 450, // level 10 (xpForLevel(10) = 450 with the 10n² curve)
+      treeRanks: {
+        heal: 1,
+        bonk: 1,
+        'heal-s1-zealous': 1,
+        'heal-s2-fast': 1,
+      } as Record<string, number>,
+      unlockedSpells: ['zealous-heal', 'bonk'],
+      actionBar: ['zealous-heal', 'bonk', '', ''],
+    };
+    return save;
+  }
+
+  it('cannot buy heal-s3 below level 10', () => {
+    const save = {
+      xp: 350, // level 9
+      treeRanks: { heal: 1, bonk: 1, 'heal-s1-zealous': 1, 'heal-s2-fast': 1 } as Record<string, number>,
+      unlockedSpells: ['zealous-heal', 'bonk'],
+      actionBar: ['zealous-heal', 'bonk', '', ''],
+    };
+    const ok = applyRadialPurchase(save, 'heal-s3', 'a');
+    expect(ok).toBe(false);
+  });
+
+  it('A (Burning Faith): +2 heal on zealous-heal at level 10', () => {
+    const save = ring3HealSave();
+    const ok = applyRadialPurchase(save, 'heal-s3', 'a');
+    expect(ok).toBe(true);
+    const mods = loadoutFromRadialSave(save);
+    const heal = mods.spells.find((s) => s.id === 'zealous-heal');
+    expect(heal?.heal).toBe(6); // 4 base + 2 from Burning Faith
+  });
+
+  it('B (Thrifty Grace): -1 mana on zealous-heal at level 10', () => {
+    const save = ring3HealSave();
+    const ok = applyRadialPurchase(save, 'heal-s3', 'b');
+    expect(ok).toBe(true);
+    const mods = loadoutFromRadialSave(save);
+    const heal = mods.spells.find((s) => s.id === 'zealous-heal');
+    expect(heal?.mana).toBe(3); // 4 base - 1 from Thrifty Grace
+  });
+
+  it('A and B are exclusive', () => {
+    const save = ring3HealSave();
+    applyRadialPurchase(save, 'heal-s3', 'a');
+    const ok = applyRadialPurchase(save, 'heal-s3', 'b');
+    expect(ok).toBe(false);
+  });
+});
+
+describe('Ring 3 — offense-s2', () => {
+  /** Save at level 10 with Vowstrike + Absolution. */
+  function vowstrikeSave() {
+    return {
+      xp: 450, // level 10
+      treeRanks: {
+        heal: 1,
+        bonk: 1,
+        'vowstrike-entry': 1,
+        'vowstrike-s1-absolution': 1,
+      } as Record<string, number>,
+      unlockedSpells: ['vowstrike-absolution'],
+      actionBar: ['heal', 'vowstrike-absolution', '', ''],
+    };
+  }
+
+  /** Save at level 10 with Bonk Upgrade + Blessed Bonk. */
+  function bonkSave() {
+    return {
+      xp: 450, // level 10
+      treeRanks: {
+        heal: 1,
+        bonk: 1,
+        'bonk-upgrade': 1,
+        'bonk-s1-blessed': 1,
+      } as Record<string, number>,
+      unlockedSpells: ['heal', 'blessed-bonk'],
+      actionBar: ['heal', 'blessed-bonk', '', ''],
+    };
+  }
+
+  it('Swift Conviction (A) shortens Vowstrike cooldown by 2s', () => {
+    const save = vowstrikeSave();
+    const ok = applyRadialPurchase(save, 'offense-s2', 'a');
+    expect(ok).toBe(true);
+    const mods = loadoutFromRadialSave(save);
+    const vs = mods.spells.find((s) => s.id === 'vowstrike-absolution');
+    expect(vs?.cooldownMs).toBe(8_000); // 10s - 2s
+  });
+
+  it('Crushing Blow (B) adds +2 damage to Vowstrike variants', () => {
+    const save = vowstrikeSave();
+    const ok = applyRadialPurchase(save, 'offense-s2', 'b');
+    expect(ok).toBe(true);
+    const mods = loadoutFromRadialSave(save);
+    const vs = mods.spells.find((s) => s.id === 'vowstrike-absolution');
+    expect(vs?.damage).toBe(7); // 5 base + 2
+  });
+
+  it('Crushing Blow (B) increases Blessed Bonk stack cap to 4', () => {
+    const save = bonkSave();
+    const ok = applyRadialPurchase(save, 'offense-s2', 'b');
+    expect(ok).toBe(true);
+    const mods = loadoutFromRadialSave(save);
+    const bb = mods.spells.find((s) => s.id === 'blessed-bonk');
+    expect(bb?.castBuff?.kind).toBe('stackNextHealPotencyPct');
+    if (bb?.castBuff?.kind === 'stackNextHealPotencyPct') {
+      expect(bb.castBuff.cap).toBe(4); // 3 base + 1
+    }
+  });
+});
+
+describe('Ring 3 — crown upgrades', () => {
+  /** Level 10 save with Wrath Ascendant. */
+  function wrathSave() {
+    return {
+      xp: 450,
+      treeRanks: { heal: 1, bonk: 1, wrath: 1 } as Record<string, number>,
+      unlockedSpells: ['heal', 'bonk'],
+      actionBar: ['heal', 'bonk', '', ''],
+    };
+  }
+
+  /** Level 10 save with Still Waters. */
+  function watersSave() {
+    return {
+      xp: 450,
+      treeRanks: { heal: 1, bonk: 1, 'still-waters': 1 } as Record<string, number>,
+      unlockedSpells: ['heal', 'bonk'],
+      actionBar: ['heal', 'bonk', '', ''],
+    };
+  }
+
+  it('crown-wrath upgrades Wrath Ascendant bonus to +3', () => {
+    const save = wrathSave();
+    const ok = applyRadialPurchase(save, 'crown-wrath');
+    expect(ok).toBe(true);
+    const mods = loadoutFromRadialSave(save);
+    const wrath = mods.cooldowns.find((c) => c.id === 'wrath-ascendant');
+    expect(wrath).toBeDefined();
+    expect(wrath?.effect.kind).toBe('healBonus');
+    if (wrath?.effect.kind === 'healBonus') {
+      expect(wrath.effect.bonusHeal).toBe(3); // 2 base + 1
+    }
+  });
+
+  it('crown-wrath cannot be bought without wrath', () => {
+    const save = {
+      xp: 450,
+      treeRanks: { heal: 1, bonk: 1 } as Record<string, number>,
+      unlockedSpells: ['heal', 'bonk'],
+      actionBar: ['heal', 'bonk', '', ''],
+    };
+    const ok = applyRadialPurchase(save, 'crown-wrath');
+    expect(ok).toBe(false);
+  });
+
+  it('crown-waters reduces Still Waters cooldown to 45s', () => {
+    const save = watersSave();
+    const ok = applyRadialPurchase(save, 'crown-waters');
+    expect(ok).toBe(true);
+    const mods = loadoutFromRadialSave(save);
+    const sw = mods.cooldowns.find((c) => c.id === 'still-waters');
+    expect(sw).toBeDefined();
+    expect(sw?.cooldownMs).toBe(45_000); // 60s - 15s
+  });
+
+  it('crown-waters cannot be bought without still-waters', () => {
+    const save = {
+      xp: 450,
+      treeRanks: { heal: 1, bonk: 1 } as Record<string, number>,
+      unlockedSpells: ['heal', 'bonk'],
+      actionBar: ['heal', 'bonk', '', ''],
+    };
+    const ok = applyRadialPurchase(save, 'crown-waters');
+    expect(ok).toBe(false);
+  });
+});

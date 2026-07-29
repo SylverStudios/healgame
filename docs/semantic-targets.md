@@ -30,7 +30,7 @@ by name.
 | `loadoutBack` | back button | `LoadoutScene.ts` |
 | `runMod:<id>` | oath/relic icon hit target (top bar) | `ui/runModsBar.ts` (Hub / Combat / Tree) |
 | `treeNode:<spotId>` | node bg rect (lattice) | `TreeScene.ts` (e.g. `treeNode:deep-reserves`) |
-| `treeNode:<spotId>` (radial) | wheel socket — logical ids: `heal`, `bonk`, `mend`, `heal-s1`, `big-heal`, `mend-s1`, `offense`, `vowstrike-s1`, `bonk-s1`, `still-waters`, `wrath`, `liturgy`, `big-heal-s1`, `heal-s2` | `RadialTreeScene.ts` |
+| `treeNode:<spotId>` (radial) | wheel socket — logical ids: `heal`, `bonk`, `mend`, `heal-s1`, `big-heal`, `mend-s1`, `offense`, `vowstrike-s1`, `bonk-s1`, `still-waters`, `wrath`, `liturgy`, `big-heal-s1`, `heal-s2`, `heal-s3`, `offense-s2`, `crown-waters`, `crown-wrath` | `RadialTreeScene.ts` |
 | `treeBack` | back-button rect | `TreeScene.ts` and `RadialTreeScene.ts` |
 | `treeChoice:a` / `treeChoice:b` | Radial A/B specialize choice buttons (inside modal) | `RadialTreeScene.ts` |
 | `combatAlly:<unitId>` | sprite body when clickable | `unitSprite.ts` |
