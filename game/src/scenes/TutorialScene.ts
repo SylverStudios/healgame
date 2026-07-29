@@ -7,9 +7,10 @@
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { loadSave, saveGame } from '../save/save';
-import { loadoutFromSave } from '../data/talentTree';
+import { loadoutForSave } from '../data/loadout';
 import { ASH_GATE } from '../data/encounters';
 import { SPELLS } from '../data/constants';
+import { RADIAL_BONK, RADIAL_HEAL } from '../data/radial/spells';
 import type { CombatSceneData } from './CombatScene';
 import { FONT, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG, PALETTE, PALETTE_NUM } from '../ui/theme';
 import { addButton, addPanel } from '../ui/panels';
@@ -36,6 +37,8 @@ export class TutorialScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(BG_COLOR);
     // Chunk 6 (bible item 6): fade in on scene entry.
     fadeInOnCreate(this);
+    const save = loadSave();
+    const radial = save.progressionMode === 'radial';
 
     // Chunk 9 (bible item 9): wordmark treatment for the title — this is the
     // "one genuine gap" the chunk-9 bible item calls out (font-at-display-size,
@@ -94,7 +97,11 @@ export class TutorialScene extends Phaser.Scene {
       .setName('tutorialLearn');
     addButton(this, width / 2, buttonY, 340, 74, { fillColor: PALETTE_NUM.panelLight, hitRect: button });
     this.add
-      .text(width / 2, buttonY, 'Learn Solemn Mend', { fontFamily: FONT, fontSize: FONT_SIZE_MD, color: ACCENT_COLOR })
+      .text(width / 2, buttonY, radial ? 'Enter with Heal' : 'Learn Solemn Mend', {
+        fontFamily: FONT,
+        fontSize: FONT_SIZE_MD,
+        color: ACCENT_COLOR,
+      })
       .setOrigin(0.5);
 
     button.on('pointerdown', () => this.onLearnSpell());
@@ -102,21 +109,28 @@ export class TutorialScene extends Phaser.Scene {
 
   private onLearnSpell(): void {
     const save = loadSave();
-    if (!save.unlockedSpells.includes(SPELLS.bonk.id)) {
-      save.unlockedSpells.push(SPELLS.bonk.id);
+    if (save.progressionMode === 'radial') {
+      if (!save.unlockedSpells.includes(RADIAL_HEAL.id)) save.unlockedSpells.push(RADIAL_HEAL.id);
+      if (!save.unlockedSpells.includes(RADIAL_BONK.id)) save.unlockedSpells.push(RADIAL_BONK.id);
+      if (save.actionBar[0] !== RADIAL_HEAL.id) save.actionBar[0] = RADIAL_HEAL.id;
+      if (save.actionBar[1] !== RADIAL_BONK.id) save.actionBar[1] = RADIAL_BONK.id;
+    } else {
+      if (!save.unlockedSpells.includes(SPELLS.bonk.id)) {
+        save.unlockedSpells.push(SPELLS.bonk.id);
+      }
+      if (!save.unlockedSpells.includes(SPELLS.solemnMend.id)) {
+        save.unlockedSpells.push(SPELLS.solemnMend.id);
+      }
+      // Q = Bonk (starter), W = Solemn Mend for the first fight.
+      if (save.actionBar[0] !== SPELLS.bonk.id) save.actionBar[0] = SPELLS.bonk.id;
+      if (save.actionBar[1] !== SPELLS.solemnMend.id) save.actionBar[1] = SPELLS.solemnMend.id;
     }
-    if (!save.unlockedSpells.includes(SPELLS.solemnMend.id)) {
-      save.unlockedSpells.push(SPELLS.solemnMend.id);
-    }
-    // Q = Bonk (starter), W = Solemn Mend for the first fight.
-    if (save.actionBar[0] !== SPELLS.bonk.id) save.actionBar[0] = SPELLS.bonk.id;
-    if (save.actionBar[1] !== SPELLS.solemnMend.id) save.actionBar[1] = SPELLS.solemnMend.id;
     save.tutorialDone = true;
     saveGame(save);
 
     const combatData: CombatSceneData = {
       encounterId: ASH_GATE.id,
-      loadout: loadoutFromSave(save),
+      loadout: loadoutForSave(save),
       returnTo: SceneKeys.Hub,
     };
     // Chunk 6: same shorter fade-out + CombatScene chunky wipe-in as the

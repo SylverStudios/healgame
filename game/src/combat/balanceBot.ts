@@ -54,7 +54,8 @@ export interface BotRun {
  *  loadout keeps every unlocked/tree spell (full kit for balance bots). */
 export function makeBalanceSave(overrides: Partial<SaveData>): SaveData {
   return {
-    version: 8,
+    version: 9,
+    progressionMode: 'lattice',
     tutorialDone: true,
     xp: 0,
     unlockedSpells: [],

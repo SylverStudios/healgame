@@ -38,7 +38,15 @@ export type SpellCastBuff =
   /** Next spell reserves `max(0, mana - amount)`. */
   | { kind: 'nextSpellManaReduction'; amount: number }
   /** Next heal's raw value gains `ceil(base * pct / 100)` before clamps. */
-  | { kind: 'nextHealPotencyPct'; pct: number };
+  | { kind: 'nextHealPotencyPct'; pct: number }
+  /**
+   * Blessed Bonk: on each cast complete, increments a stack counter by 1
+   * (capped at `cap`). On the next heal that lands with heal > 0, adds
+   * `ceil(base * stacks * pct / 100)` to raw heal, then clears stacks to 0.
+   * Non-heal casts never consume stacks. If both this and `nextHealPotencyPct`
+   * are armed simultaneously, both apply additively (flat first, stacks after).
+   */
+  | { kind: 'stackNextHealPotencyPct'; pct: number; cap: number };
 
 export interface SpellDef {
   id: string;
@@ -56,6 +64,11 @@ export interface SpellDef {
   cooldownMs?: number;
   /** Buff applied to the healer when this cast completes. */
   castBuff?: SpellCastBuff;
+  /**
+   * Wave 5 Mana Bonk: on a completed damage cast that lands a hit, restore
+   * this much mana to the healer (clamped to maxMana). Ignored when 0/absent.
+   */
+  manaOnHit?: number;
   /** Alpha 0.2 §D8 — placeholder glyph key/character for tree + spell bar. */
   glyph?: string;
   /** Short when-to-use / flavor for slot-card tooltips; ignored by the engine. */
@@ -73,6 +86,17 @@ export interface SynergyRule {
   triggerSpellId: string;
   buffedSpellId: string;
   bonusHeal: number;
+}
+
+/**
+ * Wave 5 Battle Mend: completing `triggerSpellId` arms a one-shot mana
+ * adjustment for the next cast of `targetSpellId`. `manaDelta` is typically
+ * negative (discount). Consumed at cast start for that target spell.
+ */
+export interface ManaSynergyRule {
+  triggerSpellId: string;
+  targetSpellId: string;
+  manaDelta: number;
 }
 
 /**
@@ -186,6 +210,8 @@ export interface CombatEngineOptions {
    */
   manaRegen?: { amount: number; intervalMs: number };
   synergies?: SynergyRule[];
+  /** Wave 5 radial: Battle Mend–style next-cast mana discounts. */
+  manaSynergies?: ManaSynergyRule[];
   missingHealthBonuses?: MissingHealthBonusRule[];
   missingHealthPctBonuses?: MissingHealthPctBonusRule[];
   fullHealthBonuses?: FullHealthBonusRule[];
@@ -261,6 +287,12 @@ export interface CombatState {
   nextSpellManaReduction: number;
   /** Pending Reckoning-style potency for the next heal completion. */
   nextHealPotencyPct: number;
+  /**
+   * Active Blessed Bonk stack count. Each stack adds `pct`% of base heal on
+   * the next heal land (applied additively after `nextHealPotencyPct`), then
+   * all stacks clear. 0 when no stacks are active.
+   */
+  bonkHealStacks: number;
 }
 
 /**

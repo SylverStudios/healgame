@@ -1,12 +1,39 @@
 # QA log — journey checklist & verification
 
-Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-27
+Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-29
 
 Ship summary (newest first): [`CHANGELOG.md`](./CHANGELOG.md).
 
 **PoC (2026-07-08) complete.** Every poc-spec §1 criterion is implemented and
 enforced by automated gates. Later Alpha sections below amend the baseline
 (Phase 2+ subclass UX, mid dungeons, CDs, relics, loadout, etc.).
+
+---
+
+# Playtest Wave 5 — Radial talent tree dual-ship (2026-07-29)
+
+Status: current · Last verified: 2026-07-29
+
+1. **Mode** — `SaveData.progressionMode` `'lattice' | 'radial'`, default
+   `'lattice'`. Settings Classic/Radial confirm wipes via `resetSaveToMode`
+   and restarts Tutorial. No lattice→radial rank migration.
+2. **Save v9** — `healgame-save-v9`; purges v8/v7/v6/v5/v1. Journey seeds
+   updated in the same rotate.
+3. **Facade** — `loadoutForSave` / `ownedSpellsForSave` in `data/loadout.ts`.
+   Lattice keeps `loadoutFromSave`; radial uses `loadoutFromRadialSave`.
+4. **Radial tree** — separate `RadialTreeScene` (lattice `TreeScene` untouched).
+   Polar sockets `treeNode:<spotId>`; A/B modal `treeChoice:a` / `treeChoice:b`.
+   Specialize replaces bar slot + drops prior id from library.
+5. **Rings** — Ring 1 Lv1–4 (Mend, Heal s1, Big Heal, Mend s1); Ring 2 Lv5–9
+   (offense XOR, Vowstrike s1, Still Waters / Wrath / Liturgy, Big Heal s1,
+   Heal s2); Ring 3 Lv10+ (Heal s3, offense s2, crown Wrath/Waters).
+6. **Combat hooks** — `stackNextHealPotencyPct` (Blessed Bonk); `manaOnHit`
+   (Mana Bonk); `manaSynergies` (Battle Mend). Arming Mend uses existing
+   heal synergies.
+7. **Journey** — lattice stages green on lattice seeds; radial smoke buys Mend
+   then specializes Heal and asserts spell ids.
+8. **Placeholders** — center/BUILD stamp not redesigned; Instant/Buff spokes
+   and global subclass identity remain out.
 
 ---
 

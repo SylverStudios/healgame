@@ -137,7 +137,7 @@ game/src/
   Journey resolves via `window.__healgame.locate(name)` — layout changes must
   **not** require journey coordinate edits. Adding a new interactive control
   means naming it and clicking it by name.
-- **Save changes**: `SaveData` is versioned (`healgame-save-v8`); during
+- **Save changes**: `SaveData` is versioned (`healgame-save-v9`); during
   development, shape changes rotate the key and `loadSave` deletes stale or
   unrecognized data instead of migrating it.
 

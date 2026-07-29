@@ -19,6 +19,7 @@ import { STILL_WATERS, FRENZIED_LITURGY, cooldownById } from './cooldowns';
 import type {
   SpellDef,
   SynergyRule,
+  ManaSynergyRule,
   MissingHealthBonusRule,
   MissingHealthPctBonusRule,
   FullHealthBonusRule,
@@ -71,6 +72,8 @@ export interface CombatMods {
   spells: SpellDef[];
   bonusMaxMana: number;
   synergies: SynergyRule[];
+  /** Wave 5 radial Battle Mend; omitted/empty on lattice kits. */
+  manaSynergies?: ManaSynergyRule[];
   missingHealthBonuses: MissingHealthBonusRule[];
   /** Alpha 0.1 §D4 Graven Scale: percent-of-base-heal missing-health bonus. */
   missingHealthPctBonuses: MissingHealthPctBonusRule[];

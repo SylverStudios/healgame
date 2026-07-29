@@ -297,6 +297,9 @@ export class CombatScene extends Phaser.Scene {
         ? { manaRegen: this.sceneData.loadout.manaRegen }
         : {}),
       synergies: this.sceneData.loadout.synergies,
+      ...(this.sceneData.loadout.manaSynergies !== undefined
+        ? { manaSynergies: this.sceneData.loadout.manaSynergies }
+        : {}),
       missingHealthBonuses: this.sceneData.loadout.missingHealthBonuses,
       missingHealthPctBonuses: this.sceneData.loadout.missingHealthPctBonuses,
       fullHealthBonuses: this.sceneData.loadout.fullHealthBonuses,

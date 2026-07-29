@@ -13,7 +13,8 @@ import { ACTION_BAR_SLOTS } from '../data/constants';
 import { ACTION_HOTKEY_LETTERS } from '../ui/actionHotkeys';
 import { glyphChar } from '../ui/glyph';
 import type { SpellDef } from '../combat/types';
-import { loadoutFromSave, ownedSpellsFromSave, type CombatMods } from '../data/talentTree';
+import { loadoutForSave, ownedSpellsForSave } from '../data/loadout';
+import type { CombatMods } from '../data/talentTree';
 import { FONT, FONT_SIZE_XS, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG } from '../ui/theme';
 import { addButton } from '../ui/panels';
 import { fadeInOnCreate, fadeToScene } from '../ui/transitions';
@@ -74,8 +75,8 @@ export class LoadoutScene extends Phaser.Scene {
 
     const { width, height } = this.scale;
     const save = loadSave();
-    const owned = ownedSpellsFromSave(save);
-    const loadout = loadoutFromSave(save);
+    const owned = ownedSpellsForSave(save);
+    const loadout = loadoutForSave(save);
     const bar =
       save.actionBar.length === ACTION_BAR_SLOTS ? [...save.actionBar] : emptyActionBar();
 

@@ -1,9 +1,11 @@
 # Skill tree — agent notes
 
-Status: current · Authority: skill-tree service + live TALENT_TREE wiring · Last verified: 2026-07-18
+Status: current · Authority: skill-tree service + live TALENT_TREE wiring · Last verified: 2026-07-29
 
 Config-driven tree service (`game/src/tree/`) plus the live talent-tree data and
-combat resolve (`game/src/data/talentTree.ts`). Phaser stays out of this folder.
+combat resolve (`game/src/data/talentTree.ts`). Radial dual-ship kits live under
+`game/src/data/radial/` and resolve via `loadoutForSave` (`data/loadout.ts`).
+Phaser stays out of this folder.
 
 ## Mental model
 

@@ -22,6 +22,7 @@ import type {
   MissingHealthBonusRule,
   MissingHealthPctBonusRule,
   PartyDoTCastDef,
+  ManaSynergyRule,
   SpellDef,
   SynergyRule,
   TunnelVisionCastDef,
@@ -90,6 +91,8 @@ export class CombatEngine {
 
   /** Synergy rules with mutable per-entry armed state (constructor-cloned; never shared with the caller). */
   private readonly synergies: (SynergyRule & { armed: boolean })[];
+  /** Wave 5 Battle Mend: armed mana discounts for a specific next spell. */
+  private readonly manaSynergies: (ManaSynergyRule & { armed: boolean })[];
   private readonly missingHealthBonuses: MissingHealthBonusRule[];
   private readonly missingHealthPctBonuses: MissingHealthPctBonusRule[];
   private readonly fullHealthBonuses: FullHealthBonusRule[];
@@ -120,6 +123,10 @@ export class CombatEngine {
   private nextSpellManaReduction = 0;
   /** Reckoning buff: % of base heal added on the next heal completion. */
   private nextHealPotencyPct = 0;
+  /** Blessed Bonk stacks: accumulated count (capped per buff); cleared on next heal land. */
+  private bonkHealStackCount = 0;
+  /** Blessed Bonk stacks: % per stack, updated from the most recent stackNextHealPotencyPct buff applied. */
+  private bonkHealStackPct = 0;
 
   private bossCastState: BossCastState | null = null;
   /** Countdown to the next boss cast start; null while a party-AoE cast is active or the boss has no cast. */
@@ -201,6 +208,7 @@ export class CombatEngine {
     // Chunk 1 (phase-2-handoff): synergy + missing-health bonus rules, cloned so the
     // engine's mutable `armed` state never touches the caller's arrays.
     this.synergies = (options?.synergies ?? []).map((s) => ({ ...s, armed: false }));
+    this.manaSynergies = (options?.manaSynergies ?? []).map((s) => ({ ...s, armed: false }));
     this.missingHealthBonuses = (options?.missingHealthBonuses ?? []).map((m) => ({ ...m }));
     // Chunk 4 (alpha-0.1 §D4): pct-of-base-heal missing-health rule (Graven Scale)
     // and full-health threshold rule (Steady Hands), cloned like the arrays above.
@@ -294,7 +302,10 @@ export class CombatEngine {
       // free heal — skip mana gate
     } else {
       const healer = this.getUnit('healer')!;
-      const cost = Math.max(0, this.effectiveManaCost(spell) - this.nextSpellManaReduction);
+      const cost = Math.max(
+        0,
+        this.effectiveManaCost(spell) - this.nextSpellManaReduction - this.armedManaDiscount(spellId),
+      );
       if (healer.mana < cost) return;
     }
     const out: CombatEvent[] = [];
@@ -380,6 +391,7 @@ export class CombatEngine {
         .map(([spellId, remainingMs]) => ({ spellId, remainingMs: Math.max(0, remainingMs) })),
       nextSpellManaReduction: this.nextSpellManaReduction,
       nextHealPotencyPct: this.nextHealPotencyPct,
+      bonkHealStacks: this.bonkHealStackCount,
     };
   }
 
@@ -569,6 +581,12 @@ export class CombatEngine {
         reservedMana = Math.max(0, reservedMana - this.nextSpellManaReduction);
         this.nextSpellManaReduction = 0;
       }
+      // Battle Mend: spell-specific armed mana discount, consumed at cast start.
+      const manaSynDiscount = this.armedManaDiscount(spellId);
+      if (manaSynDiscount > 0) {
+        reservedMana = Math.max(0, reservedMana - manaSynDiscount);
+        this.consumeManaSynergies(spellId);
+      }
     }
     healer.mana = Math.max(0, healer.mana - reservedMana);
     this.playerCast = { spellId, targetId, remainingMs: spell.castMs, totalMs: spell.castMs };
@@ -616,8 +634,18 @@ export class CombatEngine {
       if (target && target.alive) {
         this.applyDamageToUnit(target, spell.damage!, 'healer', events);
       }
+      // Mana Bonk: restore mana after a completed damage cast (hit attempted).
+      if ((spell.manaOnHit ?? 0) > 0) {
+        const healer = this.getUnit('healer');
+        if (healer) {
+          healer.mana = Math.min(healer.maxMana, healer.mana + spell.manaOnHit!);
+        }
+      }
       this.applySpellCastBuff(spell);
       for (const syn of this.synergies) {
+        if (syn.triggerSpellId === spell.id) syn.armed = true;
+      }
+      for (const syn of this.manaSynergies) {
         if (syn.triggerSpellId === spell.id) syn.armed = true;
       }
       if (spell.heal <= 0) return;
@@ -683,11 +711,20 @@ export class CombatEngine {
           healBonus += cd.def.effect.bonusHeal;
         }
       }
-      // Reckoning: +ceil(baseHeal * pct / 100) on the next heal only.
+      // Next-heal potency: Reckoning (flat %) and Blessed Bonk stacks each add to raw
+      // heal on the next heal land. Both clear on consume. If both are armed they apply
+      // additively — flat pct first, then stacks * pct — so the precedence is documented
+      // and deterministic regardless of cast order.
       let potencyBonus = 0;
       if (this.nextHealPotencyPct > 0) {
-        potencyBonus = Math.ceil((spell.heal * this.nextHealPotencyPct) / 100);
+        potencyBonus += Math.ceil((spell.heal * this.nextHealPotencyPct) / 100);
         this.nextHealPotencyPct = 0;
+      }
+      if (this.bonkHealStackCount > 0) {
+        potencyBonus += Math.ceil(
+          (spell.heal * this.bonkHealStackCount * this.bonkHealStackPct) / 100,
+        );
+        this.bonkHealStackCount = 0;
       }
       const raw =
         spell.heal +
@@ -730,10 +767,30 @@ export class CombatEngine {
       // free heal — skip mana gate
     } else {
       const healer = this.getUnit('healer')!;
-      const cost = Math.max(0, this.effectiveManaCost(spell) - this.nextSpellManaReduction);
+      const cost = Math.max(
+        0,
+        this.effectiveManaCost(spell) - this.nextSpellManaReduction - this.armedManaDiscount(spellId),
+      );
       if (healer.mana < cost) return;
     }
     this.beginCast(spellId, targetId, events);
+  }
+
+  /** Sum of armed Battle Mend discounts for `spellId` (positive mana amount). */
+  private armedManaDiscount(spellId: string): number {
+    let discount = 0;
+    for (const syn of this.manaSynergies) {
+      if (syn.armed && syn.targetSpellId === spellId && syn.manaDelta < 0) {
+        discount += -syn.manaDelta;
+      }
+    }
+    return discount;
+  }
+
+  private consumeManaSynergies(spellId: string): void {
+    for (const syn of this.manaSynergies) {
+      if (syn.armed && syn.targetSpellId === spellId) syn.armed = false;
+    }
   }
 
   private applySpellCastBuff(spell: SpellDef): void {
@@ -743,6 +800,9 @@ export class CombatEngine {
       this.nextSpellManaReduction = Math.max(this.nextSpellManaReduction, buff.amount);
     } else if (buff.kind === 'nextHealPotencyPct') {
       this.nextHealPotencyPct = Math.max(this.nextHealPotencyPct, buff.pct);
+    } else if (buff.kind === 'stackNextHealPotencyPct') {
+      this.bonkHealStackCount = Math.min(buff.cap, this.bonkHealStackCount + 1);
+      this.bonkHealStackPct = buff.pct;
     }
   }
 

@@ -2,13 +2,20 @@
  * Single local save slot. This is a development build: old save keys and
  * unrecognized payloads are discarded instead of migrated.
  *
- * v8 adds `musicVolumePct` (Settings music slider) and `recentRuns` (run-summary
- * ring buffer). Prior v7/v6/v5/v1 keys are purged on load — no migration.
+ * v9 adds `progressionMode` (`lattice` | `radial`) for Wave 5 dual-ship.
+ * Prior v8/v7/v6/v5/v1 keys are purged on load — no migration.
  */
 
 import { ACTION_BAR_SLOTS, SPELLS } from '../data/constants';
 
+/** Radial starter spell ids (mirrored in `data/radial/spells.ts` — keep in sync). */
+const RADIAL_STARTER_HEAL_ID = 'heal';
+const RADIAL_STARTER_BONK_ID = 'bonk';
+
 export type SubclassId = 'vigil' | 'zealot';
+
+/** Talent / spell progression topology. Default for fresh installs: lattice. */
+export type ProgressionMode = 'lattice' | 'radial';
 
 /**
  * Compact lit-path silhouette captured at run end. Structurally identical to
@@ -30,7 +37,9 @@ export interface RunRecord {
 export const MAX_RECENT_RUNS = 5;
 
 export interface SaveData {
-  version: 8;
+  version: 9;
+  /** Lattice (classic) or radial talent progression. */
+  progressionMode: ProgressionMode;
   tutorialDone: boolean;
   xp: number;
   /** Spell ids granted outside the tree (tutorial, level milestones, starter Bonk). */
@@ -60,16 +69,43 @@ export function emptyActionBar(): string[] {
   return Array.from({ length: ACTION_BAR_SLOTS }, () => '');
 }
 
-/** New-game bar: Bonk on Q. */
+/** New-game bar: Bonk on Q (lattice). */
 export function defaultActionBar(): string[] {
   const bar = emptyActionBar();
   bar[0] = SPELLS.bonk.id;
   return bar;
 }
 
-export function newSaveData(): SaveData {
+/** Radial new-game bar: Heal on Q, Bonk on W. */
+export function defaultRadialActionBar(): string[] {
+  const bar = emptyActionBar();
+  bar[0] = RADIAL_STARTER_HEAL_ID;
+  bar[1] = RADIAL_STARTER_BONK_ID;
+  return bar;
+}
+
+export function newSaveData(mode: ProgressionMode = 'lattice'): SaveData {
+  if (mode === 'radial') {
+    return {
+      version: 9,
+      progressionMode: 'radial',
+      tutorialDone: false,
+      xp: 0,
+      unlockedSpells: [RADIAL_STARTER_HEAL_ID, RADIAL_STARTER_BONK_ID],
+      actionBar: defaultRadialActionBar(),
+      treeRanks: { heal: 1, bonk: 1 },
+      subclass: null,
+      clearedDungeons: [],
+      combatPaceTenths: 10,
+      relicIds: [],
+      pendingRelicOffers: [],
+      musicVolumePct: 50,
+      recentRuns: [],
+    };
+  }
   return {
-    version: 8,
+    version: 9,
+    progressionMode: 'lattice',
     tutorialDone: false,
     xp: 0,
     unlockedSpells: [SPELLS.bonk.id],
@@ -85,12 +121,13 @@ export function newSaveData(): SaveData {
   };
 }
 
-export const SAVE_KEY = 'healgame-save-v8';
+export const SAVE_KEY = 'healgame-save-v9';
 const LEGACY_SAVE_KEYS = [
   'healgame-save-v1',
   'healgame-save-v5',
   'healgame-save-v6',
   'healgame-save-v7',
+  'healgame-save-v8',
 ] as const;
 
 /** Minimal storage interface so tests can inject an in-memory store. */
@@ -144,6 +181,20 @@ export function resetSave(store: KeyValueStore | null = defaultStore()): void {
   for (const key of LEGACY_SAVE_KEYS) store?.removeItem(key);
 }
 
+/**
+ * Wipe storage and write a fresh save in `mode` (Settings mode switch /
+ * Hub restart preserving mode).
+ */
+export function resetSaveToMode(
+  mode: ProgressionMode,
+  store: KeyValueStore | null = defaultStore(),
+): SaveData {
+  resetSave(store);
+  const fresh = newSaveData(mode);
+  saveGame(fresh, store);
+  return fresh;
+}
+
 function hasBaseShape(v: Record<string, unknown>): boolean {
   return (
     typeof v.tutorialDone === 'boolean' &&
@@ -160,7 +211,8 @@ function hasBaseShape(v: Record<string, unknown>): boolean {
 function isSaveData(value: unknown): value is SaveData {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
-  if (v.version !== 8 || !hasBaseShape(v)) return false;
+  if (v.version !== 9 || !hasBaseShape(v)) return false;
+  if (v.progressionMode !== 'lattice' && v.progressionMode !== 'radial') return false;
   const ranks = v.treeRanks;
   if (typeof ranks !== 'object' || ranks === null || Array.isArray(ranks)) return false;
   if (!Object.values(ranks).every((r) => typeof r === 'number')) return false;

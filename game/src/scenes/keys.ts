@@ -4,6 +4,8 @@ export const SceneKeys = {
   Combat: 'Combat',
   Hub: 'Hub',
   Tree: 'Tree',
+  /** Wave 5 radial wheel — separate from lattice TreeScene. */
+  RadialTree: 'RadialTree',
   Relic: 'Relic',
   Loadout: 'Loadout',
   Settings: 'Settings',

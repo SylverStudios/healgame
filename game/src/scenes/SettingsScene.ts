@@ -1,16 +1,16 @@
 /**
- * Settings: music volume slider (0..100) + Back to Hub. Temp art only — dark
- * palette, pixel font, matches Hub/Tree/Loadout styling (v0.3 chunk H).
- *
- * Live-apply: dragging or clicking the track calls setMusicVolumePct()
- * immediately (audible feedback while adjusting); the chosen integer is
- * persisted to SaveData on pointer release (debounce not needed — one write
- * per drag gesture).
+ * Settings: music volume + Talent tree mode (Classic / Radial). Switching
+ * mode confirms, wipes the save, and restarts Tutorial in that mode.
  */
 
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
-import { loadSave, saveGame } from '../save/save';
+import {
+  loadSave,
+  resetSaveToMode,
+  saveGame,
+  type ProgressionMode,
+} from '../save/save';
 import { clampMusicPct, setMusicVolumePct } from '../ui/music';
 import { FONT, FONT_SIZE_SM, FONT_SIZE_LG } from '../ui/theme';
 import { addButton, addPanel } from '../ui/panels';
@@ -22,9 +22,11 @@ const FILL_COLOR = 0xf2c14e;
 const KNOB_COLOR = 0xfff2df;
 const BORDER_COLOR = 0x0a0605;
 const BUTTON_COLOR = 0x3a2a22;
+const BUTTON_ACTIVE = 0x5a4030;
 const TEXT_COLOR = '#e8d8c8';
 const ACCENT_COLOR = '#f2c14e';
 const DIM_COLOR = '#a89888';
+const DANGER_COLOR = '#e07070';
 
 /** Track pixel width — also the relative offset journey.mjs uses (-TRACK_WIDTH/2
  *  from the located center) to reach the track's left edge without a
@@ -41,6 +43,7 @@ export class SettingsScene extends Phaser.Scene {
   private fill: Phaser.GameObjects.Rectangle | null = null;
   private knob: Phaser.GameObjects.Arc | null = null;
   private pctLabel: Phaser.GameObjects.Text | null = null;
+  private confirmLayer: { destroy: () => void }[] = [];
 
   constructor() {
     super(SceneKeys.Settings);
@@ -48,30 +51,26 @@ export class SettingsScene extends Phaser.Scene {
 
   create(): void {
     this.dragging = false;
+    this.confirmLayer = [];
     this.cameras.main.setBackgroundColor(BG_COLOR);
-    // Chunk 6 (bible item 6): fade in on scene entry.
     fadeInOnCreate(this);
     const { width, height } = this.scale;
     const centerX = width / 2;
 
     this.add
-      .text(centerX, 60, 'Settings', { fontFamily: FONT, fontSize: FONT_SIZE_LG, color: TEXT_COLOR })
+      .text(centerX, 40, 'Settings', { fontFamily: FONT, fontSize: FONT_SIZE_LG, color: TEXT_COLOR })
       .setOrigin(0.5);
 
     const save = loadSave();
     this.currentPct = clampMusicPct(save.musicVolumePct);
 
-    // Chunk 4 (bible item 4): settings panel — ui/panels.ts. The volume
-    // track itself stays an unframed flat sliver (10px tall — same "too thin
-    // for a border to read as anything but noise" finding chunk 3 recorded
-    // for the GCD/boss-cast micro-bars; see artifacts/pixellab-4/README.md).
-    addPanel(this, centerX, 193, 460, 130);
+    addPanel(this, centerX, 140, 460, 110);
 
     this.add
-      .text(centerX, 156, 'Music Volume', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: DIM_COLOR })
+      .text(centerX, 108, 'Music Volume', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: DIM_COLOR })
       .setOrigin(0.5);
 
-    this.trackY = 196;
+    this.trackY = 148;
     this.trackLeftX = centerX - TRACK_WIDTH / 2;
 
     const track = this.add
@@ -89,7 +88,7 @@ export class SettingsScene extends Phaser.Scene {
       .setStrokeStyle(2, BORDER_COLOR);
 
     this.pctLabel = this.add
-      .text(centerX, this.trackY + 34, `${this.currentPct}%`, {
+      .text(centerX, this.trackY + 28, `${this.currentPct}%`, {
         fontFamily: FONT,
         fontSize: FONT_SIZE_SM,
         color: ACCENT_COLOR,
@@ -108,21 +107,133 @@ export class SettingsScene extends Phaser.Scene {
       this.dragging = false;
       this.persist();
     });
-    // A drag that ends off-canvas never sees this scene's pointerup — also
-    // persist on shutdown so the last live-applied value is never lost.
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       if (this.dragging) this.persist();
     });
 
+    addPanel(this, centerX, 300, 520, 140);
+    this.add
+      .text(centerX, 250, 'Talent tree', {
+        fontFamily: FONT,
+        fontSize: FONT_SIZE_SM,
+        color: DIM_COLOR,
+      })
+      .setOrigin(0.5);
+    this.add
+      .text(centerX, 278, 'Switching wipes your save and restarts.', {
+        fontFamily: FONT,
+        fontSize: FONT_SIZE_SM,
+        color: DANGER_COLOR,
+      })
+      .setOrigin(0.5);
+
+    const mode = save.progressionMode;
+    this.makeModeButton(centerX - 120, 330, 'Classic', 'lattice', mode === 'lattice', 'settingsProgressionLattice');
+    this.makeModeButton(centerX + 120, 330, 'Radial', 'radial', mode === 'radial', 'settingsProgressionRadial');
+
     this.makeButton(
       centerX,
-      height - 60,
+      height - 48,
       200,
       44,
       'Back',
       () => fadeToScene(this, SceneKeys.Hub, {}),
       'settingsBack',
     );
+  }
+
+  private makeModeButton(
+    x: number,
+    y: number,
+    label: string,
+    mode: ProgressionMode,
+    active: boolean,
+    name: string,
+  ): void {
+    const fill = active ? BUTTON_ACTIVE : BUTTON_COLOR;
+    const rect = this.add
+      .rectangle(x, y, 200, 48, fill)
+      .setStrokeStyle(2, active ? FILL_COLOR : BORDER_COLOR)
+      .setInteractive({ useHandCursor: true })
+      .setName(name);
+    addButton(this, x, y, 200, 48, { fillColor: fill, hitRect: rect });
+    this.add
+      .text(x, y, label, {
+        fontFamily: FONT,
+        fontSize: FONT_SIZE_SM,
+        color: active ? ACCENT_COLOR : TEXT_COLOR,
+      })
+      .setOrigin(0.5);
+    rect.on('pointerdown', () => {
+      if (loadSave().progressionMode === mode) return;
+      this.openModeConfirm(mode);
+    });
+  }
+
+  private openModeConfirm(mode: ProgressionMode): void {
+    this.clearConfirm();
+    const { width, height } = this.scale;
+    const cx = width / 2;
+    const cy = height / 2;
+
+    const dim = this.add.rectangle(cx, cy, width, height, 0x000000, 0.65).setInteractive();
+    const panel = addPanel(this, cx, cy, 520, 200);
+    const title = this.add
+      .text(cx, cy - 60, `Switch to ${mode === 'radial' ? 'Radial' : 'Classic'}?`, {
+        fontFamily: FONT,
+        fontSize: FONT_SIZE_SM,
+        color: ACCENT_COLOR,
+      })
+      .setOrigin(0.5);
+    const body = this.add
+      .text(cx, cy - 20, 'This wipes your save and restarts the tutorial.', {
+        fontFamily: FONT,
+        fontSize: FONT_SIZE_SM,
+        color: TEXT_COLOR,
+        align: 'center',
+      })
+      .setOrigin(0.5);
+
+    const confirm = this.add
+      .rectangle(cx - 100, cy + 50, 180, 44, BUTTON_COLOR)
+      .setStrokeStyle(2, FILL_COLOR)
+      .setInteractive({ useHandCursor: true })
+      .setName('settingsProgressionConfirm');
+    addButton(this, cx - 100, cy + 50, 180, 44, { fillColor: BUTTON_COLOR, hitRect: confirm });
+    const confirmLabel = this.add
+      .text(cx - 100, cy + 50, 'Wipe & restart', {
+        fontFamily: FONT,
+        fontSize: FONT_SIZE_SM,
+        color: DANGER_COLOR,
+      })
+      .setOrigin(0.5);
+    confirm.on('pointerdown', () => {
+      this.persist();
+      resetSaveToMode(mode);
+      fadeToScene(this, SceneKeys.Tutorial, {});
+    });
+
+    const cancel = this.add
+      .rectangle(cx + 100, cy + 50, 160, 44, BUTTON_COLOR)
+      .setStrokeStyle(2, BORDER_COLOR)
+      .setInteractive({ useHandCursor: true })
+      .setName('settingsProgressionCancel');
+    addButton(this, cx + 100, cy + 50, 160, 44, { fillColor: BUTTON_COLOR, hitRect: cancel });
+    const cancelLabel = this.add
+      .text(cx + 100, cy + 50, 'Cancel', {
+        fontFamily: FONT,
+        fontSize: FONT_SIZE_SM,
+        color: TEXT_COLOR,
+      })
+      .setOrigin(0.5);
+    cancel.on('pointerdown', () => this.clearConfirm());
+
+    this.confirmLayer = [dim, panel, title, body, confirm, confirmLabel, cancel, cancelLabel];
+  }
+
+  private clearConfirm(): void {
+    for (const obj of this.confirmLayer) obj.destroy();
+    this.confirmLayer = [];
   }
 
   private fillWidthFor(pct: number): number {

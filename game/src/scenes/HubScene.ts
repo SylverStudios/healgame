@@ -9,7 +9,7 @@
 
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
-import { loadSave, pushRecentRun, resetSave, saveGame, type SaveData } from '../save/save';
+import { loadSave, pushRecentRun, resetSaveToMode, saveGame, type SaveData } from '../save/save';
 import {
   availableTalentPoints,
   currentChallengeDungeon,
@@ -18,7 +18,7 @@ import {
   type HubCombatSceneData,
   type HubNotice,
 } from '../meta/progression';
-import { loadoutFromSave } from '../data/talentTree';
+import { loadoutForSave } from '../data/loadout';
 import { runModsFromSave } from '../data/runMods';
 import { levelForXp, SPELLS, xpForLevel } from '../data/constants';
 import { ORDERED_DUNGEONS, hubDungeonTargetName } from '../data/dungeons';
@@ -229,7 +229,11 @@ export class HubScene extends Phaser.Scene {
       : undefined;
     this.makeButton(centerX - 160, metaButtonY, 280, META_BUTTON_H,
       unspent > 0 ? `Talent Tree  •  ${unspent}` : 'Talent Tree',
-      () => { fadeToScene(this, SceneKeys.Tree); },
+      () => {
+        const treeKey =
+          save.progressionMode === 'radial' ? SceneKeys.RadialTree : SceneKeys.Tree;
+        fadeToScene(this, treeKey);
+      },
       'hubTree',
       treeHighlight,
     );
@@ -252,7 +256,7 @@ export class HubScene extends Phaser.Scene {
       this.makeDungeonButton(centerX, y, dungeon, isCurrent, cleared, () => {
         const combatData: CombatSceneData = {
           encounterId: dungeon.id,
-          loadout: loadoutFromSave(save),
+          loadout: loadoutForSave(save),
           returnTo: SceneKeys.Hub,
         };
         // Chunk 6: shorter fade-out here — CombatScene.create() plays the
@@ -463,7 +467,8 @@ export class HubScene extends Phaser.Scene {
 
   private confirmWipe(): void {
     recordReset();
-    resetSave();
+    const mode = loadSave().progressionMode;
+    resetSaveToMode(mode);
     fadeToScene(this, SceneKeys.Tutorial);
   }
 

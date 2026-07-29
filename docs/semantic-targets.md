@@ -29,8 +29,10 @@ by name.
 | `loadoutPick:<spellId>` / `loadoutPick:empty` | spell picker row | `LoadoutScene.ts` |
 | `loadoutBack` | back button | `LoadoutScene.ts` |
 | `runMod:<id>` | oath/relic icon hit target (top bar) | `ui/runModsBar.ts` (Hub / Combat / Tree) |
-| `treeNode:<spotId>` | node bg rect | `TreeScene.ts` (e.g. `treeNode:deep-reserves`) |
-| `treeBack` | back-button rect | `TreeScene.ts` |
+| `treeNode:<spotId>` | node bg rect (lattice) | `TreeScene.ts` (e.g. `treeNode:deep-reserves`) |
+| `treeNode:<spotId>` (radial) | wheel socket — logical ids: `heal`, `bonk`, `mend`, `heal-s1`, `big-heal`, `mend-s1`, `offense`, `vowstrike-s1`, `bonk-s1`, `still-waters`, `wrath`, `liturgy`, `big-heal-s1`, `heal-s2`, `heal-s3`, `offense-s2`, `crown-waters`, `crown-wrath` | `RadialTreeScene.ts` |
+| `treeBack` | back-button rect | `TreeScene.ts` and `RadialTreeScene.ts` |
+| `treeChoice:a` / `treeChoice:b` | Radial A/B specialize choice buttons (inside modal) | `RadialTreeScene.ts` |
 | `combatAlly:<unitId>` | sprite body when clickable | `unitSprite.ts` |
 | `combatSpell:<spellId>` | SpellButton bg rect | `spellBar.ts` |
 | `combatCooldown:<cooldownId>` | CooldownButton bg rect | `spellBar.ts` |
@@ -40,6 +42,10 @@ by name.
 | `relicCard:<relicId>` | RelicScene card bg | `RelicScene.ts` |
 | `hubSettings` | Settings button | `HubScene.ts` |
 | `settingsVolumeSlider` | music volume slider track | `SettingsScene.ts` |
+| `settingsProgressionLattice` | Talent tree: Classic | `SettingsScene.ts` |
+| `settingsProgressionRadial` | Talent tree: Radial | `SettingsScene.ts` |
+| `settingsProgressionConfirm` | Wipe & restart confirm | `SettingsScene.ts` |
+| `settingsProgressionCancel` | Mode-switch cancel | `SettingsScene.ts` |
 | `settingsBack` | back button | `SettingsScene.ts` |
 
 ## Hook API
