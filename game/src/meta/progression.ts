@@ -3,14 +3,15 @@
  * no Phaser. Scenes call these functions and immediately persist the mutated
  * SaveData via saveGame(); this module never touches storage itself.
  *
- * Combat loadouts are resolved by the talent-tree service (`loadoutFromSave`);
+ * Combat loadouts are resolved by `loadoutForSave` (lattice or radial).
  * `buildLoadout` is a thin alias kept for existing call sites/tests.
  */
 
 import { levelForXp, SPELLS } from '../data/constants';
 import { getDungeonById, isDungeonIdUnlocked, ORDERED_DUNGEONS } from '../data/dungeons';
 import { chooseRelicOffers } from '../data/relics';
-import { loadoutFromSave, type CombatMods } from '../data/talentTree';
+import { loadoutForSave } from '../data/loadout';
+import type { CombatMods } from '../data/talentTree';
 import { placeOnActionBar, type SaveData } from '../save/save';
 import type { CombatResult } from '../scenes/CombatScene';
 import type { DungeonDef } from '../data/content/types';
@@ -48,7 +49,12 @@ export function applyCombatResult(
     });
   }
 
-  if (levelAfter >= 2 && !save.unlockedSpells.includes(SPELLS.zealousMending.id)) {
+  // Lattice milestone only — radial unlocks come from the wheel.
+  if (
+    save.progressionMode === 'lattice' &&
+    levelAfter >= 2 &&
+    !save.unlockedSpells.includes(SPELLS.zealousMending.id)
+  ) {
     save.unlockedSpells.push(SPELLS.zealousMending.id);
     placeOnActionBar(save, SPELLS.zealousMending.id);
     notices.push({
@@ -109,9 +115,9 @@ export function takeHubCombatResult(
  */
 export type Loadout = CombatMods;
 
-/** Builds the resolved Loadout for the current save via the talent-tree service. */
+/** Builds the resolved Loadout for the current save via the mode facade. */
 export function buildLoadout(save: SaveData): Loadout {
-  return loadoutFromSave(save);
+  return loadoutForSave(save);
 }
 
 export function allocatedTalentPoints(save: Pick<SaveData, 'treeRanks'>): number {

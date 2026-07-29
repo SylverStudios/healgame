@@ -55,7 +55,7 @@ const shotsDir = (() => {
 mkdirSync(shotsDir, { recursive: true });
 
 const PORT = await freePort();
-const SAVE_KEY = 'healgame-save-v8';
+const SAVE_KEY = 'healgame-save-v9';
 
 /** Resolve a semantic GameObject name via window.__healgame (src/debug/testHooks.ts). */
 const locate = (page, name) =>
@@ -150,7 +150,8 @@ async function seedSave(page, save) {
 
 function baseSave(overrides) {
   return {
-    version: 8,
+    version: 9,
+    progressionMode: 'lattice',
     tutorialDone: true,
     xp: 0,
     unlockedSpells: ['bonk', 'solemn-mend'],

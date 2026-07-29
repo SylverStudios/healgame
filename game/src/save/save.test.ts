@@ -3,12 +3,14 @@ import {
   loadSave,
   newSaveData,
   resetSave,
+  resetSaveToMode,
   SAVE_KEY,
   saveGame,
   type KeyValueStore,
   type SaveData,
 } from './save';
 import { SPELLS } from '../data/constants';
+import { RADIAL_BONK, RADIAL_HEAL } from '../data/radial/spells';
 
 function memoryStore(): KeyValueStore {
   const map = new Map<string, string>();
@@ -24,11 +26,12 @@ function storePayload(store: KeyValueStore, payload: Record<string, unknown>): v
 }
 
 describe('save', () => {
-  it('returns a fresh v8 save when nothing is stored', () => {
+  it('returns a fresh v9 lattice save when nothing is stored', () => {
     const save = loadSave(memoryStore());
     expect(save).toEqual(newSaveData());
     expect(save).toEqual({
-      version: 8,
+      version: 9,
+      progressionMode: 'lattice',
       tutorialDone: false,
       xp: 0,
       unlockedSpells: [SPELLS.bonk.id],
@@ -46,10 +49,19 @@ describe('save', () => {
     expect(save).not.toHaveProperty('rubies');
   });
 
-  it('round-trips a full v8 save', () => {
+  it('radial newSaveData prepurchases Heal + Bonk on bar', () => {
+    const save = newSaveData('radial');
+    expect(save.progressionMode).toBe('radial');
+    expect(save.unlockedSpells).toEqual([RADIAL_HEAL.id, RADIAL_BONK.id]);
+    expect(save.actionBar).toEqual([RADIAL_HEAL.id, RADIAL_BONK.id, '', '']);
+    expect(save.treeRanks).toEqual({ heal: 1, bonk: 1 });
+  });
+
+  it('round-trips a full v9 save', () => {
     const store = memoryStore();
     const data: SaveData = {
-      version: 8,
+      version: 9,
+      progressionMode: 'lattice',
       tutorialDone: true,
       xp: 42,
       unlockedSpells: [SPELLS.bonk.id, 'solemn-mend', 'zealous-mending'],
@@ -80,11 +92,13 @@ describe('save', () => {
     store.setItem('healgame-save-v5', JSON.stringify({ version: 5, xp: 999 }));
     store.setItem('healgame-save-v6', JSON.stringify({ version: 6, xp: 999 }));
     store.setItem('healgame-save-v7', JSON.stringify({ version: 7, xp: 999 }));
+    store.setItem('healgame-save-v8', JSON.stringify({ version: 8, xp: 999 }));
     expect(loadSave(store)).toEqual(newSaveData());
     expect(store.getItem('healgame-save-v1')).toBeNull();
     expect(store.getItem('healgame-save-v5')).toBeNull();
     expect(store.getItem('healgame-save-v6')).toBeNull();
     expect(store.getItem('healgame-save-v7')).toBeNull();
+    expect(store.getItem('healgame-save-v8')).toBeNull();
   });
 
   it('resetSave wipes everything (restart, no respec)', () => {
@@ -97,9 +111,18 @@ describe('save', () => {
     expect(loadSave(store)).toEqual(newSaveData());
   });
 
+  it('resetSaveToMode wipes and restarts in the chosen mode', () => {
+    const store = memoryStore();
+    saveGame(newSaveData('lattice'), store);
+    const radial = resetSaveToMode('radial', store);
+    expect(radial.progressionMode).toBe('radial');
+    expect(loadSave(store).progressionMode).toBe('radial');
+    expect(loadSave(store).unlockedSpells).toContain(RADIAL_HEAL.id);
+  });
+
   it('discards unrecognized payloads', () => {
     const store = memoryStore();
-    storePayload(store, { version: 8, xp: 'nope' });
+    storePayload(store, { version: 9, xp: 'nope' });
     expect(loadSave(store)).toEqual(newSaveData());
   });
 });

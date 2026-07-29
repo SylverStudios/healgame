@@ -40,7 +40,12 @@ by name.
 | `relicCard:<relicId>` | RelicScene card bg | `RelicScene.ts` |
 | `hubSettings` | Settings button | `HubScene.ts` |
 | `settingsVolumeSlider` | music volume slider track | `SettingsScene.ts` |
+| `settingsProgressionLattice` | Talent tree: Classic | `SettingsScene.ts` |
+| `settingsProgressionRadial` | Talent tree: Radial | `SettingsScene.ts` |
+| `settingsProgressionConfirm` | Wipe & restart confirm | `SettingsScene.ts` |
+| `settingsProgressionCancel` | Mode-switch cancel | `SettingsScene.ts` |
 | `settingsBack` | back button | `SettingsScene.ts` |
+| `treeChoice:a` / `treeChoice:b` | Radial A/B specialize options | `RadialTreeScene.ts` (Chunk 3) |
 
 ## Hook API
 

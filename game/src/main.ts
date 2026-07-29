@@ -4,6 +4,7 @@ import { TutorialScene } from './scenes/TutorialScene';
 import { CombatScene } from './scenes/CombatScene';
 import { HubScene } from './scenes/HubScene';
 import { TreeScene } from './scenes/TreeScene';
+import { RadialTreeScene } from './scenes/RadialTreeScene';
 import { RelicScene } from './scenes/RelicScene';
 import { LoadoutScene } from './scenes/LoadoutScene';
 import { SettingsScene } from './scenes/SettingsScene';
@@ -37,6 +38,7 @@ const game = new Phaser.Game({
     CombatScene,
     HubScene,
     TreeScene,
+    RadialTreeScene,
     RelicScene,
     LoadoutScene,
     SettingsScene,

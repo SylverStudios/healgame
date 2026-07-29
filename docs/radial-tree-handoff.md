@@ -167,7 +167,7 @@ bare `loadoutFromSave`. Lattice implementation stays the current function body.
 | Radial catalog | `game/src/data/radial/` (`spells.ts`, `tree.ts`, `resolve.ts`, tests) |
 | Bonk stacks | `game/src/combat/types.ts`, `engine.ts`, tests, README note |
 | Settings UI | `game/src/scenes/SettingsScene.ts` |
-| Tree UI | prefer `game/src/scenes/RadialTreeScene.ts` **or** mode branch in `TreeScene.ts` — pick one in chunk 0 and stick to it; A/B modal colocated |
+| Tree UI | **Chunk 0 pick: `RadialTreeScene.ts`** (lattice `TreeScene` stays stable); A/B modal colocated on RadialTreeScene |
 | Hub wiring | `HubScene` only if tree scene key / button target changes |
 | Docs | `semantic-targets.md`, `poc-qa.md` note, this handoff → current when shipped |
 
