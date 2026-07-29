@@ -120,6 +120,10 @@ export class CombatEngine {
   private nextSpellManaReduction = 0;
   /** Reckoning buff: % of base heal added on the next heal completion. */
   private nextHealPotencyPct = 0;
+  /** Blessed Bonk stacks: accumulated count (capped per buff); cleared on next heal land. */
+  private bonkHealStackCount = 0;
+  /** Blessed Bonk stacks: % per stack, updated from the most recent stackNextHealPotencyPct buff applied. */
+  private bonkHealStackPct = 0;
 
   private bossCastState: BossCastState | null = null;
   /** Countdown to the next boss cast start; null while a party-AoE cast is active or the boss has no cast. */
@@ -380,6 +384,7 @@ export class CombatEngine {
         .map(([spellId, remainingMs]) => ({ spellId, remainingMs: Math.max(0, remainingMs) })),
       nextSpellManaReduction: this.nextSpellManaReduction,
       nextHealPotencyPct: this.nextHealPotencyPct,
+      bonkHealStacks: this.bonkHealStackCount,
     };
   }
 
@@ -683,11 +688,20 @@ export class CombatEngine {
           healBonus += cd.def.effect.bonusHeal;
         }
       }
-      // Reckoning: +ceil(baseHeal * pct / 100) on the next heal only.
+      // Next-heal potency: Reckoning (flat %) and Blessed Bonk stacks each add to raw
+      // heal on the next heal land. Both clear on consume. If both are armed they apply
+      // additively — flat pct first, then stacks * pct — so the precedence is documented
+      // and deterministic regardless of cast order.
       let potencyBonus = 0;
       if (this.nextHealPotencyPct > 0) {
-        potencyBonus = Math.ceil((spell.heal * this.nextHealPotencyPct) / 100);
+        potencyBonus += Math.ceil((spell.heal * this.nextHealPotencyPct) / 100);
         this.nextHealPotencyPct = 0;
+      }
+      if (this.bonkHealStackCount > 0) {
+        potencyBonus += Math.ceil(
+          (spell.heal * this.bonkHealStackCount * this.bonkHealStackPct) / 100,
+        );
+        this.bonkHealStackCount = 0;
       }
       const raw =
         spell.heal +
@@ -743,6 +757,9 @@ export class CombatEngine {
       this.nextSpellManaReduction = Math.max(this.nextSpellManaReduction, buff.amount);
     } else if (buff.kind === 'nextHealPotencyPct') {
       this.nextHealPotencyPct = Math.max(this.nextHealPotencyPct, buff.pct);
+    } else if (buff.kind === 'stackNextHealPotencyPct') {
+      this.bonkHealStackCount = Math.min(buff.cap, this.bonkHealStackCount + 1);
+      this.bonkHealStackPct = buff.pct;
     }
   }
 

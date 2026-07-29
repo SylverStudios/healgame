@@ -38,7 +38,15 @@ export type SpellCastBuff =
   /** Next spell reserves `max(0, mana - amount)`. */
   | { kind: 'nextSpellManaReduction'; amount: number }
   /** Next heal's raw value gains `ceil(base * pct / 100)` before clamps. */
-  | { kind: 'nextHealPotencyPct'; pct: number };
+  | { kind: 'nextHealPotencyPct'; pct: number }
+  /**
+   * Blessed Bonk: on each cast complete, increments a stack counter by 1
+   * (capped at `cap`). On the next heal that lands with heal > 0, adds
+   * `ceil(base * stacks * pct / 100)` to raw heal, then clears stacks to 0.
+   * Non-heal casts never consume stacks. If both this and `nextHealPotencyPct`
+   * are armed simultaneously, both apply additively (flat first, stacks after).
+   */
+  | { kind: 'stackNextHealPotencyPct'; pct: number; cap: number };
 
 export interface SpellDef {
   id: string;
@@ -261,6 +269,12 @@ export interface CombatState {
   nextSpellManaReduction: number;
   /** Pending Reckoning-style potency for the next heal completion. */
   nextHealPotencyPct: number;
+  /**
+   * Active Blessed Bonk stack count. Each stack adds `pct`% of base heal on
+   * the next heal land (applied additively after `nextHealPotencyPct`), then
+   * all stacks clear. 0 when no stacks are active.
+   */
+  bonkHealStacks: number;
 }
 
 /**

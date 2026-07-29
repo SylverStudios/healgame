@@ -1,6 +1,6 @@
 # Combat engine (Chunk 1)
 
-Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-07-18
+Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-07-29
 
 Pure, deterministic TypeScript. No Phaser, no wall-clock, no randomness — driven
 entirely by `advance(dtMs)`. Chunk 2 builds the Phaser view against exactly
@@ -325,6 +325,14 @@ and compiles the ordered dungeon catalog into the engine's resolved
   applies `partyDamage` to every living party member, then drains up to
   `manaBurn` mana from the living healer (clamped to current mana) and emits
   `manaBurned { amount }` when any mana was taken. Cadence matches `partyAoE`.
+- **Blessed Bonk stacking heal potency (`stackNextHealPotencyPct` castBuff)** (Wave 5
+  Chunk 2): a spell with `castBuff: { kind: 'stackNextHealPotencyPct'; pct; cap }` increments
+  an engine-internal stack counter by 1 (capped at `cap`) on each cast completion, updating the
+  `pct` to the most recently applied buff's value. On the next heal where `heal > 0` completes,
+  the engine adds `ceil(spell.heal * stacks * pct / 100)` to raw heal and clears stacks to 0.
+  Damage-only casts never consume stacks. If both this buff and `nextHealPotencyPct` (Reckoning)
+  are simultaneously armed, both apply **additively** on the same heal: flat `nextHealPotencyPct`
+  resolves first, then stacks; both clear. Exposed on `CombatState.bonkHealStacks` (count only).
 - **Synergy and heal-formula bonuses** (Chunk 1, phase-2-handoff; extended
   Alpha 0.1 §D4): all are resolved into the existing `heal` event — no new
   event types. A cast's raw heal value is `spell.heal + synergyBonuses +
