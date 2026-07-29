@@ -69,7 +69,7 @@ describe('buildRunSummary — level-up detection', () => {
     expect(s.leveledUp).toBe(false);
     expect(s.levelBefore).toBe(1);
     expect(s.levelAfter).toBe(1);
-    expect(s.levelUpLabel).toBe('No level-up');
+    expect(s.levelUpLabel).toBeNull();
   });
 
   it('exact threshold crossing triggers a level-up (level 1 → 2)', () => {
@@ -107,18 +107,18 @@ describe('buildRunSummary — level-up detection', () => {
     expect(s.levelAfter).toBe(2);
   });
 
-  it('a victory with XP below the next threshold gives No level-up label', () => {
+  it('a victory with XP below the next threshold omits the level-up line', () => {
     // Already at level 2 (10 XP), earn 5 — threshold for level 3 is 30
     const s = makeSummary({ status: 'victory', preFightXp: xpForLevel(2), xp: 5 });
     expect(s.leveledUp).toBe(false);
-    expect(s.levelUpLabel).toBe('No level-up');
+    expect(s.levelUpLabel).toBeNull();
   });
 
   it('XP exactly one short of threshold does NOT level up', () => {
     const threshold = xpForLevel(2); // 10
     const s = makeSummary({ preFightXp: 0, xp: threshold - 1 });
     expect(s.leveledUp).toBe(false);
-    expect(s.levelUpLabel).toBe('No level-up');
+    expect(s.levelUpLabel).toBeNull();
   });
 });
 

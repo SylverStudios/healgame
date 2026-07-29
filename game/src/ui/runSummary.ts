@@ -32,8 +32,8 @@ export interface RunSummaryViewModel {
   levelAfter: number;
   /**
    * Human-readable level-up status. `"Level N → M"` when leveled (covers
-   * multi-level jumps); `"No level-up"` when the fight didn't cross a
-   * threshold.
+   * multi-level jumps); `null` when the fight didn't cross a threshold
+   * (overlay omits the line).
    */
   levelUpLabel: string | null;
 }
@@ -63,7 +63,7 @@ export function buildRunSummary(args: {
   const levelBefore = levelForXp(preFightXp);
   const levelAfter = levelForXp(preFightXp + args.xp);
   const leveledUp = levelAfter > levelBefore;
-  const levelUpLabel = leveledUp ? `Level ${levelBefore} → ${levelAfter}` : 'No level-up';
+  const levelUpLabel = leveledUp ? `Level ${levelBefore} → ${levelAfter}` : null;
 
   return {
     outcome: args.status,
