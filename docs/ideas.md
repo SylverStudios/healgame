@@ -1,6 +1,6 @@
 # Idea backlog
 
-Status: current · Authority: none — uncommitted ideas for future exploration · Last verified: 2026-07-19
+Status: current · Authority: none — uncommitted ideas for future exploration · Last verified: 2026-07-29
 
 These are prompts to revisit, not approved scope or implementation requirements.
 Living specs and active phase handoffs take precedence. This file is **not** a
@@ -50,6 +50,8 @@ Living specs and active phase handoffs take precedence. This file is **not** a
 - Frenzied Liturgy: recovery lockout after the buff expires so it cannot be
   chained forever.
 - Talent tree readability (icons + hover already partly shipped; keep iterating).
+- Wave 5 radial redesign spike (ability spokes + A/B specialize, parallel to
+  lattice): [`docs/radial-tree-design.md`](radial-tree-design.md).
 
 ## Release process
 
