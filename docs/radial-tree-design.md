@@ -324,11 +324,8 @@ Paladin-shaped spells to consider as spokes or upgrades:
 
 ## 11. Remaining open questions
 
-**v1 locks for implementation** now live in
-[`docs/radial-tree-handoff.md`](radial-tree-handoff.md) (and the pasteable
-orchestrator prompt [`docs/radial-tree-agent-prompt.md`](radial-tree-agent-prompt.md)).
-Historical open list kept below for context; treat the handoff as winning for
-ship scope.
+**v1 locks shipped** — see Wave 5 notes in [`poc-qa.md`](poc-qa.md) and
+[`CHANGELOG.md`](CHANGELOG.md). Historical open list kept below for context.
 
 Prior decisions are in §3. Still need answers before a node table can freeze:
 
