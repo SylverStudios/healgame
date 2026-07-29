@@ -20,7 +20,6 @@ const BG_COLOR = 0x1a1210;
 const BUTTON_COLOR = 0x3a2a22;
 const BORDER_COLOR = 0x0a0605;
 const TEXT_COLOR = '#e8d8c8';
-const DIM_COLOR = '#a89888';
 const ACCENT_COLOR = '#f2c14e';
 
 // Chunk 5 (bible item 5): healer bust beside the copy panel — same
@@ -59,32 +58,22 @@ export class TutorialScene extends Phaser.Scene {
       .text(width / 2, TITLE_Y, 'healgame', { fontFamily: FONT, fontSize: FONT_SIZE_LG, color: PALETTE.gold })
       .setOrigin(0.5);
 
-    this.add
-      .text(width / 2, 112, "You are the warband's only healer.", {
-        fontFamily: FONT,
-        fontSize: FONT_SIZE_SM,
-        color: TEXT_COLOR,
-      })
-      .setOrigin(0.5);
-
+    // J10: short intro — healer / Guardian / DPS names only (controls stay minimal).
     const instructions = [
-      'In combat: click an ally to target them, then click a heal (or press its',
-      'QWER key). Bonk (Q) hits the front enemy — no target click needed.',
-      '',
-      'The Ash Gate waits. Hold the line.',
-      'XP from every enemy kill is kept, so nothing is ever wasted.',
+      'You are the healer. Keep Guardian alive so he takes the damage.',
+      'Eagle Eye and Butcher deal the damage.',
     ].join('\n');
 
     // Chunk 4 (bible item 4): copy panel — ui/panels.ts.
     const copyPanelWidth = 700;
     const copyPanelX = width / 2;
-    const copyPanelY = 220;
-    addPanel(this, copyPanelX, copyPanelY, copyPanelWidth, 150);
+    const copyPanelY = 200;
+    addPanel(this, copyPanelX, copyPanelY, copyPanelWidth, 100);
     this.add
       .text(copyPanelX, copyPanelY, instructions, {
         fontFamily: FONT,
         fontSize: FONT_SIZE_SM,
-        color: DIM_COLOR,
+        color: TEXT_COLOR,
         align: 'center',
       })
       .setOrigin(0.5);

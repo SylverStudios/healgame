@@ -104,9 +104,9 @@ const HEALER_LINES: Record<BanterTrigger, Record<HealerVoice, readonly string[]>
   },
   'tank-coach': {
     // Off-design combo — tank-coach's spoken line belongs to the tank.
-    vigil: ['The wall needs my hand.', 'I should mark the tank.'],
-    zealot: ['The wall burns — heal it!', 'Flame the tank — now!'],
-    neutral: ['The tank needs healing.', 'Help the wall. Heal them.'],
+    vigil: ['The wall needs my hand.', 'I should mark the Guardian.'],
+    zealot: ['The wall burns — heal it!', 'Flame the Guardian — now!'],
+    neutral: ['The Guardian needs healing.', 'Help the wall. Heal them.'],
   },
   'low-mana': {
     vigil: [
