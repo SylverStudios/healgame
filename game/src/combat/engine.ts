@@ -22,6 +22,7 @@ import type {
   MissingHealthBonusRule,
   MissingHealthPctBonusRule,
   PartyDoTCastDef,
+  ManaSynergyRule,
   SpellDef,
   SynergyRule,
   TunnelVisionCastDef,
@@ -90,6 +91,8 @@ export class CombatEngine {
 
   /** Synergy rules with mutable per-entry armed state (constructor-cloned; never shared with the caller). */
   private readonly synergies: (SynergyRule & { armed: boolean })[];
+  /** Wave 5 Battle Mend: armed mana discounts for a specific next spell. */
+  private readonly manaSynergies: (ManaSynergyRule & { armed: boolean })[];
   private readonly missingHealthBonuses: MissingHealthBonusRule[];
   private readonly missingHealthPctBonuses: MissingHealthPctBonusRule[];
   private readonly fullHealthBonuses: FullHealthBonusRule[];
@@ -205,6 +208,7 @@ export class CombatEngine {
     // Chunk 1 (phase-2-handoff): synergy + missing-health bonus rules, cloned so the
     // engine's mutable `armed` state never touches the caller's arrays.
     this.synergies = (options?.synergies ?? []).map((s) => ({ ...s, armed: false }));
+    this.manaSynergies = (options?.manaSynergies ?? []).map((s) => ({ ...s, armed: false }));
     this.missingHealthBonuses = (options?.missingHealthBonuses ?? []).map((m) => ({ ...m }));
     // Chunk 4 (alpha-0.1 §D4): pct-of-base-heal missing-health rule (Graven Scale)
     // and full-health threshold rule (Steady Hands), cloned like the arrays above.
@@ -298,7 +302,10 @@ export class CombatEngine {
       // free heal — skip mana gate
     } else {
       const healer = this.getUnit('healer')!;
-      const cost = Math.max(0, this.effectiveManaCost(spell) - this.nextSpellManaReduction);
+      const cost = Math.max(
+        0,
+        this.effectiveManaCost(spell) - this.nextSpellManaReduction - this.armedManaDiscount(spellId),
+      );
       if (healer.mana < cost) return;
     }
     const out: CombatEvent[] = [];
@@ -574,6 +581,12 @@ export class CombatEngine {
         reservedMana = Math.max(0, reservedMana - this.nextSpellManaReduction);
         this.nextSpellManaReduction = 0;
       }
+      // Battle Mend: spell-specific armed mana discount, consumed at cast start.
+      const manaSynDiscount = this.armedManaDiscount(spellId);
+      if (manaSynDiscount > 0) {
+        reservedMana = Math.max(0, reservedMana - manaSynDiscount);
+        this.consumeManaSynergies(spellId);
+      }
     }
     healer.mana = Math.max(0, healer.mana - reservedMana);
     this.playerCast = { spellId, targetId, remainingMs: spell.castMs, totalMs: spell.castMs };
@@ -621,8 +634,18 @@ export class CombatEngine {
       if (target && target.alive) {
         this.applyDamageToUnit(target, spell.damage!, 'healer', events);
       }
+      // Mana Bonk: restore mana after a completed damage cast (hit attempted).
+      if ((spell.manaOnHit ?? 0) > 0) {
+        const healer = this.getUnit('healer');
+        if (healer) {
+          healer.mana = Math.min(healer.maxMana, healer.mana + spell.manaOnHit!);
+        }
+      }
       this.applySpellCastBuff(spell);
       for (const syn of this.synergies) {
+        if (syn.triggerSpellId === spell.id) syn.armed = true;
+      }
+      for (const syn of this.manaSynergies) {
         if (syn.triggerSpellId === spell.id) syn.armed = true;
       }
       if (spell.heal <= 0) return;
@@ -744,10 +767,30 @@ export class CombatEngine {
       // free heal — skip mana gate
     } else {
       const healer = this.getUnit('healer')!;
-      const cost = Math.max(0, this.effectiveManaCost(spell) - this.nextSpellManaReduction);
+      const cost = Math.max(
+        0,
+        this.effectiveManaCost(spell) - this.nextSpellManaReduction - this.armedManaDiscount(spellId),
+      );
       if (healer.mana < cost) return;
     }
     this.beginCast(spellId, targetId, events);
+  }
+
+  /** Sum of armed Battle Mend discounts for `spellId` (positive mana amount). */
+  private armedManaDiscount(spellId: string): number {
+    let discount = 0;
+    for (const syn of this.manaSynergies) {
+      if (syn.armed && syn.targetSpellId === spellId && syn.manaDelta < 0) {
+        discount += -syn.manaDelta;
+      }
+    }
+    return discount;
+  }
+
+  private consumeManaSynergies(spellId: string): void {
+    for (const syn of this.manaSynergies) {
+      if (syn.armed && syn.targetSpellId === spellId) syn.armed = false;
+    }
   }
 
   private applySpellCastBuff(spell: SpellDef): void {

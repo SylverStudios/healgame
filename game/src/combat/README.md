@@ -333,6 +333,12 @@ and compiles the ordered dungeon catalog into the engine's resolved
   Damage-only casts never consume stacks. If both this buff and `nextHealPotencyPct` (Reckoning)
   are simultaneously armed, both apply **additively** on the same heal: flat `nextHealPotencyPct`
   resolves first, then stacks; both clear. Exposed on `CombatState.bonkHealStacks` (count only).
+- **Mana Bonk (`SpellDef.manaOnHit`)** (Wave 5): on a completed damage cast, restore
+  `manaOnHit` mana to the healer (clamped to maxMana). Lattice spells omit the field.
+- **Battle Mend (`manaSynergies`)** (Wave 5): optional `CombatEngineOptions.manaSynergies`
+  entries arm on a completed `triggerSpellId` cast; the next cast start of `targetSpellId`
+  applies `manaDelta` (typically −1) to reserved mana and consumes the arm. Stacks with
+  Absolution's global `nextSpellManaReduction`.
 - **Synergy and heal-formula bonuses** (Chunk 1, phase-2-handoff; extended
   Alpha 0.1 §D4): all are resolved into the existing `heal` event — no new
   event types. A cast's raw heal value is `spell.heal + synergyBonuses +

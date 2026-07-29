@@ -20,7 +20,13 @@ import {
   type RadialTreeEffect,
 } from './tree';
 import { radialSpellById } from './spells';
-import type { SpellDef, SynergyRule, MissingHealthBonusRule, CooldownDef } from '../../combat/types';
+import type {
+  SpellDef,
+  SynergyRule,
+  ManaSynergyRule,
+  MissingHealthBonusRule,
+  CooldownDef,
+} from '../../combat/types';
 import { create, update, snapshot, ownedContents } from '../../tree';
 import type { TreeState } from '../../tree';
 
@@ -72,6 +78,7 @@ export function resolveRadialCombatMods(
     .map((s) => ({ ...s }));
 
   const synergyMap = new Map<string, SynergyRule>();
+  const manaSynergyMap = new Map<string, ManaSynergyRule>();
   const missingMap = new Map<string, MissingHealthBonusRule>();
   const cooldownMap = new Map<string, CooldownDef>();
   let bonusMaxMana = 0;
@@ -79,7 +86,7 @@ export function resolveRadialCombatMods(
   // Collect non-spell effects from owned tree contents.
   for (const { effects } of contents) {
     for (const effect of effects) {
-      applyEffectToMods(effect, spells, synergyMap, missingMap, cooldownMap, (d) => {
+      applyEffectToMods(effect, spells, synergyMap, manaSynergyMap, missingMap, cooldownMap, (d) => {
         bonusMaxMana += d;
       });
     }
@@ -89,6 +96,7 @@ export function resolveRadialCombatMods(
     spells,
     bonusMaxMana,
     synergies: [...synergyMap.values()],
+    manaSynergies: [...manaSynergyMap.values()],
     missingHealthBonuses: [...missingMap.values()],
     missingHealthPctBonuses: [],
     fullHealthBonuses: [],
@@ -101,6 +109,7 @@ function applyEffectToMods(
   effect: RadialTreeEffect,
   spells: SpellDef[],
   synergyMap: Map<string, SynergyRule>,
+  manaSynergyMap: Map<string, ManaSynergyRule>,
   missingMap: Map<string, MissingHealthBonusRule>,
   cooldownMap: Map<string, CooldownDef>,
   addMana: (d: number) => void,
@@ -169,9 +178,20 @@ function applyEffectToMods(
       addMana(effect.amount);
       break;
 
-    case 'manaSynergy':
-      // Engine support deferred to Chunk 4; data stored in tree, no CombatMods entry yet.
+    case 'manaSynergy': {
+      const key = `${effect.triggerSpellId}>${effect.targetSpellId}`;
+      const prev = manaSynergyMap.get(key);
+      if (prev) {
+        prev.manaDelta += effect.manaDelta;
+      } else {
+        manaSynergyMap.set(key, {
+          triggerSpellId: effect.triggerSpellId,
+          targetSpellId: effect.targetSpellId,
+          manaDelta: effect.manaDelta,
+        });
+      }
       break;
+    }
 
     case 'upgradeCooldown': {
       const cd = cooldownMap.get(effect.cooldownId);

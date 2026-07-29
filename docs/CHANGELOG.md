@@ -1,9 +1,21 @@
 # Changelog — healgame
 
-Status: current · Authority: shipped-history summary (details in poc-qa) · Last verified: 2026-07-19
+Status: current · Authority: shipped-history summary (details in poc-qa) · Last verified: 2026-07-29
 
 Newest first. Numbers and rule detail live in `game/src/data/` and
 [`poc-qa.md`](./poc-qa.md) — this file is the short ship log.
+
+---
+
+## 2026-07-29 — Wave 5: Radial talent tree dual-ship
+
+Lattice and radial progression side-by-side for friend A/B testing.
+
+- **Save v9** — `progressionMode: 'lattice' | 'radial'` (default lattice); purges v8+.
+- **Settings** — Talent tree Classic | Radial; confirm → wipe save → Tutorial restart.
+- **Facade** — `loadoutForSave` / `ownedSpellsForSave`; combat still only sees `CombatMods`.
+- **Radial kit** — Heal + Bonk starters; Ring 1–3 wheel (`RadialTreeScene`); A/B specialize modal; offense XOR; Blessed Bonk stacks; Mana Bonk / Battle Mend mana hooks.
+- **Journey** — lattice path unchanged; focused radial smoke (Mend → Heal specialize).
 
 ---
 

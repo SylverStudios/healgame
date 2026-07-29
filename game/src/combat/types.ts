@@ -64,6 +64,11 @@ export interface SpellDef {
   cooldownMs?: number;
   /** Buff applied to the healer when this cast completes. */
   castBuff?: SpellCastBuff;
+  /**
+   * Wave 5 Mana Bonk: on a completed damage cast that lands a hit, restore
+   * this much mana to the healer (clamped to maxMana). Ignored when 0/absent.
+   */
+  manaOnHit?: number;
   /** Alpha 0.2 §D8 — placeholder glyph key/character for tree + spell bar. */
   glyph?: string;
   /** Short when-to-use / flavor for slot-card tooltips; ignored by the engine. */
@@ -81,6 +86,17 @@ export interface SynergyRule {
   triggerSpellId: string;
   buffedSpellId: string;
   bonusHeal: number;
+}
+
+/**
+ * Wave 5 Battle Mend: completing `triggerSpellId` arms a one-shot mana
+ * adjustment for the next cast of `targetSpellId`. `manaDelta` is typically
+ * negative (discount). Consumed at cast start for that target spell.
+ */
+export interface ManaSynergyRule {
+  triggerSpellId: string;
+  targetSpellId: string;
+  manaDelta: number;
 }
 
 /**
@@ -194,6 +210,8 @@ export interface CombatEngineOptions {
    */
   manaRegen?: { amount: number; intervalMs: number };
   synergies?: SynergyRule[];
+  /** Wave 5 radial: Battle Mend–style next-cast mana discounts. */
+  manaSynergies?: ManaSynergyRule[];
   missingHealthBonuses?: MissingHealthBonusRule[];
   missingHealthPctBonuses?: MissingHealthPctBonusRule[];
   fullHealthBonuses?: FullHealthBonusRule[];

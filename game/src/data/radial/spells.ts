@@ -156,7 +156,7 @@ export const RADIAL_VOWSTRIKE_RECKONING: SpellDef = {
   description: 'Strike, then empower your next heal by 25%.',
 };
 
-/** Mana Bonk — Bonk that restores 1 mana on hit (Chunk 2 implements engine). Replaces Bonk. */
+/** Mana Bonk — Bonk that restores 1 mana on hit. Replaces Bonk. */
 export const RADIAL_MANA_BONK: SpellDef = {
   id: 'mana-bonk',
   name: 'Mana Bonk',
@@ -164,8 +164,9 @@ export const RADIAL_MANA_BONK: SpellDef = {
   damage: 2,
   mana: 0,
   castMs: 0,
+  manaOnHit: 1,
   glyph: '/',
-  description: 'Upgraded poke that restores 1 mana on each hit. (Chunk 2 engine support pending.)',
+  description: 'Upgraded poke that restores 1 mana on each hit.',
 };
 
 /** Blessed Bonk — stacking next-heal amp castBuff (Chunk 2 implements engine). Replaces Bonk. */

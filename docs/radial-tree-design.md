@@ -1,14 +1,13 @@
 # Radial talent tree — design spike
 
-Status: planning · Authority: none — Wave 5 design exploration; does not
-override live `TALENT_TREE` until promoted to a handoff · Last verified:
-2026-07-29
+Status: historical · Authority: none — Wave 5 design exploration (shipped dual-ship
+is documented in poc-qa / CHANGELOG) · Last verified: 2026-07-29
 
 Companion to Wave 5 in
 [`playtest-2026-07-26-roadmap.md`](playtest-2026-07-26-roadmap.md) and the
 [playtest-planning canvas](/Users/aaronvotre/.cursor/projects/Users-aaronvotre-Git-healgame/canvases/playtest-planning.canvas.tsx).
 Ability-spoke radial concept with pinned decisions from the Jul 29 Q&A.
-Research and planning only; no live code changes yet.
+Historical design spike; shipped dual-ship behavior is in poc-qa / CHANGELOG.
 
 ---
 
