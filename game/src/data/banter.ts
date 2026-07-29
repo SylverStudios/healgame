@@ -24,6 +24,12 @@ export type BanterTrigger =
   | 'oom';
 export type BanterSpeaker = 'healer' | 'tank';
 
+/**
+ * Wave 4b / J15 — healer line when a heal is pressed with no ally target.
+ * Presentation emphasizes WHO (bold + shake); not a BanterTrigger table row.
+ */
+export const NO_TARGET_HEAL_LINE = 'but WHO should I aid first?';
+
 type HealerVoice = 'vigil' | 'zealot' | 'neutral';
 
 /**
@@ -104,9 +110,9 @@ const HEALER_LINES: Record<BanterTrigger, Record<HealerVoice, readonly string[]>
   },
   'tank-coach': {
     // Off-design combo — tank-coach's spoken line belongs to the tank.
-    vigil: ['The wall needs my hand.', 'I should mark the tank.'],
-    zealot: ['The wall burns — heal it!', 'Flame the tank — now!'],
-    neutral: ['The tank needs healing.', 'Help the wall. Heal them.'],
+    vigil: ['The wall needs my hand.', 'I should mark the Guardian.'],
+    zealot: ['The wall burns — heal it!', 'Flame the Guardian — now!'],
+    neutral: ['The Guardian needs healing.', 'Help the wall. Heal them.'],
   },
   'low-mana': {
     vigil: [

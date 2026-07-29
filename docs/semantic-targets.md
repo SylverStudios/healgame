@@ -1,6 +1,6 @@
 # Semantic click targets
 
-Status: current · Authority: interactive object name inventory for journey · Last verified: 2026-07-18
+Status: current · Authority: interactive object name inventory for journey · Last verified: 2026-07-29
 
 Every interactive game object a journey stage may aim at carries a stable
 Phaser `GameObject.setName(...)`. Journey resolves via
@@ -34,7 +34,7 @@ by name.
 | `combatAlly:<unitId>` | sprite body when clickable | `unitSprite.ts` |
 | `combatSpell:<spellId>` | SpellButton bg rect | `spellBar.ts` |
 | `combatCooldown:<cooldownId>` | CooldownButton bg rect | `spellBar.ts` |
-| `combatReturn` | Return rect in result overlay | `CombatScene.ts` |
+| `combatReturn` | Return rect in result overlay | `ui/resultPanel.ts` (`mountResultReturn`) |
 | `combatPaceToggle` | pace control bg | `paceToggle.ts` |
 | `combatLogToggle` | log header text | `combatLog.ts` |
 | `relicCard:<relicId>` | RelicScene card bg | `RelicScene.ts` |

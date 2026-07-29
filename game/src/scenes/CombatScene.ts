@@ -38,14 +38,15 @@ import {
 } from '../ui/sprites';
 import { SpellBar } from '../ui/spellBar';
 import { CAST_BAR_FRAME_TEXTURE_KEY } from '../ui/spellSprites';
-import { addBanner, addPanel, addButton } from '../ui/panels';
+import { addBanner, addPanel } from '../ui/panels';
 import {
   OVERLAY_DEPTH, OVERLAY_ALPHA, OVERLAY_FADE_MS, PANEL_WIDTH, PANEL_HEIGHT, PANEL_SLIDE_OFFSET,
   PANEL_SLIDE_DELAY_MS, PANEL_SLIDE_MS, TITLE_DELAY_MS, TITLE_REVEAL_MS, XP_DELAY_MS, XP_REVEAL_MS,
-  LEVEL_UP_DELAY_MS, LEVEL_UP_REVEAL_MS, GLYPH_DELAY_MS, GLYPH_REVEAL_MS, GLYPH_CELL, GLYPH_COLOR, RETURN_DELAY_MS, RETURN_REVEAL_MS,
+  LEVEL_UP_DELAY_MS, LEVEL_UP_REVEAL_MS, GLYPH_DELAY_MS, GLYPH_REVEAL_MS, GLYPH_CELL, GLYPH_COLOR,
+  mountResultReturn,
 } from '../ui/resultPanel';
 import { CombatLog } from '../ui/combatLog';
-import { FONT, FONT_SIZE_XS, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG, PALETTE_NUM } from '../ui/theme';
+import { FONT, FONT_SIZE_XS, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG } from '../ui/theme';
 import {
   ManaSpendAura,
   shakeBossImpact,
@@ -74,6 +75,7 @@ import {
   type MidCombatBanterLatches,
 } from '../ui/midCombatBanter';
 import { showSpeechBubble } from '../ui/speechBubble';
+import { presentNoTargetHealCue } from '../ui/noTargetHealCue';
 import { portraitTextureKey, revealResultPortrait } from '../ui/portraitSprites';
 import { chunkyWipeIn, fadeToScene } from '../ui/transitions';
 import { MOB_REGISTRY } from '../data/mobs';
@@ -247,6 +249,8 @@ export class CombatScene extends Phaser.Scene {
   private healerHasActed = false;
   /** Heal event applied this fight (healer-cast only; overheal counts) — gates tank-coach. */
   private healerHasHealed = false;
+  /** Sim-ms of last no-target heal WHO bubble (Wave 4b / J15); null = never this fight. */
+  private noTargetHealCueAtMs: number | null = null;
   /** Loaded once in create(); reused at result time for treeRanks (build glyph) — save.treeRanks
    *  cannot change mid-combat, so no need to reload. */
   private save!: SaveData;
@@ -261,6 +265,7 @@ export class CombatScene extends Phaser.Scene {
     this.banterLatches = freshMidCombatBanterLatches();
     this.healerHasActed = false;
     this.healerHasHealed = false;
+    this.noTargetHealCueAtMs = null;
     this.partySprites = new Map();
     this.enemySprites = new Map();
     this.unitNames = new Map();
@@ -646,6 +651,19 @@ export class CombatScene extends Phaser.Scene {
     if (this.engine.state.status !== 'running') return;
     this.healerHasActed = true; // idle-coach: command issued even if cast rejected
     recordPress(spellId, source);
+    // J15: heal + no ally target → healer WHO bubble (rate-limited; engine unchanged).
+    const healer = this.partySprites.get('healer');
+    this.noTargetHealCueAtMs = presentNoTargetHealCue({
+      scene: this,
+      spell: this.sceneData.loadout.spells.find((s) => s.id === spellId),
+      allyTargetId: this.engine.state.targetId,
+      nowMs: this.elapsedMs,
+      lastFiredAtMs: this.noTargetHealCueAtMs,
+      healerHome: healer ? { x: healer.getHomeX(), y: healer.getHomeY() } : null,
+      yOffset: BANTER_HEALER_Y_OFFSET,
+      viewWidth: VIEW_WIDTH,
+      viewHeight: VIEW_HEIGHT,
+    });
     this.engine.castSpell(spellId);
     this.syncView();
   }
@@ -1163,38 +1181,14 @@ export class CombatScene extends Phaser.Scene {
       });
     }
 
-    // combatReturn keeps its exact original rect (hit area/name unchanged) —
-    // ui/panels.ts draws framed chrome around it (chunk-3 SpellButton pattern).
-    const returnButton = this.add
-      .rectangle(centerX, centerY + 105, 180, 40, 0x3a2a22)
-      .setStrokeStyle(1, 0x0a0605)
-      .setDepth(OVERLAY_DEPTH + 2)
-      .setInteractive({ useHandCursor: true })
-      .setName('combatReturn')
-      .setAlpha(0)
-      .on('pointerdown', () => {
+    mountResultReturn(this, {
+      centerX,
+      centerY,
+      depth: OVERLAY_DEPTH + 2,
+      onReturn: () => {
         const combatResult: CombatResult = { encounterId: this.sceneData.encounterId, status, xp };
         fadeToScene(this, this.sceneData.returnTo, { combatResult });
-      });
-    const returnFrame = addButton(this, centerX, centerY + 105, 180, 40, {
-      fillColor: PALETTE_NUM.panelLight,
-      depth: OVERLAY_DEPTH + 2,
-      hitRect: returnButton,
-    });
-    returnFrame.container.setAlpha(0);
-
-    const returnText = this.add
-      .text(centerX, centerY + 105, 'Return', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: '#e8d8c8' })
-      .setOrigin(0.5)
-      .setDepth(OVERLAY_DEPTH + 3)
-      .setAlpha(0);
-
-    // combatReturn exists immediately; only alpha is staged (journey-stable).
-    this.tweens.add({
-      targets: [returnButton, returnFrame.container, returnText],
-      alpha: 1,
-      delay: RETURN_DELAY_MS,
-      duration: RETURN_REVEAL_MS,
+      },
     });
   }
 }

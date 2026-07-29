@@ -1,10 +1,10 @@
 /**
  * A single combat unit rendered as a Tiny Dungeon tile (see ui/sprites.ts)
  * + name label + HP bar (+ mana bar for the healer) + optional heal-target
- * halo (gold/holy ring above the head). Bars/labels keep the temp-art style
- * (flat bars, pixel-font labels, dark palette); the unit body is a 16×16
- * pixel-art frame scaled up with nearest-neighbor filtering (`pixelArt: true`
- * in main.ts).
+ * sky beam (gold ring high above with light fading before the sprite).
+ * Bars/labels keep the temp-art style (flat bars, pixel-font labels, dark
+ * palette); the unit body is a 16×16 pixel-art frame scaled up with
+ * nearest-neighbor filtering (`pixelArt: true` in main.ts).
  *
  * Chunk 2 (phase-2-handoff): all visuals live inside a Phaser Container
  * anchored at the unit's fixed "home" position, so a single tween on the
@@ -24,6 +24,7 @@ import {
   FOCUS_RETICLE_PULSE_MS,
 } from './bossFocusReticle';
 import { UNIT_TEXTURE_KEY } from './sprites';
+import { drawTargetSkyBeam, skyBeamLayout } from './targetSkyBeam';
 import { FONT, FONT_SIZE_XS, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG } from './theme';
 
 /** Lerp between two 0xRRGGBB colors at `t` in [0, 1] — used by boss telegraph tint cues. */
@@ -116,17 +117,6 @@ function floatFontPx(amount: number): string {
   return FONT_SIZE_LG;
 }
 
-/** Wave 3b: diegetic gold/holy heal-target halo above the head (not a feet ring). */
-const HALO_FILL_COLOR = 0xf2c14e;
-const HALO_FILL_ALPHA = 0.38;
-const HALO_STROKE_COLOR = 0xffe08a;
-const HALO_STROKE_WIDTH = 2;
-const HALO_STROKE_ALPHA = 0.95;
-/** Base oval size; width also scales with body (~0.55×). Flatter than a circle = classic halo. */
-const HALO_WIDTH = 34;
-const HALO_HEIGHT = 12;
-/** Lift above the body crown so the ring reads as a blessing, not a hat. */
-const HALO_ABOVE_CROWN = 8;
 const DAMAGE_FLOAT_COLOR = '#e05a4e';
 /** Brighter mint so heal numbers pop against the ash background. */
 const HEAL_FLOAT_COLOR = '#5dff7a';
@@ -222,8 +212,8 @@ export class UnitSprite {
   private readonly hpText: Phaser.GameObjects.Text;
   private readonly manaBar: Bar | null;
   private readonly manaText: Phaser.GameObjects.Text | null;
-  /** Gold/holy oval above the head while this unit is the heal target. */
-  private readonly targetHalo: Phaser.GameObjects.Ellipse;
+  /** Gold sky-beam heal-target cue (ring high above; shaft behind meters). */
+  private readonly targetSkyBeam: Phaser.GameObjects.Graphics;
   /** Giant crimson reticle + beady eyes while a boss focus channel targets this unit. */
   private readonly bossFocusMarker: Phaser.GameObjects.Graphics;
 
@@ -341,6 +331,16 @@ export class UnitSprite {
     }
 
     const hpY = -height / 2 - HP_BAR_OFFSET_Y;
+    const crownY = this.bodyRestY - height / 2;
+
+    // Wave 4b / J13: sky-beam heal-target cue. Added BEFORE HP/mana so meters
+    // stay on top; shaft fades out before the sprite crown (never paints body).
+    // Distinct from the crimson boss-focus reticle added last below.
+    const beamLayout = skyBeamLayout({ hpBarY: hpY, crownY, bodyWidth: width });
+    this.targetSkyBeam = scene.add.graphics().setVisible(false);
+    drawTargetSkyBeam(this.targetSkyBeam, beamLayout);
+    this.container.add(this.targetSkyBeam);
+
     const meterHalf = this.meterWidth / 2;
     this.hpBar = new Bar(scene, -meterHalf, hpY, this.meterWidth, HP_BAR_HEIGHT, HP_FILL_COLOR);
     this.hpBar.addToContainer(this.container);
@@ -368,19 +368,8 @@ export class UnitSprite {
       this.manaBarY = null;
     }
 
-    // Wave 3b: gold/holy heal-target halo above the head (container-local so it
-    // tracks lunges). Chevron removed — halo alone is the selection cue; stays
-    // visually distinct from the crimson boss-focus reticle below.
-    const crownY = this.bodyRestY - height / 2;
-    const haloWidth = Math.max(HALO_WIDTH, Math.round(width * 0.55));
-    this.targetHalo = scene.add
-      .ellipse(0, crownY - HALO_ABOVE_CROWN, haloWidth, HALO_HEIGHT, HALO_FILL_COLOR, HALO_FILL_ALPHA)
-      .setStrokeStyle(HALO_STROKE_WIDTH, HALO_STROKE_COLOR, HALO_STROKE_ALPHA)
-      .setVisible(false);
-    this.container.add(this.targetHalo);
-
     // Wave 3 / PR2 2B: giant reticle + beady eyes centered on the ally body.
-    // Distinct from the gold heal-target halo. Added last so danger sits on top.
+    // Distinct from the gold sky-beam heal-target cue. Added last so danger sits on top.
     this.bossFocusMarker = scene.add.graphics().setPosition(0, this.bodyRestY).setVisible(false);
     drawBossFocusReticle(this.bossFocusMarker);
     this.container.add(this.bossFocusMarker);
@@ -436,7 +425,7 @@ export class UnitSprite {
       this.body.setDisplaySize(this.width * DEAD_SCALE, this.height * DEAD_SCALE);
       this.hpBar.setVisible(false);
       this.manaBar?.setVisible(false);
-      this.targetHalo.setVisible(false);
+      this.targetSkyBeam.setVisible(false);
       // Engine ends the channel on target death (bossFocusEnded), but hide
       // defensively so a dead unit never wears the brand for a frame.
       this.setBossFocused(false);
@@ -445,11 +434,11 @@ export class UnitSprite {
 
   setTargeted(isTargeted: boolean): void {
     const show = isTargeted && this.alive;
-    this.targetHalo.setVisible(show);
+    this.targetSkyBeam.setVisible(show);
     if (show) {
-      // Halo above bars/body; if boss focus is also on, keep crimson danger on top
-      // without hiding the gold ring (both stay visible — separate cues).
-      this.container.bringToTop(this.targetHalo);
+      // Sky beam stays behind meters (insertion order) — do not bringToTop.
+      // If boss focus is also on, keep crimson danger on top; both cues remain
+      // visible and distinct (gold sky light vs crimson reticle).
       if (this.bossFocusMarker.visible) {
         this.container.bringToTop(this.bossFocusMarker);
       }

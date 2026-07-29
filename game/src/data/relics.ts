@@ -33,14 +33,14 @@ export const VITAL_EMBER: RelicDef = {
 export const BASTION_PLATE: RelicDef = {
   id: 'bastion-plate',
   name: 'Bastion Plate',
-  description: 'The tank gains 5 maximum health.',
+  description: 'The Guardian gains 5 maximum health.',
   effects: [{ kind: 'roleMaxHp', role: 'tank', amount: 5 }],
 };
 
 export const IRON_WARD: RelicDef = {
   id: 'iron-ward',
   name: 'Iron Ward',
-  description: 'The tank takes 1 less damage from every hit (minimum 1).',
+  description: 'The Guardian takes 1 less damage from every hit (minimum 1).',
   effects: [{ kind: 'roleArmor', role: 'tank', amount: 1 }],
 };
 
@@ -71,7 +71,7 @@ export const WARBLOOD_GEM: RelicDef = {
 export const VANGUARD_SIGIL: RelicDef = {
   id: 'vanguard-sigil',
   name: 'Vanguard Sigil',
-  description: 'The tank deals 1 additional auto-attack damage.',
+  description: 'The Guardian deals 1 additional auto-attack damage.',
   effects: [{ kind: 'roleAutoDamage', role: 'tank', amount: 1 }],
 };
 

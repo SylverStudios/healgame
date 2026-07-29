@@ -4,10 +4,14 @@
  * pixel-font text + a tail, anchored above a unit sprite's home position,
  * clamped to the screen. Fades in, holds, fades out, then self-destroys —
  * callers fire-and-forget.
+ *
+ * Optional `segments` enable a marked emphasis span (Wave 4b / J15 WHO cue):
+ * bold + gold color with a light cast-bar-style shake while visible.
  */
 
 import Phaser from 'phaser';
-import { FONT, FONT_SIZE_SM } from './theme';
+import { castBarShakeOffset } from './castBarShake';
+import { FONT, FONT_SIZE_SM, PALETTE } from './theme';
 
 /** Above units (max ~50, see ui/unitSprite.ts FLOAT_DEPTH) but below the run-summary
  *  overlay (CombatScene OVERLAY_DEPTH = 1000) so the panel remains readable on top. */
@@ -47,6 +51,17 @@ const FADE_IN_MS = 220;
 const HOLD_MS = 2500;
 const FADE_OUT_MS = 320;
 
+/** Emphasized span (e.g. WHO): gold + bold, mid/high cast-bar shake while visible. */
+const EMPHASIS_COLOR = PALETTE.gold;
+const EMPHASIS_SHAKE_FILL = 0.75;
+const EMPHASIS_SHAKE_MAX_PX = 2;
+
+export interface SpeechBubbleSegment {
+  text: string;
+  /** Bold + gold + light shake for the life of the bubble. */
+  emphasize?: boolean;
+}
+
 export interface SpeechBubbleOptions {
   /** Speaker's world X (typically `UnitSprite.getHomeX()`). */
   x: number;
@@ -54,6 +69,8 @@ export interface SpeechBubbleOptions {
    *  offset to clear its HP/mana bars (the caller knows its own unit-sprite layout). */
   y: number;
   text: string;
+  /** When set, laid out as a horizontal run (overrides plain `text` for drawing). */
+  segments?: SpeechBubbleSegment[];
   /** Scene view bounds, used to clamp the bubble fully on screen. */
   viewWidth: number;
   viewHeight: number;
@@ -82,6 +99,39 @@ export function bubbleTotalHeight(boxHeight: number, hasPortrait: boolean): numb
   return hasPortrait ? Math.max(boxTotal, PORTRAIT_DISPLAY_SIZE + TAIL_HEIGHT) : boxTotal;
 }
 
+/**
+ * Horizontal centers for each segment width, relative to the run's center (0).
+ * Used so multi-piece labels (plain + emphasized WHO) share one centered line.
+ */
+export function layoutSegmentCenters(segmentWidths: readonly number[]): {
+  totalWidth: number;
+  centersX: number[];
+} {
+  const totalWidth = segmentWidths.reduce((sum, w) => sum + w, 0);
+  let cursor = -totalWidth / 2;
+  const centersX = segmentWidths.map((w) => {
+    const cx = cursor + w / 2;
+    cursor += w;
+    return cx;
+  });
+  return { totalWidth, centersX };
+}
+
+/**
+ * Split `line` around the first occurrence of `word`, marking that word as
+ * emphasized. If `word` is absent, returns a single plain segment.
+ */
+export function segmentsForMarkedWord(line: string, word: string): SpeechBubbleSegment[] {
+  const idx = line.indexOf(word);
+  if (idx < 0) return [{ text: line }];
+  const segments: SpeechBubbleSegment[] = [];
+  if (idx > 0) segments.push({ text: line.slice(0, idx) });
+  segments.push({ text: word, emphasize: true });
+  const after = idx + word.length;
+  if (after < line.length) segments.push({ text: line.slice(after) });
+  return segments;
+}
+
 /** Plain clamp (not `Phaser.Math.Clamp`) so this module's only `Phaser` usages stay in type
  *  positions — keeps it elidable at transform time like `ui/battlefield.ts`, which matters
  *  because `speechBubble.test.ts` imports pure helpers from this same file: a real runtime
@@ -97,13 +147,40 @@ function clamp(value: number, min: number, max: number): number {
  */
 export function showSpeechBubble(scene: Phaser.Scene, options: SpeechBubbleOptions): Phaser.GameObjects.Container {
   const { x, y, text, viewWidth, viewHeight, portraitTextureKey } = options;
+  const segments = options.segments ?? [{ text }];
 
-  const label = scene.add
-    .text(0, 0, text, { fontFamily: FONT, fontSize: BUBBLE_FONT_SIZE, color: BUBBLE_TEXT_COLOR })
-    .setOrigin(0.5);
+  const labelY = 0; // temporary; repositioned after box height is known
+  const labels: Phaser.GameObjects.Text[] = [];
+  const emphasized: { obj: Phaser.GameObjects.Text; baseX: number; baseY: number }[] = [];
 
-  const boxWidth = label.width + BUBBLE_PADDING_X * 2;
-  const boxHeight = label.height + BUBBLE_PADDING_Y * 2;
+  for (const segment of segments) {
+    const style: Phaser.Types.GameObjects.Text.TextStyle = {
+      fontFamily: FONT,
+      fontSize: BUBBLE_FONT_SIZE,
+      color: segment.emphasize ? EMPHASIS_COLOR : BUBBLE_TEXT_COLOR,
+    };
+    if (segment.emphasize) style.fontStyle = 'bold';
+    const label = scene.add.text(0, labelY, segment.text, style).setOrigin(0.5);
+    labels.push(label);
+  }
+
+  const widths = labels.map((l) => l.width);
+  const heights = labels.map((l) => l.height);
+  const { totalWidth: textWidth, centersX } = layoutSegmentCenters(widths);
+  const textHeight = heights.reduce((max, h) => Math.max(max, h), 0);
+
+  const boxWidth = textWidth + BUBBLE_PADDING_X * 2;
+  const boxHeight = textHeight + BUBBLE_PADDING_Y * 2;
+  const textCenterY = -boxHeight / 2 - TAIL_HEIGHT;
+
+  for (let i = 0; i < labels.length; i++) {
+    const label = labels[i]!;
+    const baseX = centersX[i]!;
+    label.setPosition(baseX, textCenterY);
+    if (segments[i]?.emphasize) {
+      emphasized.push({ obj: label, baseX, baseY: textCenterY });
+    }
+  }
 
   // Local coordinates: container origin (0, 0) is the tail's tip, pointing down at the
   // anchor; the box sits entirely above it (from -boxHeight to 0).
@@ -113,8 +190,6 @@ export function showSpeechBubble(scene: Phaser.Scene, options: SpeechBubbleOptio
   bg.fillTriangle(-TAIL_WIDTH / 2, -TAIL_HEIGHT, TAIL_WIDTH / 2, -TAIL_HEIGHT, 0, 0);
   bg.lineStyle(1, BUBBLE_BORDER_COLOR, 1);
   bg.strokeRoundedRect(-boxWidth / 2, -boxHeight - TAIL_HEIGHT, boxWidth, boxHeight, BUBBLE_RADIUS);
-
-  label.setPosition(0, -boxHeight / 2 - TAIL_HEIGHT);
 
   // Optional speaker bust (chunk 5): sits to the box's left, bottom-anchored to the box's
   // bottom edge so it reads as "grounded" next to the tail rather than floating. Silently
@@ -149,9 +224,27 @@ export function showSpeechBubble(scene: Phaser.Scene, options: SpeechBubbleOptio
   const clampedY = clamp(anchorY, totalHeight + SCREEN_MARGIN, viewHeight - SCREEN_MARGIN);
 
   const container = scene.add
-    .container(clampedX, clampedY, [bg, label, ...extraPieces])
+    .container(clampedX, clampedY, [bg, ...labels, ...extraPieces])
     .setDepth(BUBBLE_DEPTH)
     .setAlpha(0);
+
+  if (emphasized.length > 0) {
+    const onUpdate = (): void => {
+      if (!container.active) return;
+      const { dx, dy } = castBarShakeOffset(
+        EMPHASIS_SHAKE_FILL,
+        scene.time.now,
+        EMPHASIS_SHAKE_MAX_PX,
+      );
+      for (const piece of emphasized) {
+        piece.obj.setPosition(piece.baseX + dx, piece.baseY + dy);
+      }
+    };
+    scene.events.on('update', onUpdate);
+    container.once('destroy', () => {
+      scene.events.off('update', onUpdate);
+    });
+  }
 
   scene.tweens.add({
     targets: container,
