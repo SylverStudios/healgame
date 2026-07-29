@@ -75,6 +75,7 @@ import {
   type MidCombatBanterLatches,
 } from '../ui/midCombatBanter';
 import { showSpeechBubble } from '../ui/speechBubble';
+import { presentNoTargetHealCue } from '../ui/noTargetHealCue';
 import { portraitTextureKey, revealResultPortrait } from '../ui/portraitSprites';
 import { chunkyWipeIn, fadeToScene } from '../ui/transitions';
 import { MOB_REGISTRY } from '../data/mobs';
@@ -248,6 +249,8 @@ export class CombatScene extends Phaser.Scene {
   private healerHasActed = false;
   /** Heal event applied this fight (healer-cast only; overheal counts) — gates tank-coach. */
   private healerHasHealed = false;
+  /** Sim-ms of last no-target heal WHO bubble (Wave 4b / J15); null = never this fight. */
+  private noTargetHealCueAtMs: number | null = null;
   /** Loaded once in create(); reused at result time for treeRanks (build glyph) — save.treeRanks
    *  cannot change mid-combat, so no need to reload. */
   private save!: SaveData;
@@ -262,6 +265,7 @@ export class CombatScene extends Phaser.Scene {
     this.banterLatches = freshMidCombatBanterLatches();
     this.healerHasActed = false;
     this.healerHasHealed = false;
+    this.noTargetHealCueAtMs = null;
     this.partySprites = new Map();
     this.enemySprites = new Map();
     this.unitNames = new Map();
@@ -647,6 +651,19 @@ export class CombatScene extends Phaser.Scene {
     if (this.engine.state.status !== 'running') return;
     this.healerHasActed = true; // idle-coach: command issued even if cast rejected
     recordPress(spellId, source);
+    // J15: heal + no ally target → healer WHO bubble (rate-limited; engine unchanged).
+    const healer = this.partySprites.get('healer');
+    this.noTargetHealCueAtMs = presentNoTargetHealCue({
+      scene: this,
+      spell: this.sceneData.loadout.spells.find((s) => s.id === spellId),
+      allyTargetId: this.engine.state.targetId,
+      nowMs: this.elapsedMs,
+      lastFiredAtMs: this.noTargetHealCueAtMs,
+      healerHome: healer ? { x: healer.getHomeX(), y: healer.getHomeY() } : null,
+      yOffset: BANTER_HEALER_Y_OFFSET,
+      viewWidth: VIEW_WIDTH,
+      viewHeight: VIEW_HEIGHT,
+    });
     this.engine.castSpell(spellId);
     this.syncView();
   }

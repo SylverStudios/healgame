@@ -24,6 +24,12 @@ export type BanterTrigger =
   | 'oom';
 export type BanterSpeaker = 'healer' | 'tank';
 
+/**
+ * Wave 4b / J15 — healer line when a heal is pressed with no ally target.
+ * Presentation emphasizes WHO (bold + shake); not a BanterTrigger table row.
+ */
+export const NO_TARGET_HEAL_LINE = 'but WHO should I aid first?';
+
 type HealerVoice = 'vigil' | 'zealot' | 'neutral';
 
 /**
