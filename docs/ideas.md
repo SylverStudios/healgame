@@ -30,6 +30,7 @@ Living specs and active phase handoffs take precedence. This file is **not** a
 - Need a system that improves DPS meaningfully.
 - Spell-card upgrade mode (replace relics; dual-ship PoC): brainstorm
   [`spell-card-upgrades-brainstorm.md`](spell-card-upgrades-brainstorm.md),
+  feel bible [`relic-revamp-brainstorm.md`](relic-revamp-brainstorm.md),
   handoff [`spell-cards-poc-handoff.md`](spell-cards-poc-handoff.md),
   agent prompt [`spell-cards-poc-agent-prompt.md`](spell-cards-poc-agent-prompt.md).
 

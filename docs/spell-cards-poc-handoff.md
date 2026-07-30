@@ -4,7 +4,12 @@ Status: planning · Authority: this file wins for the spell-cards PoC · Last
 verified: 2026-07-30
 
 Design background (non-authoritative once this handoff exists):
-[`spell-card-upgrades-brainstorm.md`](spell-card-upgrades-brainstorm.md).
+
+- [`spell-card-upgrades-brainstorm.md`](spell-card-upgrades-brainstorm.md) —
+  mode shape, dual-ship, unlock cadence
+- [`relic-revamp-brainstorm.md`](relic-revamp-brainstorm.md) — **feel bible** for
+  chip fantasy (Z/S/R archetypes, “change the decision,” wild modifiers). In
+  cards mode those ideas map to **spell chips**, not a relic catalog.
 
 Remote agent entry prompt:
 [`spell-cards-poc-agent-prompt.md`](spell-cards-poc-agent-prompt.md).
@@ -15,8 +20,8 @@ Remote agent entry prompt:
 
 Ship a **third progression mode** (`cards`) dual-shipped beside lattice and
 radial so friends can A/B: no relics, no talent-tree path — **spell/CD cards
-with upgrade chips**, free level unlocks, spend points only on random chip
-drafts.
+with upgrade chips**, free level unlocks, spend points on **authored 3-way
+choices** per slot.
 
 **Done means (all must be true):**
 
@@ -27,15 +32,14 @@ drafts.
    so the player knows to open Spells).
 3. Leveling grants **+1 upgrade point per level** and free unlocks per §3
    table (Mend, Vowstrike, then one major CD per level 6–8).
-4. Player can spend a point: pick a spell with a free slot → **3 random chips**
-   from that spell’s pool → pick 1 → slot fills → next fight uses the baked
-   numbers / synergies.
+4. Player can spend a point: pick a spell with a free slot → see that slot’s
+   **fixed set of 3 chips** → pick 1 → slot fills → next fight uses the baked
+   numbers / synergies. Slot 1 sets teach synergies; slot 2 sets are wilder.
 5. **RelicScene never opens** in cards mode (first-clear does not offer relics;
    bonus upgrade point instead — §3).
 6. Hub in cards mode has a single **Spells** entry (album); tree wheel / lattice
    are not reachable. Lattice + radial journeys and Settings toggles still work.
-7. `npm run verify` green on the PR branch (or `verify:fast` + cards journey
-   smoke if full journey time-boxed — prefer full verify before PR).
+7. `npm run verify` green on the PR branch (prefer full verify before PR).
 
 ---
 
@@ -44,20 +48,20 @@ drafts.
 | # | Decision |
 |---|---|
 | D1 | Mode id: `progressionMode: 'cards'`. Settings label: **Spell cards**. |
-| D2 | Relics **fully replaced** in cards mode. `relicIds` stays `[]`; never set `pendingRelicOffers`. |
+| D2 | Relics **fully replaced** in cards mode. `relicIds` stays `[]`; never set `pendingRelicOffers`. Relic *fantasy* lives on chips — see [`relic-revamp-brainstorm.md`](relic-revamp-brainstorm.md). |
 | D3 | Spend currency = **upgrade points only**. No tree ranks / no radial spots. |
 | D4 | Spells + major CDs unlock **free on level** (§3). Unlock does not spend a point. |
 | D5 | Tree + spellbook **merge** into one album scene. Hub: one button **Spells** (reuse `hubTree` name → album; hide or no-op `hubLoadout` in cards mode). |
-| D6 | Chip offers: **random 3-from-pool**, pool size **≤6** per spell. Exclude already-owned chips on that card. If &lt;3 remain, show what’s left. |
-| D7 | **2 upgrade slots** per spell card. Major CD cards: unlock + show on album; **no chip slots in PoC** (unlock-only). |
-| D8 | Synergy chips emit existing `CombatMods` fields (`synergies`, `manaSynergies`) — **no new engine rules**. |
-| D9 | Vowstrike at 5 **adds beside Bonk** (does not replace). |
-| D10 | First-clear in cards mode: **+1 bonus upgrade point** (no relic draft). |
-| D11 | Base spell defs: **reuse radial catalog** ids (`heal`, `mend`, `bonk`, `vowstrike`, …). Cooldowns: existing `still-waters`, `wrath-ascendant`, `frenzied-liturgy`. |
-| D12 | Switching to/from cards **wipes save** (Settings confirm). Save schema bump via `npm run save:bump` when shape breaks golden fixture. |
-| D13 | Default fresh install stays **`lattice`**. Cards is opt-in via Settings. |
-| D14 | Draft RNG: injectable `random` (same pattern as relic offers) for tests. |
-| D15 | Chip magnitudes: **flat integers** (repo law). Conversational “−50%” → concrete mana/heal/ms in data. |
+| D6 | Chip offers: **fixed authored sets** — each upgradable spell has **exactly 6 chips** = **slot-1 trio** + **slot-2 trio**. No RNG in PoC. (RNG pools later if the loop feels fun.) |
+| D7 | **2 upgrade slots** per spell card. Filling slot 1 offers the slot-1 trio; filling slot 2 offers the slot-2 trio. Major CD cards: unlock + show on album; **no chip slots in PoC**. |
+| D8 | Slot-1 trios **feature synergies / relationship chips** (Arming Mend, Battle Mend, Mend→Heal links, Bonk/Vowstrike→Mend). Slot-2 trios are **wilder playstyle forks** (brinkmanship, commit trades, pressure) inspired by the relic revamp doc — still only existing `CombatMods` hooks. |
+| D9 | Synergy chips emit existing `CombatMods` fields (`synergies`, `manaSynergies`, missing/full HP bonuses, castMods, castBuff, manaOnHit) — **no new engine rules**. |
+| D10 | Vowstrike at 5 **adds beside Bonk** (does not replace). |
+| D11 | First-clear in cards mode: **+1 bonus upgrade point** (no relic draft). |
+| D12 | Base spell defs: **reuse radial catalog** ids. Cooldowns: existing `still-waters`, `wrath-ascendant`, `frenzied-liturgy`. |
+| D13 | Switching to/from cards **wipes save**. Save schema bump via `npm run save:bump` when shape breaks golden fixture. |
+| D14 | Default fresh install stays **`lattice`**. Cards is opt-in via Settings. |
+| D15 | Chip magnitudes: **flat integers** (repo law). |
 
 ---
 
@@ -83,7 +87,25 @@ radial grant). CDs appear on the combat CD row via `CombatMods.cooldowns`.
 
 ---
 
-## 4. Architecture seam (do not break)
+## 4. Feel contract (from relic revamp → chips)
+
+Read [`relic-revamp-brainstorm.md`](relic-revamp-brainstorm.md) §2–§3 before
+authoring chip copy. Rule of thumb adapted for cards mode:
+
+> Tree used to be *how you cast*. Relics were meant to be *what the fight asks
+> when you cast that way*. **Chips now own both** on the spell card: slot 1
+> teaches relationships; slot 2 asks you to commit to a style.
+
+Archetype letters (Z / S / R / X) are optional flavor in chip `description` /
+comments only — no UI badge required in PoC. Prefer “change the decision” over
+pure number-go-up, especially on **slot 2**.
+
+If a chip is only “+1 forever with no trade,” put it on slot 1 as teaching
+sugar, not on slot 2.
+
+---
+
+## 5. Architecture seam (do not break)
 
 ```
 Save  →  loadoutForSave(save)  →  CombatMods  →  CombatEngine / scenes
@@ -95,16 +117,13 @@ Save  →  loadoutForSave(save)  →  CombatMods  →  CombatEngine / scenes
 
 - Combat / scenes must **not** branch on tree topology; only call
   `loadoutForSave` / `ownedSpellsForSave` (extend facade).
-- Engine purity unchanged. Chips may only produce effect kinds resolve already
-  understands (see §6).
+- Engine purity unchanged. Chips may only produce effect kinds in §7.
 
 ---
 
-## 5. Save shape (Chunk 0)
+## 6. Save shape (Chunk 0)
 
 Extend `ProgressionMode` with `'cards'`.
-
-Cards-mode fields (names may match exactly):
 
 ```ts
 /** Unspent chip drafts. Lattice/radial ignore (treat as 0). */
@@ -112,6 +131,7 @@ upgradePoints: number;
 
 /**
  * spellId → ordered chip ids filling slots (length 0..CARD_SLOTS).
+ * Index 0 = slot-1 pick; index 1 = slot-2 pick.
  * Only spell ids (not cooldown ids) in PoC.
  */
 spellChips: Record<string, string[]>;
@@ -120,35 +140,28 @@ spellChips: Record<string, string[]>;
 Pinned defaults for `newSaveData('cards')`:
 
 - `progressionMode: 'cards'`
-- `unlockedSpells: ['heal', 'bonk']` (or derive purely from level — either is
-  fine if resolve is the single source; prefer **derive from level + starters**
-  and keep `unlockedSpells` in sync for bar/UI helpers)
+- `unlockedSpells: ['heal', 'bonk']` (keep in sync with level unlocks)
 - `actionBar: defaultRadialActionBar()` (Bonk Q, Heal W)
-- `treeRanks: {}` (unused)
-- `upgradePoints: 1` at level 1 (so Lv1 can upgrade immediately) **or**
-  `0` and grant the first point on leaving tutorial — pick one in Chunk 0 and
-  test it; **prefer `upgradePoints: 1` on new cards save**
+- `treeRanks: {}`
+- `upgradePoints: 1` on new cards save
 - `spellChips: {}`
 - `relicIds: []`, `pendingRelicOffers: []`
 - `subclass: null`
 
-`validateSaveData`: accept `'cards'`; require `upgradePoints` integer ≥0 and
-`spellChips` as string→string[] map when mode is cards (lattice/radial may omit
-or default empty for forward compat — simplest: **always** persist both fields
-on all modes with defaults `0` / `{}` so one shape).
+Prefer **always** persist `upgradePoints` + `spellChips` on all modes
+(`0` / `{}` defaults) so one save shape.
 
 Follow [`.claude/skills/rotate-save-version/SKILL.md`](../.claude/skills/rotate-save-version/SKILL.md).
 
 ---
 
-## 6. Public API contracts (Chunk 1–2 consumers)
+## 7. Public API contracts
 
-### 6.1 Unlock table — `game/src/data/cards/unlocks.ts`
+### 7.1 Unlock table — `game/src/data/cards/unlocks.ts`
 
 ```ts
 export const CARD_SLOTS = 2;
 
-/** Spells/CDs granted when player level >= minLevel (starters use minLevel 1). */
 export interface CardUnlock {
   id: string;
   kind: 'spell' | 'cooldown';
@@ -164,153 +177,188 @@ export function cooldownIdsAtLevel(level: number): string[];
 
 Must encode §3 exactly.
 
-### 6.2 Chip defs — `game/src/data/cards/chips.ts`
+### 7.2 Chip defs — `game/src/data/cards/chips.ts`
 
 ```ts
 export type CardChipEffect =
   | { kind: 'castMod'; spellId: string; castMsDelta?: number; manaDelta?: number; healDelta?: number; damageDelta?: number; cooldownMsDelta?: number }
   | { kind: 'synergy'; triggerSpellId: string; buffedSpellId: string; bonusHeal: number }
   | { kind: 'manaSynergy'; triggerSpellId: string; targetSpellId: string; manaDelta: number }
+  | { kind: 'missingHealthBonus'; spellId: string; healPer10PctMissing: number }
+  | { kind: 'missingHealthPctBonus'; spellId: string; pctPer10PctMissing: number }
+  | { kind: 'fullHealthBonus'; spellId: string; hpPctAtLeast: number; bonusHeal: number }
   | { kind: 'setManaOnHit'; spellId: string; amount: number }
   | { kind: 'setCastBuff'; spellId: string; castBuff: SpellCastBuff };
 
 export interface CardChipDef {
   id: string;
   name: string;
-  /** Plain sentence for the draft modal. */
   description: string;
-  /** Pool membership — chip only rolls for this spell. */
   spellId: string;
+  /** 0 = first upgrade on the card; 1 = second. */
+  slotIndex: 0 | 1;
   effects: CardChipEffect[];
-  /** Optional: chips sharing a tag cannot both sit on the same card. */
-  exclusiveTag?: string;
+  /** Optional flavor tag from relic revamp (Z/S/R/X) — comments/tests only. */
+  archetype?: 'Z' | 'S' | 'R' | 'X';
 }
 
 export const CARD_CHIPS: readonly CardChipDef[];
 export function chipById(id: string): CardChipDef | undefined;
-export function chipPoolForSpell(spellId: string): CardChipDef[];
+
+/** Exactly the three authored offers for this spell + slot. */
+export function chipOffersForSlot(
+  spellId: string,
+  slotIndex: 0 | 1,
+): readonly [string, string, string];
 ```
 
-### 6.3 Draft — `game/src/data/cards/draft.ts`
+Invariant: for each of `heal` | `mend` | `bonk` | `vowstrike`, there are
+exactly **3 chips with slotIndex 0** and **3 with slotIndex 1** (6 total).
+`chipOffersForSlot` returns those three ids in stable display order.
+
+### 7.3 Offers helper — `game/src/data/cards/draft.ts` (or fold into chips.ts)
 
 ```ts
-/** Pick up to 3 chip ids from the spell pool, excluding owned + exclusive conflicts. */
-export function rollChipOffers(
+/** Next slot to fill = current spellChips[spellId].length (must be 0 or 1). */
+export function offersForNextSlot(
   spellId: string,
   ownedChipIds: readonly string[],
-  random: () => number,
-): string[];
+): readonly [string, string, string] | null;
 ```
 
-### 6.4 Resolve — `game/src/data/cards/resolve.ts`
+Returns `chipOffersForSlot(spellId, ownedChipIds.length)` when
+`ownedChipIds.length < CARD_SLOTS`, else `null`. No RNG.
+
+### 7.4 Resolve — `game/src/data/cards/resolve.ts`
 
 ```ts
 export function loadoutFromCardSave(save: {
   xp: number;
   actionBar: string[];
   spellChips: Record<string, string[]>;
-  // plus anything else resolve needs from SaveData
 }): CombatMods;
 
 export function ownedSpellsFromCardSave(save: …): SpellDef[];
 
-/** Apply level-up side effects: points, unlocks, bar fills. Mutates save. */
 export function applyCardsLevelUps(save: SaveData, prevLevel: number, nextLevel: number): void;
 
-/** Spend 1 point, append chip to spellChips[spellId]. Throws/returns false if illegal. */
+/** Spend 1 point; chip must be in offersForNextSlot for that spell. */
 export function applyChipPurchase(save: SaveData, spellId: string, chipId: string): boolean;
 ```
 
 `loadoutFromCardSave` steps:
 
-1. Clone radial spell defs for `spellIdsAtLevel(levelForXp(save.xp))`.
-2. Clone cooldown defs for `cooldownIdsAtLevel(...)`.
-3. Apply each chip in slot order via effects → mutate clones / collect
-   synergies / manaSynergies.
-4. Return `CombatMods` (`spells` from action bar order, `cooldowns`,
-   `synergies`, `manaSynergies`, empty/default other fields matching radial
-   starter shape).
+1. Clone radial spell defs for spells unlocked at current level.
+2. Clone cooldown defs for CDs unlocked at current level.
+3. Apply each owned chip in slot order → mutate clones / collect synergies,
+   manaSynergies, missing/full HP bonus lists.
+4. Return `CombatMods`.
 
-### 6.5 Facade — `game/src/data/loadout.ts`
+### 7.5 Facade — `game/src/data/loadout.ts`
 
-Branch `progressionMode === 'cards'` to the functions above.
+Branch `progressionMode === 'cards'`.
 
-### 6.6 Progression / relics
-
-In `meta/progression.ts` (or equivalent):
+### 7.6 Progression / relics
 
 - Cards mode: on level-up call `applyCardsLevelUps`.
-- Cards mode: **skip** `chooseRelicOffers` / never set `pendingRelicOffers`.
-- Cards first-clear: `upgradePoints += 1` (bonus) when you would have opened
-  relics.
-
-Unspent CTA: Hub lights **Spells** when `upgradePoints > 0` in cards mode.
+- Cards mode: **skip** relic offers; first-clear → `upgradePoints += 1`.
+- Hub CTA: light **Spells** when `upgradePoints > 0`.
 
 ---
 
-## 7. PoC chip pools (ship these ids)
+## 8. Authored chip sets (ship these ids)
 
-Keep ≤6 per spell. Magnitudes are starting points — Chunk 5 may retune.
+Six chips per spell. Magnitudes are starting points — Chunk 5 may retune.
+Copy should stay plain-English (radial naming rule). Parenthetical notes map to
+[`relic-revamp-brainstorm.md`](relic-revamp-brainstorm.md) ideas — implement
+only the effect column.
 
-### `heal` pool
+### `heal` — 6 chips
 
-| id | name | effects (sketch) |
-|---|---|---|
-| `heal-power` | Power Up | castMod heal +2 |
-| `heal-cost` | Cost Cut | castMod mana −1 (resolve clamp mana ≥1) |
-| `heal-quick` | Quick Cast | castMod castMs −500 |
-| `heal-heavy` | Heavy Cast | heal +3, castMs +500 |
-| `heal-thrifty` | Thrifty | mana −1, heal −1 (mana clamp ≥1) |
-| `heal-armed-by-mend` | Mend Link | synergy mend→heal +2 (`exclusiveTag: 'heal-arm'`) |
+**Slot 1 — synergy / teach the strip**
 
-### `mend` pool
+| id | name | archetype | effects |
+|---|---|---|---|
+| `heal-mend-link` | Mend Link | X | synergy: `mend` → `heal` +2 |
+| `heal-power` | Power Up | S | castMod heal +2 |
+| `heal-cost` | Cost Cut | Z | castMod mana −1 (clamp mana ≥ 1) |
 
-| id | name | effects |
-|---|---|---|
-| `mend-power` | Power Up | heal +1 |
-| `mend-cost` | Cost Cut | mana −1 (min 0) |
-| `mend-quick` | Quick Cast | castMs −400 |
-| `mend-arming` | Arming Mend | synergy mend→heal +2 (`exclusiveTag: 'mend-identity'`) |
-| `mend-battle` | Battle Mend | manaSynergy bonk→mend −1, vowstrike→mend −1 (`exclusiveTag: 'mend-identity'`) |
-| `mend-tempo` | Soft Tempo | castMs −200 |
+**Slot 2 — wild fork**
 
-### `bonk` pool
+| id | name | archetype | effects | Relic-revamp cousin |
+|---|---|---|---|---|
+| `heal-graven` | Graven Light | S | missingHealthPctBonus on heal, pctPer10PctMissing 10 | Graven Hourglass / Hollow Mercy |
+| `heal-heavy` | Heavy Cast | S | heal +3, castMs +500 | Measured / commit Solemn |
+| `heal-steady` | Steady Hands | Z | fullHealthBonus hpPctAtLeast 80, bonusHeal +2 | Steady Ignition / top-off |
 
-| id | name | effects |
-|---|---|---|
-| `bonk-hard` | Harder Bonk | damage +1 |
-| `bonk-mana` | Mana Bonk | setManaOnHit 1 |
-| `bonk-blessed` | Blessed Bonk | setCastBuff stackNextHealPotencyPct pct 10 cap 3 |
-| `bonk-battle` | Battle Link | manaSynergy bonk→mend −1 (`exclusiveTag: 'bonk-mend'`) |
-| `bonk-power2` | Heavy Stick | damage +2 |
-| `bonk-chip` | Pocket Sand | damage +1 (second mild power; or retune) |
+### `mend` — 6 chips
 
-### `vowstrike` pool (thinner OK — still ≤6)
+**Slot 1 — synergy identity (the fun fork)**
 
-| id | name | effects |
-|---|---|---|
-| `vs-power` | Harder Strike | damage +1 |
-| `vs-ready` | Ready | cooldownMs −2000 |
-| `vs-absolution` | Absolution Lite | setCastBuff nextSpellManaReduction 1 |
-| `vs-reckoning` | Reckoning Lite | setCastBuff nextHealPotencyPct 20 |
-| `vs-battle` | Battle Link | manaSynergy vowstrike→mend −1 |
-| `vs-power2` | Crush | damage +2 |
+| id | name | archetype | effects |
+|---|---|---|---|
+| `mend-arming` | Arming Mend | X | synergy: `mend` → `heal` +2 |
+| `mend-battle` | Battle Mend | R | manaSynergy: `bonk`→`mend` −1, `vowstrike`→`mend` −1 |
+| `mend-quick` | Quick Mend | Z | castMod castMs −400 |
 
-**Exclusive:** `mend-arming` vs `mend-battle` (same `exclusiveTag`). Do not allow
-two copies of the same chip id on one card.
+**Slot 2 — wild**
+
+| id | name | archetype | effects | Cousin |
+|---|---|---|---|---|
+| `mend-penny` | Penny Mend | S | castMod mana set via manaDelta to reach 0 cost (manaDelta −1 if base 1) | Thrift Seal energy |
+| `mend-graven` | Brink Mend | S | missingHealthBonus healPer10PctMissing +1 | Graven / scary Solemn |
+| `mend-spark` | Spark Mend | Z | castMod heal +1, castMs −200 | Ember Cadence-lite (active mend) |
+
+### `bonk` — 6 chips
+
+**Slot 1 — weave / synergy**
+
+| id | name | archetype | effects |
+|---|---|---|---|
+| `bonk-battle` | Battle Link | R | manaSynergy: `bonk` → `mend` −1 |
+| `bonk-blessed` | Blessed Bonk | R | setCastBuff stackNextHealPotencyPct pct 10 cap 3 |
+| `bonk-mana` | Mana Bonk | Z | setManaOnHit 1 |
+
+**Slot 2 — wild pressure**
+
+| id | name | archetype | effects | Cousin |
+|---|---|---|---|---|
+| `bonk-crush` | Crushing Bonk | R | castMod damage +2 | pressure |
+| `bonk-reckoning` | Reckoning Weight | R | setCastBuff stackNextHealPotencyPct pct 15 cap 3 (or pct 10 cap 5) | Reckoning Weight |
+| `bonk-quicksteel` | Quicksteel | X | setCastBuff nextHealPotencyPct 25 | Quicksteel Rosary (instant → next heal) |
+
+Note: if slot 1 already took `bonk-blessed`, slot 2 `bonk-reckoning` /
+`bonk-quicksteel` **replace** castBuff (last applied wins in resolve — document
+in resolve: later chip overwrites `castBuff`). Prefer picking distinct fantasy;
+tests cover overwrite.
+
+### `vowstrike` — 6 chips
+
+**Slot 1 — synergy / aspect lite**
+
+| id | name | archetype | effects |
+|---|---|---|---|
+| `vs-battle` | Battle Link | R | manaSynergy: `vowstrike` → `mend` −1 |
+| `vs-absolution` | Absolution Lite | S | setCastBuff nextSpellManaReduction 1 |
+| `vs-reckoning` | Reckoning Lite | R | setCastBuff nextHealPotencyPct 20 |
+
+**Slot 2 — wild**
+
+| id | name | archetype | effects | Cousin |
+|---|---|---|---|---|
+| `vs-ready` | Ready Strike | Z | castMod cooldownMs −2000 | tempo |
+| `vs-crush` | Crush | R | castMod damage +2 | pressure |
+| `vs-weight` | Heavy Vow | R | castMod damage +1 + setCastBuff nextHealPotencyPct 30 | Reckoning Weight amp |
 
 ---
 
-## 8. UI / journey contracts (Chunk 3)
+## 9. UI / journey contracts (Chunk 3)
 
 ### Scene
 
-- New `CardAlbumScene` (name TBD but key in `scenes/keys.ts`, e.g.
-  `SceneKeys.CardAlbum = 'CardAlbum'`).
-- Hub cards mode: `hubTree` → `CardAlbum` (label **Spells**). Do not start
-  `Tree` / `RadialTree`.
-- `hubLoadout`: hidden in cards mode (bar editing can be a follow-up; PoC
-  auto-equips unlocks).
+- New `CardAlbumScene` (`SceneKeys.CardAlbum = 'CardAlbum'`).
+- Hub cards mode: `hubTree` → `CardAlbum` (label **Spells**).
+- `hubLoadout`: hidden in cards mode.
 
 ### Semantic names (add to `docs/semantic-targets.md`)
 
@@ -319,87 +367,85 @@ two copies of the same chip id on one card.
 | `settingsProgressionCards` | Spell cards mode button |
 | `cardAlbumBack` | back |
 | `cardSpell:<spellId>` | spell card hit target |
-| `cardUpgrade:<spellId>` | upgrade / spend affordance on that card |
+| `cardUpgrade:<spellId>` | upgrade affordance |
 | `cardChipOffer:<chipId>` | draft modal offer |
-| `cardChipConfirm` | confirm pick (if separate from clicking offer) |
+| `cardChipConfirm` | confirm (if separate) |
 | `cardChipCancel` | cancel draft |
-
-Reuse `settingsProgressionConfirm` / `Cancel` for wipe dialog.
 
 ### Draft modal
 
-Show chip name + description. For castMod chips, show **before → after** Cost /
-Power / Speed when cheap; synergy chips show the one-line description.
-Confirming calls `applyChipPurchase` + `saveGame()`.
+Show the **fixed three** for the next empty slot. Name + description; castMod
+chips show before→after Cost/Power/Speed when cheap; synergy chips show the
+one-liner. Confirm → `applyChipPurchase` + `saveGame()`.
 
 ### Journey smoke (cards)
 
-Seed or Settings→Spell cards→confirm→Tutorial→Hub→`hubTree`→upgrade Heal once
-→ back → Ash Gate enter. Lattice/radial journeys must stay green (don’t steal
-their Settings clicks).
+Settings→Spell cards→confirm→Tutorial→Hub→`hubTree`→ upgrade Heal (pick any
+slot-1 offer) → Ash Gate. Lattice/radial journeys stay green.
 
 ---
 
-## 9. Chunk table
+## 10. Chunk table
 
-| Chunk | What | Depends | Owns (CREATE / MAY EDIT) | Do not touch |
+| Chunk | What | Depends | Owns | Do not touch |
 |---|---|---|---|---|
-| **0** Central | Mode shell: `ProgressionMode`, save fields, `newSaveData('cards')`, validate, Settings third button + wipe, `loadoutForSave` → starters-only stub, skip relics in cards, Hub routes to stub album **or** Loadout temporarily, save bump | — | `save/`, `data/loadout.ts`, `SettingsScene.ts`, `HubScene.ts` (routing), `meta/progression.ts` (relic skip + points stub), `scenes/keys.ts`, golden fixture / package version via bump | chip pools, album UI polish, engine |
-| **1** | Unlock table + level-up grants + auto-equip; `upgradePoints` economy; unit tests | 0 | `data/cards/unlocks.ts`, `data/cards/resolve.ts` (unlock portion), `meta/progression.ts`, tests | draft UI, chip defs beyond stubs |
-| **2** | Full chip defs, `rollChipOffers`, apply chips in resolve, Arming/Battle Mend tests, `applyChipPurchase` | 1 | `data/cards/chips.ts`, `draft.ts`, `resolve.ts`, `*.test.ts` | Phaser scenes |
-| **3** | `CardAlbumScene` + draft modal + journey names + cards journey smoke | 2 | new scene, `BootScene` registration, `semantic-targets.md`, `scripts/journey.mjs` (cards path), Hub labels | lattice/radial tree scenes (except Hub branch) |
-| **4** | Hub/first-clear polish: Spells CTA on points, no relic copy, Tutorial ok in cards | 3 | Hub/Tutorial/result copy paths for cards | new chip kinds |
-| **5** Central | Balance smoke bots for cards kits; retune flats if Ash Gate trivial/impossible; full `verify`; PR | 4 | `combat/*Balance*.ts` or cards balance test, chip numbers, poc-qa note on PR | scope creep |
+| **0** Central | Mode shell, save + bump, Settings third button, loadout stub, relic skip, Hub route stub | — | `save/`, `data/loadout.ts`, `SettingsScene.ts`, `HubScene.ts`, `meta/progression.ts`, `scenes/keys.ts` | chip tables, album polish, engine |
+| **1** | Unlock table + level-up grants + points + tests | 0 | `data/cards/unlocks.ts`, resolve unlock portion, `meta/progression.ts` | draft UI |
+| **2** | All 24 chips, `chipOffersForSlot` / `offersForNextSlot`, resolve apply (incl. missing/full HP), purchase validation, synergy tests | 1 | `data/cards/chips.ts`, `draft.ts`, `resolve.ts`, tests | Phaser scenes |
+| **3** | `CardAlbumScene` + modal + journey names + cards journey | 2 | new scene, BootScene, `semantic-targets.md`, `journey.mjs` | lattice/radial tree scenes |
+| **4** | Hub/Tutorial/first-clear polish | 3 | Hub/Tutorial/result cards paths | new chip kinds |
+| **5** Central | Balance smoke, retune, full verify, PR | 4 | balance tests, chip numbers | scope creep |
 
-**Chunk 0 + Chunk 5 = central agent.** Delegate 1–4 sequentially; after each,
-central runs gates, integrates, commits one checkpoint.
+**Chunk 0 + 5 = central agent.** Delegate 1–4 sequentially; verify + commit
+per chunk.
 
 ---
 
-## 10. Gates
-
-From `game/`:
+## 11. Gates
 
 ```bash
-npm run verify:fast   # after every chunk
-npm run verify        # before PR (includes journey)
+cd game && npm run verify:fast   # after every chunk
+cd game && npm run verify        # before PR
 ```
 
-Chunk 2 must add pure unit tests for unlocks, draft exclusion, resolve with
-Arming Mend + Battle Mend chips. Chunk 3 adds journey coverage for cards mode.
+Chunk 2 tests must prove: unlock table; `chipOffersForSlot` returns exact trios;
+`applyChipPurchase` rejects wrong-slot chips; Arming Mend + Battle Mend resolve
+into engine-visible synergies/manaSynergies; Graven/Steady chips land in
+missing/full HP lists.
 
 ---
 
-## 11. Non-goals (reject)
+## 12. Non-goals (reject)
 
 - Deleting lattice or radial
-- Relic redesign / relic art (#19)
+- Shipping a parallel relic catalog / relic art (#19) — fantasy only via chips
+- RNG chip pools (deferred)
 - Big Heal, specialize forms, oaths
-- Chip slots / pools on major CDs
+- Chip slots on major CDs
 - Respec, dual-spec
-- Idea A polish on lattice/radial tooltips (nice-to-have inside album only)
-- Party-stat chips (Guardian HP, DPS swing, etc.)
-- New combat engine mechanics
-- Migrating active saves across modes without wipe
+- New combat engine mechanics (Martyr’s Mirror, Silent Choir, Ash Confession,
+  etc. stay brainstorm-only until a later phase)
+- Party-stat chips (Guardian HP, DPS swing)
+- Soft save migration across modes
 
 ---
 
-## 12. Risks & mitigations
+## 13. Risks & mitigations
 
 | Risk | Mitigation |
 |---|---|
-| Three modes maintenance | PoC quality bar; don’t feature-match radial specializes |
-| Synergy RNG feels bad | Small pools + exclusiveTags; Mend identity is a clear fork |
-| Power chips stack too hard | 2 slots only; Chunk 5 bot pass |
-| Hub confusion | One Spells button; hide Spellbook in cards mode |
-| Save bump noise | Chunk 0 owns bump; one rotation |
+| Three modes maintenance | PoC bar; don’t feature-match radial specializes |
+| Slot-2 too weak/strong | Authored sets — easy to retune in Chunk 5 |
+| castBuff overwrite on Bonk | Document last-wins; journey can pick Blessed then Crush |
+| Hub confusion | One Spells button |
+| Feel drift from relic doc | Slot-2 must cite a cousin; reject pure +flat with no trade |
 
 ---
 
-## 13. PR expectations
+## 14. PR expectations
 
-- One PR from this branch (or stacked commits per chunk on same branch).
-- Title suggestion: `PoC: spell-card upgrade mode (dual-ship)`
-- Body: summary + how to try (Settings → Spell cards → wipe) + test plan
-  checklist from §1 done-means.
-- Do not merge without human A/B intent — open PR for review / cloud verify.
+- One PR from `poc/spell-card-upgrades`.
+- Title: `PoC: spell-card upgrade mode (dual-ship)`
+- Body: try-steps (Settings → Spell cards → wipe) + Done-means checklist.
+- Note chip sets are fixed (no RNG) and point at relic-revamp for future wild
+  engine chips.

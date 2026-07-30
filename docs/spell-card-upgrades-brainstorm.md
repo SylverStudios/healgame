@@ -9,7 +9,8 @@ talent trees with **upgrade chips on spell cards**. Dual-ship for friend A/B
 
 Pinned answers from Jul 30 Q&A are in §3. **Executable PoC handoff (wins):**
 [`spell-cards-poc-handoff.md`](spell-cards-poc-handoff.md) · remote prompt:
-[`spell-cards-poc-agent-prompt.md`](spell-cards-poc-agent-prompt.md).
+[`spell-cards-poc-agent-prompt.md`](spell-cards-poc-agent-prompt.md) ·
+chip feel bible: [`relic-revamp-brainstorm.md`](relic-revamp-brainstorm.md).
 
 ---
 
@@ -38,8 +39,9 @@ lands is: *here is my card; it got stronger in a way I can see*.
 1. Each owned spell is a **card** with empty upgrade slots.
 2. Level-ups grant **upgrade points** (not tree nodes). Spells/CDs unlock
    **free at level milestones** — no spend to gain Vowstrike, etc.
-3. Spend a point → pick a spell with a free slot → roll **3 from that
-   spell’s small pool (~6)** → pick 1 → chip fills the slot forever.
+3. Spend a point → pick a spell with a free slot → choose from that slot’s
+   **fixed trio of 3 chips** → pick 1 → chip fills the slot forever.
+   (6 chips authored per spell; RNG deferred.)
 4. Relics are **gone** in this mode. First-clear does not open RelicScene.
 5. Talent tree + spellbook **merge** into one album of spell cards (no path
    tracing). Hub “Tree” / “Spellbook” become the same surface (or one dies).
@@ -54,12 +56,12 @@ separate product track anymore.
 
 | # | Topic | Decision |
 |---|---|---|
-| 1 | Relics | **Fully replaced** by card chips in this mode. No RelicScene. |
+| 1 | Relics | **Fully replaced** by card chips in this mode. No RelicScene. Fantasy from [`relic-revamp-brainstorm.md`](relic-revamp-brainstorm.md). |
 | 2 | Spend | **Only card upgrades.** Shared point pool is upgrade points only. |
-| 3 | Spell unlocks | **Free on level** (e.g. Vowstrike at 5). No point cost to unlock. |
+| 3 | Spell unlocks | **Free on level** (Vowstrike at 5; major CDs one per level 6–8). |
 | 4 | Tree shape | Tree + spellbook **merge** into a spell-card album. No path tracing. |
-| 5 | Synergies | **Encapsulate in chips** (Arming Mend / Battle Mend style). Engine already supports this via `synergies` / `manaSynergies` on `CombatMods`. |
-| 6 | Offer RNG | **Random 3-from-pool**, pools small (~**6 chips per spell**). |
+| 5 | Synergies | **Encapsulate in chips**. Slot-1 trios feature them. |
+| 6 | Offers | **Fixed authored sets** — 6 chips/spell = slot-1 trio + slot-2 trio. No RNG in PoC. |
 | 7 | Dual-ship | Settings mode + wipe save (Wave 5 pattern). Keep lattice/radial. |
 
 ---
@@ -145,58 +147,15 @@ the same level-up — that’s fine; the free spell doesn’t consume the point.
 
 ---
 
-## 7. Example pools (~6 each) — draft, not final numbers
+## 7. Chip sets — see handoff
 
-Use **flat integers** where possible (repo law). “−50% cast” in conversation
-becomes concrete ms / mana / heal in data.
+**Authoritative tables** (fixed slot-1 / slot-2 trios, 24 chips):
+[`spell-cards-poc-handoff.md`](spell-cards-poc-handoff.md) §8.
 
-### Heal
+Feel / wild fantasy source:
+[`relic-revamp-brainstorm.md`](relic-revamp-brainstorm.md).
 
-| Chip | Effect sketch | Kind |
-|---|---|---|
-| Power Up | heal +2 | stat |
-| Cost Cut | mana −1 (min 1) | stat |
-| Quick Cast | castMs −500 | stat |
-| Heavy Cast | heal +3, castMs +500 | trade |
-| Thrifty | mana −1, heal −1 | trade |
-| Prep Heal | synergy: Mend arms this Heal +2 *(or reverse — author later)* | synergy |
-
-### Mend
-
-| Chip | Effect sketch | Kind |
-|---|---|---|
-| Power Up | heal +1 | stat |
-| Cost Cut | mana −1 (min 0) | stat |
-| Quick Cast | castMs −400 | stat |
-| **Arming Mend** | synergy → next Heal +2 | synergy |
-| **Battle Mend** | manaSynergy ← Bonk/Vowstrike → Mend −1 mana | synergy |
-| Soft Repeat | castMs −200, heal +0 | tempo |
-
-### Bonk
-
-| Chip | Effect sketch | Kind |
-|---|---|---|
-| Harder Bonk | damage +1 | stat |
-| Mana Bonk | `manaOnHit: 1` | spell field |
-| Blessed Bonk | `castBuff: stackNextHealPotencyPct` | spell field |
-| Quick Jab | (already instant — skip or tiny CD toy later) | — |
-| Arm Mend | manaSynergy bonk→mend (if not taken on Mend) | synergy |
-| Pocket Sand | damage +1, something tiny | stat |
-
-### Vowstrike (unlocks later — pool can be thinner for PoC)
-
-| Chip | Effect sketch | Kind |
-|---|---|---|
-| Power | damage +1 | stat |
-| Ready | cooldownMs −2000 | stat |
-| Absolution-lite | nextSpellManaReduction | castBuff |
-| Reckoning-lite | nextHealPotencyPct | castBuff |
-| Battle Mend link | manaSynergy vowstrike→mend | synergy |
-| Thrifty Strike | mana −0 already; skip or heal-self fantasy later | — |
-
-Pools stay ≤6. When rolling 3, **exclude chips already owned** on that card
-and chips that conflict (e.g. Arming vs a second copy). If fewer than 3 left,
-show what’s left (no refill from other spells).
+PoC: **no RNG**. Each upgrade shows that slot’s authored three options.
 
 ---
 
@@ -221,8 +180,7 @@ upgradePoints: number                  // unspent
 // relics unused: relicIds stays [] ; never populate pendingRelicOffers
 ```
 
-Determinism: draft rolls need a seeded RNG from save (or inject `random` like
-relic offers today) so tests don’t flake. Combat itself stays pure.
+Offers are deterministic (fixed trios). Combat stays pure.
 
 ### Resolve
 
@@ -261,7 +219,7 @@ Estimate: **smaller than full Wave 5**, larger than a polish PR — roughly
 | **0 — Mode shell** | `progressionMode: 'cards'`, save wipe, Settings toggle, `loadoutForSave` branch returning radial starters only, skip relic offers | Can boot Tutorial→Ash Gate in cards mode with Heal+Bonk; lattice/radial green |
 | **1 — Level unlocks + points** | Level→spell table, `upgradePoints` on level-up, no tree spend | Hit Lv2 in a bot/save → Mend owned; points accrue; bar updates |
 | **2 — Chip data + resolve** | ~6 chips × Heal/Mend/Bonk (+ thin Vowstrike), `spellChips` on save, pure resolve + unit tests (incl. Arming + Battle Mend chips) | Scripted save with chips changes CombatMods; engine tests reuse existing synergy cases |
-| **3 — Album + draft UI** | Card grid scene, slot glyphs, spend→roll 3→pick, journey names | Human can upgrade without console; `verify:fast` + cards journey smoke |
+| **3 — Album + draft UI** | Card grid scene, slot glyphs, spend→fixed 3→pick, journey names | Human can upgrade without console; `verify:fast` + cards journey smoke |
 | **4 — First-clear / hub cleanup** | No relics; hub copy; optional Big Heal or skip | Full friend loop: fight → level → upgrade → fight |
 | **5 — Soft balance** | One bot pass so Ash Gate isn’t trivial/impossible with 2 stacked Power chips | `radialBalance`-style smoke for cards kits; tune chip magnitudes |
 
