@@ -76,6 +76,7 @@ import {
 } from '../ui/midCombatBanter';
 import { showSpeechBubble } from '../ui/speechBubble';
 import { presentNoTargetHealCue } from '../ui/noTargetHealCue';
+import { syncBattleMendIcon, type BattleMendIcon } from '../ui/battleMendIcon';
 import { portraitTextureKey, revealResultPortrait } from '../ui/portraitSprites';
 import { chunkyWipeIn, fadeToScene } from '../ui/transitions';
 import { MOB_REGISTRY } from '../data/mobs';
@@ -234,6 +235,7 @@ export class CombatScene extends Phaser.Scene {
   private paceToggle!: PaceToggle;
   private combatPaceTenths = 10;
   private healerRune: Phaser.GameObjects.Triangle | null = null;
+  private battleMendIcon: BattleMendIcon | null = null;
   /** Presentation-only DBZ-style aura: intensity from mana spent in the last 30s. */
   private manaAura: ManaSpendAura | null = null;
   /** Wall-clock delta of the last update() tick — drives aura pulse without pacing. */
@@ -990,23 +992,22 @@ export class CombatScene extends Phaser.Scene {
   }
 
   private syncHealerRune(state: CombatState): void {
-    const armed = state.armedBuffedSpellIds.length > 0;
     const healerSprite = this.partySprites.get('healer');
-    if (!armed || !healerSprite) {
+    if (state.armedBuffedSpellIds.length === 0 || !healerSprite) {
       this.healerRune?.destroy();
       this.healerRune = null;
-      return;
-    }
-    const x = healerSprite.getHomeX() - 36;
-    const y = healerSprite.getHomeY() - 24;
-    if (!this.healerRune) {
-      this.healerRune = this.add
+    } else {
+      const x = healerSprite.getHomeX() - 36;
+      const y = healerSprite.getHomeY() - 24;
+      this.healerRune ??= this.add
         .triangle(x, y, 0, -7, 6, 3, -6, 3, 0xf2c14e)
         .setStrokeStyle(1, 0x8a7868)
         .setDepth(40);
-    } else {
       this.healerRune.setPosition(x, y);
     }
+    this.battleMendIcon = syncBattleMendIcon(
+      this, this.battleMendIcon, state.armedManaDiscountSpellIds, healerSprite,
+    );
   }
 
   /** DBZ-style power glow around the healer — intensity from recent mana spend. */

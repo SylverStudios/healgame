@@ -377,6 +377,9 @@ export class CombatEngine {
       waveIndex: this.waveIndex,
       status: this.status,
       armedBuffedSpellIds: [...new Set(this.synergies.filter((s) => s.armed).map((s) => s.buffedSpellId))],
+      armedManaDiscountSpellIds: [
+        ...new Set(this.manaSynergies.filter((s) => s.armed).map((s) => s.targetSpellId)),
+      ],
       cooldowns: this.cooldowns.map(
         (cd): CooldownState => ({
           id: cd.def.id,

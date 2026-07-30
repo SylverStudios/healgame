@@ -66,4 +66,22 @@ describe('Wave 5 radial mana hooks', () => {
     // Mend base 3, discount 1 → spent 2
     expect(engine.state.party.find((u) => u.id === 'healer')!.mana).toBe(startMana - 2);
   });
+
+  it('armedManaDiscountSpellIds arms on trigger, clears on Mend cast start', () => {
+    const engine = new CombatEngine(makeEncounter(), [BONK, MEND], {
+      manaSynergies: [{ triggerSpellId: 'bonk', targetSpellId: 'mend', manaDelta: -1 }],
+    });
+    engine.setTarget('tank');
+    expect(engine.state.armedManaDiscountSpellIds).toEqual([]);
+
+    engine.castSpell('bonk');
+    engine.advance(GCD_MS);
+    expect(engine.state.armedManaDiscountSpellIds).toEqual(['mend']);
+
+    // Consumed at cast start (instant Mend completes in the same call).
+    engine.castSpell('mend');
+    expect(engine.state.armedManaDiscountSpellIds).toEqual([]);
+    engine.advance(GCD_MS);
+    expect(engine.state.armedManaDiscountSpellIds).toEqual([]);
+  });
 });

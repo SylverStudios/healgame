@@ -1,6 +1,6 @@
 # Combat engine (Chunk 1)
 
-Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-07-29
+Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-07-30
 
 Pure, deterministic TypeScript. No Phaser, no wall-clock, no randomness — driven
 entirely by `advance(dtMs)`. Chunk 2 builds the Phaser view against exactly
@@ -338,7 +338,8 @@ and compiles the ordered dungeon catalog into the engine's resolved
 - **Battle Mend (`manaSynergies`)** (Wave 5): optional `CombatEngineOptions.manaSynergies`
   entries arm on a completed `triggerSpellId` cast; the next cast start of `targetSpellId`
   applies `manaDelta` (typically −1) to reserved mana and consumes the arm. Stacks with
-  Absolution's global `nextSpellManaReduction`.
+  Absolution's global `nextSpellManaReduction`. Armed targets are exposed as
+  `CombatState.armedManaDiscountSpellIds` (Wave 5b; drives the healer overhead cue).
 - **Synergy and heal-formula bonuses** (Chunk 1, phase-2-handoff; extended
   Alpha 0.1 §D4): all are resolved into the existing `heal` event — no new
   event types. A cast's raw heal value is `spell.heal + synergyBonuses +
