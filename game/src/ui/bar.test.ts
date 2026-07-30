@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { framedFillSize } from './bar';
+import { framedFillSize } from './barGeometry';
 import { CAST_BAR_FRAME_FILL_INSET, CAST_BAR_FRAME_NATIVE_SIZE } from './spellSprites';
 
 describe('framedFillSize', () => {

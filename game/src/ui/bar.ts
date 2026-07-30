@@ -18,40 +18,18 @@
  */
 
 import Phaser from 'phaser';
+import {
+  type BarFillInset,
+  ZERO_BAR_FILL_INSET,
+  framedFillSize,
+} from './barGeometry';
+
+export type { BarFillInset } from './barGeometry';
+export { framedFillSize } from './barGeometry';
 
 const DEFAULT_BG_COLOR = 0x2a1e18;
 const BORDER_COLOR = 0x0a0605;
 const BORDER_WIDTH = 1;
-
-/** Per-edge inset (display px) from the outer Bar box into the fill/bg. */
-export interface BarFillInset {
-  readonly left: number;
-  readonly right: number;
-  readonly top: number;
-  readonly bottom: number;
-}
-
-const ZERO_INSET: BarFillInset = { left: 0, right: 0, top: 0, bottom: 0 };
-
-/**
- * Pure fill/bg geometry inside an outer Bar box. `offsetX`/`offsetY` are
- * added to the outer left-edge / vertical-center origin used by `Bar`.
- * Integers only — callers must pass integer outer size and inset.
- */
-export function framedFillSize(
-  outerWidth: number,
-  outerHeight: number,
-  inset: BarFillInset = ZERO_INSET,
-): { width: number; height: number; offsetX: number; offsetY: number } {
-  return {
-    width: outerWidth - inset.left - inset.right,
-    height: outerHeight - inset.top - inset.bottom,
-    offsetX: inset.left,
-    // Vertical origin is 0.5; shift so unequal top/bottom still centers the
-    // fill in the transparent window.
-    offsetY: (inset.top - inset.bottom) / 2,
-  };
-}
 
 export class Bar {
   /** Outer width (frame / layout size); fill may be narrower when inset. */
@@ -72,7 +50,7 @@ export class Bar {
     fillColor: number,
     bgColor: number = DEFAULT_BG_COLOR,
     frameTextureKey?: string,
-    fillInset: BarFillInset = ZERO_INSET,
+    fillInset: BarFillInset = ZERO_BAR_FILL_INSET,
   ) {
     const geom = framedFillSize(width, height, fillInset);
     this.outerWidth = width;
