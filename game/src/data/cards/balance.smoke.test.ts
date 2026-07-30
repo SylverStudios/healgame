@@ -43,7 +43,7 @@ function runCardsAshGate(loadout: CombatMods): {
   const engine = new CombatEngine(ASH_GATE, loadout.spells, {
     bonusMaxMana: loadout.bonusMaxMana,
     synergies: loadout.synergies,
-    manaSynergies: loadout.manaSynergies,
+    ...(loadout.manaSynergies !== undefined ? { manaSynergies: loadout.manaSynergies } : {}),
     missingHealthBonuses: loadout.missingHealthBonuses,
     missingHealthPctBonuses: loadout.missingHealthPctBonuses,
     fullHealthBonuses: loadout.fullHealthBonuses,

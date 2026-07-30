@@ -1,12 +1,38 @@
 # QA log — journey checklist & verification
 
-Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-29
+Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-30
 
 Ship summary (newest first): [`CHANGELOG.md`](./CHANGELOG.md).
 
 **PoC (2026-07-08) complete.** Every poc-spec §1 criterion is implemented and
 enforced by automated gates. Later Alpha sections below amend the baseline
 (Phase 2+ subclass UX, mid dungeons, CDs, relics, loadout, etc.).
+
+---
+
+# Spell-card upgrades PoC (2026-07-30)
+
+Status: current · Last verified: 2026-07-30
+
+1. **Mode** — `progressionMode: 'cards'` (Settings label **Spell cards**).
+   Default fresh install remains `lattice`. Mode switch wipes save.
+2. **Save v10** — `upgradePoints` + `spellChips` on all modes (`0` / `{}`
+   outside cards). Cards starters: Heal + Bonk, `upgradePoints: 1`.
+3. **Unlocks** — free on level (§3 handoff): Lv1 heal+bonk, Lv2 mend, Lv5
+   vowstrike, Lv6–8 Still Waters / Wrath Ascendant / Frenzied Liturgy. +1
+   upgrade point every level. CDs discovered via `cooldownIdsAtLevel` (not
+   stored on save).
+4. **Chips** — fixed authored trios per slot (no RNG). 24 chips; slot 1
+   teaches synergies; slot 2 wilder forks. Resolve only existing
+   `CombatMods` hooks. CastBuff last-wins on same spell.
+5. **Relics** — fully replaced in cards; first-clear → `upgradePoints += 1`,
+   never opens RelicScene.
+6. **Hub** — single Spells CTA (`hubTree` → CardAlbum); `hubLoadout` hidden.
+7. **Balance smoke** — starter Heal+Bonk not a comfortable Ash Gate clear;
+   Lv8 teaching chips + CDs clear Ash Gate. Chip magnitudes unchanged from
+   handoff §8 starting points.
+8. **Reversible defaults** — CD unlocks not persisted (level table only);
+   Tutorial keeps Bonk Q / Heal W for cards (radial still flips to Heal Q).
 
 ---
 
