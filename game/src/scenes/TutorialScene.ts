@@ -1,7 +1,8 @@
 /**
  * First scene a new player sees (poc-spec §3): a one-click "learn your heal"
- * moment, then straight into Ash Gate. Temp art only — panels + text buttons,
- * dark palette, pixel font.
+ * moment (lattice: Solemn Mend; radial/cards: Enter with Heal), then straight
+ * into Ash Gate. Cards copy calls out Heal+Bonk + Spells upgrades. Temp art
+ * only — panels + text buttons, dark palette, pixel font.
  */
 
 import Phaser from 'phaser';
@@ -38,8 +39,8 @@ export class TutorialScene extends Phaser.Scene {
     // Chunk 6 (bible item 6): fade in on scene entry.
     fadeInOnCreate(this);
     const save = loadSave();
-    const starterKit =
-      save.progressionMode === 'radial' || save.progressionMode === 'cards';
+    const cards = save.progressionMode === 'cards';
+    const starterKit = save.progressionMode === 'radial' || cards;
 
     // Chunk 9 (bible item 9): wordmark treatment for the title — this is the
     // "one genuine gap" the chunk-9 bible item calls out (font-at-display-size,
@@ -63,16 +64,24 @@ export class TutorialScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     // J10: short intro — healer / Guardian / DPS names only (controls stay minimal).
-    const instructions = [
-      'You are the healer. Keep Guardian alive so he takes the damage.',
-      'Eagle Eye and Butcher deal the damage.',
-    ].join('\n');
+    // Cards mode: call out the Heal+Bonk starter + Spells upgrades (not Solemn Mend).
+    const instructions = cards
+      ? [
+          'You are the healer. Keep Guardian alive so he takes the damage.',
+          'Eagle Eye and Butcher deal the damage.',
+          'Start with Heal and Bonk — upgrade their cards in Spells after fights.',
+        ].join('\n')
+      : [
+          'You are the healer. Keep Guardian alive so he takes the damage.',
+          'Eagle Eye and Butcher deal the damage.',
+        ].join('\n');
 
     // Chunk 4 (bible item 4): copy panel — ui/panels.ts.
     const copyPanelWidth = 700;
     const copyPanelX = width / 2;
     const copyPanelY = 200;
-    addPanel(this, copyPanelX, copyPanelY, copyPanelWidth, 100);
+    const copyPanelH = cards ? 120 : 100;
+    addPanel(this, copyPanelX, copyPanelY, copyPanelWidth, copyPanelH);
     this.add
       .text(copyPanelX, copyPanelY, instructions, {
         fontFamily: FONT,

@@ -140,7 +140,9 @@ describe('applyCombatResult', () => {
     expect(s.clearedDungeons).toEqual(['ash-gate']);
     expect(s.pendingRelicOffers).toEqual([]);
     expect(s.upgradePoints).toBe(2);
-    expect(notices).toEqual([{ kind: 'firstClear', text: 'FIRST CLEAR — +1 Upgrade Point' }]);
+    expect(notices).toEqual([
+      { kind: 'firstClear', text: 'FIRST CLEAR — +1 Upgrade Point · open Spells' },
+    ]);
   });
 
   it('cards level 2 grants Mend + upgrade point (not lattice Zealous Mending)', () => {

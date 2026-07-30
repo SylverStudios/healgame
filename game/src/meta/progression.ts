@@ -107,7 +107,7 @@ export function applyCombatResult(
       save.upgradePoints += 1;
       notices.push({
         kind: 'firstClear',
-        text: 'FIRST CLEAR — +1 Upgrade Point',
+        text: 'FIRST CLEAR — +1 Upgrade Point · open Spells',
       });
     } else {
       save.pendingRelicOffers = chooseRelicOffers(save.relicIds, random);

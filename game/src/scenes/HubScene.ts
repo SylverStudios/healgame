@@ -1,10 +1,11 @@
 /**
- * Hub: shows XP/level/talent progress, applies the combat result that just
- * ended, applies pending first-clear relic offers, and launches unlocked
- * dungeons from a vertical challenge list (current uncleared dungeon marked
- * CURRENT). Talent Tree / Spellbook sit above the dungeon stack. Run mods
- * (oath + relics) live in the shared top-left RunModsBar. Temp art only —
- * panels + text buttons, dark palette, pixel font (ui/theme.ts).
+ * Hub: shows XP/level/talent (or upgrade-point) progress, applies the combat
+ * result that just ended, routes pending first-clear relic offers (lattice /
+ * radial only — cards never opens RelicScene), and launches unlocked dungeons
+ * from a vertical challenge list (current uncleared dungeon marked CURRENT).
+ * Meta row: Talent Tree + Spellbook, or a single Spells button in cards mode.
+ * Run mods (oath + relics) live in the shared top-left RunModsBar. Temp art
+ * only — panels + text buttons, dark palette, pixel font (ui/theme.ts).
  */
 
 import Phaser from 'phaser';
@@ -126,7 +127,9 @@ export class HubScene extends Phaser.Scene {
       saveGame(save);
     }
 
-    if (save.pendingRelicOffers.length > 0) {
+    // Cards mode never drafts relics (pending stays empty); still skip Relic
+    // if a stale payload somehow arrives so cards Hub always renders.
+    if (save.progressionMode !== 'cards' && save.pendingRelicOffers.length > 0) {
       fadeToScene(this, SceneKeys.Relic);
       return;
     }
@@ -186,6 +189,7 @@ export class HubScene extends Phaser.Scene {
   private buildStats(save: SaveData): void {
     const { width } = this.scale;
     const level = levelForXp(save.xp);
+    const cards = save.progressionMode === 'cards';
     const hasZealous = save.unlockedSpells.includes(SPELLS.zealousMending.id);
     const nextLevelXp = xpForLevel(level + 1);
     // Lattice-only tease — radial/cards unlock elsewhere.
@@ -193,16 +197,22 @@ export class HubScene extends Phaser.Scene {
       save.progressionMode === 'lattice' && !hasZealous
         ? ` + ${SPELLS.zealousMending.name}`
         : '';
+    const upgradePoints = Math.max(0, Math.floor(save.upgradePoints));
+    const levelLine = cards
+      ? upgradePoints > 0
+        ? `Level ${level}  ·  ${upgradePoints} upgrade point${upgradePoints === 1 ? '' : 's'}`
+        : `Level ${level}`
+      : `Level ${level}`;
     const xpLine = `XP ${save.xp}/${nextLevelXp} → Level ${level + 1}${mendTease}`;
 
     // Chunk 4: hub stats block gets a light frame (bible item 4 "hub stats
     // block if it helps") — sized around the two text lines below.
     addPanel(this, width / 2, 94, 560, 56, { size: 'sm' });
     this.add
-      .text(width / 2, 82, `Level ${level}`, {
+      .text(width / 2, 82, levelLine, {
         fontFamily: FONT,
         fontSize: FONT_SIZE_SM,
-        color: TEXT_COLOR,
+        color: cards && upgradePoints > 0 ? ACCENT_COLOR : TEXT_COLOR,
       })
       .setOrigin(0.5);
     this.add
