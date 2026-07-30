@@ -34,6 +34,7 @@ import {
 } from '../data/radial/tree';
 import { radialSpellById } from '../data/radial/spells';
 import { view, type SpotView, type TreeView } from '../tree';
+import { EDGE_INACTIVE } from '../ui/treeSockets';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
@@ -144,6 +145,35 @@ const DISPLAY_SPOTS: readonly DisplaySpot[] = (() => {
 
   return spots;
 })();
+
+/**
+ * Along-spoke connector segments (display logicalIds).
+ *
+ * Chains related upgrades on the same ability path — not a cross-spoke
+ * synergy web. Pair list is pinned here next to DISPLAY_SPOTS so layout
+ * angles alone aren't the source of truth for which nodes link.
+ *
+ * Offense forks after the shared entry: bonk → offense → (vowstrike-s1 | bonk-s1) → offense-s2.
+ */
+export const SPOKE_CHAINS: readonly (readonly [string, string])[] = [
+  // Mend spoke
+  ['mend', 'mend-s1'],
+  // Heal specialization spoke
+  ['heal', 'heal-s1'],
+  ['heal-s1', 'heal-s2'],
+  ['heal-s2', 'heal-s3'],
+  // Big Heal spoke
+  ['big-heal', 'big-heal-s1'],
+  // Offense spoke (A/B fork after offense entry)
+  ['bonk', 'offense'],
+  ['offense', 'vowstrike-s1'],
+  ['offense', 'bonk-s1'],
+  ['vowstrike-s1', 'offense-s2'],
+  ['bonk-s1', 'offense-s2'],
+  // CD crowns
+  ['wrath', 'crown-wrath'],
+  ['still-waters', 'crown-waters'],
+];
 
 // ─── Display-state derivation ─────────────────────────────────────────────────
 
@@ -388,12 +418,24 @@ export class RadialTreeScene extends Phaser.Scene {
     rings.strokeCircle(WHEEL_CX, WHEEL_CY, R2 + NODE_RADIUS + 9);
     rings.strokeCircle(WHEEL_CX, WHEEL_CY, R3 + NODE_RADIUS + 9);
 
-    // ── Spoke guide lines (centre → each non-root position) ──────────────
-    const spokes = this.add.graphics().setDepth(1);
-    spokes.lineStyle(1, BORDER_DARK, 0.15);
+    // ── Dim centre→node rays (optional radial guides; spoke chains dominate) ─
+    const rays = this.add.graphics().setDepth(1);
+    rays.lineStyle(1, BORDER_DARK, 0.06);
     for (const ds of DISPLAY_SPOTS) {
       if (ds.logicalId === 'heal') continue;
-      spokes.lineBetween(WHEEL_CX, WHEEL_CY, ds.x, ds.y);
+      rays.lineBetween(WHEEL_CX, WHEEL_CY, ds.x, ds.y);
+    }
+
+    // ── Along-spoke connector segments (required; explicit SPOKE_CHAINS) ──
+    const spotByLogicalId = new Map(DISPLAY_SPOTS.map((s) => [s.logicalId, s]));
+    const spokeGfx = this.add.graphics().setDepth(2);
+    // Reuse lattice inactive edge tint; plain lineBetween for v1 (no strip).
+    spokeGfx.lineStyle(2, EDGE_INACTIVE, 0.75);
+    for (const [fromId, toId] of SPOKE_CHAINS) {
+      const from = spotByLogicalId.get(fromId);
+      const to = spotByLogicalId.get(toId);
+      if (!from || !to) continue;
+      spokeGfx.lineBetween(from.x, from.y, to.x, to.y);
     }
 
     // ── Ring labels (left edge) ───────────────────────────────────────────
