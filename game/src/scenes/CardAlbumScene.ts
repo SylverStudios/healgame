@@ -53,9 +53,12 @@ const ACCENT_COLOR = PALETTE.gold;
 
 const CARD_W = 200;
 const CARD_H = 300;
-const CARD_GAP = 20;
-const SLOT_ROW_H = 28;
-const STAT_ROW_H = 18;
+const CARD_GAP = 16;
+/** Keep content clear of the sm panel edge band (~12px) + a little air. */
+const CARD_PAD = 16;
+const SLOT_ROW_H = 26;
+const STAT_ROW_H = 16;
+const FOOTER_H = 32;
 
 const MODAL_DEPTH = 2000;
 const TOOLTIP_DEPTH = 2500;
@@ -190,47 +193,58 @@ export class CardAlbumScene extends Phaser.Scene {
       .setStrokeStyle(2, BORDER_COLOR)
       .setInteractive({ useHandCursor: true })
       .setName(`cardSpell:${spellId}`);
-    addPanel(this, x, y, CARD_W, CARD_H, { fillColor: PANEL_COLOR, hitRect: bg });
+    // sm frame: album cards are compact — lg edge band ate the old inset.
+    addPanel(this, x, y, CARD_W, CARD_H, { size: 'sm', fillColor: PANEL_COLOR, hitRect: bg });
 
+    const innerLeft = x - CARD_W / 2 + CARD_PAD;
+    const innerRight = x + CARD_W / 2 - CARD_PAD;
+    const innerW = CARD_W - CARD_PAD * 2;
     const top = y - CARD_H / 2;
+    const bottom = y + CARD_H / 2;
+    let cursorY = top + CARD_PAD;
+
     this.add
-      .text(x, top + 16, name, {
+      .text(x, cursorY, name, {
         fontFamily: FONT,
         fontSize: FONT_SIZE_SM,
         color: TEXT_COLOR,
+        wordWrap: { width: innerW },
+        align: 'center',
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5, 0);
+    cursorY += 22;
 
-    // Power / Cost / Speed — three rows matching combat card language.
+    // Power / Cost / Speed — three rows inside the padded content box.
     if (spell) {
       const stats = spellStatRows(spell);
-      stats.forEach((row, i) => {
-        const rowY = top + 44 + i * STAT_ROW_H;
+      stats.forEach((row) => {
         this.add
-          .text(x - CARD_W / 2 + 16, rowY, row.label, {
+          .text(innerLeft, cursorY, row.label, {
             fontFamily: FONT,
             fontSize: FONT_SIZE_XS,
             color: DIM_COLOR,
           })
-          .setOrigin(0, 0.5);
+          .setOrigin(0, 0);
         this.add
-          .text(x + CARD_W / 2 - 16, rowY, row.value, {
+          .text(innerRight, cursorY, row.value, {
             fontFamily: FONT,
             fontSize: FONT_SIZE_XS,
             color: row.color,
           })
-          .setOrigin(1, 0.5);
+          .setOrigin(1, 0);
+        cursorY += STAT_ROW_H;
       });
     }
 
-    const slotsTop = top + 44 + 3 * STAT_ROW_H + 14;
+    cursorY += 8;
+    const slotW = innerW;
     for (let slot = 0; slot < CARD_SLOTS; slot++) {
       const chipId = chips[slot];
       const chip = chipId ? chipById(chipId) : undefined;
-      const label = chip ? `Slot ${slot + 1}: ${chip.name}` : `Slot ${slot + 1}: empty`;
-      const slotY = slotsTop + slot * SLOT_ROW_H;
+      const label = chip ? `${slot + 1}. ${chip.name}` : `${slot + 1}. empty`;
+      const slotY = cursorY + SLOT_ROW_H / 2;
       const slotBg = this.add
-        .rectangle(x, slotY, CARD_W - 28, SLOT_ROW_H - 4, PANEL_LIGHT)
+        .rectangle(x, slotY, slotW, SLOT_ROW_H - 2, PANEL_LIGHT)
         .setStrokeStyle(1, BORDER_COLOR)
         .setName(chip ? `cardChipOwned:${spellId}:${slot}` : `cardChipEmpty:${spellId}:${slot}`);
       this.add
@@ -238,6 +252,8 @@ export class CardAlbumScene extends Phaser.Scene {
           fontFamily: FONT,
           fontSize: FONT_SIZE_XS,
           color: chip ? ACCENT_COLOR : DIM_COLOR,
+          wordWrap: { width: slotW - 10 },
+          align: 'center',
         })
         .setOrigin(0.5);
 
@@ -245,29 +261,32 @@ export class CardAlbumScene extends Phaser.Scene {
         slotBg.setInteractive({ useHandCursor: true });
         slotBg.on('pointerover', () => {
           if (this.modalOpen) return;
-          this.tooltip.show(x, slotY - (SLOT_ROW_H - 4) / 2, [
+          this.tooltip.show(x, slotY - SLOT_ROW_H / 2, [
             { text: chip.name, color: ACCENT_COLOR },
             { text: chip.description, color: DIM_COLOR },
           ]);
         });
         slotBg.on('pointerout', () => this.tooltip.hide());
       }
+      cursorY += SLOT_ROW_H;
     }
 
-    const uy = y + CARD_H / 2 - 28;
+    // Footer stays fully above the bottom frame pad.
+    const footerCenterY = bottom - CARD_PAD - FOOTER_H / 2;
     if (canUpgrade) {
+      const btnW = innerW;
       const upgrade = this.add
-        .rectangle(x, uy, CARD_W - 36, 36, BUTTON_COLOR)
+        .rectangle(x, footerCenterY, btnW, FOOTER_H, BUTTON_COLOR)
         .setStrokeStyle(2, PALETTE_NUM.gold)
         .setInteractive({ useHandCursor: true })
         .setName(`cardUpgrade:${spellId}`);
-      addButton(this, x, uy, CARD_W - 36, 36, {
+      addButton(this, x, footerCenterY, btnW, FOOTER_H, {
         fillColor: BUTTON_COLOR,
         hitRect: upgrade,
         state: 'current',
       });
       this.add
-        .text(x, uy, 'Upgrade', {
+        .text(x, footerCenterY, 'Upgrade', {
           fontFamily: FONT,
           fontSize: FONT_SIZE_SM,
           color: ACCENT_COLOR,
@@ -283,7 +302,7 @@ export class CardAlbumScene extends Phaser.Scene {
         chips.length >= CARD_SLOTS ? 'Fully upgraded' : points <= 0 ? 'No points' : '';
       if (hint) {
         this.add
-          .text(x, uy, hint, {
+          .text(x, footerCenterY, hint, {
             fontFamily: FONT,
             fontSize: FONT_SIZE_XS,
             color: DIM_COLOR,
@@ -303,39 +322,44 @@ export class CardAlbumScene extends Phaser.Scene {
       .setStrokeStyle(2, BORDER_COLOR)
       .setInteractive({ useHandCursor: true })
       .setName(`cardSpell:${cooldownId}`);
-    addPanel(this, x, y, CARD_W, CARD_H, { fillColor: PANEL_COLOR, hitRect: bg });
+    addPanel(this, x, y, CARD_W, CARD_H, { size: 'sm', fillColor: PANEL_COLOR, hitRect: bg });
 
+    const innerW = CARD_W - CARD_PAD * 2;
     const top = y - CARD_H / 2;
+    const bottom = y + CARD_H / 2;
+
     this.add
-      .text(x, top + 18, name, {
+      .text(x, top + CARD_PAD, name, {
         fontFamily: FONT,
         fontSize: FONT_SIZE_SM,
         color: TEXT_COLOR,
+        wordWrap: { width: innerW },
+        align: 'center',
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5, 0);
     this.add
-      .text(x, top + 44, 'Major cooldown', {
+      .text(x, top + CARD_PAD + 24, 'Major cooldown', {
         fontFamily: FONT,
         fontSize: FONT_SIZE_XS,
         color: ACCENT_COLOR,
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5, 0);
     this.add
-      .text(x, top + 72, desc, {
+      .text(x, top + CARD_PAD + 48, desc, {
         fontFamily: FONT,
         fontSize: FONT_SIZE_XS,
         color: DIM_COLOR,
         align: 'center',
-        wordWrap: { width: CARD_W - 24 },
+        wordWrap: { width: innerW },
       })
       .setOrigin(0.5, 0);
     this.add
-      .text(x, y + CARD_H / 2 - 32, 'No chip slots', {
+      .text(x, bottom - CARD_PAD - 8, 'No chip slots', {
         fontFamily: FONT,
         fontSize: FONT_SIZE_XS,
         color: DIM_COLOR,
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5, 1);
   }
 
   private openDraftModal(spellId: string): void {
