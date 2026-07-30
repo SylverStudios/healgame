@@ -7,11 +7,15 @@
  * `buildLoadout` is a thin alias kept for existing call sites/tests.
  */
 
+import { applyCardsLevelUps } from '../data/cards/resolve';
+import { CARD_UNLOCKS } from '../data/cards/unlocks';
 import { levelForXp, SPELLS } from '../data/constants';
+import { cooldownById } from '../data/cooldowns';
 import { getDungeonById, isDungeonIdUnlocked, ORDERED_DUNGEONS } from '../data/dungeons';
 import { chooseRelicOffers } from '../data/relics';
 import { loadoutForSave } from '../data/loadout';
 import { treeStateFromRadialSave } from '../data/radial/resolve';
+import { radialSpellById } from '../data/radial/spells';
 import type { CombatMods } from '../data/talentTree';
 import { placeOnActionBar, type SaveData } from '../save/save';
 import type { CombatResult } from '../scenes/CombatScene';
@@ -47,12 +51,26 @@ export function applyCombatResult(
   if (levelAfter > levelBefore) {
     const points = levelAfter - levelBefore;
     if (save.progressionMode === 'cards') {
-      // Chunk 1 wires unlock grants; Chunk 0 only banks upgrade points.
-      save.upgradePoints += points;
+      // applyCardsLevelUps owns upgrade-point banking + free unlock grants.
+      applyCardsLevelUps(save, levelBefore, levelAfter);
       notices.push({
         kind: 'levelUp',
         text: `LEVEL ${levelAfter} — +${points} Upgrade Point${points === 1 ? '' : 's'}`,
       });
+      for (let level = levelBefore + 1; level <= levelAfter; level++) {
+        for (const unlock of CARD_UNLOCKS) {
+          if (unlock.minLevel !== level) continue;
+          const name =
+            unlock.kind === 'spell'
+              ? radialSpellById(unlock.id)?.name
+              : cooldownById(unlock.id)?.name;
+          if (name === undefined) continue;
+          notices.push({
+            kind: 'spellLearned',
+            text: `${name} learned!`,
+          });
+        }
+      }
     } else {
       notices.push({
         kind: 'levelUp',
