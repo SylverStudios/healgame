@@ -7,14 +7,15 @@ sprites in Phaser. Authority for live Kenney mapping: [`docs/unit-art.md`](../..
 
 | Unit | Artifacts | Combat still | Attack |
 |---|---|---|---|
-| Ash Husk | `artifacts/pixellab-ash-husk/` | `west.png` (88×88) | `idle-west/0–3.png` (idle, not attack) |
-| Starter tank | `artifacts/pixellab-starter-tank/` | `east.png` (92×92) | `attack-east/0–6.png` |
-| Starter DPS1 | `artifacts/pixellab-starter-dps1/` | `east.png` (92×92) | `attack-east/0–6.png` |
-| Starter DPS2 | `artifacts/pixellab-starter-dps2/` | `east.png` (92×92) | `attack-east/0–6.png` |
+| Ash Husk | `artifacts/pixellab-ash-husk-v2/` · source `art/source/ash-husk/` | `west.png` (**32×32** tight) | `attack-west/0–6.png` + `hurt-west/0–4.png` |
+| Starter tank | `artifacts/pixellab-tank-v2/` | `east.png` (32×32) | `attack-east/` + `hurt-east/` |
+| Starter DPS1 | `artifacts/pixellab-dps1-v2/` | `east.png` (32×32) | `attack-east/` + `hurt-east/` |
+| Starter DPS2 | `artifacts/pixellab-dps2-v2/` | `east.png` (32×32) | `attack-east/` + `hurt-east/` |
 
 PixelLab ids (regenerate via MCP if missing locally):
 
-- Ash Husk: `da0196d5-84ee-4a6c-a0a2-39bc5d4de869`
+- Ash Husk v2 (tight): `70791a0f-4676-4278-9d8b-6f513ad822e5`
+- Ash Husk legacy (retired): `da0196d5-84ee-4a6c-a0a2-39bc5d4de869`
 - Starter tank: `806703ff-4ea0-4eb5-b04f-7823fa62897a`
 - Starter DPS1: `c1af3f15-9e76-41e7-8245-ed787386e145`
 - Starter DPS2: `d0055c04-5cff-4070-9e1d-9a16866d32b5`
@@ -23,16 +24,14 @@ PixelLab ids (regenerate via MCP if missing locally):
 
 | Role | Display |
 |---|---|
-| PixelLab mercs (legacy padded ~92px) | 112×112 |
-| Healer (native 32×32 armored-paladin) | 64×64 |
+| Tight 32×32 (healer, tank, dps1, dps2, ash-husk) | 64×64 |
 | Kenney party | 48×48 |
-| PixelLab trash | 72×72 |
 | Kenney trash | 32×32 |
 | Boss | 80×80 |
 
-Scale with `setDisplaySize` and `pixelArt: true` (nearest neighbor). Legacy
-PixelLab canvases are padded; 32×32 healer frames are tight — use the smaller
-`HEALER_FOOT_PAD_RATIO` so feet meet the ground line.
+Scale with `setDisplaySize` and `pixelArt: true` (nearest neighbor). Tight
+canvases use `TIGHT_FOOT_PAD_RATIO` (2/32) so feet meet the ground line.
+**Density exemplar:** armored-paladin healer — see `art/STYLE.md`.
 
 ## Static + attack contract (shipped)
 

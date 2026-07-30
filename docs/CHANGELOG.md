@@ -1,9 +1,19 @@
 # Changelog — healgame
 
-Status: current · Authority: shipped-history summary (details in poc-qa) · Last verified: 2026-07-29
+Status: current · Authority: shipped-history summary (details in poc-qa) · Last verified: 2026-07-30
 
 Newest first. Numbers and rule detail live in `game/src/data/` and
 [`poc-qa.md`](./poc-qa.md) — this file is the short ship log.
+
+---
+
+## 2026-07-30 — Ash husk tight 32×32 + healer density exemplar
+
+- **Density law** — armored-paladin healer pinned as the exemplar in
+  `art/STYLE.md`, CLAUDE/AGENTS, and pixellab skills (J18).
+- **Ash husk** — regenerated to tight 32×32 west at healer grain (display 64);
+  attack + hurt strips wired; saved prompts in `art/source/ash-husk/PROMPT.md`
+  (J17).
 
 ---
 
