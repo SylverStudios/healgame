@@ -29,6 +29,9 @@
  *   Settings  v0.3 chunk H: hubSettings → SettingsScene (slider + Back
  *      visible) → click slider center (~50%) → click track's left edge via a
  *      relative offset from the located center (0%) → settingsBack → hub
+ *   Radial  seeded radial save → Hub → Tree → Mend → heal-s1 A/B specialize
+ *   Cards  Settings → Spell cards → confirm wipe → Tutorial → Hub (seeded
+ *      post-tutorial) → Spells album → upgrade Heal (slot-1 chip) → Ash Gate
  *
  * Ash Gate / Iron Pass victory itself is proven deterministically at engine
  * level (src/combat/balance.test.ts); stages B/B3/D2 seed the relevant save
@@ -285,7 +288,7 @@ try {
   await clickNamed(page, 'tutorialLearn');
   await page.waitForTimeout(800);
   let save = await readSave(page);
-  check(save?.version === 9, 'new saves are written as v9');
+  check(save?.version === SAVE_SCHEMA, `new saves are written as v${SAVE_SCHEMA}`);
   check(save?.tutorialDone === true, 'tutorial click sets tutorialDone');
   check(save?.unlockedSpells.includes('solemn-mend') === true, 'Solemn Mend unlocked via tutorial');
   check(save?.unlockedSpells.includes('bonk') === true, 'Bonk is unlocked from the start');
@@ -734,6 +737,88 @@ try {
   await clickNamed(page, 'treeBack');
   await waitForNamed(page, 'hubTree');
   await shot(page, 'hub-after-radial-tree');
+
+  // ---- Stage Cards: Settings → Spell cards → album upgrade Heal → Ash Gate ----
+  console.log('Stage Cards: Spell cards mode → Spells album → chip draft → Ash Gate');
+  await clickNamed(page, 'hubSettings');
+  await waitForNamed(page, 'settingsProgressionCards');
+  await shot(page, 'settings-before-cards');
+  await clickNamed(page, 'settingsProgressionCards');
+  await waitForNamed(page, 'settingsProgressionConfirm');
+  await clickNamed(page, 'settingsProgressionConfirm');
+  await waitForNamed(page, 'tutorialLearn');
+  save = await readSave(page);
+  check(save?.progressionMode === 'cards', 'Spell cards wipe restarts in cards mode');
+  check(save?.upgradePoints === 1, 'fresh cards save banks 1 upgrade point');
+  check(
+    save?.unlockedSpells?.includes('heal') && save?.unlockedSpells?.includes('bonk'),
+    'fresh cards save owns Heal + Bonk',
+  );
+  await shot(page, 'tutorial-cards-mode');
+
+  // Enter Ash Gate from tutorial, then seed Hub so the stage stays a smoke
+  // (full wipe already covered by Stage A).
+  await clickNamed(page, 'tutorialLearn');
+  await waitForNamed(page, 'combatSpell:heal');
+  check((await locate(page, 'combatSpell:heal')) !== null, 'cards tutorial enters Ash Gate with Heal');
+  await shot(page, 'ash-gate-cards-first-enter');
+
+  await seedSave(page, {
+    version: SAVE_SCHEMA,
+    progressionMode: 'cards',
+    tutorialDone: true,
+    xp: 0,
+    unlockedSpells: ['heal', 'bonk'],
+    actionBar: ['bonk', 'heal', '', ''],
+    treeRanks: {},
+    subclass: null,
+    clearedDungeons: [],
+    combatPaceTenths: 10,
+    relicIds: [],
+    pendingRelicOffers: [],
+    upgradePoints: 1,
+    spellChips: {},
+    musicVolumePct: 50,
+    recentRuns: [],
+  });
+  save = await readSave(page);
+  check(save?.progressionMode === 'cards' && save?.tutorialDone === true, 'seeded cards Hub save');
+  check((await locate(page, 'hubLoadout')) === null, 'cards Hub hides Spellbook (hubLoadout)');
+  await shot(page, 'hub-cards-mode');
+
+  await clickNamed(page, 'hubTree');
+  await waitForNamed(page, 'cardAlbumBack');
+  check((await locate(page, 'cardSpell:heal')) !== null, 'album shows Heal card');
+  check((await locate(page, 'cardSpell:bonk')) !== null, 'album shows Bonk card');
+  check((await locate(page, 'cardUpgrade:heal')) !== null, 'Heal offers Upgrade with a free point');
+  await shot(page, 'card-album');
+
+  await clickNamed(page, 'cardUpgrade:heal');
+  await waitForNamed(page, 'cardChipOffer:heal-mend-link');
+  check((await locate(page, 'cardChipOffer:heal-power')) !== null, 'Heal slot-1 draft shows Power Up');
+  check((await locate(page, 'cardChipOffer:heal-cost')) !== null, 'Heal slot-1 draft shows Cost Cut');
+  check((await locate(page, 'cardChipCancel')) !== null, 'draft modal exposes cancel');
+  await shot(page, 'card-chip-draft');
+
+  // Pick any slot-1 offer (Power Up) → Confirm
+  await clickNamed(page, 'cardChipOffer:heal-power');
+  await clickNamed(page, 'cardChipConfirm');
+  await waitForNamed(page, 'cardAlbumBack');
+  save = await readSave(page);
+  check(save?.upgradePoints === 0, 'chip purchase spends the upgrade point');
+  check(
+    Array.isArray(save?.spellChips?.heal) && save.spellChips.heal[0] === 'heal-power',
+    'Heal slot 1 filled with heal-power',
+  );
+  check((await locate(page, 'cardUpgrade:heal')) === null, 'no Upgrade affordance without points');
+  await shot(page, 'card-album-after-upgrade');
+
+  await clickNamed(page, 'cardAlbumBack');
+  await waitForNamed(page, 'hubDungeon:ash-gate');
+  await clickNamed(page, 'hubDungeon:ash-gate');
+  await waitForNamed(page, 'combatSpell:heal');
+  check((await locate(page, 'combatSpell:heal')) !== null, 'cards Hub can re-enter Ash Gate after upgrade');
+  await shot(page, 'ash-gate-cards-after-upgrade');
 } finally {
   await browser?.close();
   if (preview) {

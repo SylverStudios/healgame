@@ -49,6 +49,11 @@ by name.
 | `settingsProgressionCancel` | Mode-switch cancel | `SettingsScene.ts` |
 | `settingsBack` | back button | `SettingsScene.ts` |
 | `cardAlbumBack` | Card album back | `CardAlbumScene.ts` |
+| `cardSpell:<spellId>` | Spell / major-CD card hit target | `CardAlbumScene.ts` |
+| `cardUpgrade:<spellId>` | Upgrade affordance on a spell card | `CardAlbumScene.ts` |
+| `cardChipOffer:<chipId>` | Chip draft modal offer card | `CardAlbumScene.ts` |
+| `cardChipConfirm` | Confirm chip purchase | `CardAlbumScene.ts` |
+| `cardChipCancel` | Cancel chip draft | `CardAlbumScene.ts` |
 
 ## Hook API
 
