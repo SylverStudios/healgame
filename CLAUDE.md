@@ -88,10 +88,12 @@ game/src/
   creep anywhere else.
   - Combat units render Kenney Tiny Dungeon 16×16 tiles (CC0; sheet in
     `game/public/assets/`, unit→tile mapping in `game/src/ui/sprites.ts`,
-    `pixelArt: true`) plus PixelLab party/trash stills; the party healer is
-    the 32×32 armored-paladin sheet (`assets/units/healer/`, source in
-    `art/source/armored-paladin/`). Target density for new character art is
-    **32×32** (bosses may be larger canvases at the same density).
+    `pixelArt: true`) plus PixelLab party/trash stills; the party healer
+    (**armored-paladin**, `assets/units/healer/`, source
+    `art/source/armored-paladin/`) is the **density exemplar** — native
+    **32×32**, display 2×. Every new unit, VFX, relic icon, or prop must
+    match that pixel grain (`art/STYLE.md`). Bosses may use larger canvases
+    at the same density; never finer pixels or padded legacy canvases.
   - Heal VFX uses the user-authored sheet (`heal-vfx.png`).
   - Relic icons are hand-authored 32×32 stills (`assets/relics/`,
     `ui/relicSprites.ts`).

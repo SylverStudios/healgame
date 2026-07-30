@@ -1,11 +1,14 @@
 # Prompt library — allies, enemies, bosses
 
-Status: current · Authority: pinned generation prompts (non-healer-cast) · Last verified: 2026-07-19
+Status: current · Authority: pinned generation prompts (non-healer-cast) · Last verified: 2026-07-30
 
 Healer **charge/cast** canon lives in
 [`../pixellab-unit-art/healer-animation-prompts.md`](../pixellab-unit-art/healer-animation-prompts.md).
 This file covers everything else. When a re-roll produces an approved result
 from a changed prompt, paste the winning prompt back here.
+
+**Density:** match the armored-paladin healer (`art/STYLE.md`). Party/trash
+stills are native **32×32**; do not ship padded ~88–92px canvases.
 
 Rules (both prompt kinds):
 
@@ -44,10 +47,17 @@ dps2 in `../pixellab-unit-art/SKILL.md` — reuse their prose, regenerate at
 > dungeon — [body/material description], [glow/eye detail], [clothing/decay
 > detail], [ambient particle detail], \<suffix\>
 
-Shipped exemplar (Ash Husk): charcoal bone, cracked cinder flesh, hollow
-glowing ember eyes, tattered soot-black rags, ash drifting off shoulders.
-Match dungeon palette: Ash Gate = soot+ember, Iron Pass = rust+iron, Cinder
-Court = molten orange, Choir = bone+pale gold, Bramble = thorn-green+bruise.
+Shipped exemplar (Ash Husk, tight 32×32 west — 2026-07-30):
+
+> Ash Gate soot-and-ember trash undead — charcoal bone skeleton, cracked
+> cinder flesh patches, hollow glowing ember-orange eyes, tattered soot-black
+> rags, ash drifting off shoulders, hunched ready stance filling the canvas
+> with feet near the bottom edge, \<suffix\>
+
+PixelLab id `70791a0f-4676-4278-9d8b-6f513ad822e5`; prompt saved at
+`art/source/ash-husk/PROMPT.md`. Match dungeon palette: Ash Gate = soot+ember,
+Iron Pass = rust+iron, Cinder Court = molten orange, Choir = bone+pale gold,
+Bramble = thorn-green+bruise.
 
 ### Elite pattern (40, west)
 

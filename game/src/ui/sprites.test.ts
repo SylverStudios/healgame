@@ -3,6 +3,8 @@ import type { UnitRole } from '../combat/types';
 import { GCD_MS } from '../data/constants';
 import { MOBS } from '../data/mobs';
 import {
+  ASH_HUSK_ATTACK_FRAME_DURATIONS_MS,
+  ASH_HUSK_HURT_FRAME_DURATIONS_MS,
   ASH_HUSK_TEXTURE_KEY,
   attackAnimFrames,
   attackAnimKeyForUnit,
@@ -168,6 +170,16 @@ describe('merc attack exposure sheet', () => {
     expect(dps2Def.frameCount).toBe(7);
     expect(new Set(DPS2_ATTACK_FRAME_DURATIONS_MS).size).toBeGreaterThan(1);
   });
+
+  it('wires ash-husk west attack by mobId (not instance id)', () => {
+    const def = UNIT_ATTACK_ANIMS.find((d) => d.unitId === 'ash-husk')!;
+    expect(def.frameDurationsMs).toBe(ASH_HUSK_ATTACK_FRAME_DURATIONS_MS);
+    expect(def.frameCount).toBe(7);
+    expect(attackAnimKeyForUnit({ id: 'ash-husk-0', mobId: 'ash-husk' })).toBe(
+      'unit-ash-husk-attack',
+    );
+    expect(attackAnimKeyForUnit({ id: 'ash-husk-0' })).toBeUndefined();
+  });
 });
 
 describe('tank / dps1 / dps2 hurt exposure sheets', () => {
@@ -193,6 +205,13 @@ describe('tank / dps1 / dps2 hurt exposure sheets', () => {
     expect(DPS2_HURT_FRAME_DURATIONS_MS.length).toBe(def.frameCount);
     expect(def.frameCount).toBe(5);
     expect(new Set(DPS2_HURT_FRAME_DURATIONS_MS).size).toBeGreaterThan(1);
+  });
+
+  it('wires ash-husk west hurt by mobId', () => {
+    const def = UNIT_HURT_ANIMS.find((d) => d.unitId === 'ash-husk')!;
+    expect(def.frameDurationsMs).toBe(ASH_HUSK_HURT_FRAME_DURATIONS_MS);
+    expect(def.frameCount).toBe(5);
+    expect(hurtAnimKeyForUnit({ id: 'ash-husk-2', mobId: 'ash-husk' })).toBe('unit-ash-husk-hurt');
   });
 
   it('builds Phaser frames from the hurt exposure sheet', () => {

@@ -44,8 +44,8 @@ export type CustomUnitTextureKey =
  * individual textures; BootScene registers the Phaser anim from these keys.
  */
 export interface UnitAttackAnimDef {
-  /** Party unit id this strip belongs to. */
-  unitId: 'tank' | 'dps1' | 'dps2';
+  /** Unit id or mob visual key this strip belongs to. */
+  unitId: 'tank' | 'dps1' | 'dps2' | 'ash-husk';
   animKey: string;
   /** Rest still shown when not attacking. */
   restTextureKey: CustomUnitTextureKey;
@@ -60,13 +60,13 @@ export interface UnitAttackAnimDef {
 }
 
 /**
- * One-shot hurt reaction strip for a party merc. Same shape as
+ * One-shot hurt reaction strip for a party merc or trash mob. Same shape as
  * `UnitAttackAnimDef` (separate per-frame PNGs, FE exposure sheet); kept as a
- * distinct type because not every merc has a hurt strip yet.
+ * distinct type because not every unit has a hurt strip yet.
  */
 export interface UnitHurtAnimDef {
-  /** Party unit id this strip belongs to. */
-  unitId: 'tank' | 'dps1' | 'dps2';
+  /** Unit id or mob visual key this strip belongs to. */
+  unitId: 'tank' | 'dps1' | 'dps2' | 'ash-husk';
   animKey: string;
   /** Rest still shown when not flinching. */
   restTextureKey: CustomUnitTextureKey;
@@ -154,6 +154,18 @@ export const DPS2_ARROW_HIT_LEAD_MS: number = DPS2_ATTACK_FRAME_DURATIONS_MS.sli
  */
 export const DPS2_HURT_FRAME_DURATIONS_MS: readonly number[] = [50, 100, 150, 83, 100] as const;
 
+/**
+ * Ash husk west attack (7 frames: rest + 6 gen). Same shape as tight mercs.
+ */
+export const ASH_HUSK_ATTACK_FRAME_DURATIONS_MS: readonly number[] = [
+  50, 100, 33, 167, 67, 83, 100,
+] as const;
+
+/**
+ * Ash husk west hurt (5 frames): quick antic, snap flinch, held recoil, recover.
+ */
+export const ASH_HUSK_HURT_FRAME_DURATIONS_MS: readonly number[] = [50, 100, 150, 83, 100] as const;
+
 /** Shared shape for building Phaser anim frame lists from a per-frame exposure sheet. */
 interface FrameStripSource {
   animKey: string;
@@ -195,7 +207,7 @@ function attackFrameUrl(slug: string, facing: 'east' | 'west', index: number): s
   return `assets/units/${slug}/attack-${facing}/${index}.png`;
 }
 
-/** Tank / DPS1 / DPS2 east attack strips (7 frames: rest + 6 generated). */
+/** Tank / DPS1 / DPS2 east + ash-husk west attack strips (7 frames: rest + 6 generated). */
 export const UNIT_ATTACK_ANIMS: readonly UnitAttackAnimDef[] = [
   {
     unitId: 'tank',
@@ -224,11 +236,21 @@ export const UNIT_ATTACK_ANIMS: readonly UnitAttackAnimDef[] = [
     frameUrl: (i) => attackFrameUrl('dps2', 'east', i),
     frameDurationsMs: DPS2_ATTACK_FRAME_DURATIONS_MS,
   },
+  {
+    unitId: 'ash-husk',
+    animKey: 'unit-ash-husk-attack',
+    restTextureKey: ASH_HUSK_TEXTURE_KEY,
+    frameCount: 7,
+    frameKey: (i) => attackFrameKey('ash-husk', i),
+    frameUrl: (i) => attackFrameUrl('ash-husk', 'west', i),
+    frameDurationsMs: ASH_HUSK_ATTACK_FRAME_DURATIONS_MS,
+  },
 ] as const;
 
-/** Phaser anim key for a party merc's attack strip, if one is wired. */
-export function attackAnimKeyForUnit(unit: Pick<Unit, 'id'>): string | undefined {
-  return UNIT_ATTACK_ANIMS.find((def) => def.unitId === unit.id)?.animKey;
+/** Phaser anim key for a unit's attack strip, if one is wired. */
+export function attackAnimKeyForUnit(unit: Pick<Unit, 'id' | 'mobId'>): string | undefined {
+  const key = stripUnitKey(unit);
+  return key === undefined ? undefined : UNIT_ATTACK_ANIMS.find((def) => def.unitId === key)?.animKey;
 }
 
 function hurtFrameKey(slug: string, index: number): string {
@@ -239,7 +261,7 @@ function hurtFrameUrl(slug: string, facing: 'east' | 'west', index: number): str
   return `assets/units/${slug}/hurt-${facing}/${index}.png`;
 }
 
-/** Tank + dps1 + dps2 east hurt strips (5 frames each). */
+/** Party merc east + ash-husk west hurt strips (5 frames each). */
 export const UNIT_HURT_ANIMS: readonly UnitHurtAnimDef[] = [
   {
     unitId: 'tank',
@@ -268,11 +290,30 @@ export const UNIT_HURT_ANIMS: readonly UnitHurtAnimDef[] = [
     frameUrl: (i) => hurtFrameUrl('dps2', 'east', i),
     frameDurationsMs: DPS2_HURT_FRAME_DURATIONS_MS,
   },
+  {
+    unitId: 'ash-husk',
+    animKey: 'unit-ash-husk-hurt',
+    restTextureKey: ASH_HUSK_TEXTURE_KEY,
+    frameCount: 5,
+    frameKey: (i) => hurtFrameKey('ash-husk', i),
+    frameUrl: (i) => hurtFrameUrl('ash-husk', 'west', i),
+    frameDurationsMs: ASH_HUSK_HURT_FRAME_DURATIONS_MS,
+  },
 ] as const;
 
-/** Phaser anim key for a party merc's hurt reaction strip, if one is wired. */
-export function hurtAnimKeyForUnit(unit: Pick<Unit, 'id'>): string | undefined {
-  return UNIT_HURT_ANIMS.find((def) => def.unitId === unit.id)?.animKey;
+/** Phaser anim key for a unit's hurt reaction strip, if one is wired. */
+export function hurtAnimKeyForUnit(unit: Pick<Unit, 'id' | 'mobId'>): string | undefined {
+  const key = stripUnitKey(unit);
+  return key === undefined ? undefined : UNIT_HURT_ANIMS.find((def) => def.unitId === key)?.animKey;
+}
+
+/** Resolve strip registry key from party id or ash-husk mobId. */
+function stripUnitKey(
+  unit: Pick<Unit, 'id' | 'mobId'>,
+): UnitAttackAnimDef['unitId'] | undefined {
+  if (unit.id === 'tank' || unit.id === 'dps1' || unit.id === 'dps2') return unit.id;
+  if (unit.mobId === 'ash-husk') return 'ash-husk';
+  return undefined;
 }
 
 /** Phaser anim frame entries with FE holds (skips duration ≤ 0). */

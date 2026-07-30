@@ -115,7 +115,7 @@ const ENEMY_SLOT_RIGHT = 880;
 const PARTY_VISUAL_ORDER = ['healer', 'dps2', 'dps1', 'tank'];
 
 // Display: legacy padded mercs 112 (none left in the live party); tight
-// 32×32 (healer/tank/dps1/dps2) 64; Kenney 48.
+// 32×32 (healer/tank/dps1/dps2/ash-husk) 64; Kenney party 48 / trash 32.
 const PARTY_MERC_WIDTH = 112;
 const PARTY_MERC_HEIGHT = 112;
 const PARTY_HEALER_WIDTH = 64;
@@ -124,11 +124,12 @@ const PARTY_TIGHT_MERC_WIDTH = 64; // native×2
 const PARTY_TIGHT_MERC_HEIGHT = 64;
 const PARTY_KENNEY_WIDTH = 48;
 const PARTY_KENNEY_HEIGHT = 48;
-const TRASH_CUSTOM_WIDTH = 72;
-const TRASH_CUSTOM_HEIGHT = 72;
-/** Foot pad as fraction of display height: legacy ~23/92, tight native ~2/32. */
+const TRASH_CUSTOM_WIDTH = 64; // tight 32→2× (healer density)
+const TRASH_CUSTOM_HEIGHT = 64;
+/** Foot pad as fraction of display height: legacy padded ~23/92, tight native ~2/32. */
 const PIXELLAB_FOOT_PAD_RATIO = 23 / 92;
-const HEALER_FOOT_PAD_RATIO = 2 / 32;
+const TIGHT_FOOT_PAD_RATIO = 2 / 32;
+const HEALER_FOOT_PAD_RATIO = TIGHT_FOOT_PAD_RATIO;
 const TRASH_KENNEY_WIDTH = 32;
 const TRASH_KENNEY_HEIGHT = 32;
 const BOSS_UNIT_WIDTH = 80;
@@ -469,40 +470,37 @@ export class CombatScene extends Phaser.Scene {
   private rebuildEnemies(enemies: Unit[]): void {
     for (const sprite of this.enemySprites.values()) sprite.destroy();
     this.enemySprites.clear();
-
     const isBoss = enemies.length === 1 && enemies[0]?.role === 'boss';
-
     enemies.forEach((unit, i) => {
       this.unitNames.set(unit.id, unit.name);
-      const x = slotX(i, enemies.length, ENEMY_SLOT_LEFT, ENEMY_SLOT_RIGHT);
       const presentation = presentationForUnit(unit);
-      const width = isBoss
-        ? BOSS_UNIT_WIDTH
-        : presentation.kind === 'texture'
-          ? TRASH_CUSTOM_WIDTH
-          : TRASH_KENNEY_WIDTH;
-      const height = isBoss
-        ? BOSS_UNIT_HEIGHT
-        : presentation.kind === 'texture'
-          ? TRASH_CUSTOM_HEIGHT
-          : TRASH_KENNEY_HEIGHT;
-      const y = groundAnchorY(height);
-      const bodyOffsetY =
-        presentation.kind === 'texture' ? Math.round(height * PIXELLAB_FOOT_PAD_RATIO) : 0;
-      const sprite = new UnitSprite(unit, {
-        scene: this,
-        x,
-        y,
-        width,
-        height,
-        ...(presentation.kind === 'texture'
-          ? { bodyTextureKey: presentation.key, fixedFacing: true, bodyOffsetY }
-          : { frame: presentation.frame }),
-        showMana: false,
-        clickable: false,
-        facing: 'left',
-      });
-      this.enemySprites.set(unit.id, sprite);
+      const custom = presentation.kind === 'texture';
+      const width = isBoss ? BOSS_UNIT_WIDTH : custom ? TRASH_CUSTOM_WIDTH : TRASH_KENNEY_WIDTH;
+      const height = isBoss ? BOSS_UNIT_HEIGHT : custom ? TRASH_CUSTOM_HEIGHT : TRASH_KENNEY_HEIGHT;
+      const attackAnimKey = attackAnimKeyForUnit(unit);
+      const hurtAnimKey = hurtAnimKeyForUnit(unit);
+      this.enemySprites.set(
+        unit.id,
+        new UnitSprite(unit, {
+          scene: this,
+          x: slotX(i, enemies.length, ENEMY_SLOT_LEFT, ENEMY_SLOT_RIGHT),
+          y: groundAnchorY(height),
+          width,
+          height,
+          ...(custom
+            ? {
+                bodyTextureKey: presentation.key,
+                fixedFacing: true,
+                bodyOffsetY: Math.round(height * TIGHT_FOOT_PAD_RATIO),
+              }
+            : { frame: presentation.frame }),
+          ...(attackAnimKey === undefined ? {} : { attackAnimKey }),
+          ...(hurtAnimKey === undefined ? {} : { hurtAnimKey }),
+          showMana: false,
+          clickable: false,
+          facing: 'left',
+        }),
+      );
     });
   }
 
@@ -712,8 +710,10 @@ export class CombatScene extends Phaser.Scene {
             pendingHealerImpact = null;
           } else {
             if (attacker) {
-              const au = this.engine.state.party.find((u) => u.id === event.sourceId);
-              if (au?.role === 'tank' || au?.role === 'dps') attacker.playAttack();
+              const source =
+                this.engine.state.party.find((u) => u.id === event.sourceId) ??
+                this.engine.state.enemies.find((u) => u.id === event.sourceId);
+              if (source && attackAnimKeyForUnit(source)) attacker.playAttack();
               else attacker.lunge(victim?.getHomeX() ?? attacker.getHomeX());
             }
             const applyHit = () => {

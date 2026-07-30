@@ -557,7 +557,7 @@ export class UnitSprite {
    * autos never stack listeners.
    */
   playAttack(): void {
-    if (!this.attackAnimKey || !this.alive) return;
+    if (!this.attackAnimKey || !this.alive || !this.body.anims) return;
     // Restart if already mid-swing so rapid autos replace the strip instead of
     // being ignored (Phaser's ignoreIfPlaying=true would skip the new play).
     this.body.play(this.attackAnimKey, false);
@@ -569,9 +569,11 @@ export class UnitSprite {
    * restored on ANIMATION_COMPLETE (see constructor). Safe no-op for units
    * without one. Mirrors `playAttack()` — either call simply restarts
    * whichever body anim was playing, so no explicit priority is needed.
+   * Also no-ops if the body was destroyed (e.g. delayed arrow-hit contact
+   * after a wave rebuild).
    */
   playHurt(): void {
-    if (!this.hurtAnimKey || !this.alive) return;
+    if (!this.hurtAnimKey || !this.alive || !this.body.anims) return;
     this.body.play(this.hurtAnimKey, false);
     this.body.setDisplaySize(this.width, this.height);
   }
