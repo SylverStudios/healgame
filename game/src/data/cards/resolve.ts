@@ -1,10 +1,23 @@
 /**
  * Cards-mode save → CombatMods.
  *
- * Chunk 1: unlock table + level-up grants. Chip application arrives in Chunk 2.
+ * Unlock table + level-up grants (Chunk 1). Chip application + purchase
+ * (Chunk 2): owned chips bake castMods / synergies / manaSynergies /
+ * missing+full HP lists / castBuff / manaOnHit onto cloned radial defs.
+ *
+ * **castBuff last-wins:** when two chips set `castBuff` on the same spell
+ * (e.g. Bonk Blessed then Reckoning/Quicksteel), later chips in slot order
+ * overwrite earlier ones.
  */
 
-import type { SpellDef } from '../../combat/types';
+import type {
+  FullHealthBonusRule,
+  ManaSynergyRule,
+  MissingHealthBonusRule,
+  MissingHealthPctBonusRule,
+  SpellDef,
+  SynergyRule,
+} from '../../combat/types';
 import type { SaveData } from '../../save/save';
 import { placeOnActionBar } from '../../save/save';
 import { levelForXp } from '../constants';
@@ -12,7 +25,9 @@ import { cooldownById } from '../cooldowns';
 import { manaBonusesForLevel } from '../levelMana';
 import { radialSpellById } from '../radial/spells';
 import { spellsFromActionBar, type CombatMods } from '../talentTree';
-import { CARD_UNLOCKS, cooldownIdsAtLevel } from './unlocks';
+import { chipById, type CardChipEffect } from './chips';
+import { offersForNextSlot } from './draft';
+import { CARD_SLOTS, CARD_UNLOCKS, cooldownIdsAtLevel } from './unlocks';
 
 /** Empty CombatMods shell shared by stub + later chip resolve. */
 function emptyMods(spells: SpellDef[]): CombatMods {
@@ -29,10 +44,160 @@ function emptyMods(spells: SpellDef[]): CombatMods {
   };
 }
 
+function applyChipEffect(
+  effect: CardChipEffect,
+  spells: SpellDef[],
+  synergyMap: Map<string, SynergyRule>,
+  manaSynergyMap: Map<string, ManaSynergyRule>,
+  missingMap: Map<string, MissingHealthBonusRule>,
+  missingPctMap: Map<string, MissingHealthPctBonusRule>,
+  fullHealthMap: Map<string, FullHealthBonusRule>,
+): void {
+  switch (effect.kind) {
+    case 'castMod': {
+      const spell = spells.find((s) => s.id === effect.spellId);
+      if (!spell) break;
+      if (effect.castMsDelta !== undefined) {
+        spell.castMs = Math.max(0, spell.castMs + effect.castMsDelta);
+      }
+      if (effect.manaDelta !== undefined) {
+        // heal-cost parenthetical "clamp ≥ 1" is satisfied by heal base 3 − 1;
+        // mend-penny needs 0 cost, so floor is 0 like radial/lattice castMod.
+        spell.mana = Math.max(0, spell.mana + effect.manaDelta);
+      }
+      if (effect.healDelta !== undefined) {
+        spell.heal = Math.max(0, spell.heal + effect.healDelta);
+      }
+      if (effect.damageDelta !== undefined) {
+        spell.damage = Math.max(0, (spell.damage ?? 0) + effect.damageDelta);
+      }
+      if (effect.cooldownMsDelta !== undefined && spell.cooldownMs !== undefined) {
+        spell.cooldownMs = Math.max(0, spell.cooldownMs + effect.cooldownMsDelta);
+      }
+      break;
+    }
+
+    case 'synergy': {
+      const key = `${effect.triggerSpellId}>${effect.buffedSpellId}`;
+      const prev = synergyMap.get(key);
+      if (prev) {
+        prev.bonusHeal += effect.bonusHeal;
+      } else {
+        synergyMap.set(key, {
+          triggerSpellId: effect.triggerSpellId,
+          buffedSpellId: effect.buffedSpellId,
+          bonusHeal: effect.bonusHeal,
+        });
+      }
+      break;
+    }
+
+    case 'manaSynergy': {
+      const key = `${effect.triggerSpellId}>${effect.targetSpellId}`;
+      const prev = manaSynergyMap.get(key);
+      if (prev) {
+        prev.manaDelta += effect.manaDelta;
+      } else {
+        manaSynergyMap.set(key, {
+          triggerSpellId: effect.triggerSpellId,
+          targetSpellId: effect.targetSpellId,
+          manaDelta: effect.manaDelta,
+        });
+      }
+      break;
+    }
+
+    case 'missingHealthBonus': {
+      const prev = missingMap.get(effect.spellId);
+      if (prev) {
+        prev.healPer10PctMissing += effect.healPer10PctMissing;
+      } else {
+        missingMap.set(effect.spellId, {
+          spellId: effect.spellId,
+          healPer10PctMissing: effect.healPer10PctMissing,
+        });
+      }
+      break;
+    }
+
+    case 'missingHealthPctBonus': {
+      const prev = missingPctMap.get(effect.spellId);
+      if (prev) {
+        prev.pctPer10PctMissing += effect.pctPer10PctMissing;
+      } else {
+        missingPctMap.set(effect.spellId, {
+          spellId: effect.spellId,
+          pctPer10PctMissing: effect.pctPer10PctMissing,
+        });
+      }
+      break;
+    }
+
+    case 'fullHealthBonus': {
+      const key = `${effect.spellId}:${effect.hpPctAtLeast}`;
+      const prev = fullHealthMap.get(key);
+      if (prev) {
+        prev.bonusHeal += effect.bonusHeal;
+      } else {
+        fullHealthMap.set(key, {
+          spellId: effect.spellId,
+          hpPctAtLeast: effect.hpPctAtLeast,
+          bonusHeal: effect.bonusHeal,
+        });
+      }
+      break;
+    }
+
+    case 'setManaOnHit': {
+      const spell = spells.find((s) => s.id === effect.spellId);
+      if (spell) spell.manaOnHit = effect.amount;
+      break;
+    }
+
+    case 'setCastBuff': {
+      // Later chip overwrites castBuff on the same spell (last wins).
+      const spell = spells.find((s) => s.id === effect.spellId);
+      if (spell) spell.castBuff = effect.castBuff;
+      break;
+    }
+  }
+}
+
 /**
- * Canonical cards fight-start entry: unlocked spells → radial defs → level
- * mana → CDs from unlock table at current level → action-bar order.
- * Chips ignored until Chunk 2.
+ * Apply owned chips in slot order onto cloned spells / synergy maps.
+ * Slot order = array order of spellChips[spellId] (index 0 = slot 1 pick).
+ */
+function applyOwnedChips(
+  spellChips: Record<string, string[]>,
+  spells: SpellDef[],
+  synergyMap: Map<string, SynergyRule>,
+  manaSynergyMap: Map<string, ManaSynergyRule>,
+  missingMap: Map<string, MissingHealthBonusRule>,
+  missingPctMap: Map<string, MissingHealthPctBonusRule>,
+  fullHealthMap: Map<string, FullHealthBonusRule>,
+): void {
+  for (const chipIds of Object.values(spellChips)) {
+    for (const chipId of chipIds) {
+      const chip = chipById(chipId);
+      if (!chip) continue;
+      for (const effect of chip.effects) {
+        applyChipEffect(
+          effect,
+          spells,
+          synergyMap,
+          manaSynergyMap,
+          missingMap,
+          missingPctMap,
+          fullHealthMap,
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Canonical cards fight-start entry: unlocked spells → radial defs → chips →
+ * level mana → CDs from unlock table at current level → action-bar order.
  */
 export function loadoutFromCardSave(save: {
   xp: number;
@@ -46,7 +211,28 @@ export function loadoutFromCardSave(save: {
     .filter((s): s is SpellDef => s !== undefined)
     .map((s) => ({ ...s }));
 
+  const synergyMap = new Map<string, SynergyRule>();
+  const manaSynergyMap = new Map<string, ManaSynergyRule>();
+  const missingMap = new Map<string, MissingHealthBonusRule>();
+  const missingPctMap = new Map<string, MissingHealthPctBonusRule>();
+  const fullHealthMap = new Map<string, FullHealthBonusRule>();
+
+  applyOwnedChips(
+    save.spellChips ?? {},
+    spells,
+    synergyMap,
+    manaSynergyMap,
+    missingMap,
+    missingPctMap,
+    fullHealthMap,
+  );
+
   const mods = emptyMods(spells);
+  mods.synergies = [...synergyMap.values()];
+  mods.manaSynergies = [...manaSynergyMap.values()];
+  mods.missingHealthBonuses = [...missingMap.values()];
+  mods.missingHealthPctBonuses = [...missingPctMap.values()];
+  mods.fullHealthBonuses = [...fullHealthMap.values()];
 
   const level = levelForXp(save.xp);
   const levelMana = manaBonusesForLevel(level);
@@ -112,4 +298,36 @@ export function applyCardsLevelUps(
       placeOnActionBar(save, unlock.id);
     }
   }
+}
+
+/**
+ * Spend 1 upgrade point to fill the next chip slot on `spellId`.
+ *
+ * Rejects when: unknown spell (not unlocked / no chip catalog), insufficient
+ * points, all slots full, chip not in `offersForNextSlot`, or chip belongs to
+ * a different spell. Mutates `save` on success.
+ */
+export function applyChipPurchase(save: SaveData, spellId: string, chipId: string): boolean {
+  if (!save.unlockedSpells.includes(spellId)) return false;
+  if (save.upgradePoints < 1) return false;
+
+  const chip = chipById(chipId);
+  if (!chip) return false;
+  if (chip.spellId !== spellId) return false;
+
+  const owned = save.spellChips[spellId] ?? [];
+  if (owned.length >= CARD_SLOTS) return false;
+
+  const offers = offersForNextSlot(spellId, owned);
+  if (!offers || !offers.includes(chipId)) return false;
+  // Wrong-slot chips are rejected by offersForNextSlot matching slotIndex.
+
+  if (chip.slotIndex !== owned.length) return false;
+
+  save.upgradePoints -= 1;
+  if (!save.spellChips[spellId]) {
+    save.spellChips[spellId] = [];
+  }
+  save.spellChips[spellId].push(chipId);
+  return true;
 }
