@@ -128,6 +128,28 @@ describe('applyCombatResult', () => {
     expect(s.clearedDungeons).toEqual([]);
   });
 
+  it('cards first-clear grants upgrade point and skips relic offers', () => {
+    const s = save({ progressionMode: 'cards', upgradePoints: 1 });
+    const notices = applyCombatResult(s, result({ status: 'victory' }), () => 0);
+    expect(s.clearedDungeons).toEqual(['ash-gate']);
+    expect(s.pendingRelicOffers).toEqual([]);
+    expect(s.upgradePoints).toBe(2);
+    expect(notices).toEqual([{ kind: 'firstClear', text: 'FIRST CLEAR — +1 Upgrade Point' }]);
+  });
+
+  it('cards level-up banks upgrade points without lattice Mend unlock', () => {
+    const s = save({
+      progressionMode: 'cards',
+      xp: XP_LEVEL_2_THRESHOLD - 1,
+      unlockedSpells: ['heal', 'bonk'],
+      upgradePoints: 1,
+    });
+    const notices = applyCombatResult(s, result({ xp: 1 }));
+    expect(s.upgradePoints).toBe(2);
+    expect(s.unlockedSpells).not.toContain(SPELLS.zealousMending.id);
+    expect(notices).toEqual([{ kind: 'levelUp', text: 'LEVEL 2 — +1 Upgrade Point' }]);
+  });
+
   it('does not reward or record an unknown dungeon id', () => {
     const s = save();
     const notices = applyCombatResult(

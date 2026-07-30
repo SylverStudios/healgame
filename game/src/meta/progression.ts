@@ -3,7 +3,7 @@
  * no Phaser. Scenes call these functions and immediately persist the mutated
  * SaveData via saveGame(); this module never touches storage itself.
  *
- * Combat loadouts are resolved by `loadoutForSave` (lattice or radial).
+ * Combat loadouts are resolved by `loadoutForSave` (lattice, radial, or cards).
  * `buildLoadout` is a thin alias kept for existing call sites/tests.
  */
 
@@ -45,13 +45,24 @@ export function applyCombatResult(
   const levelAfter = levelForXp(save.xp);
 
   if (levelAfter > levelBefore) {
-    notices.push({
-      kind: 'levelUp',
-      text: `LEVEL ${levelAfter} — +${levelAfter - levelBefore} Talent Point${levelAfter - levelBefore === 1 ? '' : 's'}`,
-    });
+    const points = levelAfter - levelBefore;
+    if (save.progressionMode === 'cards') {
+      // Chunk 1 wires unlock grants; Chunk 0 only banks upgrade points.
+      save.upgradePoints += points;
+      notices.push({
+        kind: 'levelUp',
+        text: `LEVEL ${levelAfter} — +${points} Upgrade Point${points === 1 ? '' : 's'}`,
+      });
+    } else {
+      notices.push({
+        kind: 'levelUp',
+        text: `LEVEL ${levelAfter} — +${points} Talent Point${points === 1 ? '' : 's'}`,
+      });
+    }
   }
 
-  // Lattice milestone only — radial unlocks come from the wheel.
+  // Lattice milestone only — radial unlocks come from the wheel; cards from
+  // the unlock table (Chunk 1).
   if (
     save.progressionMode === 'lattice' &&
     levelAfter >= 2 &&
@@ -72,11 +83,21 @@ export function applyCombatResult(
     !save.clearedDungeons.includes(dungeon.id)
   ) {
     save.clearedDungeons.push(dungeon.id);
-    save.pendingRelicOffers = chooseRelicOffers(save.relicIds, random);
-    notices.push({
-      kind: 'firstClear',
-      text: save.pendingRelicOffers.length > 0 ? 'FIRST CLEAR — CHOOSE A RELIC' : 'FIRST CLEAR!',
-    });
+    if (save.progressionMode === 'cards') {
+      // Relics fully replaced — first-clear grants a bonus upgrade point.
+      save.pendingRelicOffers = [];
+      save.upgradePoints += 1;
+      notices.push({
+        kind: 'firstClear',
+        text: 'FIRST CLEAR — +1 Upgrade Point',
+      });
+    } else {
+      save.pendingRelicOffers = chooseRelicOffers(save.relicIds, random);
+      notices.push({
+        kind: 'firstClear',
+        text: save.pendingRelicOffers.length > 0 ? 'FIRST CLEAR — CHOOSE A RELIC' : 'FIRST CLEAR!',
+      });
+    }
   }
 
   return notices;
@@ -131,17 +152,21 @@ export function availableTalentPoints(save: Pick<SaveData, 'xp' | 'treeRanks'>):
 }
 
 /**
- * Hub Talent Tree CTA unspent count — mode-aware.
+ * Hub Talent Tree / Spells CTA unspent count — mode-aware.
  *
  * Lattice: same as {@link availableTalentPoints} (level − sum of treeRanks).
  * Radial: free starter spots (`heal`/`bonk`) do not consume points; matches the
  * talent wallet from {@link treeStateFromRadialSave}.
+ * Cards: unspent {@link SaveData.upgradePoints}.
  */
 export function unspentTalentPointsForHub(
-  save: Pick<SaveData, 'xp' | 'treeRanks' | 'progressionMode'>,
+  save: Pick<SaveData, 'xp' | 'treeRanks' | 'progressionMode' | 'upgradePoints'>,
 ): number {
   if (save.progressionMode === 'radial') {
     return walletOf(treeStateFromRadialSave(save.treeRanks, save.xp)).talent ?? 0;
+  }
+  if (save.progressionMode === 'cards') {
+    return Math.max(0, Math.floor(save.upgradePoints));
   }
   return availableTalentPoints(save);
 }

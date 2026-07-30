@@ -187,6 +187,8 @@ function baseSave(overrides) {
     combatPaceTenths: 10,
     relicIds: [],
     pendingRelicOffers: [],
+    upgradePoints: 0,
+    spellChips: {},
     musicVolumePct: 50,
     recentRuns: [],
     ...overrides,
@@ -689,6 +691,8 @@ try {
     combatPaceTenths: 10,
     relicIds: [],
     pendingRelicOffers: [],
+    upgradePoints: 0,
+    spellChips: {},
     musicVolumePct: 50,
     recentRuns: [],
   });

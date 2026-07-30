@@ -38,7 +38,8 @@ export class TutorialScene extends Phaser.Scene {
     // Chunk 6 (bible item 6): fade in on scene entry.
     fadeInOnCreate(this);
     const save = loadSave();
-    const radial = save.progressionMode === 'radial';
+    const starterKit =
+      save.progressionMode === 'radial' || save.progressionMode === 'cards';
 
     // Chunk 9 (bible item 9): wordmark treatment for the title — this is the
     // "one genuine gap" the chunk-9 bible item calls out (font-at-display-size,
@@ -97,7 +98,7 @@ export class TutorialScene extends Phaser.Scene {
       .setName('tutorialLearn');
     addButton(this, width / 2, buttonY, 340, 74, { fillColor: PALETTE_NUM.panelLight, hitRect: button });
     this.add
-      .text(width / 2, buttonY, radial ? 'Enter with Heal' : 'Learn Solemn Mend', {
+      .text(width / 2, buttonY, starterKit ? 'Enter with Heal' : 'Learn Solemn Mend', {
         fontFamily: FONT,
         fontSize: FONT_SIZE_MD,
         color: ACCENT_COLOR,
@@ -109,11 +110,18 @@ export class TutorialScene extends Phaser.Scene {
 
   private onLearnSpell(): void {
     const save = loadSave();
-    if (save.progressionMode === 'radial') {
+    if (save.progressionMode === 'radial' || save.progressionMode === 'cards') {
       if (!save.unlockedSpells.includes(RADIAL_HEAL.id)) save.unlockedSpells.push(RADIAL_HEAL.id);
       if (!save.unlockedSpells.includes(RADIAL_BONK.id)) save.unlockedSpells.push(RADIAL_BONK.id);
-      if (save.actionBar[0] !== RADIAL_HEAL.id) save.actionBar[0] = RADIAL_HEAL.id;
-      if (save.actionBar[1] !== RADIAL_BONK.id) save.actionBar[1] = RADIAL_BONK.id;
+      // Cards keeps Bonk Q / Heal W from newSaveData; radial tutorial historically
+      // flipped to Heal Q / Bonk W — preserve that for radial only.
+      if (save.progressionMode === 'radial') {
+        if (save.actionBar[0] !== RADIAL_HEAL.id) save.actionBar[0] = RADIAL_HEAL.id;
+        if (save.actionBar[1] !== RADIAL_BONK.id) save.actionBar[1] = RADIAL_BONK.id;
+      } else {
+        if (save.actionBar[0] !== RADIAL_BONK.id) save.actionBar[0] = RADIAL_BONK.id;
+        if (save.actionBar[1] !== RADIAL_HEAL.id) save.actionBar[1] = RADIAL_HEAL.id;
+      }
     } else {
       if (!save.unlockedSpells.includes(SPELLS.bonk.id)) {
         save.unlockedSpells.push(SPELLS.bonk.id);

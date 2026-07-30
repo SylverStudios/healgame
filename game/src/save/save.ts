@@ -20,7 +20,7 @@ const RADIAL_STARTER_BONK_ID = 'bonk';
 export type SubclassId = 'vigil' | 'zealot';
 
 /** Talent / spell progression topology. Default for fresh installs: lattice. */
-export type ProgressionMode = 'lattice' | 'radial';
+export type ProgressionMode = 'lattice' | 'radial' | 'cards';
 
 /**
  * Compact lit-path silhouette captured at run end. Structurally identical to
@@ -44,7 +44,7 @@ export const MAX_RECENT_RUNS = 5;
 export interface SaveData {
   /** Must equal {@link SAVE_SCHEMA}. */
   version: number;
-  /** Lattice (classic) or radial talent progression. */
+  /** Lattice (classic), radial, or spell-card progression. */
   progressionMode: ProgressionMode;
   tutorialDone: boolean;
   xp: number;
@@ -64,6 +64,13 @@ export interface SaveData {
   relicIds: string[];
   /** Stable three-card offer awaiting a choice; empty when no reward is pending. */
   pendingRelicOffers: string[];
+  /** Unspent spell-card chip drafts. Lattice/radial keep 0. */
+  upgradePoints: number;
+  /**
+   * spellId → ordered chip ids filling slots (length 0..2).
+   * Index 0 = slot-1 pick; index 1 = slot-2 pick. Cards mode only; others `{}`.
+   */
+  spellChips: Record<string, string[]>;
   /** Master music volume 0..100 (integer). 0 fully stops playback. */
   musicVolumePct: number;
   /** Last few combat runs, newest first (run summary / Hub display). */
@@ -105,6 +112,28 @@ export function newSaveData(mode: ProgressionMode = 'lattice'): SaveData {
       combatPaceTenths: 10,
       relicIds: [],
       pendingRelicOffers: [],
+      upgradePoints: 0,
+      spellChips: {},
+      musicVolumePct: 50,
+      recentRuns: [],
+    };
+  }
+  if (mode === 'cards') {
+    return {
+      version: SAVE_SCHEMA,
+      progressionMode: 'cards',
+      tutorialDone: false,
+      xp: 0,
+      unlockedSpells: [RADIAL_STARTER_HEAL_ID, RADIAL_STARTER_BONK_ID],
+      actionBar: defaultRadialActionBar(),
+      treeRanks: {},
+      subclass: null,
+      clearedDungeons: [],
+      combatPaceTenths: 10,
+      relicIds: [],
+      pendingRelicOffers: [],
+      upgradePoints: 1,
+      spellChips: {},
       musicVolumePct: 50,
       recentRuns: [],
     };
@@ -122,6 +151,8 @@ export function newSaveData(mode: ProgressionMode = 'lattice'): SaveData {
     combatPaceTenths: 10,
     relicIds: [],
     pendingRelicOffers: [],
+    upgradePoints: 0,
+    spellChips: {},
     musicVolumePct: 50,
     recentRuns: [],
   };
@@ -136,6 +167,7 @@ export const LEGACY_SAVE_KEYS = [
   'healgame-save-v6',
   'healgame-save-v7',
   'healgame-save-v8',
+  'healgame-save-v9',
 ] as const;
 
 /** Minimal storage interface so tests can inject an in-memory store. */
@@ -221,12 +253,28 @@ export function validateSaveData(value: unknown): value is SaveData {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
   if (v.version !== SAVE_SCHEMA || !hasBaseShape(v)) return false;
-  if (v.progressionMode !== 'lattice' && v.progressionMode !== 'radial') return false;
+  if (
+    v.progressionMode !== 'lattice' &&
+    v.progressionMode !== 'radial' &&
+    v.progressionMode !== 'cards'
+  ) {
+    return false;
+  }
   const ranks = v.treeRanks;
   if (typeof ranks !== 'object' || ranks === null || Array.isArray(ranks)) return false;
   if (!Object.values(ranks).every((r) => typeof r === 'number')) return false;
   if (typeof v.combatPaceTenths !== 'number') return false;
   if (typeof v.musicVolumePct !== 'number') return false;
+  if (typeof v.upgradePoints !== 'number') return false;
+  const chips = v.spellChips;
+  if (typeof chips !== 'object' || chips === null || Array.isArray(chips)) return false;
+  if (
+    !Object.values(chips).every(
+      (ids) => Array.isArray(ids) && ids.every((id) => typeof id === 'string'),
+    )
+  ) {
+    return false;
+  }
   if (!Array.isArray(v.recentRuns) || !v.recentRuns.every(isRunRecord)) return false;
   return (
     Array.isArray(v.relicIds) &&

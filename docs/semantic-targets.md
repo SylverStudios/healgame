@@ -1,6 +1,6 @@
 # Semantic click targets
 
-Status: current · Authority: interactive object name inventory for journey · Last verified: 2026-07-29
+Status: current · Authority: interactive object name inventory for journey · Last verified: 2026-07-30
 
 Every interactive game object a journey stage may aim at carries a stable
 Phaser `GameObject.setName(...)`. Journey resolves via
@@ -17,8 +17,8 @@ by name.
 |---|---|---|
 | `tutorialLearn` | learn-button rect | `TutorialScene.ts` |
 | `hubDungeon:<id>` (e.g. `hubDungeon:ash-gate`) | dungeon button rects | `HubScene.ts` via `hubDungeonTargetName` |
-| `hubTree` | Talent Tree button | `HubScene.ts` |
-| `hubLoadout` | Spellbook button | `HubScene.ts` |
+| `hubTree` | Talent Tree button (lattice/radial) or Spells (cards) | `HubScene.ts` |
+| `hubLoadout` | Spellbook button (hidden in cards mode) | `HubScene.ts` |
 | `hubRestart` | restart text label | `HubScene.ts` |
 | `hubSendFeedback` | "✨ Send Aaron feedback" text (bottom-left) | `HubScene.ts` |
 | `hubWipePrompt` | wipe-confirm telemetry prompt | `HubScene.ts` |
@@ -44,9 +44,11 @@ by name.
 | `settingsVolumeSlider` | music volume slider track | `SettingsScene.ts` |
 | `settingsProgressionLattice` | Talent tree: Classic | `SettingsScene.ts` |
 | `settingsProgressionRadial` | Talent tree: Radial | `SettingsScene.ts` |
+| `settingsProgressionCards` | Talent tree: Spell cards | `SettingsScene.ts` |
 | `settingsProgressionConfirm` | Wipe & restart confirm | `SettingsScene.ts` |
 | `settingsProgressionCancel` | Mode-switch cancel | `SettingsScene.ts` |
 | `settingsBack` | back button | `SettingsScene.ts` |
+| `cardAlbumBack` | Card album back | `CardAlbumScene.ts` |
 
 ## Hook API
 

@@ -1,6 +1,6 @@
 /**
- * Settings: music volume + Talent tree mode (Classic / Radial). Switching
- * mode confirms, wipes the save, and restarts Tutorial in that mode.
+ * Settings: music volume + Talent tree mode (Classic / Radial / Spell cards).
+ * Switching mode confirms, wipes the save, and restarts Tutorial in that mode.
  */
 
 import Phaser from 'phaser';
@@ -111,7 +111,7 @@ export class SettingsScene extends Phaser.Scene {
       if (this.dragging) this.persist();
     });
 
-    addPanel(this, centerX, 300, 520, 140);
+    addPanel(this, centerX, 310, 700, 160);
     this.add
       .text(centerX, 250, 'Talent tree', {
         fontFamily: FONT,
@@ -128,8 +128,9 @@ export class SettingsScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const mode = save.progressionMode;
-    this.makeModeButton(centerX - 120, 330, 'Classic', 'lattice', mode === 'lattice', 'settingsProgressionLattice');
-    this.makeModeButton(centerX + 120, 330, 'Radial', 'radial', mode === 'radial', 'settingsProgressionRadial');
+    this.makeModeButton(centerX - 220, 330, 'Classic', 'lattice', mode === 'lattice', 'settingsProgressionLattice');
+    this.makeModeButton(centerX, 330, 'Radial', 'radial', mode === 'radial', 'settingsProgressionRadial');
+    this.makeModeButton(centerX + 220, 330, 'Spell cards', 'cards', mode === 'cards', 'settingsProgressionCards');
 
     this.makeButton(
       centerX,
@@ -152,11 +153,11 @@ export class SettingsScene extends Phaser.Scene {
   ): void {
     const fill = active ? BUTTON_ACTIVE : BUTTON_COLOR;
     const rect = this.add
-      .rectangle(x, y, 200, 48, fill)
+      .rectangle(x, y, 180, 48, fill)
       .setStrokeStyle(2, active ? FILL_COLOR : BORDER_COLOR)
       .setInteractive({ useHandCursor: true })
       .setName(name);
-    addButton(this, x, y, 200, 48, { fillColor: fill, hitRect: rect });
+    addButton(this, x, y, 180, 48, { fillColor: fill, hitRect: rect });
     this.add
       .text(x, y, label, {
         fontFamily: FONT,
@@ -179,7 +180,7 @@ export class SettingsScene extends Phaser.Scene {
     const dim = this.add.rectangle(cx, cy, width, height, 0x000000, 0.65).setInteractive();
     const panel = addPanel(this, cx, cy, 520, 200);
     const title = this.add
-      .text(cx, cy - 60, `Switch to ${mode === 'radial' ? 'Radial' : 'Classic'}?`, {
+      .text(cx, cy - 60, `Switch to ${modeLabel(mode)}?`, {
         fontFamily: FONT,
         fontSize: FONT_SIZE_SM,
         color: ACCENT_COLOR,
@@ -281,4 +282,10 @@ export class SettingsScene extends Phaser.Scene {
     this.add.text(x, y, label, { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: TEXT_COLOR }).setOrigin(0.5);
     rect.on('pointerdown', onClick);
   }
+}
+
+function modeLabel(mode: ProgressionMode): string {
+  if (mode === 'radial') return 'Radial';
+  if (mode === 'cards') return 'Spell cards';
+  return 'Classic';
 }
