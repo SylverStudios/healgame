@@ -3,14 +3,19 @@
  * Usage: node scripts/capture-healer-rune.mjs [output.png]
  */
 import { spawn } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = 4175;
-const SAVE_KEY = 'healgame-save-v1';
+// Shared schema key (see save-version.json). TODO: VIGIL_SAVE payload below is a
+// pre-v9 shape and will be discarded by validateSaveData until refreshed.
+const SAVE_SCHEMA = JSON.parse(
+  readFileSync(join(__dirname, '../src/save/save-version.json'), 'utf8'),
+).schema;
+const SAVE_KEY = `healgame-save-v${SAVE_SCHEMA}`;
 const outPath = resolve(
   process.argv[2] ?? resolve(__dirname, '../../artifacts/screenshots/healer-rune-armed.png'),
 );

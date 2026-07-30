@@ -6,7 +6,7 @@ import { CombatEngine } from './engine';
 import { SPELLS } from '../data/constants';
 import { BONEHOWL, EMBERFALL, EXTINCTION, NULL_PSALM, SOUL_TOLL } from '../data/enemyAbilities';
 import { loadoutFromSave, type CombatMods } from '../data/talentTree';
-import type { SaveData } from '../save/save';
+import { SAVE_SCHEMA, type SaveData } from '../save/save';
 import type { CombatEngineOptions, EncounterDef, RelicDef, SpellDef, Unit } from './types';
 
 /**
@@ -54,7 +54,7 @@ export interface BotRun {
  *  loadout keeps every unlocked/tree spell (full kit for balance bots). */
 export function makeBalanceSave(overrides: Partial<SaveData>): SaveData {
   return {
-    version: 9,
+    version: SAVE_SCHEMA,
     progressionMode: 'lattice',
     tutorialDone: true,
     xp: 0,

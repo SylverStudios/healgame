@@ -43,7 +43,9 @@
  * Usage: node scripts/journey.mjs [--shots DIR]
  */
 import { spawn } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { freePort } from './lib/freePort.mjs';
 
@@ -55,7 +57,12 @@ const shotsDir = (() => {
 mkdirSync(shotsDir, { recursive: true });
 
 const PORT = await freePort();
-const SAVE_KEY = 'healgame-save-v9';
+const saveVersionPath = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '../src/save/save-version.json',
+);
+const SAVE_SCHEMA = JSON.parse(readFileSync(saveVersionPath, 'utf8')).schema;
+const SAVE_KEY = `healgame-save-v${SAVE_SCHEMA}`;
 
 /** Resolve a semantic GameObject name via window.__healgame (src/debug/testHooks.ts). */
 const locate = (page, name) =>
@@ -168,7 +175,7 @@ async function seedSave(page, save) {
 
 function baseSave(overrides) {
   return {
-    version: 9,
+    version: SAVE_SCHEMA,
     progressionMode: 'lattice',
     tutorialDone: true,
     xp: 0,
@@ -670,7 +677,7 @@ try {
   // ---- Stage Radial: radial mode → Hub → Tree → Mend → heal-s1 specialize ----
   console.log('Stage Radial: radial mode → buy Mend → specialize Heal via A/B modal → assert bar');
   await seedSave(page, {
-    version: 9,
+    version: SAVE_SCHEMA,
     progressionMode: 'radial',
     tutorialDone: true,
     xp: 10,  // level 2 → 2 talent points (buy Mend + heal-s1 specialization)
