@@ -28,7 +28,7 @@ function starterSave() {
     xp: 0,
     treeRanks: { heal: 1, bonk: 1 } as Record<string, number>,
     unlockedSpells: ['heal', 'bonk'],
-    actionBar: ['heal', 'bonk', '', ''],
+    actionBar: ['bonk', 'heal', '', ''],
   };
 }
 
@@ -41,7 +41,7 @@ function midKitSave() {
     xp: 100, // level 5
     treeRanks: { heal: 1, bonk: 1 } as Record<string, number>,
     unlockedSpells: ['heal', 'bonk'],
-    actionBar: ['heal', 'bonk', '', ''],
+    actionBar: ['bonk', 'heal', '', ''],
   };
   applyRadialPurchase(save, 'heal-s1', 'a');   // zealous-heal
   applyRadialPurchase(save, 'mend');            // mend
@@ -55,7 +55,7 @@ function ring3Save() {
     xp: 450, // level 10
     treeRanks: { heal: 1, bonk: 1 } as Record<string, number>,
     unlockedSpells: ['heal', 'bonk'],
-    actionBar: ['heal', 'bonk', '', ''],
+    actionBar: ['bonk', 'heal', '', ''],
   };
   applyRadialPurchase(save, 'heal-s1', 'a');     // zealous-heal
   applyRadialPurchase(save, 'mend');              // mend
@@ -71,9 +71,9 @@ function ring3Save() {
 // ---------------------------------------------------------------------------
 
 describe('radial loadout resolution', () => {
-  it('starter kit resolves: Heal + Bonk, no cooldowns, no synergies', () => {
+  it('starter kit resolves: Bonk + Heal, no cooldowns, no synergies', () => {
     const mods = loadoutFromRadialSave(starterSave());
-    expect(mods.spells.map((s) => s.id)).toEqual(['heal', 'bonk']);
+    expect(mods.spells.map((s) => s.id)).toEqual(['bonk', 'heal']);
     expect(mods.cooldowns).toHaveLength(0);
     expect(mods.synergies).toHaveLength(0);
   });

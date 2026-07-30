@@ -49,11 +49,11 @@ describe('save', () => {
     expect(save).not.toHaveProperty('rubies');
   });
 
-  it('radial newSaveData prepurchases Heal + Bonk on bar', () => {
+  it('radial newSaveData prepurchases Bonk on Q + Heal on W', () => {
     const save = newSaveData('radial');
     expect(save.progressionMode).toBe('radial');
     expect(save.unlockedSpells).toEqual([RADIAL_HEAL.id, RADIAL_BONK.id]);
-    expect(save.actionBar).toEqual([RADIAL_HEAL.id, RADIAL_BONK.id, '', '']);
+    expect(save.actionBar).toEqual([RADIAL_BONK.id, RADIAL_HEAL.id, '', '']);
     expect(save.treeRanks).toEqual({ heal: 1, bonk: 1 });
   });
 

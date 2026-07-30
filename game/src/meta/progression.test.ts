@@ -10,6 +10,7 @@ import {
   isMawUnlocked,
   manaBonusesForLevel,
   takeHubCombatResult,
+  unspentTalentPointsForHub,
   type HubCombatSceneData,
 } from './progression';
 import { newSaveData, type SaveData } from '../save/save';
@@ -303,6 +304,37 @@ describe('talent points', () => {
       ),
     ).toBe(0);
     expect(availableTalentPoints(save({ xp: 0, treeRanks: { 'deep-reserves': 3 } }))).toBe(0);
+  });
+});
+
+describe('unspentTalentPointsForHub', () => {
+  it('lattice matches availableTalentPoints', () => {
+    expect(unspentTalentPointsForHub(save({ xp: 0 }))).toBe(1);
+    expect(unspentTalentPointsForHub(save({ xp: 0, treeRanks: { 'deep-reserves': 1 } }))).toBe(0);
+    expect(
+      unspentTalentPointsForHub(
+        save({ xp: 30, treeRanks: { 'deep-reserves': 2, 'vigil-oath': 1 } }),
+      ),
+    ).toBe(0);
+  });
+
+  it('radial free starters do not consume CTA points', () => {
+    const fresh = newSaveData('radial');
+    // Lattice-style sum would treat heal+bonk as spent → 0; Hub must still show 1.
+    expect(availableTalentPoints(fresh)).toBe(0);
+    expect(unspentTalentPointsForHub(fresh)).toBe(1);
+  });
+
+  it('radial after spending Mend shows 0 unspent at level 1', () => {
+    const s = newSaveData('radial');
+    s.treeRanks = { heal: 1, bonk: 1, mend: 1 };
+    expect(unspentTalentPointsForHub(s)).toBe(0);
+  });
+
+  it('radial level-up grants another CTA point on top of free starters', () => {
+    const s = newSaveData('radial');
+    s.xp = XP_LEVEL_2_THRESHOLD;
+    expect(unspentTalentPointsForHub(s)).toBe(2);
   });
 });
 

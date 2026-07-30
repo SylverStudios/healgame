@@ -31,7 +31,7 @@ function starterSave() {
     xp: 0,
     treeRanks: { heal: 1, bonk: 1 } as Record<string, number>,
     unlockedSpells: [RADIAL_HEAL.id, RADIAL_BONK.id],
-    actionBar: [RADIAL_HEAL.id, RADIAL_BONK.id, '', ''],
+    actionBar: [RADIAL_BONK.id, RADIAL_HEAL.id, '', ''],
   };
 }
 
@@ -140,11 +140,11 @@ describe('applyRadialPurchase — specialize (heal-s1)', () => {
     expect(save.treeRanks['heal-s1-solemn']).toBe(1);
   });
 
-  it('specialize places new spell in the old slot (slot 0)', () => {
+  it('specialize places new spell in the old slot (Heal on W)', () => {
     const save = saveAtXp(0);
-    expect(save.actionBar[0]).toBe(RADIAL_HEAL.id);
+    expect(save.actionBar[1]).toBe(RADIAL_HEAL.id);
     applyRadialPurchase(save, 'heal-s1', 'a');
-    expect(save.actionBar[0]).toBe('zealous-heal');
+    expect(save.actionBar[1]).toBe('zealous-heal');
   });
 
   it('after specializing heal-s1-zealous, cannot also buy heal-s1-solemn', () => {

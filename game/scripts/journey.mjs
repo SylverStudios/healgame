@@ -652,7 +652,7 @@ try {
     tutorialDone: true,
     xp: 10,  // level 2 → 2 talent points (buy Mend + heal-s1 specialization)
     unlockedSpells: ['heal', 'bonk'],
-    actionBar: ['heal', 'bonk', '', ''],
+    actionBar: ['bonk', 'heal', '', ''],
     treeRanks: { heal: 1, bonk: 1 },
     subclass: null,
     clearedDungeons: [],
