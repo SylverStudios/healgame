@@ -66,6 +66,8 @@ export function makeBalanceSave(overrides: Partial<SaveData>): SaveData {
     combatPaceTenths: 10,
     relicIds: [],
     pendingRelicOffers: [],
+    upgradePoints: 0,
+    spellChips: {},
     musicVolumePct: 50,
     recentRuns: [],
     ...overrides,

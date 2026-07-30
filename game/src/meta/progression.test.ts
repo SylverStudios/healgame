@@ -14,7 +14,13 @@ import {
   type HubCombatSceneData,
 } from './progression';
 import { newSaveData, type SaveData } from '../save/save';
-import { LEVEL_MANA, levelForXp, SPELLS, XP_LEVEL_2_THRESHOLD, xpForLevel } from '../data/constants';
+import {
+  LEVEL_MANA,
+  levelForXp,
+  SPELLS,
+  XP_LEVEL_2_THRESHOLD,
+  xpForLevel,
+} from '../data/constants';
 import { IRON_PASS, THE_MAW } from '../data/encounters';
 import type { CombatResult } from '../scenes/CombatScene';
 
@@ -126,6 +132,107 @@ describe('applyCombatResult', () => {
     applyCombatResult(s, result({ status: 'wipe' }), () => 0);
     expect(s.pendingRelicOffers).toEqual([]);
     expect(s.clearedDungeons).toEqual([]);
+  });
+
+  it('cards first-clear grants upgrade point and skips relic offers', () => {
+    const s = save({ progressionMode: 'cards', upgradePoints: 0 });
+    const notices = applyCombatResult(s, result({ status: 'victory' }), () => 0);
+    expect(s.clearedDungeons).toEqual(['ash-gate']);
+    expect(s.pendingRelicOffers).toEqual([]);
+    expect(s.upgradePoints).toBe(1);
+    expect(notices).toEqual([
+      { kind: 'firstClear', text: 'FIRST CLEAR — +1 Upgrade Point · open Spells' },
+    ]);
+  });
+
+  it('cards level 2 grants Mend + upgrade point (not lattice Zealous Mending)', () => {
+    const s = save({
+      progressionMode: 'cards',
+      xp: XP_LEVEL_2_THRESHOLD - 1,
+      unlockedSpells: ['heal', 'bonk'],
+      actionBar: ['heal', 'bonk', '', ''],
+      upgradePoints: 0,
+    });
+    const notices = applyCombatResult(s, result({ xp: 1 }));
+    expect(s.upgradePoints).toBe(1);
+    expect(s.unlockedSpells).toContain('mend');
+    expect(s.actionBar).toContain('mend');
+    expect(s.unlockedSpells).not.toContain(SPELLS.zealousMending.id);
+    expect(notices).toEqual([
+      { kind: 'levelUp', text: 'Welcome to level 2' },
+      { kind: 'spellLearned', text: 'Mend learned!' },
+    ]);
+  });
+
+  it('cards level 5 grants Vowstrike beside Bonk', () => {
+    const s = save({
+      progressionMode: 'cards',
+      xp: xpForLevel(5) - 1,
+      unlockedSpells: ['heal', 'bonk', 'mend'],
+      actionBar: ['heal', 'bonk', 'mend', ''],
+      upgradePoints: 2, // after lv2–3 (+1 each), skipped unlucky 4
+    });
+    const notices = applyCombatResult(s, result({ xp: 1 }));
+    expect(levelForXp(s.xp)).toBe(5);
+    expect(s.upgradePoints).toBe(3);
+    expect(s.unlockedSpells).toContain('vowstrike');
+    expect(s.unlockedSpells).toContain('bonk');
+    expect(s.actionBar).toContain('vowstrike');
+    expect(notices).toEqual([
+      { kind: 'levelUp', text: 'Welcome to level 5' },
+      { kind: 'spellLearned', text: 'Vowstrike learned!' },
+    ]);
+  });
+
+  it('cards level 4 is unlucky — welcome copy, no upgrade point', () => {
+    const s = save({
+      progressionMode: 'cards',
+      xp: xpForLevel(4) - 1,
+      unlockedSpells: ['heal', 'bonk', 'mend'],
+      actionBar: ['heal', 'bonk', 'mend', ''],
+      upgradePoints: 2,
+    });
+    const notices = applyCombatResult(s, result({ xp: 1 }));
+    expect(levelForXp(s.xp)).toBe(4);
+    expect(s.upgradePoints).toBe(2);
+    expect(notices).toEqual([{ kind: 'levelUp', text: 'Welcome to unlucky level 4' }]);
+  });
+
+  it('cards level 8 is lucky — welcome copy, +2 upgrade points + Liturgy', () => {
+    const s = save({
+      progressionMode: 'cards',
+      xp: xpForLevel(8) - 1,
+      unlockedSpells: ['heal', 'bonk', 'mend', 'vowstrike'],
+      actionBar: ['heal', 'bonk', 'mend', 'vowstrike'],
+      upgradePoints: 5,
+    });
+    const notices = applyCombatResult(s, result({ xp: 1 }));
+    expect(levelForXp(s.xp)).toBe(8);
+    expect(s.upgradePoints).toBe(7);
+    expect(buildLoadout(s).cooldowns.map((c) => c.id)).toContain('frenzied-liturgy');
+    expect(notices).toEqual([
+      { kind: 'levelUp', text: 'Welcome to lucky level 8' },
+      { kind: 'spellLearned', text: 'Frenzied Liturgy learned!' },
+    ]);
+  });
+
+  it('cards level 6 unlocks Still Waters via loadout (no unlockedSpells entry)', () => {
+    const s = save({
+      progressionMode: 'cards',
+      xp: xpForLevel(6) - 1,
+      unlockedSpells: ['heal', 'bonk', 'mend', 'vowstrike'],
+      actionBar: ['heal', 'bonk', 'mend', 'vowstrike'],
+      upgradePoints: 3,
+    });
+    const notices = applyCombatResult(s, result({ xp: 1 }));
+    expect(levelForXp(s.xp)).toBe(6);
+    expect(s.upgradePoints).toBe(4);
+    expect(s.unlockedSpells).not.toContain('still-waters');
+    expect(buildLoadout(s).cooldowns.map((c) => c.id)).toContain('still-waters');
+    expect(notices).toEqual([
+      { kind: 'levelUp', text: 'Welcome to level 6' },
+      { kind: 'spellLearned', text: 'Still Waters learned!' },
+    ]);
   });
 
   it('does not reward or record an unknown dungeon id', () => {

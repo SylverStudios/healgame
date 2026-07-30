@@ -52,6 +52,8 @@ describe('save', () => {
       combatPaceTenths: 10,
       relicIds: [],
       pendingRelicOffers: [],
+      upgradePoints: 0,
+      spellChips: {},
       musicVolumePct: 50,
       recentRuns: [],
     });
@@ -65,6 +67,20 @@ describe('save', () => {
     expect(save.unlockedSpells).toEqual([RADIAL_HEAL.id, RADIAL_BONK.id]);
     expect(save.actionBar).toEqual([RADIAL_BONK.id, RADIAL_HEAL.id, '', '']);
     expect(save.treeRanks).toEqual({ heal: 1, bonk: 1 });
+    expect(save.upgradePoints).toBe(0);
+    expect(save.spellChips).toEqual({});
+  });
+
+  it('cards newSaveData starts Heal+Bonk with 0 upgrade points', () => {
+    const save = newSaveData('cards');
+    expect(save.progressionMode).toBe('cards');
+    expect(save.unlockedSpells).toEqual([RADIAL_HEAL.id, RADIAL_BONK.id]);
+    expect(save.actionBar).toEqual([RADIAL_BONK.id, RADIAL_HEAL.id, '', '']);
+    expect(save.treeRanks).toEqual({});
+    expect(save.upgradePoints).toBe(0);
+    expect(save.spellChips).toEqual({});
+    expect(save.relicIds).toEqual([]);
+    expect(save.pendingRelicOffers).toEqual([]);
   });
 
   it('round-trips a full save', () => {
@@ -82,6 +98,8 @@ describe('save', () => {
       combatPaceTenths: 15,
       relicIds: ['ember-ledger', 'triage-bell'],
       pendingRelicOffers: ['still-reservoir', 'vital-ember', 'bastion-plate'],
+      upgradePoints: 0,
+      spellChips: {},
       musicVolumePct: 30,
       recentRuns: [
         {
@@ -124,6 +142,11 @@ describe('save', () => {
     expect(radial.progressionMode).toBe('radial');
     expect(loadSave(store).progressionMode).toBe('radial');
     expect(loadSave(store).unlockedSpells).toContain(RADIAL_HEAL.id);
+
+    const cards = resetSaveToMode('cards', store);
+    expect(cards.progressionMode).toBe('cards');
+    expect(cards.upgradePoints).toBe(0);
+    expect(loadSave(store).progressionMode).toBe('cards');
   });
 
   it('discards unrecognized payloads', () => {

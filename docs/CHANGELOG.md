@@ -7,6 +7,26 @@ Newest first. Numbers and rule detail live in `game/src/data/` and
 
 ---
 
+## 2026-07-30 — PoC: Spell-card upgrade mode (dual-ship)
+
+Third progression mode beside lattice + radial for friend A/B testing.
+
+- **Save v10** — `progressionMode: 'cards'`; `upgradePoints` + `spellChips` on
+  all modes; purges v9+.
+- **Settings** — Classic | Radial | **Spell cards**; confirm → wipe → Tutorial.
+- **Cards loop** — free level unlocks (Heal/Bonk → Mend at Lv2 with first
+  upgrade point → Vowstrike → 3 major CDs); spend points on **fixed 3-way
+  chip sets** per slot (no RNG); resolve into existing `CombatMods` hooks
+  via `loadoutFromCardSave`. Level 1 starts with 0 points.
+- **No relics** in cards — first-clear grants +1 upgrade point; Hub single
+  **Spells** entry (`hubTree` → `CardAlbumScene`).
+- **Journey** — Stage Cards: Settings → album chip draft → Ash Gate.
+
+Handoff (until closeout): [`spell-cards-poc-handoff.md`](./spell-cards-poc-handoff.md).
+Feel reference: [`relic-revamp-brainstorm.md`](./relic-revamp-brainstorm.md).
+
+---
+
 ## 2026-07-30 — Ash husk tight 32×32 + healer density exemplar
 
 - **Density law** — armored-paladin healer pinned as the exemplar in

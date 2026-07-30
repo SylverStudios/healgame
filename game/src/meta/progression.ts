@@ -3,15 +3,19 @@
  * no Phaser. Scenes call these functions and immediately persist the mutated
  * SaveData via saveGame(); this module never touches storage itself.
  *
- * Combat loadouts are resolved by `loadoutForSave` (lattice or radial).
+ * Combat loadouts are resolved by `loadoutForSave` (lattice, radial, or cards).
  * `buildLoadout` is a thin alias kept for existing call sites/tests.
  */
 
+import { applyCardsLevelUps } from '../data/cards/resolve';
+import { CARD_UNLOCKS, cardsLevelUpWelcome } from '../data/cards/unlocks';
 import { levelForXp, SPELLS } from '../data/constants';
+import { cooldownById } from '../data/cooldowns';
 import { getDungeonById, isDungeonIdUnlocked, ORDERED_DUNGEONS } from '../data/dungeons';
 import { chooseRelicOffers } from '../data/relics';
 import { loadoutForSave } from '../data/loadout';
 import { treeStateFromRadialSave } from '../data/radial/resolve';
+import { radialSpellById } from '../data/radial/spells';
 import type { CombatMods } from '../data/talentTree';
 import { placeOnActionBar, type SaveData } from '../save/save';
 import type { CombatResult } from '../scenes/CombatScene';
@@ -45,13 +49,39 @@ export function applyCombatResult(
   const levelAfter = levelForXp(save.xp);
 
   if (levelAfter > levelBefore) {
-    notices.push({
-      kind: 'levelUp',
-      text: `LEVEL ${levelAfter} — +${levelAfter - levelBefore} Talent Point${levelAfter - levelBefore === 1 ? '' : 's'}`,
-    });
+    const points = levelAfter - levelBefore;
+    if (save.progressionMode === 'cards') {
+      // applyCardsLevelUps owns upgrade-point banking + free unlock grants.
+      applyCardsLevelUps(save, levelBefore, levelAfter);
+      // Upgrade-point count is shown on the Spells CTA — keep the ribbon short.
+      notices.push({
+        kind: 'levelUp',
+        text: cardsLevelUpWelcome(levelAfter),
+      });
+      for (let level = levelBefore + 1; level <= levelAfter; level++) {
+        for (const unlock of CARD_UNLOCKS) {
+          if (unlock.minLevel !== level) continue;
+          const name =
+            unlock.kind === 'spell'
+              ? radialSpellById(unlock.id)?.name
+              : cooldownById(unlock.id)?.name;
+          if (name === undefined) continue;
+          notices.push({
+            kind: 'spellLearned',
+            text: `${name} learned!`,
+          });
+        }
+      }
+    } else {
+      notices.push({
+        kind: 'levelUp',
+        text: `LEVEL ${levelAfter} — +${points} Talent Point${points === 1 ? '' : 's'}`,
+      });
+    }
   }
 
-  // Lattice milestone only — radial unlocks come from the wheel.
+  // Lattice milestone only — radial unlocks come from the wheel; cards from
+  // the unlock table (Chunk 1).
   if (
     save.progressionMode === 'lattice' &&
     levelAfter >= 2 &&
@@ -72,11 +102,21 @@ export function applyCombatResult(
     !save.clearedDungeons.includes(dungeon.id)
   ) {
     save.clearedDungeons.push(dungeon.id);
-    save.pendingRelicOffers = chooseRelicOffers(save.relicIds, random);
-    notices.push({
-      kind: 'firstClear',
-      text: save.pendingRelicOffers.length > 0 ? 'FIRST CLEAR — CHOOSE A RELIC' : 'FIRST CLEAR!',
-    });
+    if (save.progressionMode === 'cards') {
+      // Relics fully replaced — first-clear grants a bonus upgrade point.
+      save.pendingRelicOffers = [];
+      save.upgradePoints += 1;
+      notices.push({
+        kind: 'firstClear',
+        text: 'FIRST CLEAR — +1 Upgrade Point · open Spells',
+      });
+    } else {
+      save.pendingRelicOffers = chooseRelicOffers(save.relicIds, random);
+      notices.push({
+        kind: 'firstClear',
+        text: save.pendingRelicOffers.length > 0 ? 'FIRST CLEAR — CHOOSE A RELIC' : 'FIRST CLEAR!',
+      });
+    }
   }
 
   return notices;
@@ -131,17 +171,21 @@ export function availableTalentPoints(save: Pick<SaveData, 'xp' | 'treeRanks'>):
 }
 
 /**
- * Hub Talent Tree CTA unspent count — mode-aware.
+ * Hub Talent Tree / Spells CTA unspent count — mode-aware.
  *
  * Lattice: same as {@link availableTalentPoints} (level − sum of treeRanks).
  * Radial: free starter spots (`heal`/`bonk`) do not consume points; matches the
  * talent wallet from {@link treeStateFromRadialSave}.
+ * Cards: unspent {@link SaveData.upgradePoints}.
  */
 export function unspentTalentPointsForHub(
-  save: Pick<SaveData, 'xp' | 'treeRanks' | 'progressionMode'>,
+  save: Pick<SaveData, 'xp' | 'treeRanks' | 'progressionMode' | 'upgradePoints'>,
 ): number {
   if (save.progressionMode === 'radial') {
     return walletOf(treeStateFromRadialSave(save.treeRanks, save.xp)).talent ?? 0;
+  }
+  if (save.progressionMode === 'cards') {
+    return Math.max(0, Math.floor(save.upgradePoints));
   }
   return availableTalentPoints(save);
 }

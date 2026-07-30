@@ -19,4 +19,12 @@ describe('loadoutForSave facade', () => {
     expect(mods.spells.map((s) => s.id)).toEqual([RADIAL_BONK.id, RADIAL_HEAL.id]);
     expect(ownedSpellsForSave(save).map((s) => s.name)).toEqual(['Heal', 'Bonk']);
   });
+
+  it('cards path returns Bonk + Heal starters (Bonk on Q)', () => {
+    const save = newSaveData('cards');
+    const mods = loadoutForSave(save);
+    expect(mods.spells.map((s) => s.id)).toEqual([RADIAL_BONK.id, RADIAL_HEAL.id]);
+    expect(ownedSpellsForSave(save).map((s) => s.name)).toEqual(['Heal', 'Bonk']);
+    expect(mods.cooldowns).toEqual([]);
+  });
 });

@@ -1,10 +1,11 @@
 /**
- * Hub: shows XP/level/talent progress, applies the combat result that just
- * ended, applies pending first-clear relic offers, and launches unlocked
- * dungeons from a vertical challenge list (current uncleared dungeon marked
- * CURRENT). Talent Tree / Spellbook sit above the dungeon stack. Run mods
- * (oath + relics) live in the shared top-left RunModsBar. Temp art only —
- * panels + text buttons, dark palette, pixel font (ui/theme.ts).
+ * Hub: shows XP/level/talent (or upgrade-point) progress, applies the combat
+ * result that just ended, routes pending first-clear relic offers (lattice /
+ * radial only — cards never opens RelicScene), and launches unlocked dungeons
+ * from a vertical challenge list (current uncleared dungeon marked CURRENT).
+ * Meta row: Talent Tree + Spellbook, or a single Spells button in cards mode.
+ * Run mods (oath + relics) live in the shared top-left RunModsBar. Temp art
+ * only — panels + text buttons, dark palette, pixel font (ui/theme.ts).
  */
 
 import Phaser from 'phaser';
@@ -126,7 +127,9 @@ export class HubScene extends Phaser.Scene {
       saveGame(save);
     }
 
-    if (save.pendingRelicOffers.length > 0) {
+    // Cards mode never drafts relics (pending stays empty); still skip Relic
+    // if a stale payload somehow arrives so cards Hub always renders.
+    if (save.progressionMode !== 'cards' && save.pendingRelicOffers.length > 0) {
       fadeToScene(this, SceneKeys.Relic);
       return;
     }
@@ -186,15 +189,25 @@ export class HubScene extends Phaser.Scene {
   private buildStats(save: SaveData): void {
     const { width } = this.scale;
     const level = levelForXp(save.xp);
+    const cards = save.progressionMode === 'cards';
     const hasZealous = save.unlockedSpells.includes(SPELLS.zealousMending.id);
     const nextLevelXp = xpForLevel(level + 1);
-    const xpLine = `XP ${save.xp}/${nextLevelXp} → Level ${level + 1}${hasZealous ? '' : ` + ${SPELLS.zealousMending.name}`}`;
+    // Lattice-only tease — radial/cards unlock elsewhere.
+    const mendTease =
+      save.progressionMode === 'lattice' && !hasZealous
+        ? ` + ${SPELLS.zealousMending.name}`
+        : '';
+    // Cards: level + XP only — upgrade cues live on the Spells button / notices.
+    const levelLine = `Level ${level}`;
+    const xpLine = cards
+      ? `XP ${save.xp}/${nextLevelXp}`
+      : `XP ${save.xp}/${nextLevelXp} → Level ${level + 1}${mendTease}`;
 
     // Chunk 4: hub stats block gets a light frame (bible item 4 "hub stats
     // block if it helps") — sized around the two text lines below.
     addPanel(this, width / 2, 94, 560, 56, { size: 'sm' });
     this.add
-      .text(width / 2, 82, `Level ${level}`, {
+      .text(width / 2, 82, levelLine, {
         fontFamily: FONT,
         fontSize: FONT_SIZE_SM,
         color: TEXT_COLOR,
@@ -204,7 +217,7 @@ export class HubScene extends Phaser.Scene {
       .text(width / 2, 106, xpLine, {
         fontFamily: FONT,
         fontSize: FONT_SIZE_SM,
-        color: hasZealous ? DIM_COLOR : ACCENT_COLOR,
+        color: save.progressionMode === 'lattice' && !hasZealous ? ACCENT_COLOR : DIM_COLOR,
       })
       .setOrigin(0.5);
   }
@@ -237,11 +250,16 @@ export class HubScene extends Phaser.Scene {
 
     // Meta destinations stay above the dungeon stack so a long unlock list
     // never pushes Talent Tree / Spellbook off the 540px canvas.
+    const cards = save.progressionMode === 'cards';
     const unspent = unspentTalentPointsForHub(save);
     const treeHighlight = unspent > 0
       ? { frameState: 'current' as FrameState, labelColor: ACCENT_COLOR, fillColor: BUTTON_CURRENT_COLOR }
       : undefined;
     const openTree = (): void => {
+      if (save.progressionMode === 'cards') {
+        fadeToScene(this, SceneKeys.CardAlbum);
+        return;
+      }
       const treeKey =
         save.progressionMode === 'radial' ? SceneKeys.RadialTree : SceneKeys.Tree;
       fadeToScene(this, treeKey);
@@ -249,15 +267,24 @@ export class HubScene extends Phaser.Scene {
     const openLoadout = (): void => {
       fadeToScene(this, SceneKeys.Loadout);
     };
-    this.makeButton(centerX - 160, metaButtonY, 280, META_BUTTON_H,
-      unspent > 0 ? `Talent Tree  •  ${unspent}` : 'Talent Tree',
-      openTree,
-      'hubTree',
-      { ...treeHighlight, keycap: 'T' },
-    );
-    this.makeButton(centerX + 160, metaButtonY, 280, META_BUTTON_H, 'Spellbook', openLoadout, 'hubLoadout', {
-      keycap: 'S',
+    const treeLabel = cards
+      ? unspent > 0
+        ? `Spells  •  ${unspent}`
+        : 'Spells'
+      : unspent > 0
+        ? `Talent Tree  •  ${unspent}`
+        : 'Talent Tree';
+    // Cards mode: single Spells entry (hubTree → album); hide Spellbook.
+    const treeX = cards ? centerX : centerX - 160;
+    this.makeButton(treeX, metaButtonY, 280, META_BUTTON_H, treeLabel, openTree, 'hubTree', {
+      ...treeHighlight,
+      keycap: 'T',
     });
+    if (!cards) {
+      this.makeButton(centerX + 160, metaButtonY, 280, META_BUTTON_H, 'Spellbook', openLoadout, 'hubLoadout', {
+        keycap: 'S',
+      });
+    }
     // v0.3 chunk H: small Settings entry — sits in the unused margin to the
     // right of the meta-button row (right edge of Spellbook is centerX+300,
     // well clear of the canvas edge at 960) so it never competes with the
@@ -266,7 +293,7 @@ export class HubScene extends Phaser.Scene {
       fadeToScene(this, SceneKeys.Settings);
     }, 'hubSettings');
 
-    // T = Talent Tree, S = Spellbook — blocked while wipe-confirm is active.
+    // T = Talent Tree / Spells, S = Spellbook — blocked while wipe-confirm is active.
     const keyboard = this.input.keyboard;
     if (keyboard) {
       keyboard.on('keydown-T', (event: KeyboardEvent) => {
@@ -274,11 +301,13 @@ export class HubScene extends Phaser.Scene {
         event.preventDefault();
         openTree();
       });
-      keyboard.on('keydown-S', (event: KeyboardEvent) => {
-        if (this.restartPhase !== 'idle') return;
-        event.preventDefault();
-        openLoadout();
-      });
+      if (!cards) {
+        keyboard.on('keydown-S', (event: KeyboardEvent) => {
+          if (this.restartPhase !== 'idle') return;
+          event.preventDefault();
+          openLoadout();
+        });
+      }
     }
 
     const dungeonStartY = metaButtonY + 52;

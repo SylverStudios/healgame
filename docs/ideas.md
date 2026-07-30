@@ -1,6 +1,6 @@
 # Idea backlog
 
-Status: current · Authority: none — uncommitted ideas for future exploration · Last verified: 2026-07-29
+Status: current · Authority: none — uncommitted ideas for future exploration · Last verified: 2026-07-30
 
 These are prompts to revisit, not approved scope or implementation requirements.
 Living specs and active phase handoffs take precedence. This file is **not** a
@@ -28,6 +28,11 @@ Living specs and active phase handoffs take precedence. This file is **not** a
 - Tree felt linear after the first real choice; more meaningful forks.
 - Class / multi-tree system later; make the current tree fun first.
 - Need a system that improves DPS meaningfully.
+- Spell-card upgrade mode (replace relics; dual-ship PoC): brainstorm
+  [`spell-card-upgrades-brainstorm.md`](spell-card-upgrades-brainstorm.md),
+  feel bible [`relic-revamp-brainstorm.md`](relic-revamp-brainstorm.md),
+  handoff [`spell-cards-poc-handoff.md`](spell-cards-poc-handoff.md),
+  agent prompt [`spell-cards-poc-agent-prompt.md`](spell-cards-poc-agent-prompt.md).
 
 ## Dungeon structure and combat
 
@@ -52,6 +57,8 @@ Living specs and active phase handoffs take precedence. This file is **not** a
 - Talent tree readability (icons + hover already partly shipped; keep iterating).
 - Wave 5 radial redesign spike (ability spokes + A/B specialize, parallel to
   lattice): [`docs/radial-tree-design.md`](radial-tree-design.md).
+- Spell-card Cost/Power/Speed + chip upgrades (same PoC as Progression):
+  [`spell-cards-poc-handoff.md`](spell-cards-poc-handoff.md).
 
 ## Release process
 
