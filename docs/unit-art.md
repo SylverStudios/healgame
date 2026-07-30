@@ -1,27 +1,29 @@
 # Unit art — Kenney Tiny Dungeon + custom stills
 
-Status: current · Authority: combat unit tile mapping + relic icons · Last verified: 2026-07-19
+Status: current · Authority: combat unit tile mapping + relic icons · Last verified: 2026-07-30
 
 Chunk 1B: healer combat facing is now **south** (camera), with a breathing
 idle loop and a Bonk-only zap strip — see "Current casting" and "Healer
 sheet" below.
 
 Style law (density, canvas tiers, palette, timing): [`art/STYLE.md`](../art/STYLE.md).
-Unit registry + audit: [`art/manifest.json`](../art/manifest.json) via
-`npm run art -- audit`. Generation workflow:
-`.claude/skills/pixellab-art-pipeline/SKILL.md`.
+**Density exemplar:** armored-paladin healer (`art/source/armored-paladin/`,
+live `game/public/assets/units/healer/` — native 32×32, display 64). New
+units/VFX/icons must match that grain. Unit registry + audit:
+[`art/manifest.json`](../art/manifest.json) via `npm run art -- audit`.
+Generation workflow: `.claude/skills/pixellab-art-pipeline/SKILL.md`.
 
 Combat units render from two presentation paths (see `game/src/ui/sprites.ts`
 `presentationForUnit`):
 
 1. **Kenney Tiny Dungeon** (default) — 16×16 tiles from the packed sheet
-2. **Custom textures** — PixelLab party mercs / ash-husk stills (+ attack
+2. **Custom textures** — PixelLab party mercs / trash stills (+ attack
    strips), or the 32×32 armored-paladin healer sheet (cast poses)
 
-**Target density:** party characters and trash aim for **native 32×32** (chunky
-SNES/GBA read). Bosses can share that pixel density at a larger canvas later.
-All three party mercs (tank, dps1, dps2) are now tight 32×32; ash-husk is the
-last legacy ~92×92 padded canvas still queued for replacement.
+**Target density:** party characters and trash aim for **native 32×32** at
+healer grain (chunky SNES/GBA read). Bosses can share that pixel density at a
+larger canvas. All three party mercs (tank, dps1, dps2) and ash-husk trash are tight 32×32
+at healer grain.
 
 Relic pick / run-mod icons use hand-authored 32×32 stills (`ui/relicSprites.ts`).
 Everything else in the game stays temp art per CLAUDE.md.
@@ -55,8 +57,9 @@ Everything else in the game stays temp art per CLAUDE.md.
   `DPS2_ATTACK_FRAME_DURATIONS_MS`, `DPS2_HURT_FRAME_DURATIONS_MS`
   (`sprites.ts`). Authoring cache: `artifacts/pixellab-dps2-v2/` (source
   still also in `art/source/dps2/`).
-- `game/public/assets/units/ash-husk/` — PixelLab ash husk (`west.png` +
-  idle frames for a later pass). Authoring cache: `artifacts/pixellab-ash-husk/`.
+- `game/public/assets/units/ash-husk/` — tight 32×32 ash husk (`west.png`).
+  Source + saved prompt: `art/source/ash-husk/`. Authoring cache:
+  `artifacts/pixellab-ash-husk-v2/`. Attack/hurt strips queued.
 - `game/public/assets/relics/<id>.png` — hand-authored FE GBA inventory icons
   (32×32 native, 64×64 nearest in game; General-sheet metal language). Cache:
   `artifacts/pixellab-relics/hand-fe-v2/`. Keys via `ui/relicSprites.ts`;
@@ -113,11 +116,11 @@ Everything else in the game stays temp art per CLAUDE.md.
   (`combatFx.showZapImpact`).
 - `pixelArt: true` in `main.ts` gives nearest-neighbor filtering game-wide.
 - Display sizes (`CombatScene.ts`): tight 32×32 party (healer, tank, dps1,
-  dps2) at **64** (2×) — no more legacy padded 112 party mercs; Kenney party
-  **48**; PixelLab trash **72**, Kenney trash **32**; bosses **80** (Kenney
-  today).
-  Padded canvases use `bodyOffsetY` so painted feet meet `GROUND_Y`. HP/mana
-  meters are capped at 72px wide so neighboring party bars don't overlap.
+  dps2) and tight trash (ash-husk) at **64** (2×); Kenney party **48**;
+  Kenney trash **32**; bosses **80** (Kenney today).
+  Tight canvases use `TIGHT_FOOT_PAD_RATIO` (2/32) so painted feet meet
+  `GROUND_Y`. HP/mana meters are capped at 72px wide so neighboring party
+  bars don't overlap.
 - Death state = dark tint + alpha + shrink (`update()` in unitSprite.ts).
 
 ## Current casting
@@ -128,7 +131,7 @@ Everything else in the game stays temp art per CLAUDE.md.
 | dps1 | tight 32 still + attack + hurt | `unit-dps1` + `unit-dps1-attack` + `unit-dps1-hurt` |
 | dps2 | tight 32 still + attack + hurt | `unit-dps2` + `unit-dps2-attack` + `unit-dps2-hurt` |
 | healer | 32×32 armored-paladin south | idle + Solemn/Zealous charge/cast + Bonk zap |
-| ash-husk | custom still | `unit-ash-husk` (west.png) |
+| ash-husk | tight 32 still (west) | `unit-ash-husk` |
 | other trash | Kenney | ghost 121 |
 | Gate Warden / Ember / Matriarch | Kenney | brute 109 |
 | Spire / Dirge / Hollow King | Kenney | demon 110 |

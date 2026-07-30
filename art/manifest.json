@@ -191,19 +191,20 @@
       "slug": "ash-husk",
       "archetype": "enemy",
       "facing": "west",
-      "nativeSize": 88,
-      "canvas": "padded-legacy",
-      "status": "legacy",
-      "pixellabCharacterId": "da0196d5-84ee-4a6c-a0a2-39bc5d4de869",
+      "nativeSize": 32,
+      "canvas": "tight",
+      "status": "live",
+      "pixellabCharacterId": "70791a0f-4676-4278-9d8b-6f513ad822e5",
       "assetsDir": "game/public/assets/units/ash-husk",
-      "sourceDir": "artifacts/pixellab-ash-husk",
+      "sourceDir": "art/source/ash-husk",
       "strips": {
         "idle-still": {
           "file": "west.png",
-          "frames": 1
+          "frames": 1,
+          "status": "live",
+          "note": "tight 32×32 west; healer density; attack/hurt queued"
         }
-      },
-      "replacePlan": "regen tight 32x32 with idle still + attack + hurt"
+      }
     },
     {
       "slug": "iron-husk",

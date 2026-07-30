@@ -18,7 +18,9 @@ step (see Handoff). Do not invent gameplay numbers.
 Authority chain:
 
 1. [`art/STYLE.md`](../../../art/STYLE.md) — density law, canvas tiers,
-   palette, timing. Read it before generating anything.
+   palette, timing. **Density exemplar = armored-paladin healer** (native
+   32×32 → display 64). Read STYLE.md before generating anything; reject
+   output that looks finer- or coarser-grained beside the healer.
 2. [`art/manifest.json`](../../../art/manifest.json) — unit registry: sizes,
    facings, PixelLab character ids, strip contracts. Update it whenever art
    ships or a character id is minted.

@@ -71,7 +71,7 @@ agents should prefer `verify`.
 | Journey names | [`docs/semantic-targets.md`](docs/semantic-targets.md) |
 | Idea backlog | [`docs/ideas.md`](docs/ideas.md) (`Status: current`, not a handoff) |
 | Research | `docs/research/` |
-| Art ops | `docs/unit-art.md` |
+| Art ops | `docs/unit-art.md` · density law + exemplar: [`art/STYLE.md`](art/STYLE.md) (armored-paladin healer) |
 | Long-term design | `docs/GDD.md` |
 | GitHub auto-merge (ops) | [`docs/github-automerge.md`](docs/github-automerge.md) — repo Allow auto-merge ≠ merge on ready; need per-PR `--auto` |
 

@@ -33,9 +33,11 @@ not meme, not pastel.
    - **Party** → east (faces right)
    - **Enemies** → west (faces left)
 4. Default size: `32` character (`view: "side"`, `mode: "v3"`). Prefer tight
-   32×32 readable figures (party + trash). Larger padded canvases (~88–92px
-   from older `size=48` gens) are legacy — do not target them for new units.
-   Bosses may use the same density on a larger canvas later.
+   32×32 readable figures (party + trash) at the **same pixel density as the
+   armored-paladin healer** (`art/STYLE.md` exemplar —
+   `art/source/armored-paladin/`, live `assets/units/healer/`). Larger padded
+   canvases (~88–92px from older gens) are legacy — do not target them for
+   new units. Bosses may use the same density on a larger canvas later.
 
 ## Prompt recipe
 

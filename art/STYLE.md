@@ -1,6 +1,6 @@
 # healgame art style bible
 
-Status: current · Authority: unit art style — density, canvas tiers, palette, timing · Last verified: 2026-07-19
+Status: current · Authority: unit art style — density, canvas tiers, palette, timing · Last verified: 2026-07-30
 
 Single source of truth for how every combat sprite must look. Generation
 workflow lives in `.claude/skills/pixellab-art-pipeline/SKILL.md`; the unit
@@ -14,23 +14,32 @@ figures; strong silhouettes; a few held key poses over many in-betweens.
 Tone: heavy-metal dark fantasy (`docs/GDD.md` §4) — grim last-stand dread,
 mythic metal album-cover menace. Not cute, not cartoonish, not pastel.
 
-The canonical exemplar is the **armored-paladin healer**
-(`art/source/armored-paladin/east.png`, live at
-`game/public/assets/units/healer/`). Every new unit must sit next to it on
-screen without looking finer- or coarser-grained.
+### Density exemplar (pin this)
+
+The **armored-paladin healer** is the ideal pixel density for its canvas
+size. Judge every new unit, VFX, relic icon, and prop by placing it beside
+the healer on screen — if it looks finer- or coarser-grained, reject it.
+
+| | Path |
+|---|---|
+| Source still | `art/source/armored-paladin/east.png` (also `south.png`) |
+| Live combat | `game/public/assets/units/healer/` (native **32×32**, display **64**) |
+| Style law | this file · skills must restate the exemplar, not invent a new one |
+
+Everything we author aims at **that same grain**. Size differences come from
+**bigger canvases at the same density**, never from finer pixels.
 
 ## Density rule (the one law)
 
 > **One art pixel = 2 screen pixels. Always.**
 
 Sprites are authored at native size and displayed at exactly 2× with
-nearest-neighbor (`pixelArt: true`). Size differences between units come from
-**bigger canvases, never finer pixels**. A 64×64 boss has the same chunky
+nearest-neighbor (`pixelArt: true`). A 64×64 boss has the same chunky
 pixel grid as the 32×32 healer — just more of it.
 
-Legacy PixelLab mercs (~92px padded canvases displayed at 112) violate this
-rule and are queued for regeneration; do not author anything new at that
-density.
+Legacy PixelLab trash (~88px padded canvases displayed undersized) and old
+padded mercs (~92px → 112) violate this rule and are queued for regeneration;
+do not author anything new at that density.
 
 ## Canvas tiers
 
