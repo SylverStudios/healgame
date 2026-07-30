@@ -76,11 +76,11 @@ export function defaultActionBar(): string[] {
   return bar;
 }
 
-/** Radial new-game bar: Heal on Q, Bonk on W. */
+/** Radial new-game bar: Bonk on Q, Heal on W. */
 export function defaultRadialActionBar(): string[] {
   const bar = emptyActionBar();
-  bar[0] = RADIAL_STARTER_HEAL_ID;
-  bar[1] = RADIAL_STARTER_BONK_ID;
+  bar[0] = RADIAL_STARTER_BONK_ID;
+  bar[1] = RADIAL_STARTER_HEAL_ID;
   return bar;
 }
 

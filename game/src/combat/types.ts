@@ -279,6 +279,12 @@ export interface CombatState {
   status: CombatStatus;
   /** Spell ids that currently have at least one armed synergy buffing them. */
   armedBuffedSpellIds: string[];
+  /**
+   * Wave 5 Battle Mend: spell ids that currently receive an armed mana-synergy
+   * discount (`manaSynergies` with `armed`). Typically Mend / specialized Mend.
+   * Cleared when the discount is spent at cast start.
+   */
+  armedManaDiscountSpellIds: string[];
   /** Alpha 0.1 §D6: live cooldown state, same order as the constructor's `cooldowns` option; empty when none. */
   cooldowns: CooldownState[];
   /** Personal spell reuse timers (Vowstrike etc.), keyed by spell id. */

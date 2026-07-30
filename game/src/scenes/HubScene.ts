@@ -11,10 +11,10 @@ import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { loadSave, pushRecentRun, resetSaveToMode, saveGame, type SaveData } from '../save/save';
 import {
-  availableTalentPoints,
   currentChallengeDungeon,
   isDungeonUnlocked,
   takeHubCombatResult,
+  unspentTalentPointsForHub,
   type HubCombatSceneData,
   type HubNotice,
 } from '../meta/progression';
@@ -31,6 +31,7 @@ import { loadTelemetry, recordReset, sendPlaytestMail } from '../telemetry';
 import { FONT, FONT_SIZE_SM, FONT_SIZE_LG, PALETTE, PALETTE_NUM } from '../ui/theme';
 import { addBanner, addButton, addPanel, type FrameState } from '../ui/panels';
 import { COMBAT_ENTRY_FADE_OUT_MS, fadeInOnCreate, fadeToScene } from '../ui/transitions';
+import { KEYCAP_FRAME_TEXTURE_KEY } from '../ui/spellSprites';
 
 type HubSceneData = HubCombatSceneData;
 
@@ -60,6 +61,19 @@ const SETTINGS_BUTTON_W = 120;
 const SETTINGS_BUTTON_H = 34;
 /** Gap between the bottom of the last notice and the top of the meta buttons. */
 const NOTICE_TO_META_GAP = 12;
+
+/** Match combat keycap language, sized for Hub meta buttons (280×34).
+ *  Inset clears the sm panel edge band (12px). Chip is larger than combat's
+ *  18×14 — Hub buttons have room, and a single letter must read clearly. */
+const KEYCAP_WIDTH = 28;
+const KEYCAP_HEIGHT = 20;
+const KEYCAP_BG = 0x1a1210;
+const KEYCAP_BORDER = 0xc4b49a;
+/** Past sm panel left edge (12px) + rivet corner so the chip sits in the fill. */
+const KEYCAP_INSET = 22;
+const KEYCAP_DEPTH = 5;
+/** Combat hotkey ink — same as spellBar HOTKEY_COLOR. */
+const KEYCAP_LETTER_COLOR = '#e8d8c8';
 
 export class HubScene extends Phaser.Scene {
   private sceneData: HubSceneData = {};
@@ -223,23 +237,27 @@ export class HubScene extends Phaser.Scene {
 
     // Meta destinations stay above the dungeon stack so a long unlock list
     // never pushes Talent Tree / Spellbook off the 540px canvas.
-    const unspent = availableTalentPoints(save);
+    const unspent = unspentTalentPointsForHub(save);
     const treeHighlight = unspent > 0
       ? { frameState: 'current' as FrameState, labelColor: ACCENT_COLOR, fillColor: BUTTON_CURRENT_COLOR }
       : undefined;
+    const openTree = (): void => {
+      const treeKey =
+        save.progressionMode === 'radial' ? SceneKeys.RadialTree : SceneKeys.Tree;
+      fadeToScene(this, treeKey);
+    };
+    const openLoadout = (): void => {
+      fadeToScene(this, SceneKeys.Loadout);
+    };
     this.makeButton(centerX - 160, metaButtonY, 280, META_BUTTON_H,
       unspent > 0 ? `Talent Tree  •  ${unspent}` : 'Talent Tree',
-      () => {
-        const treeKey =
-          save.progressionMode === 'radial' ? SceneKeys.RadialTree : SceneKeys.Tree;
-        fadeToScene(this, treeKey);
-      },
+      openTree,
       'hubTree',
-      treeHighlight,
+      { ...treeHighlight, keycap: 'T' },
     );
-    this.makeButton(centerX + 160, metaButtonY, 280, META_BUTTON_H, 'Spellbook', () => {
-      fadeToScene(this, SceneKeys.Loadout);
-    }, 'hubLoadout');
+    this.makeButton(centerX + 160, metaButtonY, 280, META_BUTTON_H, 'Spellbook', openLoadout, 'hubLoadout', {
+      keycap: 'S',
+    });
     // v0.3 chunk H: small Settings entry — sits in the unused margin to the
     // right of the meta-button row (right edge of Spellbook is centerX+300,
     // well clear of the canvas edge at 960) so it never competes with the
@@ -247,6 +265,21 @@ export class HubScene extends Phaser.Scene {
     this.makeButton(width - 16 - SETTINGS_BUTTON_W / 2, metaButtonY, SETTINGS_BUTTON_W, SETTINGS_BUTTON_H, 'Settings', () => {
       fadeToScene(this, SceneKeys.Settings);
     }, 'hubSettings');
+
+    // T = Talent Tree, S = Spellbook — blocked while wipe-confirm is active.
+    const keyboard = this.input.keyboard;
+    if (keyboard) {
+      keyboard.on('keydown-T', (event: KeyboardEvent) => {
+        if (this.restartPhase !== 'idle') return;
+        event.preventDefault();
+        openTree();
+      });
+      keyboard.on('keydown-S', (event: KeyboardEvent) => {
+        if (this.restartPhase !== 'idle') return;
+        event.preventDefault();
+        openLoadout();
+      });
+    }
 
     const dungeonStartY = metaButtonY + 52;
     unlockedDungeons.forEach((dungeon, visibleIndex) => {
@@ -480,7 +513,12 @@ export class HubScene extends Phaser.Scene {
     label: string,
     onClick: () => void,
     name: string,
-    opts: { frameState?: FrameState; labelColor?: string; fillColor?: number } = {},
+    opts: {
+      frameState?: FrameState;
+      labelColor?: string;
+      fillColor?: number;
+      keycap?: string;
+    } = {},
   ): void {
     const rect = this.add
       .rectangle(x, y, w, h, BUTTON_COLOR)
@@ -492,15 +530,53 @@ export class HubScene extends Phaser.Scene {
       state: opts.frameState ?? 'normal',
       hitRect: rect,
     });
+    const labelPad = opts.keycap ? KEYCAP_INSET + KEYCAP_WIDTH + 8 : 24;
     this.add
       .text(x, y, label, {
         fontFamily: FONT,
         fontSize: FONT_SIZE_SM,
         color: opts.labelColor ?? TEXT_COLOR,
-        wordWrap: { width: w - 24 },
+        wordWrap: { width: w - labelPad },
         align: 'center',
       })
       .setOrigin(0.5);
+    if (opts.keycap) {
+      const keycapX = x - w / 2 + KEYCAP_INSET + KEYCAP_WIDTH / 2;
+      addHubKeycap(this, keycapX, y).setDepth(KEYCAP_DEPTH);
+      // Monospace: HealgameIron at this size muddies single glyphs (S reads as noise).
+      this.add
+        .text(keycapX, y, opts.keycap, {
+          fontFamily: 'monospace',
+          fontSize: FONT_SIZE_SM,
+          color: KEYCAP_LETTER_COLOR,
+          fontStyle: 'bold',
+        })
+        .setOrigin(0.5)
+        .setDepth(KEYCAP_DEPTH + 1);
+    }
     rect.on('pointerdown', onClick);
   }
+}
+
+/**
+ * Hub keycap chip — solid rect + stroke always (readable on panel chrome).
+ * Overlays the combat keycap-frame art when Boot loaded it, same vocabulary
+ * as spellBar, but the rect guarantees contrast Hub panels otherwise eat.
+ */
+function addHubKeycap(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+): Phaser.GameObjects.Rectangle {
+  const chip = scene.add
+    .rectangle(x, y, KEYCAP_WIDTH, KEYCAP_HEIGHT, KEYCAP_BG)
+    .setStrokeStyle(2, KEYCAP_BORDER);
+  if (scene.textures.exists(KEYCAP_FRAME_TEXTURE_KEY)) {
+    scene.add
+      .image(x, y, KEYCAP_FRAME_TEXTURE_KEY)
+      .setOrigin(0.5)
+      .setDisplaySize(KEYCAP_WIDTH, KEYCAP_HEIGHT)
+      .setDepth(KEYCAP_DEPTH);
+  }
+  return chip;
 }

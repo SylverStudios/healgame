@@ -145,7 +145,25 @@ async function seedSave(page, save) {
     [SAVE_KEY, JSON.stringify(save)],
   );
   await page.reload({ waitUntil: 'load' });
-  await page.waitForTimeout(800);
+  // Boot routes to Tutorial, Relic, or Hub. A fixed 800ms sleep flakes on CI
+  // (Wave 5/5b: Stage M tutorialLearn + Stage C dungeon buttons missing while
+  // Hub/Tutorial create is still in flight). Poll for a destination target.
+  const start = Date.now();
+  while (Date.now() - start < 10_000) {
+    const names = await page.evaluate(() => window.__healgame?.list() ?? []);
+    if (
+      names.includes('hubTree') ||
+      names.includes('tutorialLearn') ||
+      names.some((n) => n.startsWith('relicCard:'))
+    ) {
+      return;
+    }
+    await page.waitForTimeout(50);
+  }
+  const visible = await page.evaluate(() => window.__healgame?.list() ?? []);
+  throw new Error(
+    `seedSave: boot never exposed hubTree/tutorialLearn/relicCard; visible: ${visible.join(', ')}`,
+  );
 }
 
 function baseSave(overrides) {
@@ -313,6 +331,7 @@ try {
   });
   save = await readSave(page);
   check(save === null, 'stale save payload was deleted instead of migrated');
+  // seedSave already waited for tutorialLearn (or hub/relic); re-assert presence.
   check((await locate(page, 'tutorialLearn')) !== null, 'stale save returns to the fresh tutorial');
   await shot(page, 'tutorial-after-stale-save-wipe');
 
@@ -357,6 +376,7 @@ try {
   // ---- Stage D2: Ash Gate clear unlocks Iron Pass (not yet Cinder Vault / Maw) --------
   console.log('Stage D2: Ash-Gate-cleared save → Iron Pass unlocked on hub, later dungeons still gated');
   await seedSave(page, baseSave({ clearedDungeons: ['ash-gate'] }));
+  await waitForNamed(page, 'hubDungeon:iron-pass');
   await shot(page, 'hub-iron-pass-unlocked'); // visual: Iron Pass button present, no Maw button below it
 
   // Later dungeon buttons must not exist yet — locate is null (not an inert pixel click).
@@ -567,6 +587,7 @@ try {
   // ---- Stage C: Maw gating — gated on Gloam Sanctum, still unwinnable -----
   console.log('Stage C: Maw gating — absent after Black Choir alone, present + unwinnable after Gloam Sanctum');
   await seedSave(page, baseSave({ clearedDungeons: ['ash-gate', 'iron-pass'] }));
+  await waitForNamed(page, 'hubDungeon:cinder-vault');
   check((await locate(page, 'hubDungeon:cinder-vault')) !== null, 'Cinder Vault present after Iron Pass clear');
   check((await locate(page, 'hubDungeon:the-maw')) === null, 'The Maw still gated after Iron Pass alone');
   await seedSave(
@@ -575,6 +596,7 @@ try {
       clearedDungeons: ['ash-gate', 'iron-pass', 'cinder-vault', 'verdant-rift', 'black-choir'],
     }),
   );
+  await waitForNamed(page, 'hubDungeon:gloam-sanctum');
   check((await locate(page, 'hubDungeon:gloam-sanctum')) !== null, 'Gloam Sanctum present after Black Choir clear');
   check((await locate(page, 'hubDungeon:the-maw')) === null, 'The Maw still gated after Black Choir alone');
   await seedSave(
@@ -593,6 +615,7 @@ try {
   save = await readSave(page);
   const xpBeforeMaw = save.xp;
   await shot(page, 'hub-maw-unlocked'); // visual: The Maw button now present
+  await waitForNamed(page, 'hubDungeon:the-maw');
   check((await locate(page, 'hubDungeon:the-maw')) !== null, 'The Maw button present after Gloam Sanctum clear');
   await clickNamed(page, 'hubDungeon:the-maw');
   await page.waitForTimeout(1000);
@@ -652,7 +675,7 @@ try {
     tutorialDone: true,
     xp: 10,  // level 2 → 2 talent points (buy Mend + heal-s1 specialization)
     unlockedSpells: ['heal', 'bonk'],
-    actionBar: ['heal', 'bonk', '', ''],
+    actionBar: ['bonk', 'heal', '', ''],
     treeRanks: { heal: 1, bonk: 1 },
     subclass: null,
     clearedDungeons: [],

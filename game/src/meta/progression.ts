@@ -11,10 +11,12 @@ import { levelForXp, SPELLS } from '../data/constants';
 import { getDungeonById, isDungeonIdUnlocked, ORDERED_DUNGEONS } from '../data/dungeons';
 import { chooseRelicOffers } from '../data/relics';
 import { loadoutForSave } from '../data/loadout';
+import { treeStateFromRadialSave } from '../data/radial/resolve';
 import type { CombatMods } from '../data/talentTree';
 import { placeOnActionBar, type SaveData } from '../save/save';
 import type { CombatResult } from '../scenes/CombatScene';
 import type { DungeonDef } from '../data/content/types';
+import { walletOf } from '../tree';
 
 export interface HubNotice {
   kind: 'levelUp' | 'spellLearned' | 'firstClear';
@@ -126,6 +128,22 @@ export function allocatedTalentPoints(save: Pick<SaveData, 'treeRanks'>): number
 
 export function availableTalentPoints(save: Pick<SaveData, 'xp' | 'treeRanks'>): number {
   return Math.max(0, levelForXp(save.xp) - allocatedTalentPoints(save));
+}
+
+/**
+ * Hub Talent Tree CTA unspent count — mode-aware.
+ *
+ * Lattice: same as {@link availableTalentPoints} (level − sum of treeRanks).
+ * Radial: free starter spots (`heal`/`bonk`) do not consume points; matches the
+ * talent wallet from {@link treeStateFromRadialSave}.
+ */
+export function unspentTalentPointsForHub(
+  save: Pick<SaveData, 'xp' | 'treeRanks' | 'progressionMode'>,
+): number {
+  if (save.progressionMode === 'radial') {
+    return walletOf(treeStateFromRadialSave(save.treeRanks, save.xp)).talent ?? 0;
+  }
+  return availableTalentPoints(save);
 }
 
 /** Generic config-driven dungeon unlock check. Unknown ids are never unlocked. */

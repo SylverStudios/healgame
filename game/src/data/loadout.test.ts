@@ -13,10 +13,10 @@ describe('loadoutForSave facade', () => {
     expect(mods.spells.map((s) => s.id)).toEqual([SPELLS.bonk.id, SPELLS.solemnMend.id]);
   });
 
-  it('radial path returns Heal + Bonk starters', () => {
+  it('radial path returns Bonk + Heal starters (Bonk on Q)', () => {
     const save = newSaveData('radial');
     const mods = loadoutForSave(save);
-    expect(mods.spells.map((s) => s.id)).toEqual([RADIAL_HEAL.id, RADIAL_BONK.id]);
+    expect(mods.spells.map((s) => s.id)).toEqual([RADIAL_BONK.id, RADIAL_HEAL.id]);
     expect(ownedSpellsForSave(save).map((s) => s.name)).toEqual(['Heal', 'Bonk']);
   });
 });
