@@ -1,6 +1,6 @@
 # CLAUDE.md — operating healgame
 
-Status: current · Authority: gates, hard rules, working style · Last verified: 2026-07-18
+Status: current · Authority: gates, hard rules, working style · Last verified: 2026-07-30
 
 healgame is a healer-focused auto-battler: Phaser 3 + TypeScript (strict) +
 Vite. The game lives in `game/`; design docs in `docs/`. Doc conventions and
@@ -137,9 +137,12 @@ game/src/
   Journey resolves via `window.__healgame.locate(name)` — layout changes must
   **not** require journey coordinate edits. Adding a new interactive control
   means naming it and clicking it by name.
-- **Save changes**: `SaveData` is versioned (`healgame-save-v9`); during
-  development, shape changes rotate the key and `loadSave` deletes stale or
-  unrecognized data instead of migrating it.
+- **Save changes**: schema integer lives in `game/src/save/save-version.json`
+  (drives `SAVE_KEY`, `SaveData.version`, and `0.<schema>.<patch>` in
+  `package.json`). Incompatible golden-fixture validation auto-bumps via
+  `scripts/bump-save-version.mjs` during local `verify` (CI fails closed —
+  run `npm run save:bump` and commit). Wipe policy unchanged: no soft
+  migration.
 
 ## Working style (user preferences)
 

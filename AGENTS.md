@@ -1,6 +1,6 @@
 # AGENTS.md — healgame documentation system
 
-Status: current · Authority: doc conventions for all agents · Last verified: 2026-07-27
+Status: current · Authority: doc conventions for all agents · Last verified: 2026-07-30
 
 
 How we keep docs trustworthy. Operating rules for the game itself live in
@@ -107,5 +107,5 @@ quality gate is `npm run verify` / `verify:fast`.
 - Run/play: `npm run dev` serves the game at http://localhost:5173 (Vite,
   viewport 960×540). New saves route through the Tutorial ("Learn Solemn Mend")
   into Ash Gate combat; returning saves boot to the Hub. Progress persists in
-  browser `localStorage` (`healgame-save-v9`) — clear it to replay the tutorial.
+  browser `localStorage` (`healgame-save-vN` from `save-version.json`) — clear it to replay the tutorial.
 - The pod runs Node 22; CI pins Node 20. Both work for this repo.

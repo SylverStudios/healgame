@@ -5,18 +5,44 @@ description: Rotate the healgame SaveData localStorage key when the save shape c
 
 # rotate-save-version
 
-`SaveData` is versioned by localStorage key (`healgame-save-vN`). Development
-policy is rotate-and-delete, never migrate.
+`SaveData` compatibility is a single integer in
+`game/src/save/save-version.json` (`schema`). That drives `SAVE_KEY`
+(`healgame-save-vN`), `SaveData.version`, and `game/package.json`
+(`0.<schema>.<patch>`). Development policy remains rotate-and-wipe — no soft
+migration.
 
-1. Bump the key in `game/src/save/save.ts` (vN → vN+1) and update the header
-   comment that documents the shape.
-2. Confirm `loadSave` deletes stale or unrecognized keys, including the one
-   you just retired.
-3. `game/scripts/journey.mjs` hardcodes `SAVE_KEY` and seeds save objects —
-   update them in the **same commit**. Known footgun: forgetting this fails
-   journey with a silently-deleted stale save, not an obvious error.
-4. Sweep: `grep -rn "healgame-save-v" game/src game/scripts` — only the new
-   version may appear.
-5. Note the rotation and its reason in `docs/poc-qa.md`.
-6. Run full `npm run verify` — journey is the only stage that exercises the
-   real save path in a browser.
+**Do not hand-edit the schema integer.** The bump script is the source of
+truth for rotation.
+
+## Flow
+
+1. Change `SaveData` / `validateSaveData` (formerly `isSaveData`) as needed.
+2. Run `npm run verify:fast` (or `npm run save:compat`) from `game/`.
+   - If the golden fixture still validates → no bump (compatible change).
+   - If incompatible → local verify runs `npm run save:bump` once, rewrites
+     the fixture from `newSaveData('lattice')`, and continues.
+3. Commit the bumped files with the breaking change:
+   - `src/save/save-version.json`
+   - `src/save/fixtures/golden-save.json`
+   - `src/save/save.ts` (`LEGACY_SAVE_KEYS` append)
+   - `package.json` / `package-lock.json` (version `0.N.0`)
+4. On CI save-compat failure: run `npm run save:bump` locally and commit
+   (CI never writes bumps — `CI=true` fails closed).
+
+## Manual bump
+
+```bash
+cd game && npm run save:bump
+```
+
+## Optional
+
+Note the rotation reason in `docs/poc-qa.md` on ship. Not required for every
+infra bump.
+
+## How to prove the loop
+
+Temporarily require a fake field in `validateSaveData`, run
+`npm run save:compat` (expect exit 2), then `npm run save:bump` (or
+`verify:fast`), confirm schema N→N+1 and fixture refresh, then **revert the
+fake validation break** before committing unless the break is intentional.

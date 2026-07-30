@@ -2,11 +2,16 @@
  * Single local save slot. This is a development build: old save keys and
  * unrecognized payloads are discarded instead of migrated.
  *
- * v9 adds `progressionMode` (`lattice` | `radial`) for Wave 5 dual-ship.
- * Prior v8/v7/v6/v5/v1 keys are purged on load — no migration.
+ * Schema integer is owned by `save-version.json` and bumped by
+ * `scripts/bump-save-version.mjs` when the golden fixture fails validation.
+ * Policy: rotate-and-wipe on incompat — no soft migration.
  */
 
 import { ACTION_BAR_SLOTS, SPELLS } from '../data/constants';
+import saveVersion from './save-version.json';
+
+/** Compatible save-shape integer — single source of truth (`save-version.json`). */
+export const SAVE_SCHEMA: number = saveVersion.schema;
 
 /** Radial starter spell ids (mirrored in `data/radial/spells.ts` — keep in sync). */
 const RADIAL_STARTER_HEAL_ID = 'heal';
@@ -37,7 +42,8 @@ export interface RunRecord {
 export const MAX_RECENT_RUNS = 5;
 
 export interface SaveData {
-  version: 9;
+  /** Must equal {@link SAVE_SCHEMA}. */
+  version: number;
   /** Lattice (classic) or radial talent progression. */
   progressionMode: ProgressionMode;
   tutorialDone: boolean;
@@ -87,7 +93,7 @@ export function defaultRadialActionBar(): string[] {
 export function newSaveData(mode: ProgressionMode = 'lattice'): SaveData {
   if (mode === 'radial') {
     return {
-      version: 9,
+      version: SAVE_SCHEMA,
       progressionMode: 'radial',
       tutorialDone: false,
       xp: 0,
@@ -104,7 +110,7 @@ export function newSaveData(mode: ProgressionMode = 'lattice'): SaveData {
     };
   }
   return {
-    version: 9,
+    version: SAVE_SCHEMA,
     progressionMode: 'lattice',
     tutorialDone: false,
     xp: 0,
@@ -121,8 +127,10 @@ export function newSaveData(mode: ProgressionMode = 'lattice'): SaveData {
   };
 }
 
-export const SAVE_KEY = 'healgame-save-v9';
-const LEGACY_SAVE_KEYS = [
+export const SAVE_KEY = `healgame-save-v${SAVE_SCHEMA}`;
+
+/** Retired localStorage keys purged on load. Bump script appends the prior key. */
+export const LEGACY_SAVE_KEYS = [
   'healgame-save-v1',
   'healgame-save-v5',
   'healgame-save-v6',
@@ -149,7 +157,7 @@ export function loadSave(store: KeyValueStore | null = defaultStore()): SaveData
   if (!raw) return newSaveData();
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (isSaveData(parsed)) return parsed;
+    if (validateSaveData(parsed)) return parsed;
     store.removeItem(SAVE_KEY);
     return newSaveData();
   } catch {
@@ -208,10 +216,11 @@ function hasBaseShape(v: Record<string, unknown>): boolean {
   );
 }
 
-function isSaveData(value: unknown): value is SaveData {
+/** Same validation `loadSave` uses — exported for golden-fixture / save-compat. */
+export function validateSaveData(value: unknown): value is SaveData {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
-  if (v.version !== 9 || !hasBaseShape(v)) return false;
+  if (v.version !== SAVE_SCHEMA || !hasBaseShape(v)) return false;
   if (v.progressionMode !== 'lattice' && v.progressionMode !== 'radial') return false;
   const ranks = v.treeRanks;
   if (typeof ranks !== 'object' || ranks === null || Array.isArray(ranks)) return false;

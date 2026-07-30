@@ -1,16 +1,21 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  LEGACY_SAVE_KEYS,
   loadSave,
   newSaveData,
   resetSave,
   resetSaveToMode,
   SAVE_KEY,
+  SAVE_SCHEMA,
   saveGame,
+  validateSaveData,
   type KeyValueStore,
   type SaveData,
 } from './save';
 import { SPELLS } from '../data/constants';
 import { RADIAL_BONK, RADIAL_HEAL } from '../data/radial/spells';
+import saveVersion from './save-version.json';
 
 function memoryStore(): KeyValueStore {
   const map = new Map<string, string>();
@@ -26,11 +31,16 @@ function storePayload(store: KeyValueStore, payload: Record<string, unknown>): v
 }
 
 describe('save', () => {
-  it('returns a fresh v9 lattice save when nothing is stored', () => {
+  it('SAVE_KEY and SAVE_SCHEMA derive from save-version.json', () => {
+    expect(SAVE_SCHEMA).toBe(saveVersion.schema);
+    expect(SAVE_KEY).toBe(`healgame-save-v${SAVE_SCHEMA}`);
+  });
+
+  it('returns a fresh lattice save when nothing is stored', () => {
     const save = loadSave(memoryStore());
     expect(save).toEqual(newSaveData());
     expect(save).toEqual({
-      version: 9,
+      version: SAVE_SCHEMA,
       progressionMode: 'lattice',
       tutorialDone: false,
       xp: 0,
@@ -57,10 +67,10 @@ describe('save', () => {
     expect(save.treeRanks).toEqual({ heal: 1, bonk: 1 });
   });
 
-  it('round-trips a full v9 save', () => {
+  it('round-trips a full save', () => {
     const store = memoryStore();
     const data: SaveData = {
-      version: 9,
+      version: SAVE_SCHEMA,
       progressionMode: 'lattice',
       tutorialDone: true,
       xp: 42,
@@ -88,17 +98,13 @@ describe('save', () => {
 
   it('deletes old development save keys instead of migrating them', () => {
     const store = memoryStore();
-    store.setItem('healgame-save-v1', JSON.stringify({ version: 4, xp: 999 }));
-    store.setItem('healgame-save-v5', JSON.stringify({ version: 5, xp: 999 }));
-    store.setItem('healgame-save-v6', JSON.stringify({ version: 6, xp: 999 }));
-    store.setItem('healgame-save-v7', JSON.stringify({ version: 7, xp: 999 }));
-    store.setItem('healgame-save-v8', JSON.stringify({ version: 8, xp: 999 }));
+    for (const key of LEGACY_SAVE_KEYS) {
+      store.setItem(key, JSON.stringify({ version: 0, xp: 999 }));
+    }
     expect(loadSave(store)).toEqual(newSaveData());
-    expect(store.getItem('healgame-save-v1')).toBeNull();
-    expect(store.getItem('healgame-save-v5')).toBeNull();
-    expect(store.getItem('healgame-save-v6')).toBeNull();
-    expect(store.getItem('healgame-save-v7')).toBeNull();
-    expect(store.getItem('healgame-save-v8')).toBeNull();
+    for (const key of LEGACY_SAVE_KEYS) {
+      expect(store.getItem(key)).toBeNull();
+    }
   });
 
   it('resetSave wipes everything (restart, no respec)', () => {
@@ -122,7 +128,14 @@ describe('save', () => {
 
   it('discards unrecognized payloads', () => {
     const store = memoryStore();
-    storePayload(store, { version: 9, xp: 'nope' });
+    storePayload(store, { version: SAVE_SCHEMA, xp: 'nope' });
     expect(loadSave(store)).toEqual(newSaveData());
+  });
+
+  it('golden fixture and newSaveData pass validateSaveData', () => {
+    const raw = readFileSync(new URL('./fixtures/golden-save.json', import.meta.url), 'utf8');
+    const fixture: unknown = JSON.parse(raw);
+    expect(validateSaveData(fixture)).toBe(true);
+    expect(validateSaveData(newSaveData('lattice'))).toBe(true);
   });
 });

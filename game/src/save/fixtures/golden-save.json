@@ -1,0 +1,23 @@
+{
+  "version": 9,
+  "progressionMode": "lattice",
+  "tutorialDone": false,
+  "xp": 0,
+  "unlockedSpells": [
+    "bonk"
+  ],
+  "actionBar": [
+    "bonk",
+    "",
+    "",
+    ""
+  ],
+  "treeRanks": {},
+  "subclass": null,
+  "clearedDungeons": [],
+  "combatPaceTenths": 10,
+  "relicIds": [],
+  "pendingRelicOffers": [],
+  "musicVolumePct": 50,
+  "recentRuns": []
+}
