@@ -1,6 +1,6 @@
 /**
  * Wipe/victory result overlay helpers for CombatScene — layout/timing constants
- * plus the Return button mount (Enter keycap + Enter/Space keybinds).
+ * plus the Return button mount (Space keycap + Space-only keybind).
  *
  * Split out of CombatScene.ts to stay under the max-lines lint cap; the rest of
  * showResultOverlay still lives there (tweens, engine, save, sprites).
@@ -42,16 +42,19 @@ export const RETURN_BUTTON_HEIGHT = 40;
 /** Y offset from panel center for the Return hit rect / chrome. */
 export const RETURN_BUTTON_Y_OFFSET = 105;
 
-/** Match spellBar / LoadoutScene keycap chip (18×14 display). */
-const KEYCAP_WIDTH = 18;
+/**
+ * Slightly wider than spellBar's 18×14 Shift chips so the three-char `Spc`
+ * label stays readable at FONT_SIZE_XS.
+ */
+const KEYCAP_WIDTH = 22;
 const KEYCAP_HEIGHT = 14;
 const KEYCAP_BG = 0x241a15;
 const KEYCAP_BORDER = 0x8a7868;
 const KEYCAP_INSET = 6;
-/** Compact Enter label for the 18×14 chip (same budget as Shift hotkeys like `sQ`). */
-export const RETURN_KEYCAP_LABEL = 'Ent';
+/** Compact Space label for the Return keycap chip. */
+export const RETURN_KEYCAP_LABEL = 'Spc';
 
-/** Pure layout: Enter keycap center inside the Return button. */
+/** Pure layout: Space keycap center inside the Return button. */
 export function resultReturnKeycapPosition(
   buttonX: number,
   buttonY: number,
@@ -63,7 +66,7 @@ export function resultReturnKeycapPosition(
   };
 }
 
-/** Single-fire wrapper so click + Enter + Space share one dismiss path. */
+/** Single-fire wrapper so click + Space share one dismiss path. */
 export function createOnceAction(action: () => void): () => void {
   let fired = false;
   return () => {
@@ -83,7 +86,7 @@ export interface MountResultReturnOptions {
 
 /**
  * Mount the result-overlay Return control: named hit rect (`combatReturn`),
- * framed chrome, visible Enter keycap, and Enter/Space keybinds that share a
+ * framed chrome, visible Space keycap, and Space-only keybind that shares a
  * single-fire dismiss with pointerdown.
  */
 export function mountResultReturn(scene: Phaser.Scene, opts: MountResultReturnOptions): void {
@@ -134,7 +137,6 @@ export function mountResultReturn(scene: Phaser.Scene, opts: MountResultReturnOp
       event.preventDefault();
       dismiss();
     };
-    keyboard.on('keydown-ENTER', onKey);
     keyboard.on('keydown-SPACE', onKey);
   }
 
