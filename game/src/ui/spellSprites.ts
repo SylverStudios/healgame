@@ -68,6 +68,19 @@ export const CAST_BAR_FRAME_TEXTURE_KEY = 'ui-cast-bar-frame';
 export const CAST_BAR_FRAME_TEXTURE_URL = 'assets/ui/frame/cast-bar-frame.png';
 export const CAST_BAR_FRAME_NATIVE_SIZE = { width: 160, height: 10 } as const;
 
+/**
+ * Display-px inset from the outer Bar box into the frame's transparent
+ * window. Measured on `cast-bar-frame.png` (native 160×10): clear band is
+ * cols 14..145 and rows 2..7; at 2× display that is left/right 28 and
+ * top/bottom 4. Pass to `Bar` so end caps fully cover fill at ratio=1.
+ */
+export const CAST_BAR_FRAME_FILL_INSET = {
+  left: 28,
+  right: 28,
+  top: 4,
+  bottom: 4,
+} as const;
+
 /** Tooltip panel corner ornament: native 8×8 art px, displayed at 16×16,
  *  pinned to each of the panel's four corners (spellTooltip.ts) — the panel
  *  itself stays a plain bordered rectangle since its size is content-driven

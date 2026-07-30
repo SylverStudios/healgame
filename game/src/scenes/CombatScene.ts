@@ -37,7 +37,7 @@ import {
   presentationForUnit,
 } from '../ui/sprites';
 import { SpellBar } from '../ui/spellBar';
-import { CAST_BAR_FRAME_TEXTURE_KEY } from '../ui/spellSprites';
+import { CAST_BAR_FRAME_FILL_INSET, CAST_BAR_FRAME_TEXTURE_KEY } from '../ui/spellSprites';
 import { addBanner, addPanel } from '../ui/panels';
 import {
   OVERLAY_DEPTH, OVERLAY_ALPHA, OVERLAY_FADE_MS, PANEL_WIDTH, PANEL_HEIGHT, PANEL_SLIDE_OFFSET,
@@ -551,6 +551,7 @@ export class CombatScene extends Phaser.Scene {
       PLAYER_CAST_FILL_COLOR,
       undefined,
       CAST_BAR_FRAME_TEXTURE_KEY,
+      CAST_BAR_FRAME_FILL_INSET,
     );
     this.playerCastBar.setVisible(false);
     this.playerCastLabel = this.add
