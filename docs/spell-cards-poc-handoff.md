@@ -30,8 +30,9 @@ choices** per slot.
 2. Fresh **Spell cards** save: Heal + Bonk on the bar; album shows both cards
    with empty slots; **0 upgrade points** at level 1 (first point + Mend at
    level 2 — Spells CTA lights when points are available).
-3. Leveling grants **+1 upgrade point per level** and free unlocks per §3
-   table (Mend, Vowstrike, then one major CD per level 6–8).
+3. Leveling grants upgrade points via `upgradePointsGrantedAtLevel` (most
+   levels +1; **unlucky level 4 = 0**; **lucky level 8 = 2**) and free unlocks
+   per §3 table (Mend, Vowstrike, then one major CD per level 6–8).
 4. Player can spend a point: pick a spell with a free slot → see that slot’s
    **fixed set of 3 chips** → pick 1 → slot fills → next fight uses the baked
    numbers / synergies. Slot 1 sets teach synergies; slot 2 sets are wilder.
@@ -78,10 +79,11 @@ choices** per slot.
 | 8 | `frenzied-liturgy` | major CD |
 | 9+ | — | upgrade point only |
 
-On level-up: always `upgradePoints += 1` (including the level that also
-unlocks content). When crossing a threshold, grant the unlock into the owned
-library and auto-equip spells into the first free action-bar slot (mirror
-radial grant). CDs appear on the combat CD row via `CombatMods.cooldowns`.
+On level-up: bank `upgradePointsGrantedAtLevel(level)` (usually +1; level 4
+grants **0**; level 8 grants **2**). When crossing a threshold, grant the
+unlock into the owned library and auto-equip spells into the first free
+action-bar slot (mirror radial grant). CDs appear on the combat CD row via
+`CombatMods.cooldowns`.
 
 **Big Heal / specialize forms / oaths:** out of PoC.
 

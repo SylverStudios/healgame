@@ -51,6 +51,7 @@ by name.
 | `cardAlbumBack` | Card album back | `CardAlbumScene.ts` |
 | `cardSpell:<spellId>` | Spell / major-CD card hit target | `CardAlbumScene.ts` |
 | `cardUpgrade:<spellId>` | Upgrade affordance on a spell card | `CardAlbumScene.ts` |
+| `cardChipOwned:<spellId>:<slot>` | Filled chip slot (hover shows chip desc) | `CardAlbumScene.ts` |
 | `cardChipOffer:<chipId>` | Chip draft modal offer card | `CardAlbumScene.ts` |
 | `cardChipConfirm` | Confirm chip purchase | `CardAlbumScene.ts` |
 | `cardChipCancel` | Cancel chip draft | `CardAlbumScene.ts` |

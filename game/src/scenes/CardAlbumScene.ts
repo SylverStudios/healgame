@@ -17,7 +17,11 @@ import Phaser from 'phaser';
 import { SceneKeys } from './keys';
 import { loadSave, saveGame, type SaveData } from '../save/save';
 import { levelForXp } from '../data/constants';
-import { CARD_SLOTS, cooldownIdsAtLevel, spellIdsAtLevel } from '../data/cards/unlocks';
+import {
+  CARD_SLOTS,
+  cooldownIdsAtLevel,
+  spellIdsAtLevel,
+} from '../data/cards/unlocks';
 import { chipById, type CardChipDef, type CardChipEffect } from '../data/cards/chips';
 import { offersForNextSlot } from '../data/cards/draft';
 import { applyChipPurchase, ownedSpellsFromCardSave } from '../data/cards/resolve';
@@ -35,6 +39,8 @@ import {
 } from '../ui/theme';
 import { addButton, addPanel } from '../ui/panels';
 import { fadeInOnCreate, fadeToScene } from '../ui/transitions';
+import { MANA_BLUE_CSS } from '../ui/manaAffordance';
+import { SpellTooltip } from '../ui/spellTooltip';
 
 const BG_COLOR = 0x1a1210;
 const BUTTON_COLOR = 0x3a2a22;
@@ -46,15 +52,22 @@ const DIM_COLOR = PALETTE.dim;
 const ACCENT_COLOR = PALETTE.gold;
 
 const CARD_W = 200;
-const CARD_H = 280;
+const CARD_H = 300;
 const CARD_GAP = 20;
 const SLOT_ROW_H = 28;
+const STAT_ROW_H = 18;
 
 const MODAL_DEPTH = 2000;
+const TOOLTIP_DEPTH = 2500;
+
+const POWER_COLOR = '#7ad67a';
+const DAMAGE_POWER_COLOR = '#e0a06a';
+const SPEED_COLOR = '#d8c8b8';
 
 export class CardAlbumScene extends Phaser.Scene {
   private save!: SaveData;
   private overlay!: Phaser.GameObjects.Container;
+  private tooltip!: SpellTooltip;
   private draftSpellId: string | null = null;
   private selectedChipId: string | null = null;
   private confirmHit: Phaser.GameObjects.Rectangle | null = null;
@@ -71,6 +84,7 @@ export class CardAlbumScene extends Phaser.Scene {
     fadeInOnCreate(this);
 
     this.overlay = this.add.container(0, 0).setDepth(MODAL_DEPTH).setVisible(false);
+    this.tooltip = new SpellTooltip(this, { screenWidth: this.scale.width, depth: TOOLTIP_DEPTH });
     this.modalOpen = false;
     this.draftSpellId = null;
     this.selectedChipId = null;
@@ -78,6 +92,10 @@ export class CardAlbumScene extends Phaser.Scene {
     this.confirmLabel = null;
 
     this.buildAlbum();
+  }
+
+  shutdown(): void {
+    this.tooltip?.destroy();
   }
 
   private buildAlbum(): void {
@@ -163,7 +181,6 @@ export class CardAlbumScene extends Phaser.Scene {
       ownedSpellsFromCardSave(this.save).find((s) => s.id === spellId) ??
       radialSpellById(spellId);
     const name = spell?.name ?? spellId;
-    const desc = spell?.description ?? '';
     const chips = this.save.spellChips[spellId] ?? [];
     const canUpgrade =
       points > 0 && chips.length < CARD_SLOTS && offersForNextSlot(spellId, chips) !== null;
@@ -177,28 +194,45 @@ export class CardAlbumScene extends Phaser.Scene {
 
     const top = y - CARD_H / 2;
     this.add
-      .text(x, top + 18, name, {
+      .text(x, top + 16, name, {
         fontFamily: FONT,
         fontSize: FONT_SIZE_SM,
         color: TEXT_COLOR,
       })
       .setOrigin(0.5);
-    this.add
-      .text(x, top + 42, desc, {
-        fontFamily: FONT,
-        fontSize: FONT_SIZE_XS,
-        color: DIM_COLOR,
-        align: 'center',
-        wordWrap: { width: CARD_W - 24 },
-      })
-      .setOrigin(0.5, 0);
 
+    // Power / Cost / Speed — three rows matching combat card language.
+    if (spell) {
+      const stats = spellStatRows(spell);
+      stats.forEach((row, i) => {
+        const rowY = top + 44 + i * STAT_ROW_H;
+        this.add
+          .text(x - CARD_W / 2 + 16, rowY, row.label, {
+            fontFamily: FONT,
+            fontSize: FONT_SIZE_XS,
+            color: DIM_COLOR,
+          })
+          .setOrigin(0, 0.5);
+        this.add
+          .text(x + CARD_W / 2 - 16, rowY, row.value, {
+            fontFamily: FONT,
+            fontSize: FONT_SIZE_XS,
+            color: row.color,
+          })
+          .setOrigin(1, 0.5);
+      });
+    }
+
+    const slotsTop = top + 44 + 3 * STAT_ROW_H + 14;
     for (let slot = 0; slot < CARD_SLOTS; slot++) {
       const chipId = chips[slot];
       const chip = chipId ? chipById(chipId) : undefined;
       const label = chip ? `Slot ${slot + 1}: ${chip.name}` : `Slot ${slot + 1}: empty`;
-      const slotY = top + 130 + slot * SLOT_ROW_H;
-      this.add.rectangle(x, slotY, CARD_W - 28, SLOT_ROW_H - 4, PANEL_LIGHT).setStrokeStyle(1, BORDER_COLOR);
+      const slotY = slotsTop + slot * SLOT_ROW_H;
+      const slotBg = this.add
+        .rectangle(x, slotY, CARD_W - 28, SLOT_ROW_H - 4, PANEL_LIGHT)
+        .setStrokeStyle(1, BORDER_COLOR)
+        .setName(chip ? `cardChipOwned:${spellId}:${slot}` : `cardChipEmpty:${spellId}:${slot}`);
       this.add
         .text(x, slotY, label, {
           fontFamily: FONT,
@@ -206,9 +240,21 @@ export class CardAlbumScene extends Phaser.Scene {
           color: chip ? ACCENT_COLOR : DIM_COLOR,
         })
         .setOrigin(0.5);
+
+      if (chip) {
+        slotBg.setInteractive({ useHandCursor: true });
+        slotBg.on('pointerover', () => {
+          if (this.modalOpen) return;
+          this.tooltip.show(x, slotY - (SLOT_ROW_H - 4) / 2, [
+            { text: chip.name, color: ACCENT_COLOR },
+            { text: chip.description, color: DIM_COLOR },
+          ]);
+        });
+        slotBg.on('pointerout', () => this.tooltip.hide());
+      }
     }
 
-    const uy = y + CARD_H / 2 - 32;
+    const uy = y + CARD_H / 2 - 28;
     if (canUpgrade) {
       const upgrade = this.add
         .rectangle(x, uy, CARD_W - 36, 36, BUTTON_COLOR)
@@ -228,8 +274,8 @@ export class CardAlbumScene extends Phaser.Scene {
         })
         .setOrigin(0.5);
       upgrade.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-        // Stop the card bg underneath from also handling this click.
         pointer.event?.stopPropagation?.();
+        this.tooltip.hide();
         this.openDraftModal(spellId);
       });
     } else {
@@ -501,12 +547,24 @@ export class CardAlbumScene extends Phaser.Scene {
     this.selectedChipId = null;
     this.confirmHit = null;
     this.confirmLabel = null;
+    this.tooltip.hide();
     this.overlay.setVisible(false);
     this.overlay.removeAll(true);
   }
 }
 
 type AlbumEntry = { kind: 'spell'; id: string } | { kind: 'cooldown'; id: string };
+
+function spellStatRows(spell: SpellDef): { label: string; value: string; color: string }[] {
+  const isDamage = (spell.damage ?? 0) > 0 && spell.heal <= 0;
+  const power = isDamage ? String(spell.damage ?? 0) : String(spell.heal);
+  const speed = spell.castMs === 0 ? 'Instant' : `${(spell.castMs / 1000).toFixed(1)}s`;
+  return [
+    { label: 'Power', value: power, color: isDamage ? DAMAGE_POWER_COLOR : POWER_COLOR },
+    { label: 'Cost', value: String(spell.mana), color: MANA_BLUE_CSS },
+    { label: 'Speed', value: speed, color: SPEED_COLOR },
+  ];
+}
 
 /** Cheap before→after line for castMod chips; synergies rely on description. */
 function castModPreviewLine(chip: CardChipDef, base: SpellDef | null): string | null {

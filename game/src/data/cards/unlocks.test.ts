@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   CARD_SLOTS,
   CARD_UNLOCKS,
+  cardsLevelUpWelcome,
   cooldownIdsAtLevel,
   spellIdsAtLevel,
   unlocksAtOrBelowLevel,
+  upgradePointsGrantedAtLevel,
 } from './unlocks';
 
 describe('CARD_UNLOCKS (§3 table)', () => {
@@ -37,7 +39,7 @@ describe('unlocksAtOrBelowLevel / spellIdsAtLevel / cooldownIdsAtLevel', () => {
     expect(cooldownIdsAtLevel(2)).toEqual([]);
   });
 
-  it('levels 3–4 are upgrade-point-only (same library as 2)', () => {
+  it('levels 3–4 share the level-2 library (4 grants no upgrade point)', () => {
     expect(spellIdsAtLevel(3)).toEqual(spellIdsAtLevel(2));
     expect(spellIdsAtLevel(4)).toEqual(spellIdsAtLevel(2));
     expect(cooldownIdsAtLevel(4)).toEqual([]);
@@ -69,5 +71,22 @@ describe('unlocksAtOrBelowLevel / spellIdsAtLevel / cooldownIdsAtLevel', () => {
     expect(unlocksAtOrBelowLevel(0)).toEqual([]);
     expect(spellIdsAtLevel(0)).toEqual([]);
     expect(cooldownIdsAtLevel(-1)).toEqual([]);
+  });
+});
+
+describe('upgradePointsGrantedAtLevel / cardsLevelUpWelcome', () => {
+  it('unlucky 4 grants 0; lucky 8 grants 2; others grant 1', () => {
+    expect(upgradePointsGrantedAtLevel(2)).toBe(1);
+    expect(upgradePointsGrantedAtLevel(3)).toBe(1);
+    expect(upgradePointsGrantedAtLevel(4)).toBe(0);
+    expect(upgradePointsGrantedAtLevel(5)).toBe(1);
+    expect(upgradePointsGrantedAtLevel(8)).toBe(2);
+    expect(upgradePointsGrantedAtLevel(9)).toBe(1);
+  });
+
+  it('welcome copy calls out unlucky 4 and lucky 8', () => {
+    expect(cardsLevelUpWelcome(2)).toBe('Welcome to level 2');
+    expect(cardsLevelUpWelcome(4)).toBe('Welcome to unlucky level 4');
+    expect(cardsLevelUpWelcome(8)).toBe('Welcome to lucky level 8');
   });
 });

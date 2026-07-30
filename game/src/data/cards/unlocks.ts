@@ -1,8 +1,8 @@
 /**
  * Cards-mode free unlock table (spell-cards-poc-handoff §3 / §7.1).
  *
- * Unlocks are free — they never spend upgrade points. +1 upgrade point per
- * level is handled separately by `applyCardsLevelUps`.
+ * Unlocks are free — they never spend upgrade points. Upgrade-point grants
+ * per level are {@link upgradePointsGrantedAtLevel} (unlucky 4 / lucky 8).
  */
 
 export const CARD_SLOTS = 2;
@@ -23,6 +23,23 @@ export const CARD_UNLOCKS: readonly CardUnlock[] = [
   { id: 'wrath-ascendant', kind: 'cooldown', minLevel: 7 },
   { id: 'frenzied-liturgy', kind: 'cooldown', minLevel: 8 },
 ];
+
+/**
+ * Upgrade points granted when crossing into `level`.
+ * Level 4 is unlucky (0); level 8 is lucky (2); every other level is 1.
+ */
+export function upgradePointsGrantedAtLevel(level: number): number {
+  if (level === 4) return 0;
+  if (level === 8) return 2;
+  return 1;
+}
+
+/** Hub level-up ribbon copy for cards mode. */
+export function cardsLevelUpWelcome(level: number): string {
+  if (level === 4) return 'Welcome to unlucky level 4';
+  if (level === 8) return 'Welcome to lucky level 8';
+  return `Welcome to level ${level}`;
+}
 
 /** All unlocks with minLevel ≤ level (cumulative library at that level). */
 export function unlocksAtOrBelowLevel(level: number): CardUnlock[] {

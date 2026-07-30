@@ -8,7 +8,7 @@
  */
 
 import { applyCardsLevelUps } from '../data/cards/resolve';
-import { CARD_UNLOCKS } from '../data/cards/unlocks';
+import { CARD_UNLOCKS, cardsLevelUpWelcome } from '../data/cards/unlocks';
 import { levelForXp, SPELLS } from '../data/constants';
 import { cooldownById } from '../data/cooldowns';
 import { getDungeonById, isDungeonIdUnlocked, ORDERED_DUNGEONS } from '../data/dungeons';
@@ -56,7 +56,7 @@ export function applyCombatResult(
       // Upgrade-point count is shown on the Spells CTA — keep the ribbon short.
       notices.push({
         kind: 'levelUp',
-        text: `Welcome to level ${levelAfter}`,
+        text: cardsLevelUpWelcome(levelAfter),
       });
       for (let level = levelBefore + 1; level <= levelAfter; level++) {
         for (const unlock of CARD_UNLOCKS) {

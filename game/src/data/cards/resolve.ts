@@ -27,7 +27,7 @@ import { radialSpellById } from '../radial/spells';
 import { spellsFromActionBar, type CombatMods } from '../talentTree';
 import { chipById, type CardChipEffect } from './chips';
 import { offersForNextSlot } from './draft';
-import { CARD_SLOTS, CARD_UNLOCKS, cooldownIdsAtLevel } from './unlocks';
+import { CARD_SLOTS, CARD_UNLOCKS, cooldownIdsAtLevel, upgradePointsGrantedAtLevel } from './unlocks';
 
 /** Empty CombatMods shell shared by stub + later chip resolve. */
 function emptyMods(spells: SpellDef[]): CombatMods {
@@ -269,8 +269,8 @@ export function ownedSpellsFromCardSave(save: {
 }
 
 /**
- * Cards mode level-up: bank +1 upgrade point per crossed level and grant free
- * unlocks for those levels (handoff §3).
+ * Cards mode level-up: bank upgrade points per crossed level (unlucky 4 /
+ * lucky 8) and grant free unlocks for those levels (handoff §3).
  *
  * This is the **sole** source of level-up upgrade points in cards mode —
  * callers must not also add `upgradePoints` for the same level range.
@@ -287,7 +287,7 @@ export function applyCardsLevelUps(
   if (nextLevel <= prevLevel) return;
 
   for (let level = prevLevel + 1; level <= nextLevel; level++) {
-    save.upgradePoints += 1;
+    save.upgradePoints += upgradePointsGrantedAtLevel(level);
 
     for (const unlock of CARD_UNLOCKS) {
       if (unlock.minLevel !== level) continue;

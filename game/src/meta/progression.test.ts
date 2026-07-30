@@ -170,11 +170,11 @@ describe('applyCombatResult', () => {
       xp: xpForLevel(5) - 1,
       unlockedSpells: ['heal', 'bonk', 'mend'],
       actionBar: ['heal', 'bonk', 'mend', ''],
-      upgradePoints: 3,
+      upgradePoints: 2, // after lv2–3 (+1 each), skipped unlucky 4
     });
     const notices = applyCombatResult(s, result({ xp: 1 }));
     expect(levelForXp(s.xp)).toBe(5);
-    expect(s.upgradePoints).toBe(4);
+    expect(s.upgradePoints).toBe(3);
     expect(s.unlockedSpells).toContain('vowstrike');
     expect(s.unlockedSpells).toContain('bonk');
     expect(s.actionBar).toContain('vowstrike');
@@ -184,17 +184,49 @@ describe('applyCombatResult', () => {
     ]);
   });
 
+  it('cards level 4 is unlucky — welcome copy, no upgrade point', () => {
+    const s = save({
+      progressionMode: 'cards',
+      xp: xpForLevel(4) - 1,
+      unlockedSpells: ['heal', 'bonk', 'mend'],
+      actionBar: ['heal', 'bonk', 'mend', ''],
+      upgradePoints: 2,
+    });
+    const notices = applyCombatResult(s, result({ xp: 1 }));
+    expect(levelForXp(s.xp)).toBe(4);
+    expect(s.upgradePoints).toBe(2);
+    expect(notices).toEqual([{ kind: 'levelUp', text: 'Welcome to unlucky level 4' }]);
+  });
+
+  it('cards level 8 is lucky — welcome copy, +2 upgrade points + Liturgy', () => {
+    const s = save({
+      progressionMode: 'cards',
+      xp: xpForLevel(8) - 1,
+      unlockedSpells: ['heal', 'bonk', 'mend', 'vowstrike'],
+      actionBar: ['heal', 'bonk', 'mend', 'vowstrike'],
+      upgradePoints: 5,
+    });
+    const notices = applyCombatResult(s, result({ xp: 1 }));
+    expect(levelForXp(s.xp)).toBe(8);
+    expect(s.upgradePoints).toBe(7);
+    expect(buildLoadout(s).cooldowns.map((c) => c.id)).toContain('frenzied-liturgy');
+    expect(notices).toEqual([
+      { kind: 'levelUp', text: 'Welcome to lucky level 8' },
+      { kind: 'spellLearned', text: 'Frenzied Liturgy learned!' },
+    ]);
+  });
+
   it('cards level 6 unlocks Still Waters via loadout (no unlockedSpells entry)', () => {
     const s = save({
       progressionMode: 'cards',
       xp: xpForLevel(6) - 1,
       unlockedSpells: ['heal', 'bonk', 'mend', 'vowstrike'],
       actionBar: ['heal', 'bonk', 'mend', 'vowstrike'],
-      upgradePoints: 4,
+      upgradePoints: 3,
     });
     const notices = applyCombatResult(s, result({ xp: 1 }));
     expect(levelForXp(s.xp)).toBe(6);
-    expect(s.upgradePoints).toBe(5);
+    expect(s.upgradePoints).toBe(4);
     expect(s.unlockedSpells).not.toContain('still-waters');
     expect(buildLoadout(s).cooldowns.map((c) => c.id)).toContain('still-waters');
     expect(notices).toEqual([

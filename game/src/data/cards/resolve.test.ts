@@ -4,13 +4,17 @@ import { newSaveData } from '../../save/save';
 import { applyCardsLevelUps, loadoutFromCardSave } from './resolve';
 
 describe('applyCardsLevelUps', () => {
-  it('banks +1 upgrade point per crossed level and no-ops when levels equal', () => {
+  it('banks upgrade points per level (skips unlucky 4, doubles lucky 8)', () => {
     const save = newSaveData('cards');
     expect(save.upgradePoints).toBe(0);
     applyCardsLevelUps(save, 1, 1);
     expect(save.upgradePoints).toBe(0);
     applyCardsLevelUps(save, 1, 3);
-    expect(save.upgradePoints).toBe(2); // +1 for lv2, +1 for lv3
+    expect(save.upgradePoints).toBe(2); // lv2 + lv3
+    applyCardsLevelUps(save, 3, 4);
+    expect(save.upgradePoints).toBe(2); // unlucky 4 grants 0
+    applyCardsLevelUps(save, 7, 8);
+    expect(save.upgradePoints).toBe(4); // lucky 8 grants 2
   });
 
   it('grants mend at level 2 and auto-equips into the first free bar slot', () => {
@@ -31,7 +35,8 @@ describe('applyCardsLevelUps', () => {
     );
     expect(save.actionBar).toContain('vowstrike');
     expect(save.actionBar).toContain('bonk');
-    expect(save.upgradePoints).toBe(4); // 4 levels crossed (2–5)
+    // lv2+3+4(0)+5 = 3 points
+    expect(save.upgradePoints).toBe(3);
   });
 
   it('does not push cooldown ids into unlockedSpells; loadout discovers them', () => {
