@@ -28,7 +28,7 @@ import { drawBuildGlyph } from '../ui/buildGlyph';
 import type { CombatSceneData } from './CombatScene';
 import type { DungeonDef } from '../data/content/types';
 import { loadTelemetry, recordReset, sendPlaytestMail } from '../telemetry';
-import { FONT, FONT_SIZE_SM, FONT_SIZE_LG, FONT_SIZE_XS, PALETTE, PALETTE_NUM } from '../ui/theme';
+import { FONT, FONT_SIZE_SM, FONT_SIZE_LG, PALETTE, PALETTE_NUM } from '../ui/theme';
 import { addBanner, addButton, addPanel, type FrameState } from '../ui/panels';
 import { COMBAT_ENTRY_FADE_OUT_MS, fadeInOnCreate, fadeToScene } from '../ui/transitions';
 import { KEYCAP_FRAME_TEXTURE_KEY } from '../ui/spellSprites';
@@ -62,12 +62,18 @@ const SETTINGS_BUTTON_H = 34;
 /** Gap between the bottom of the last notice and the top of the meta buttons. */
 const NOTICE_TO_META_GAP = 12;
 
-/** Match spellBar / resultPanel keycap chip (18×14 display). */
-const KEYCAP_WIDTH = 18;
-const KEYCAP_HEIGHT = 14;
-const KEYCAP_BG = 0x241a15;
-const KEYCAP_BORDER = 0x8a7868;
-const KEYCAP_INSET = 6;
+/** Match combat keycap language, sized for Hub meta buttons (280×34).
+ *  Inset clears the sm panel edge band (12px). Chip is larger than combat's
+ *  18×14 — Hub buttons have room, and a single letter must read clearly. */
+const KEYCAP_WIDTH = 28;
+const KEYCAP_HEIGHT = 20;
+const KEYCAP_BG = 0x1a1210;
+const KEYCAP_BORDER = 0xc4b49a;
+/** Past sm panel left edge (12px) + rivet corner so the chip sits in the fill. */
+const KEYCAP_INSET = 22;
+const KEYCAP_DEPTH = 5;
+/** Combat hotkey ink — same as spellBar HOTKEY_COLOR. */
+const KEYCAP_LETTER_COLOR = '#e8d8c8';
 
 export class HubScene extends Phaser.Scene {
   private sceneData: HubSceneData = {};
@@ -524,41 +530,53 @@ export class HubScene extends Phaser.Scene {
       state: opts.frameState ?? 'normal',
       hitRect: rect,
     });
+    const labelPad = opts.keycap ? KEYCAP_INSET + KEYCAP_WIDTH + 8 : 24;
     this.add
       .text(x, y, label, {
         fontFamily: FONT,
         fontSize: FONT_SIZE_SM,
         color: opts.labelColor ?? TEXT_COLOR,
-        wordWrap: { width: w - 24 },
+        wordWrap: { width: w - labelPad },
         align: 'center',
       })
       .setOrigin(0.5);
     if (opts.keycap) {
       const keycapX = x - w / 2 + KEYCAP_INSET + KEYCAP_WIDTH / 2;
-      addHubKeycap(this, keycapX, y);
+      addHubKeycap(this, keycapX, y).setDepth(KEYCAP_DEPTH);
+      // Monospace: HealgameIron at this size muddies single glyphs (S reads as noise).
       this.add
         .text(keycapX, y, opts.keycap, {
-          fontFamily: FONT,
-          fontSize: FONT_SIZE_XS,
-          color: PALETTE.text,
+          fontFamily: 'monospace',
+          fontSize: FONT_SIZE_SM,
+          color: KEYCAP_LETTER_COLOR,
+          fontStyle: 'bold',
         })
-        .setOrigin(0.5);
+        .setOrigin(0.5)
+        .setDepth(KEYCAP_DEPTH + 1);
     }
     rect.on('pointerdown', onClick);
   }
 }
 
-/** Keycap chip: pixel-art image when loaded, else flat rect + stroke (spellBar language). */
+/**
+ * Hub keycap chip — solid rect + stroke always (readable on panel chrome).
+ * Overlays the combat keycap-frame art when Boot loaded it, same vocabulary
+ * as spellBar, but the rect guarantees contrast Hub panels otherwise eat.
+ */
 function addHubKeycap(
   scene: Phaser.Scene,
   x: number,
   y: number,
-): Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle {
+): Phaser.GameObjects.Rectangle {
+  const chip = scene.add
+    .rectangle(x, y, KEYCAP_WIDTH, KEYCAP_HEIGHT, KEYCAP_BG)
+    .setStrokeStyle(2, KEYCAP_BORDER);
   if (scene.textures.exists(KEYCAP_FRAME_TEXTURE_KEY)) {
-    return scene.add
+    scene.add
       .image(x, y, KEYCAP_FRAME_TEXTURE_KEY)
       .setOrigin(0.5)
-      .setDisplaySize(KEYCAP_WIDTH, KEYCAP_HEIGHT);
+      .setDisplaySize(KEYCAP_WIDTH, KEYCAP_HEIGHT)
+      .setDepth(KEYCAP_DEPTH);
   }
-  return scene.add.rectangle(x, y, KEYCAP_WIDTH, KEYCAP_HEIGHT, KEYCAP_BG).setStrokeStyle(1, KEYCAP_BORDER);
+  return chip;
 }

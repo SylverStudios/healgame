@@ -104,6 +104,9 @@ function polar(cx: number, cy: number, r: number, angleDeg: number): { x: number
 }
 
 // Build the static wheel layout once at module load.
+//
+// Ability spokes share a polar angle so SPOKE_CHAINS draw as radial segments
+// (not cross-ring chords). Ring radius still encodes band (R1 / R2 / R3).
 const DISPLAY_SPOTS: readonly DisplaySpot[] = (() => {
   const spots: DisplaySpot[] = [];
   const p = (r: number, a: number) => polar(WHEEL_CX, WHEEL_CY, r, a);
@@ -111,37 +114,35 @@ const DISPLAY_SPOTS: readonly DisplaySpot[] = (() => {
   const add = (logicalId: string, isChoice: boolean, concreteIds: string[], pos: { x: number; y: number }) =>
     spots.push({ logicalId, isChoice, concreteIds, ...pos });
 
-  // Centre — heal
+  // Centre — heal (hub of the Heal specialize spoke @ 0°)
   add('heal', false, ['heal'], { x: WHEEL_CX, y: WHEEL_CY });
 
-  // Inner ring — bonk at 45° (upper-right, avoids Ring-1 node at 0°)
-  add('bonk', false, ['bonk'], p(R_INNER, 45));
+  // Heal specialize spoke @ 0° (east): heal → heal-s1 → heal-s2 → heal-s3
+  add('heal-s1', true, ['heal-s1-zealous', 'heal-s1-solemn'], p(R1, 0));
+  add('heal-s2', true, ['heal-s2-fast', 'heal-s2-slow'], p(R2, 0));
+  add('heal-s3', true, ['heal-s3-committed', 'heal-s3-thrifty'], p(R3, 0));
 
-  // Ring 1 — 4 display spots, 90° apart (top / right / bottom / left)
-  add('mend',     false, ['mend'],                               p(R1, 270));
-  add('heal-s1',  true,  ['heal-s1-zealous', 'heal-s1-solemn'], p(R1, 0));
-  add('big-heal', false, ['big-heal'],                           p(R1, 90));
-  add('mend-s1',  true,  ['mend-s1-arming', 'mend-s1-battle'],  p(R1, 180));
+  // Mend spoke @ 270° (north): heal → mend → mend-s1
+  add('mend', false, ['mend'], p(R1, 270));
+  add('mend-s1', true, ['mend-s1-arming', 'mend-s1-battle'], p(R2, 270));
 
-  // Ring 2 — 8 display spots, 45° apart (start top)
-  add('offense',      true,  ['vowstrike-entry',          'bonk-upgrade'],             p(R2, 270));
-  add('vowstrike-s1', true,  ['vowstrike-s1-absolution',   'vowstrike-s1-reckoning'], p(R2, 315));
-  add('bonk-s1',      true,  ['bonk-s1-mana',              'bonk-s1-blessed'],        p(R2, 0));
-  add('still-waters', false, ['still-waters'],                                         p(R2, 45));
-  add('wrath',        false, ['wrath'],                                                p(R2, 90));
-  add('liturgy',      false, ['liturgy'],                                              p(R2, 135));
-  add('big-heal-s1',  true,  ['big-heal-s1-prepared',      'big-heal-s1-thrifty'],    p(R2, 180));
-  add('heal-s2',      true,  ['heal-s2-fast',              'heal-s2-slow'],            p(R2, 225));
+  // Big Heal spoke @ 90° (south): heal → big-heal → big-heal-s1
+  add('big-heal', false, ['big-heal'], p(R1, 90));
+  add('big-heal-s1', true, ['big-heal-s1-prepared', 'big-heal-s1-thrifty'], p(R2, 90));
 
-  // Ring 3 — 4 display spots (minLevel 10), placed outside Ring-2 neighbors
-  // heal-s3: continues the heal line (heal-s2 lives at 225°)
-  add('heal-s3',    true,  ['heal-s3-committed', 'heal-s3-thrifty'],  p(R3, 225));
-  // offense-s2: above, between bonk-s1 (0°) and vowstrike-s1 (315°)
-  add('offense-s2', true,  ['offense-s2-a', 'offense-s2-b'],          p(R3, 315));
-  // crown-waters: outside still-waters (45°). R3=255 keeps it visible at y≈449.
-  add('crown-waters', false, ['crown-waters'],                          p(R3, 40));
-  // crown-wrath: outside wrath (90°). Use shorter radius (r=225) so node stays above bottom edge.
-  add('crown-wrath',  false, ['crown-wrath'],                           polar(WHEEL_CX, WHEEL_CY, 225, 80));
+  // Offense spoke @ 35° (ESE): spine + fork children on R3 (no same-ring chords)
+  add('bonk', false, ['bonk'], p(R_INNER, 35));
+  add('offense', true, ['vowstrike-entry', 'bonk-upgrade'], p(R2, 35));
+  add('vowstrike-s1', true, ['vowstrike-s1-absolution', 'vowstrike-s1-reckoning'], p(R3, 15));
+  add('bonk-s1', true, ['bonk-s1-mana', 'bonk-s1-blessed'], p(R3, 55));
+  add('offense-s2', true, ['offense-s2-a', 'offense-s2-b'], p(R3, 35));
+
+  // CD spokes — keep clear of the left ring-label column
+  add('still-waters', false, ['still-waters'], p(R2, 145));
+  add('crown-waters', false, ['crown-waters'], p(R3, 145));
+  add('wrath', false, ['wrath'], p(R2, 200));
+  add('crown-wrath', false, ['crown-wrath'], p(R3, 200));
+  add('liturgy', false, ['liturgy'], p(R2, 235));
 
   return spots;
 })();
@@ -150,26 +151,30 @@ const DISPLAY_SPOTS: readonly DisplaySpot[] = (() => {
  * Along-spoke connector segments (display logicalIds).
  *
  * Chains related upgrades on the same ability path — not a cross-spoke
- * synergy web. Pair list is pinned here next to DISPLAY_SPOTS so layout
- * angles alone aren't the source of truth for which nodes link.
+ * synergy web. Pair list is pinned here next to DISPLAY_SPOTS; layout
+ * angles above keep each chain radial (forks only for offense A/B).
  *
- * Offense forks after the shared entry: bonk → offense → (vowstrike-s1 | bonk-s1) → offense-s2.
+ * Offense: bonk → offense → offense-s2 spine; vowstrike-s1 / bonk-s1 fork
+ * outward on R3 from offense (no same-ring chords).
  */
 export const SPOKE_CHAINS: readonly (readonly [string, string])[] = [
-  // Mend spoke
+  // Hub roots — unlock spokes radiate from centre Heal
+  ['heal', 'mend'],
+  ['heal', 'big-heal'],
+  ['heal', 'bonk'],
+  // Mend spoke @ 270°
   ['mend', 'mend-s1'],
-  // Heal specialization spoke
+  // Heal specialization spoke @ 0°
   ['heal', 'heal-s1'],
   ['heal-s1', 'heal-s2'],
   ['heal-s2', 'heal-s3'],
-  // Big Heal spoke
+  // Big Heal spoke @ 90°
   ['big-heal', 'big-heal-s1'],
-  // Offense spoke (A/B fork after offense entry)
+  // Offense spoke @ 35°: main spine + outward A/B fork on R3
   ['bonk', 'offense'],
+  ['offense', 'offense-s2'],
   ['offense', 'vowstrike-s1'],
   ['offense', 'bonk-s1'],
-  ['vowstrike-s1', 'offense-s2'],
-  ['bonk-s1', 'offense-s2'],
   // CD crowns
   ['wrath', 'crown-wrath'],
   ['still-waters', 'crown-waters'],
@@ -410,21 +415,14 @@ export class RadialTreeScene extends Phaser.Scene {
       .setDepth(HUD_DEPTH + 1);
     back.on('pointerdown', () => fadeToScene(this, SceneKeys.Hub, {}));
 
-    // ── Ring guide circles ────────────────────────────────────────────────
+    // ── Ring guide circles only (no centre→every-node rays — those fought
+    // the along-spoke chains). Spoke segments below are the readable paths. ─
     const rings = this.add.graphics().setDepth(1);
     rings.lineStyle(1, BORDER_DARK, 0.22);
     rings.strokeCircle(WHEEL_CX, WHEEL_CY, R_INNER + NODE_RADIUS + 7);
     rings.strokeCircle(WHEEL_CX, WHEEL_CY, R1 + NODE_RADIUS + 9);
     rings.strokeCircle(WHEEL_CX, WHEEL_CY, R2 + NODE_RADIUS + 9);
     rings.strokeCircle(WHEEL_CX, WHEEL_CY, R3 + NODE_RADIUS + 9);
-
-    // ── Dim centre→node rays (optional radial guides; spoke chains dominate) ─
-    const rays = this.add.graphics().setDepth(1);
-    rays.lineStyle(1, BORDER_DARK, 0.06);
-    for (const ds of DISPLAY_SPOTS) {
-      if (ds.logicalId === 'heal') continue;
-      rays.lineBetween(WHEEL_CX, WHEEL_CY, ds.x, ds.y);
-    }
 
     // ── Along-spoke connector segments (required; explicit SPOKE_CHAINS) ──
     const spotByLogicalId = new Map(DISPLAY_SPOTS.map((s) => [s.logicalId, s]));
@@ -438,34 +436,34 @@ export class RadialTreeScene extends Phaser.Scene {
       spokeGfx.lineBetween(from.x, from.y, to.x, to.y);
     }
 
-    // ── Ring labels (left edge) ───────────────────────────────────────────
-    const ringLabelX = WHEEL_CX - R2 - NODE_RADIUS - 16;
+    // ── Ring labels (far left — clear of west CD crowns) ─────────────────
+    const ringLabelX = 16;
     this.add
-      .text(ringLabelX, WHEEL_CY, 'Ring 1\nLv 1+', {
+      .text(ringLabelX, WHEEL_CY - R1, 'Ring 1\nLv 1+', {
         fontFamily: FONT,
         fontSize: FONT_SIZE_XS,
         color: DIM_COLOR,
-        align: 'right',
+        align: 'left',
       })
-      .setOrigin(1, 0.5)
+      .setOrigin(0, 0.5)
       .setDepth(HUD_DEPTH);
     this.add
-      .text(ringLabelX, WHEEL_CY - (R2 - R1) / 2 - R1 / 2, 'Ring 2\nLv 5+', {
+      .text(ringLabelX, WHEEL_CY - R2, 'Ring 2\nLv 5+', {
         fontFamily: FONT,
         fontSize: FONT_SIZE_XS,
         color: DIM_COLOR,
-        align: 'right',
+        align: 'left',
       })
-      .setOrigin(1, 0.5)
+      .setOrigin(0, 0.5)
       .setDepth(HUD_DEPTH);
     this.add
-      .text(ringLabelX, WHEEL_CY - (R3 - R2) / 2 - R2 / 2, 'Ring 3\nLv 10+', {
+      .text(ringLabelX, WHEEL_CY - R3, 'Ring 3\nLv 10+', {
         fontFamily: FONT,
         fontSize: FONT_SIZE_XS,
         color: DIM_COLOR,
-        align: 'right',
+        align: 'left',
       })
-      .setOrigin(1, 0.5)
+      .setOrigin(0, 0.5)
       .setDepth(HUD_DEPTH);
 
     // ── Node + overlay containers ─────────────────────────────────────────
