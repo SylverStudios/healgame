@@ -11,16 +11,32 @@
  * `height` (density rule: 1 art px = 2 screen px) with a transparent center
  * window so the fill rectangle shows through — see
  * `spellSprites.ts` CAST_BAR_FRAME_* and `CombatScene.buildCastBars()`.
+ *
+ * When a frame is present, pass `fillInset` (e.g. CAST_BAR_FRAME_FILL_INSET)
+ * so bg/fill sit strictly inside the transparent window; end caps then mask
+ * the fill. Unframed bars omit inset and keep full outer geometry.
  */
 
 import Phaser from 'phaser';
+import {
+  type BarFillInset,
+  ZERO_BAR_FILL_INSET,
+  framedFillSize,
+} from './barGeometry';
+
+export type { BarFillInset } from './barGeometry';
+export { framedFillSize } from './barGeometry';
 
 const DEFAULT_BG_COLOR = 0x2a1e18;
 const BORDER_COLOR = 0x0a0605;
 const BORDER_WIDTH = 1;
 
 export class Bar {
-  private readonly width: number;
+  /** Outer width (frame / layout size); fill may be narrower when inset. */
+  private readonly outerWidth: number;
+  private readonly fillWidth: number;
+  private readonly offsetX: number;
+  private readonly offsetY: number;
   private readonly bg: Phaser.GameObjects.Rectangle;
   private readonly fill: Phaser.GameObjects.Rectangle;
   private readonly frame: Phaser.GameObjects.Image | null;
@@ -34,13 +50,28 @@ export class Bar {
     fillColor: number,
     bgColor: number = DEFAULT_BG_COLOR,
     frameTextureKey?: string,
+    fillInset: BarFillInset = ZERO_BAR_FILL_INSET,
   ) {
-    this.width = width;
+    const geom = framedFillSize(width, height, fillInset);
+    this.outerWidth = width;
+    this.fillWidth = geom.width;
+    this.offsetX = geom.offsetX;
+    this.offsetY = geom.offsetY;
+
+    const fillX = x + geom.offsetX;
+    const fillY = y + geom.offsetY;
+
     this.bg = scene.add
-      .rectangle(x, y, width, height, bgColor)
-      .setOrigin(0, 0.5)
-      .setStrokeStyle(BORDER_WIDTH, BORDER_COLOR);
-    this.fill = scene.add.rectangle(x, y, width, height, fillColor).setOrigin(0, 0.5);
+      .rectangle(fillX, fillY, geom.width, geom.height, bgColor)
+      .setOrigin(0, 0.5);
+    // Framed bars: chrome supplies the border; a stroked rect would peek past
+    // the transparent window into the opaque end caps.
+    if (!frameTextureKey) {
+      this.bg.setStrokeStyle(BORDER_WIDTH, BORDER_COLOR);
+    }
+    this.fill = scene.add
+      .rectangle(fillX, fillY, geom.width, geom.height, fillColor)
+      .setOrigin(0, 0.5);
     this.frame =
       frameTextureKey && scene.textures.exists(frameTextureKey)
         ? scene.add
@@ -53,13 +84,13 @@ export class Bar {
   /** ratio in [0, 1]; clamped. Fill shrinks from the right edge (left-anchored origin). */
   setRatio(ratio: number): void {
     const clamped = Phaser.Math.Clamp(ratio, 0, 1);
-    this.fill.width = this.width * clamped;
+    this.fill.width = this.fillWidth * clamped;
   }
 
   setPosition(x: number, y: number): void {
-    this.bg.setPosition(x, y);
-    this.fill.setPosition(x, y);
-    this.frame?.setPosition(x + this.width / 2, y);
+    this.bg.setPosition(x + this.offsetX, y + this.offsetY);
+    this.fill.setPosition(x + this.offsetX, y + this.offsetY);
+    this.frame?.setPosition(x + this.outerWidth / 2, y);
   }
 
   /** Re-parents both rectangles (+ frame, if any) into `container` (their x/y become local offsets). */
