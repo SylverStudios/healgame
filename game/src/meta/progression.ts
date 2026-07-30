@@ -53,9 +53,10 @@ export function applyCombatResult(
     if (save.progressionMode === 'cards') {
       // applyCardsLevelUps owns upgrade-point banking + free unlock grants.
       applyCardsLevelUps(save, levelBefore, levelAfter);
+      // Upgrade-point count is shown on the Spells CTA — keep the ribbon short.
       notices.push({
         kind: 'levelUp',
-        text: `LEVEL ${levelAfter} — +${points} Upgrade Point${points === 1 ? '' : 's'}`,
+        text: `Welcome to level ${levelAfter}`,
       });
       for (let level = levelBefore + 1; level <= levelAfter; level++) {
         for (const unlock of CARD_UNLOCKS) {

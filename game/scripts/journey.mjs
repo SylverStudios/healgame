@@ -749,7 +749,7 @@ try {
   await waitForNamed(page, 'tutorialLearn');
   save = await readSave(page);
   check(save?.progressionMode === 'cards', 'Spell cards wipe restarts in cards mode');
-  check(save?.upgradePoints === 1, 'fresh cards save banks 1 upgrade point');
+  check(save?.upgradePoints === 0, 'fresh cards save starts with 0 upgrade points');
   check(
     save?.unlockedSpells?.includes('heal') && save?.unlockedSpells?.includes('bonk'),
     'fresh cards save owns Heal + Bonk',

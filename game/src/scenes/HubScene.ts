@@ -197,13 +197,11 @@ export class HubScene extends Phaser.Scene {
       save.progressionMode === 'lattice' && !hasZealous
         ? ` + ${SPELLS.zealousMending.name}`
         : '';
-    const upgradePoints = Math.max(0, Math.floor(save.upgradePoints));
-    const levelLine = cards
-      ? upgradePoints > 0
-        ? `Level ${level}  ·  ${upgradePoints} upgrade point${upgradePoints === 1 ? '' : 's'}`
-        : `Level ${level}`
-      : `Level ${level}`;
-    const xpLine = `XP ${save.xp}/${nextLevelXp} → Level ${level + 1}${mendTease}`;
+    // Cards: level + XP only — upgrade cues live on the Spells button / notices.
+    const levelLine = `Level ${level}`;
+    const xpLine = cards
+      ? `XP ${save.xp}/${nextLevelXp}`
+      : `XP ${save.xp}/${nextLevelXp} → Level ${level + 1}${mendTease}`;
 
     // Chunk 4: hub stats block gets a light frame (bible item 4 "hub stats
     // block if it helps") — sized around the two text lines below.
@@ -212,7 +210,7 @@ export class HubScene extends Phaser.Scene {
       .text(width / 2, 82, levelLine, {
         fontFamily: FONT,
         fontSize: FONT_SIZE_SM,
-        color: cards && upgradePoints > 0 ? ACCENT_COLOR : TEXT_COLOR,
+        color: TEXT_COLOR,
       })
       .setOrigin(0.5);
     this.add

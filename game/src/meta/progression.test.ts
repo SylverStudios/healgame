@@ -135,11 +135,11 @@ describe('applyCombatResult', () => {
   });
 
   it('cards first-clear grants upgrade point and skips relic offers', () => {
-    const s = save({ progressionMode: 'cards', upgradePoints: 1 });
+    const s = save({ progressionMode: 'cards', upgradePoints: 0 });
     const notices = applyCombatResult(s, result({ status: 'victory' }), () => 0);
     expect(s.clearedDungeons).toEqual(['ash-gate']);
     expect(s.pendingRelicOffers).toEqual([]);
-    expect(s.upgradePoints).toBe(2);
+    expect(s.upgradePoints).toBe(1);
     expect(notices).toEqual([
       { kind: 'firstClear', text: 'FIRST CLEAR — +1 Upgrade Point · open Spells' },
     ]);
@@ -151,15 +151,15 @@ describe('applyCombatResult', () => {
       xp: XP_LEVEL_2_THRESHOLD - 1,
       unlockedSpells: ['heal', 'bonk'],
       actionBar: ['heal', 'bonk', '', ''],
-      upgradePoints: 1,
+      upgradePoints: 0,
     });
     const notices = applyCombatResult(s, result({ xp: 1 }));
-    expect(s.upgradePoints).toBe(2);
+    expect(s.upgradePoints).toBe(1);
     expect(s.unlockedSpells).toContain('mend');
     expect(s.actionBar).toContain('mend');
     expect(s.unlockedSpells).not.toContain(SPELLS.zealousMending.id);
     expect(notices).toEqual([
-      { kind: 'levelUp', text: 'LEVEL 2 — +1 Upgrade Point' },
+      { kind: 'levelUp', text: 'Welcome to level 2' },
       { kind: 'spellLearned', text: 'Mend learned!' },
     ]);
   });
@@ -170,16 +170,16 @@ describe('applyCombatResult', () => {
       xp: xpForLevel(5) - 1,
       unlockedSpells: ['heal', 'bonk', 'mend'],
       actionBar: ['heal', 'bonk', 'mend', ''],
-      upgradePoints: 4,
+      upgradePoints: 3,
     });
     const notices = applyCombatResult(s, result({ xp: 1 }));
     expect(levelForXp(s.xp)).toBe(5);
-    expect(s.upgradePoints).toBe(5);
+    expect(s.upgradePoints).toBe(4);
     expect(s.unlockedSpells).toContain('vowstrike');
     expect(s.unlockedSpells).toContain('bonk');
     expect(s.actionBar).toContain('vowstrike');
     expect(notices).toEqual([
-      { kind: 'levelUp', text: 'LEVEL 5 — +1 Upgrade Point' },
+      { kind: 'levelUp', text: 'Welcome to level 5' },
       { kind: 'spellLearned', text: 'Vowstrike learned!' },
     ]);
   });
@@ -190,15 +190,15 @@ describe('applyCombatResult', () => {
       xp: xpForLevel(6) - 1,
       unlockedSpells: ['heal', 'bonk', 'mend', 'vowstrike'],
       actionBar: ['heal', 'bonk', 'mend', 'vowstrike'],
-      upgradePoints: 5,
+      upgradePoints: 4,
     });
     const notices = applyCombatResult(s, result({ xp: 1 }));
     expect(levelForXp(s.xp)).toBe(6);
-    expect(s.upgradePoints).toBe(6);
+    expect(s.upgradePoints).toBe(5);
     expect(s.unlockedSpells).not.toContain('still-waters');
     expect(buildLoadout(s).cooldowns.map((c) => c.id)).toContain('still-waters');
     expect(notices).toEqual([
-      { kind: 'levelUp', text: 'LEVEL 6 — +1 Upgrade Point' },
+      { kind: 'levelUp', text: 'Welcome to level 6' },
       { kind: 'spellLearned', text: 'Still Waters learned!' },
     ]);
   });

@@ -6,11 +6,11 @@ import { applyCardsLevelUps, loadoutFromCardSave } from './resolve';
 describe('applyCardsLevelUps', () => {
   it('banks +1 upgrade point per crossed level and no-ops when levels equal', () => {
     const save = newSaveData('cards');
-    expect(save.upgradePoints).toBe(1);
+    expect(save.upgradePoints).toBe(0);
     applyCardsLevelUps(save, 1, 1);
-    expect(save.upgradePoints).toBe(1);
+    expect(save.upgradePoints).toBe(0);
     applyCardsLevelUps(save, 1, 3);
-    expect(save.upgradePoints).toBe(3); // +1 for lv2, +1 for lv3
+    expect(save.upgradePoints).toBe(2); // +1 for lv2, +1 for lv3
   });
 
   it('grants mend at level 2 and auto-equips into the first free bar slot', () => {
@@ -20,7 +20,7 @@ describe('applyCardsLevelUps', () => {
     expect(save.unlockedSpells).toContain('mend');
     expect(save.unlockedSpells.filter((id) => id === 'mend')).toHaveLength(1);
     expect(save.actionBar[2]).toBe('mend');
-    expect(save.upgradePoints).toBe(2);
+    expect(save.upgradePoints).toBe(1);
   });
 
   it('grants vowstrike at level 5 beside bonk (does not replace)', () => {
@@ -31,14 +31,14 @@ describe('applyCardsLevelUps', () => {
     );
     expect(save.actionBar).toContain('vowstrike');
     expect(save.actionBar).toContain('bonk');
-    expect(save.upgradePoints).toBe(5); // start 1 + 4 levels crossed
+    expect(save.upgradePoints).toBe(4); // 4 levels crossed (2–5)
   });
 
   it('does not push cooldown ids into unlockedSpells; loadout discovers them', () => {
     const save = newSaveData('cards');
     applyCardsLevelUps(save, 5, 6);
     expect(save.unlockedSpells).not.toContain('still-waters');
-    expect(save.upgradePoints).toBe(2); // start 1 + 1
+    expect(save.upgradePoints).toBe(1); // +1 for lv6
     const mods = loadoutFromCardSave({
       xp: xpForLevel(6),
       actionBar: save.actionBar,

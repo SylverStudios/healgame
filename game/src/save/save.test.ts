@@ -71,13 +71,13 @@ describe('save', () => {
     expect(save.spellChips).toEqual({});
   });
 
-  it('cards newSaveData starts Heal+Bonk with 1 upgrade point', () => {
+  it('cards newSaveData starts Heal+Bonk with 0 upgrade points', () => {
     const save = newSaveData('cards');
     expect(save.progressionMode).toBe('cards');
     expect(save.unlockedSpells).toEqual([RADIAL_HEAL.id, RADIAL_BONK.id]);
     expect(save.actionBar).toEqual([RADIAL_BONK.id, RADIAL_HEAL.id, '', '']);
     expect(save.treeRanks).toEqual({});
-    expect(save.upgradePoints).toBe(1);
+    expect(save.upgradePoints).toBe(0);
     expect(save.spellChips).toEqual({});
     expect(save.relicIds).toEqual([]);
     expect(save.pendingRelicOffers).toEqual([]);
@@ -145,7 +145,7 @@ describe('save', () => {
 
     const cards = resetSaveToMode('cards', store);
     expect(cards.progressionMode).toBe('cards');
-    expect(cards.upgradePoints).toBe(1);
+    expect(cards.upgradePoints).toBe(0);
     expect(loadSave(store).progressionMode).toBe('cards');
   });
 

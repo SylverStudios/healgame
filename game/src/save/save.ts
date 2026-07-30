@@ -132,7 +132,8 @@ export function newSaveData(mode: ProgressionMode = 'lattice'): SaveData {
       combatPaceTenths: 10,
       relicIds: [],
       pendingRelicOffers: [],
-      upgradePoints: 1,
+      // First upgrade point arrives at level 2 (with Mend) — no spend at Lv1.
+      upgradePoints: 0,
       spellChips: {},
       musicVolumePct: 50,
       recentRuns: [],

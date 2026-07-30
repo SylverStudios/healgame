@@ -93,7 +93,7 @@ describe('offersForNextSlot', () => {
 describe('applyChipPurchase', () => {
   it('spends a point and appends an offered slot-0 chip', () => {
     const save = newSaveData('cards');
-    expect(save.upgradePoints).toBe(1);
+    save.upgradePoints = 1;
     expect(applyChipPurchase(save, 'heal', 'heal-power')).toBe(true);
     expect(save.upgradePoints).toBe(0);
     expect(save.spellChips.heal).toEqual(['heal-power']);
@@ -101,6 +101,7 @@ describe('applyChipPurchase', () => {
 
   it('rejects wrong-slot chips (slot-1 while slot-0 empty)', () => {
     const save = newSaveData('cards');
+    save.upgradePoints = 1;
     expect(applyChipPurchase(save, 'heal', 'heal-graven')).toBe(false);
     expect(save.upgradePoints).toBe(1);
     expect(save.spellChips.heal).toBeUndefined();
@@ -108,6 +109,7 @@ describe('applyChipPurchase', () => {
 
   it('rejects chip for a different spell', () => {
     const save = newSaveData('cards');
+    save.upgradePoints = 1;
     expect(applyChipPurchase(save, 'heal', 'mend-arming')).toBe(false);
     expect(save.upgradePoints).toBe(1);
   });
@@ -115,6 +117,8 @@ describe('applyChipPurchase', () => {
   it('rejects unknown spell / insufficient points / full slots', () => {
     const save = newSaveData('cards');
     expect(applyChipPurchase(save, 'mend', 'mend-arming')).toBe(false); // not unlocked
+    expect(applyChipPurchase(save, 'heal', 'heal-power')).toBe(false); // no points
+    save.upgradePoints = 1;
     expect(applyChipPurchase(save, 'heal', 'heal-power')).toBe(true);
     expect(applyChipPurchase(save, 'heal', 'heal-graven')).toBe(false); // no points left
     save.upgradePoints = 1;

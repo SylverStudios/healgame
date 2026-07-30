@@ -28,8 +28,8 @@ choices** per slot.
 1. Settings offers **Classic | Radial | Spell cards**. Switching modes confirms,
    wipes save, restarts Tutorial (same UX as today’s Classic↔Radial).
 2. Fresh **Spell cards** save: Heal + Bonk on the bar; album shows both cards
-   with empty slots; **1 unspent upgrade point** at level 1 (or equivalent CTA
-   so the player knows to open Spells).
+   with empty slots; **0 upgrade points** at level 1 (first point + Mend at
+   level 2 — Spells CTA lights when points are available).
 3. Leveling grants **+1 upgrade point per level** and free unlocks per §3
    table (Mend, Vowstrike, then one major CD per level 6–8).
 4. Player can spend a point: pick a spell with a free slot → see that slot’s
@@ -143,7 +143,7 @@ Pinned defaults for `newSaveData('cards')`:
 - `unlockedSpells: ['heal', 'bonk']` (keep in sync with level unlocks)
 - `actionBar: defaultRadialActionBar()` (Bonk Q, Heal W)
 - `treeRanks: {}`
-- `upgradePoints: 1` on new cards save
+- `upgradePoints: 0` on new cards save (first point at level 2)
 - `spellChips: {}`
 - `relicIds: []`, `pendingRelicOffers: []`
 - `subclass: null`

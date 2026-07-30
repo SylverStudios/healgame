@@ -14,9 +14,10 @@ Third progression mode beside lattice + radial for friend A/B testing.
 - **Save v10** — `progressionMode: 'cards'`; `upgradePoints` + `spellChips` on
   all modes; purges v9+.
 - **Settings** — Classic | Radial | **Spell cards**; confirm → wipe → Tutorial.
-- **Cards loop** — free level unlocks (Heal/Bonk → Mend → Vowstrike → 3 major
-  CDs); spend points on **fixed 3-way chip sets** per slot (no RNG); resolve
-  into existing `CombatMods` hooks via `loadoutFromCardSave`.
+- **Cards loop** — free level unlocks (Heal/Bonk → Mend at Lv2 with first
+  upgrade point → Vowstrike → 3 major CDs); spend points on **fixed 3-way
+  chip sets** per slot (no RNG); resolve into existing `CombatMods` hooks
+  via `loadoutFromCardSave`. Level 1 starts with 0 points.
 - **No relics** in cards — first-clear grants +1 upgrade point; Hub single
   **Spells** entry (`hubTree` → `CardAlbumScene`).
 - **Journey** — Stage Cards: Settings → album chip draft → Ash Gate.
