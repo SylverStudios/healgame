@@ -131,7 +131,7 @@ Everything else in the game stays temp art per CLAUDE.md.
 | dps1 | tight 32 still + attack + hurt | `unit-dps1` + `unit-dps1-attack` + `unit-dps1-hurt` |
 | dps2 | tight 32 still + attack + hurt | `unit-dps2` + `unit-dps2-attack` + `unit-dps2-hurt` |
 | healer | 32×32 armored-paladin south | idle + Solemn/Zealous charge/cast + Bonk zap |
-| ash-husk | tight 32 still (west) | `unit-ash-husk` |
+| ash-husk | tight 32 still + attack + hurt (west) | `unit-ash-husk` + attack/hurt strips |
 | other trash | Kenney | ghost 121 |
 | Gate Warden / Ember / Matriarch | Kenney | brute 109 |
 | Spire / Dirge / Hollow King | Kenney | demon 110 |

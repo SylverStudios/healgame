@@ -202,7 +202,21 @@
           "file": "west.png",
           "frames": 1,
           "status": "live",
-          "note": "tight 32×32 west; healer density; attack/hurt queued"
+          "note": "tight 32×32 west; healer density"
+        },
+        "attack": {
+          "dir": "attack-west",
+          "frames": 7,
+          "status": "live",
+          "durations": "ASH_HUSK_ATTACK_FRAME_DURATIONS_MS",
+          "note": "west claw one-shot; keep_first_frame rest + 6 gen"
+        },
+        "hurt": {
+          "dir": "hurt-west",
+          "frames": 5,
+          "status": "live",
+          "durations": "ASH_HUSK_HURT_FRAME_DURATIONS_MS",
+          "note": "west hurt one-shot; keep_first_frame rest + 4 gen"
         }
       }
     },

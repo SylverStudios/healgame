@@ -7,7 +7,7 @@ sprites in Phaser. Authority for live Kenney mapping: [`docs/unit-art.md`](../..
 
 | Unit | Artifacts | Combat still | Attack |
 |---|---|---|---|
-| Ash Husk | `artifacts/pixellab-ash-husk-v2/` · source `art/source/ash-husk/` | `west.png` (**32×32** tight) | attack/hurt queued |
+| Ash Husk | `artifacts/pixellab-ash-husk-v2/` · source `art/source/ash-husk/` | `west.png` (**32×32** tight) | `attack-west/0–6.png` + `hurt-west/0–4.png` |
 | Starter tank | `artifacts/pixellab-tank-v2/` | `east.png` (32×32) | `attack-east/` + `hurt-east/` |
 | Starter DPS1 | `artifacts/pixellab-dps1-v2/` | `east.png` (32×32) | `attack-east/` + `hurt-east/` |
 | Starter DPS2 | `artifacts/pixellab-dps2-v2/` | `east.png` (32×32) | `attack-east/` + `hurt-east/` |
