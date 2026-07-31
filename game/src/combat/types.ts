@@ -322,6 +322,12 @@ export interface EnemyGroupDef {
   autoDamage?: number;
   /** Falls back to the legacy trash constant for synthetic encounters. */
   swingIntervalMs?: number;
+  /**
+   * Optional telegraphed cast compiled from the mob's single abilityIds[0]
+   * (v1 enemy mechanics — trash may teach the boss verb). Omitted when the
+   * mob has no ability.
+   */
+  cast?: EnemyCastDef;
 }
 
 export interface WaveDef {
@@ -400,13 +406,16 @@ export type BossCastDef =
   | PartyDoTCastDef
   | ManaSiphonCastDef;
 
+/** Shared cast shape for boss and trash (v1 enemy mechanics). Alias keeps churn low. */
+export type EnemyCastDef = BossCastDef;
+
 export interface BossDef {
   id: string;
   name: string;
   hp: number;
   autoDamage: number;
   swingIntervalMs: number;
-  cast?: BossCastDef;
+  cast?: EnemyCastDef;
 }
 
 export interface EncounterDef {

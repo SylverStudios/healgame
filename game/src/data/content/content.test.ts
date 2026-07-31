@@ -278,7 +278,7 @@ describe('content diagnostics', () => {
     expect(compiled.waves[0]?.enemies[0]?.autoDamage).toBe(0);
   });
 
-  it('rejects empty names, ambiguous mob tags, and trash abilities', () => {
+  it('rejects empty names and ambiguous mob tags', () => {
     const malformed: ContentCatalogs = {
       ...CONTENT_CATALOGS,
       abilities: [
@@ -302,9 +302,52 @@ describe('content diagnostics', () => {
 
     const codes = validateContent(malformed).errors.map(({ code }) => code);
     expect(codes.filter((code) => code === 'empty-name')).toHaveLength(3);
-    expect(codes).toEqual(
-      expect.arrayContaining(['invalid-mob-tags', 'trash-abilities-unsupported']),
-    );
+    expect(codes).toEqual(expect.arrayContaining(['invalid-mob-tags']));
+    expect(codes).not.toContain('trash-abilities-unsupported');
+  });
+
+  it('accepts trash mobs with one ability and compiles cast onto the group', () => {
+    const withTrashCast: ContentCatalogs = {
+      ...CONTENT_CATALOGS,
+      abilities: [
+        ...CONTENT_CATALOGS.abilities,
+        {
+          id: 'bonehowl-lesser',
+          name: 'Lesser Bonehowl',
+          kind: 'partyAoE',
+          castMs: 4_000,
+          firstCastAtMs: 1_500,
+          intervalMs: 10_000,
+          partyDamage: 2,
+          visualKey: 'bonehowl',
+        },
+      ],
+      mobs: CONTENT_CATALOGS.mobs.map((mob) =>
+        mob.id === 'ash-husk' ? { ...mob, abilityIds: ['bonehowl-lesser'] } : mob,
+      ),
+    };
+
+    expect(validateContent(withTrashCast).errors).toEqual([]);
+    const compiled = compileDungeon('ash-gate', withTrashCast);
+    expect(compiled.waves[0]?.enemies[0]?.cast).toEqual({
+      name: 'Lesser Bonehowl',
+      castMs: 4_000,
+      firstCastAtMs: 1_500,
+      intervalMs: 10_000,
+      partyDamage: 2,
+    });
+    expect(compiled.boss.cast?.name).toBe('Bonehowl');
+  });
+
+  it('rejects trash and boss mobs with more than one ability', () => {
+    const tooMany: ContentCatalogs = {
+      ...CONTENT_CATALOGS,
+      mobs: CONTENT_CATALOGS.mobs.map((mob) =>
+        mob.id === 'ash-husk' ? { ...mob, abilityIds: ['bonehowl', 'extinction'] } : mob,
+      ),
+    };
+    const codes = validateContent(tooMany).errors.map(({ code }) => code);
+    expect(codes).toContain('runtime-ability-limit');
   });
 
   it('returns all errors and unused-content warnings for an invalid fixture', () => {
