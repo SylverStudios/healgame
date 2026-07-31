@@ -66,7 +66,7 @@ agents should prefer `verify`.
 |------|----------|
 | Living rules | `CLAUDE.md`, `docs/poc-spec.md`, `docs/poc-qa.md` |
 | Ship log | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) |
-| Active mission | None; check `docs/*-handoff.md` for a future `Status: planning` handoff |
+| Active mission | [`docs/v1-mechanics-handoff.md`](docs/v1-mechanics-handoff.md) (`Status: planning`) — player mechanics; agent prompt [`docs/v1-mechanics-agent-prompt.md`](docs/v1-mechanics-agent-prompt.md) |
 | Module contracts | Colocated `AGENTS.md` / `README.md` |
 | Journey names | [`docs/semantic-targets.md`](docs/semantic-targets.md) |
 | Idea backlog | [`docs/ideas.md`](docs/ideas.md) (`Status: current`, not a handoff) |
