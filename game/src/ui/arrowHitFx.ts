@@ -4,8 +4,12 @@
  * Self-cleaning: owns its sprites/tweens/timers and destroys them.
  * Safe no-op if the texture is missing. Removable without combat/engine fallout.
  *
- * No on-screen travel — impact plays at the victim after the archer's bow
- * raises (`DPS2_ARROW_HIT_LEAD_MS`), suggesting the shot was too fast to see.
+ * No full-screen projectile — impact plays at the victim after the archer's
+ * bow raises (`DPS2_ARROW_HIT_LEAD_MS`), suggesting the shot was too fast to
+ * see. Each impact lands with a small random jitter (`hitJitterOffset`) so
+ * repeated hits don't stack pixel-perfect, and the embedded stub does a tiny
+ * left→right sink slide into the body (`ARROW_SINK_SLIDE_PX`) as it settles —
+ * a few-px settle, not a flight across the battlefield.
  */
 
 import Phaser from 'phaser';
@@ -17,6 +21,7 @@ import {
   ARROW_HIT_TEXTURE_KEY,
   DPS2_ARROW_HIT_LEAD_MS,
 } from './sprites';
+import { ARROW_SINK_SLIDE_MS, ARROW_SINK_SLIDE_PX, hitJitterOffset } from './hitFxLayout';
 
 const DISPLAY_SIZE = 64;
 const DEPTH = 49;
@@ -39,8 +44,11 @@ export function showArrowHit(
     onContact?: () => void;
   },
 ): void {
-  const impactX = args.targetX + EMBED_X_OFFSET;
-  const impactY = args.targetY + ANCHOR_Y_OFFSET;
+  // Presentation-only jitter (UI Math.random is allowed) so stacked archer
+  // hits on the same victim don't land pixel-identical.
+  const jitter = hitJitterOffset(Math.random(), Math.random());
+  const impactX = args.targetX + EMBED_X_OFFSET + jitter.dx;
+  const impactY = args.targetY + ANCHOR_Y_OFFSET + jitter.dy;
   const onContact = args.onContact;
 
   const fire = () => {
@@ -68,6 +76,15 @@ function playImpact(scene: Phaser.Scene, x: number, y: number): void {
     .image(x, y, ARROW_HIT_TEXTURE_KEY, ARROW_HIT_EMBED_FRAME)
     .setDisplaySize(DISPLAY_SIZE, DISPLAY_SIZE)
     .setDepth(DEPTH);
+
+  // Tiny left→right sink slide: the stub settles a few px deeper into the body
+  // (eastward) as it embeds — a settle, not a projectile crossing the field.
+  scene.tweens.add({
+    targets: embed,
+    x: x + ARROW_SINK_SLIDE_PX,
+    duration: ARROW_SINK_SLIDE_MS,
+    ease: 'Quad.easeOut',
+  });
 
   const burst = scene.add
     .image(x, y, ARROW_HIT_TEXTURE_KEY, ARROW_HIT_BURST_FRAME_START)

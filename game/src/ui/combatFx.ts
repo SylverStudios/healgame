@@ -18,6 +18,7 @@ import {
   ZAP_VFX_FRAME_DURATIONS_MS,
   ZAP_VFX_TEXTURE_KEY,
 } from './sprites';
+import { hitJitterOffset } from './hitFxLayout';
 
 const BOSS_SHAKE_DURATION_MS = 150;
 const BOSS_SHAKE_INTENSITY = 0.004;
@@ -111,10 +112,14 @@ export function showHealSparkle(scene: Phaser.Scene, x: number, y: number): void
  * Chunk 1B: one-shot pale-gold impact burst played on the enemy target when
  * Bonk lands — mirrors `showHealSparkle`'s wiring but with per-frame holds
  * (heal-vfx uses one fixed delay; zap-vfx's exposure sheet is uneven).
+ *
+ * Wave 6 / R2: the burst lands with a small presentation-only random jitter
+ * (UI `Math.random` is allowed) so repeated Bonk hits don't stack pixel-perfect.
  */
 export function showZapImpact(scene: Phaser.Scene, x: number, y: number): void {
+  const jitter = hitJitterOffset(Math.random(), Math.random());
   const sprite = scene.add
-    .image(x, y - 10, ZAP_VFX_TEXTURE_KEY, 0)
+    .image(x + jitter.dx, y - 10 + jitter.dy, ZAP_VFX_TEXTURE_KEY, 0)
     .setDisplaySize(ZAP_VFX_DISPLAY_SIZE, ZAP_VFX_DISPLAY_SIZE)
     .setDepth(ZAP_VFX_DEPTH);
   let frame = 0;
