@@ -106,12 +106,15 @@ export class CombatEngine {
   private readonly blockThresholdN: number | undefined;
   /** Running accumulator for block math (integer carry-over across swings). */
   private blockDamageCarry = 0;
-  /** v1 M3: crit chance in permille (0–1000). 0 = never crits (default). */
-  private readonly critChancePermille: number;
-  /** v1 M3: crit damage/heal bonus in permille above base (e.g. 500 = +50%). */
+  /**
+   * Crit every-N completed player casts. Undefined = disabled.
+   * Higher rank → smaller N (see secondaryStats.critThreshold).
+   */
+  private readonly critThresholdN: number | undefined;
+  /** Cast counter for deterministic crit (mirrors blockDamageCarry). */
+  private critCastCarry = 0;
+  /** Crit output bonus in permille above base (e.g. 500 = +50%). */
   private readonly critBonusPermille: number;
-  /** Injected RNG for crit. Default () => 1 ensures the check `rng()*1000 < chance` is always false. */
-  private readonly rng: () => number;
 
   private party: Unit[] = [];
   private activeEnemies: Unit[] = [];
@@ -163,9 +166,8 @@ export class CombatEngine {
     this.spells = spells;
     this.hastePermille = options?.hastePermille ?? 0;
     this.blockThresholdN = options?.blockThresholdN;
-    this.critChancePermille = options?.critChancePermille ?? 0;
+    this.critThresholdN = options?.critThresholdN;
     this.critBonusPermille = options?.critBonusPermille ?? 0;
-    this.rng = options?.rng ?? (() => 1);
 
     this.relicStats = {
       bonusMaxMana: 0,
@@ -653,20 +655,21 @@ export class CombatEngine {
     // Mana was already reserved/debited at cast start — do not subtract again.
     events.push({ type: 'castFinished', spellId: cast.spellId });
 
+    // Deterministic crit: one tick per completed cast (heal, damage, or hybrid).
+    // Same isCrit applies to every player heal/damage output from this cast.
+    const isCrit = this.consumeCritForCast();
+
     const target = this.getUnit(cast.targetId);
 
     // Damage spells (Bonk / Vowstrike): hit the locked enemy target; then apply
     // castBuff / synergy arming. Heal pipeline is skipped when heal === 0.
     if ((spell.damage ?? 0) > 0) {
       if (target && target.alive) {
-        // v1 M3 crit: roll before applying armor. floor multiply per locked contract.
         let dmgAmount = spell.damage!;
-        let isDmgCrit = false;
-        if (this.rng() * 1000 < this.critChancePermille) {
+        if (isCrit) {
           dmgAmount = Math.floor((dmgAmount * (1000 + this.critBonusPermille)) / 1000);
-          isDmgCrit = true;
         }
-        this.applyDamageToUnit(target, dmgAmount, 'healer', events, isDmgCrit);
+        this.applyDamageToUnit(target, dmgAmount, 'healer', events, isCrit);
       }
       // Mana Bonk: restore mana after a completed damage cast (hit attempted).
       if ((spell.manaOnHit ?? 0) > 0) {
@@ -760,7 +763,7 @@ export class CombatEngine {
         );
         this.bonkHealStackCount = 0;
       }
-      // v1 M3 crit: assembled raw first, then roll. floor multiply per locked contract.
+      // Deterministic crit: assembled raw first, then every-N-casts multiply.
       let raw =
         spell.heal +
         synergyBonus +
@@ -770,10 +773,8 @@ export class CombatEngine {
         this.relicStats.bonusHealing +
         healBonus +
         potencyBonus;
-      let isHealCrit = false;
-      if (this.rng() * 1000 < this.critChancePermille) {
+      if (isCrit) {
         raw = Math.floor((raw * (1000 + this.critBonusPermille)) / 1000);
-        isHealCrit = true;
       }
       const applied = Math.min(raw, missing);
       const overheal = raw - applied;
@@ -784,7 +785,7 @@ export class CombatEngine {
         amount: applied,
         overheal,
         spellId: spell.id,
-        ...(isHealCrit ? { crit: true } : {}),
+        ...(isCrit ? { crit: true } : {}),
       });
       // v0.3 §Coyote: a heal that completes on a dying unit (within its grace window, since a
       // truly-dead target would have auto-cancelled this cast instead — see cancelCastIfTargeting)
@@ -896,6 +897,18 @@ export class CombatEngine {
   private damageAfterArmor(target: Unit, amount: number): number {
     if (target.role !== 'tank' && target.role !== 'dps' && target.role !== 'healer') return amount;
     return Math.max(1, amount - this.relicStats.armor[target.role]);
+  }
+
+  /**
+   * Deterministic crit tick — once per completed player cast.
+   * `carry += 1; procs = floor(carry / N); carry %= N` (mirrors tank block).
+   */
+  private consumeCritForCast(): boolean {
+    if (this.critThresholdN === undefined) return false;
+    this.critCastCarry += 1;
+    const procs = Math.floor(this.critCastCarry / this.critThresholdN);
+    this.critCastCarry %= this.critThresholdN;
+    return procs > 0;
   }
 
   private applyDamageToUnit(

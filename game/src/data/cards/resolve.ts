@@ -259,11 +259,13 @@ export function loadoutFromCardSave(save: {
     .filter((c): c is NonNullable<typeof c> => c !== undefined)
     .map((c) => ({ ...c }));
 
-  // Secondary Upgrade ranks → fight mods (engine applies in M2/M3).
+  // Secondary Upgrade ranks → fight mods (engine applies haste/block/crit).
   const sec = fightModsFromSecondaryRanks(save.secondaryRanks ?? {});
   if (sec.hastePermille > 0) mods.hastePermille = sec.hastePermille;
-  if (sec.critChancePermille > 0) mods.critChancePermille = sec.critChancePermille;
-  if (sec.critChancePermille > 0) mods.critBonusPermille = sec.critBonusPermille;
+  if (sec.critThresholdN !== null) {
+    mods.critThresholdN = sec.critThresholdN;
+    mods.critBonusPermille = sec.critBonusPermille;
+  }
   if (sec.blockThresholdN !== null) mods.blockThresholdN = sec.blockThresholdN;
   if (sec.manaRegen !== null) {
     if (mods.manaRegen) {

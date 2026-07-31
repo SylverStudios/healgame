@@ -22,8 +22,8 @@ export function combatOptionsFromLoadout(
     cooldowns: lo.cooldowns,
     relics,
     ...(lo.hastePermille != null ? { hastePermille: lo.hastePermille } : {}),
-    ...(lo.critChancePermille != null
-      ? { critChancePermille: lo.critChancePermille, critBonusPermille: lo.critBonusPermille }
+    ...(lo.critThresholdN != null
+      ? { critThresholdN: lo.critThresholdN, critBonusPermille: lo.critBonusPermille }
       : {}),
     ...(lo.blockThresholdN != null ? { blockThresholdN: lo.blockThresholdN } : {}),
   };

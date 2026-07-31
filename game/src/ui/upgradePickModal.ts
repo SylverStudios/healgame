@@ -32,7 +32,7 @@ const UPGRADE_LABELS: Record<SecondaryId, string> = {
 
 const UPGRADE_DESCS: Record<SecondaryId, string> = {
   block: 'Tank blocks 1 damage every N hits taken. Higher rank blocks more often.',
-  crit: 'Heals have a chance to critically heal for +50% output.',
+  crit: 'Every N casts, that cast critically heals/damages for +50%. Higher ranks crit more often.',
   haste: 'Reduces cast time, letting you heal faster.',
   manaRegen: 'Restores mana over time, enabling more casts.',
 };

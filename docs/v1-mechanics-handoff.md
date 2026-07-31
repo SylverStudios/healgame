@@ -49,8 +49,9 @@ until a **separate removal pass** (out of this handoff).
    **significant-only** (power-only chips parked/removed from offers).
 4. Every level-up: player picks **one of four** secondaries to rank up; ranks
    persist; fight kit applies them.
-5. Engine supports: deterministic tank **block** (every-N), probabilistic
-   **crit** (injected RNG), **haste** (castMs only), **mana regen** stacking.
+5. Engine supports: deterministic tank **block** (every-N damage),
+   deterministic **crit** (every-N casts), **haste** (castMs only),
+   **mana regen** stacking.
 6. Level 6 → pick 1 of Set A (3); level 8 → pick 1 of Set B (3 distinct new
    CDs). Chosen ids persist. No auto-grant of all three legacy majors.
 7. Save bumped if golden fixtures break; journey names for new controls.
@@ -72,11 +73,11 @@ until a **separate removal pass** (out of this handoff).
 | D8 | **Upgrades**: on **every level-up**, choose **1 of 4** secondaries (`block`, `crit`, `haste`, `manaRegen`). One pick per level gained. Ranks stack. |
 | D9 | Magnitudes live in `data/` tables keyed by rank — **not** baked into SaveData (save stores ranks / chosen ids only). |
 | D10 | **Block (tank only, deterministic):** no RNG. Tank accumulates incoming damage; **every N damage, block 1** (reduce that hit by 1, carry remainder). Upgrades **reduce N**. See §5.3. |
-| D11 | **Crit:** chance (permille) × output bonus (fantasy **+50%** = 500 permille). Applies to **player heal and player spell damage**. Needs injected RNG. |
+| D11 | **Crit (deterministic, cast-based):** every N **completed player casts**, that cast crits (+50% = 500 permille). Applies to player heal and player spell damage. Same carry model as block. **No RNG.** |
 | D12 | **Haste:** % reduction of **player castMs only**. **GCD unchanged.** |
 | D13 | **Mana regen:** stacks via existing merge (sum amount, min interval). |
-| D14 | `CombatEngineOptions.rng?: () => number` for crit only. No `Math.random` inside pure modules. Tests/bots: `() => 0` → never crit, or fixed seed. |
-| D15 | Probabilities / rates use **integers** (permille, damage thresholds). |
+| D14 | Crit and block are both deterministic accumulators — no `CombatEngineOptions.rng` for secondaries. |
+| D15 | Rates use **integers** (permille bonuses, damage/cast thresholds). |
 | D16 | **CD choice:** L6 → Set A (existing `still-waters`, `wrath-ascendant`, `frenzied-liturgy`); L8 → Set B (**three new distinct CD ids**). Max two majors. |
 | D17 | Chosen CD ids **persist on save**. Cards loadout reads save, not `cooldownIdsAtLevel` auto list. |
 | D18 | **Default** `newSaveData().progressionMode = 'cards'`. Settings still offers Classic / Radial / Spell cards (wipe on switch). |
@@ -213,14 +214,16 @@ export const SECONDARY_RANK_EFFECTS: Record<SecondaryId, (rank: number) => Secon
 - Emit `blocked?: number` (or boolean) on `damage` events for future juice.
 - **Not** probabilistic. **Not** %-DR. **Not** whole-party.
 
-**Crit — probabilistic:**
+**Crit — deterministic every-N casts:**
 
-- `critChancePermille(rank)`, `critBonusPermille` (stub 500 = +50%).
+- `critThresholdN(rank)`, `critBonusPermille` (stub 500 = +50%).
+- Each **completed** player cast: `carry += 1; procs = floor(carry / N);
+  carry %= N`. When `procs > 0`, that cast crits. Cancelled casts do not
+  advance carry. Hybrid damage+heal shares one tick.
 - After heal/damage raw assembled in `completePlayerCast`, before overheal
-  split / apply: if `rng()*1000 < chance`, multiply by `(1000+bonus)/1000`
-  (integer ceil/floor — pick one, test it).
+  split / apply: multiply by `(1000+bonus)/1000` with **integer floor**.
 - `crit?: boolean` on heal/damage events.
-- Default rng never-procs in tests.
+- Rank 0 / omit = disabled. Higher rank → smaller N.
 
 **Haste — castMs only:**
 
@@ -273,10 +276,10 @@ fantasy later.
 
 1. Optional secondaries on options / `CombatMods` — omit = today’s behavior.
 2. Block uses accumulator state on engine (tank), not RNG.
-3. Crit uses optional `rng`.
+3. Crit uses cast-count accumulator (player casts), not RNG.
 4. Event flags for later juice.
 5. Balance bots: leave secondaries at 0 on crown kits unless intentionally
-   testing; crit rng = never.
+   testing.
 
 ---
 

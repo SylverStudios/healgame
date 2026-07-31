@@ -23,8 +23,6 @@ export type SecondaryRanks = Partial<Record<SecondaryId, number>>;
 export interface SecondaryFightMods {
   /** Player castMs reduction in permille (0..999). GCD unchanged. */
   hastePermille: number;
-  /** Crit chance in permille (0..1000). */
-  critChancePermille: number;
   /** Crit output bonus in permille (500 = +50%). */
   critBonusPermille: number;
   /**
@@ -32,6 +30,11 @@ export interface SecondaryFightMods {
    * Higher rank → smaller N.
    */
   blockThresholdN: number | null;
+  /**
+   * Player crit: every N completed casts, that cast crits. `null` = disabled.
+   * Higher rank → smaller N. Deterministic — no RNG.
+   */
+  critThresholdN: number | null;
   /** Extra mana regen folded into CombatMods.manaRegen merge. */
   manaRegen: { amount: number; intervalMs: number } | null;
 }
@@ -43,10 +46,14 @@ export function blockThreshold(rank: number): number | null {
   return Math.max(5, 20 - (r - 1) * 2);
 }
 
-/** Stub: +20‰ chance per rank (rank 1 = 2%). */
-export function critChancePermille(rank: number): number {
+/**
+ * Stub: rank 0 = off; rank 1 → every 8 casts; each rank −1 N, floor 3.
+ * Parallel to block — upgrades make crits more frequent.
+ */
+export function critThreshold(rank: number): number | null {
   const r = Math.max(0, Math.floor(rank));
-  return r * 20;
+  if (r <= 0) return null;
+  return Math.max(3, 8 - (r - 1));
 }
 
 /** Fantasy +50% on crit — Balance may retune. */
@@ -72,9 +79,9 @@ export function fightModsFromSecondaryRanks(ranks: SecondaryRanks): SecondaryFig
   const mana = Math.max(0, Math.floor(ranks.manaRegen ?? 0));
   return {
     hastePermille: hastePermille(haste),
-    critChancePermille: critChancePermille(crit),
     critBonusPermille: CRIT_BONUS_PERMILLE,
     blockThresholdN: blockThreshold(block),
+    critThresholdN: critThreshold(crit),
     manaRegen: manaRegenFromRank(mana),
   };
 }

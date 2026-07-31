@@ -16,8 +16,8 @@ Cards is the real progression path; lattice/radial remain dual-shipped.
 - **Loadout** — cards Hub shows Spellbook (`hubLoadout`) beside Spells album.
 - **Modifiers** — significant-only chip offers (flat power bumps parked).
 - **Upgrades** — every level-up pick 1 of block / crit / haste / manaRegen;
-  ranks apply in combat (tank block every-N, crit via injected rng, haste =
-  castMs only, manaRegen merge).
+  ranks apply in combat (tank block every-N damage, crit every-N casts,
+  haste = castMs only, manaRegen merge).
 - **Cooldown choice** — L6 Set A (Still / Wrath / Liturgy); L8 Set B
   (`iron-canticle` / `mercy-reserve` / `ashen-rite`); no auto-grant of all
   three legacy majors.

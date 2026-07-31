@@ -102,10 +102,11 @@ export interface CombatMods {
    * Magnitudes from `data/secondaryStats.ts` via save ranks.
    */
   hastePermille?: number;
-  critChancePermille?: number;
   critBonusPermille?: number;
   /** Tank block every-N post-armor damage; omit/undefined = disabled. */
   blockThresholdN?: number;
+  /** Player crit every-N completed casts; omit/undefined = disabled. */
+  critThresholdN?: number;
 }
 
 function content(c: TalentTreeContent): TalentTreeContent {
