@@ -1,9 +1,20 @@
 # Changelog — healgame
 
-Status: current · Authority: shipped-history summary (details in poc-qa) · Last verified: 2026-07-30
+Status: current · Authority: shipped-history summary (details in poc-qa) · Last verified: 2026-07-31
 
 Newest first. Numbers and rule detail live in `game/src/data/` and
 [`poc-qa.md`](./poc-qa.md) — this file is the short ship log.
+
+---
+
+## 2026-07-31 — Catalogue (spell cards content review)
+
+- **Settings → Catalogue** — scrollable Spells / Chips tabs listing every
+  cards-mode unlock and authored chip (ids, stats, descriptions, effect
+  lines). Shows spell/CD icons when shipped, plus icon art prompts from
+  `data/cards/iconPrompts.ts` when authored.
+- Journey names: `settingsCatalogue`, `catalogueTabSpells` /
+  `catalogueTabChips`, `catalogueBack`.
 
 ---
 

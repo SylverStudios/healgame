@@ -9,6 +9,7 @@ import { CardAlbumScene } from './scenes/CardAlbumScene';
 import { RelicScene } from './scenes/RelicScene';
 import { LoadoutScene } from './scenes/LoadoutScene';
 import { SettingsScene } from './scenes/SettingsScene';
+import { CatalogueScene } from './scenes/CatalogueScene';
 import { installTestHooks } from './debug/testHooks';
 import { installPlaytimeTracker } from './telemetry';
 
@@ -44,6 +45,7 @@ const game = new Phaser.Game({
     RelicScene,
     LoadoutScene,
     SettingsScene,
+    CatalogueScene,
   ],
 });
 installTestHooks(game);

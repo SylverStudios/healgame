@@ -1,5 +1,6 @@
 /**
- * Settings: music volume + Talent tree mode (Classic / Radial / Spell cards).
+ * Settings: music volume + Talent tree mode (Classic / Radial / Spell cards)
+ * + Catalogue (cards-mode spell/chip review).
  * Switching mode confirms, wipes the save, and restarts Tutorial in that mode.
  */
 
@@ -131,6 +132,16 @@ export class SettingsScene extends Phaser.Scene {
     this.makeModeButton(centerX - 220, 330, 'Classic', 'lattice', mode === 'lattice', 'settingsProgressionLattice');
     this.makeModeButton(centerX, 330, 'Radial', 'radial', mode === 'radial', 'settingsProgressionRadial');
     this.makeModeButton(centerX + 220, 330, 'Spell cards', 'cards', mode === 'cards', 'settingsProgressionCards');
+
+    this.makeButton(
+      centerX,
+      430,
+      240,
+      44,
+      'Catalogue',
+      () => fadeToScene(this, SceneKeys.Catalogue, {}),
+      'settingsCatalogue',
+    );
 
     this.makeButton(
       centerX,

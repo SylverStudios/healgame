@@ -11,6 +11,8 @@ export const SceneKeys = {
   Relic: 'Relic',
   Loadout: 'Loadout',
   Settings: 'Settings',
+  /** Cards-mode content catalogue (Settings → Catalogue). */
+  Catalogue: 'Catalogue',
 } as const;
 
 export type SceneKey = (typeof SceneKeys)[keyof typeof SceneKeys];
