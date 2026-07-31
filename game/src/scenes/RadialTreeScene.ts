@@ -489,7 +489,7 @@ export class RadialTreeScene extends Phaser.Scene {
     this.hideTooltip();
 
     const level = levelForXp(this.save.xp);
-    const treeState = treeStateFromRadialSave(this.save.treeRanks, this.save.xp);
+    const treeState = treeStateFromRadialSave(this.save.talentPointsEarned, this.save.treeRanks);
     const tv = view(RADIAL_TREE, treeState, level);
 
     const available = tv.wallet['talent'] ?? 0;

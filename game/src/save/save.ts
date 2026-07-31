@@ -57,6 +57,13 @@ export interface SaveData {
   actionBar: string[];
   /** Allocated talent points: nodeId → ranks owned (≥1). */
   treeRanks: Record<string, number>;
+  /**
+   * Lattice + radial: cumulative spendable talent points granted by dungeon
+   * victories (one per victory, first-clear or repeat). Available-to-spend is
+   * this minus points already allocated. Cards mode banks in `upgradePoints`
+   * and leaves this at 0.
+   */
+  talentPointsEarned: number;
   subclass: SubclassId | null;
   clearedDungeons: string[];
   combatPaceTenths: number;
@@ -107,6 +114,7 @@ export function newSaveData(mode: ProgressionMode = 'lattice'): SaveData {
       unlockedSpells: [RADIAL_STARTER_HEAL_ID, RADIAL_STARTER_BONK_ID],
       actionBar: defaultRadialActionBar(),
       treeRanks: { heal: 1, bonk: 1 },
+      talentPointsEarned: 0,
       subclass: null,
       clearedDungeons: [],
       combatPaceTenths: 10,
@@ -127,6 +135,7 @@ export function newSaveData(mode: ProgressionMode = 'lattice'): SaveData {
       unlockedSpells: [RADIAL_STARTER_HEAL_ID, RADIAL_STARTER_BONK_ID],
       actionBar: defaultRadialActionBar(),
       treeRanks: {},
+      talentPointsEarned: 0,
       subclass: null,
       clearedDungeons: [],
       combatPaceTenths: 10,
@@ -147,6 +156,7 @@ export function newSaveData(mode: ProgressionMode = 'lattice'): SaveData {
     unlockedSpells: [SPELLS.bonk.id],
     actionBar: defaultActionBar(),
     treeRanks: {},
+    talentPointsEarned: 0,
     subclass: null,
     clearedDungeons: [],
     combatPaceTenths: 10,
@@ -169,6 +179,7 @@ export const LEGACY_SAVE_KEYS = [
   'healgame-save-v7',
   'healgame-save-v8',
   'healgame-save-v9',
+  'healgame-save-v10',
 ] as const;
 
 /** Minimal storage interface so tests can inject an in-memory store. */
@@ -264,6 +275,7 @@ export function validateSaveData(value: unknown): value is SaveData {
   const ranks = v.treeRanks;
   if (typeof ranks !== 'object' || ranks === null || Array.isArray(ranks)) return false;
   if (!Object.values(ranks).every((r) => typeof r === 'number')) return false;
+  if (typeof v.talentPointsEarned !== 'number') return false;
   if (typeof v.combatPaceTenths !== 'number') return false;
   if (typeof v.musicVolumePct !== 'number') return false;
   if (typeof v.upgradePoints !== 'number') return false;

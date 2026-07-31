@@ -9,6 +9,7 @@ this surface (`engine.ts` + `types.ts`).
 ```ts
 new CombatEngine(encounter: EncounterDef, spells: SpellDef[], options?: {
   bonusMaxMana?: number;
+  bonusMaxHp?: { tank?: number; dps?: number; healer?: number }; // J26 — level HP; stacks on base + relic roleMaxHp
   manaRegen?: { amount: number; intervalMs: number }; // Alpha 0.2 — merge w/ relic regen
   synergies?: { triggerSpellId: string; buffedSpellId: string; bonusHeal: number }[];
   missingHealthBonuses?: { spellId: string; healPer10PctMissing: number }[];

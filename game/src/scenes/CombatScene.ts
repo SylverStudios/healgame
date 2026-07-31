@@ -302,19 +302,17 @@ export class CombatScene extends Phaser.Scene {
       .flatMap((r) => r.effects)
       .reduce((s, e) => s + (e.kind === 'bonusHealing' ? e.amount : 0), 0);
 
+    const lo = this.sceneData.loadout;
     this.engine = new CombatEngine(encounter, spells, {
-      bonusMaxMana: this.sceneData.loadout.bonusMaxMana,
-      ...(this.sceneData.loadout.manaRegen !== undefined
-        ? { manaRegen: this.sceneData.loadout.manaRegen }
-        : {}),
-      synergies: this.sceneData.loadout.synergies,
-      ...(this.sceneData.loadout.manaSynergies !== undefined
-        ? { manaSynergies: this.sceneData.loadout.manaSynergies }
-        : {}),
-      missingHealthBonuses: this.sceneData.loadout.missingHealthBonuses,
-      missingHealthPctBonuses: this.sceneData.loadout.missingHealthPctBonuses,
-      fullHealthBonuses: this.sceneData.loadout.fullHealthBonuses,
-      cooldowns: this.sceneData.loadout.cooldowns,
+      bonusMaxMana: lo.bonusMaxMana,
+      ...(lo.bonusMaxHp !== undefined ? { bonusMaxHp: lo.bonusMaxHp } : {}),
+      ...(lo.manaRegen !== undefined ? { manaRegen: lo.manaRegen } : {}),
+      synergies: lo.synergies,
+      ...(lo.manaSynergies !== undefined ? { manaSynergies: lo.manaSynergies } : {}),
+      missingHealthBonuses: lo.missingHealthBonuses,
+      missingHealthPctBonuses: lo.missingHealthPctBonuses,
+      fullHealthBonuses: lo.fullHealthBonuses,
+      cooldowns: lo.cooldowns,
       relics: relicsList,
     });
 

@@ -1,12 +1,54 @@
 # QA log — journey checklist & verification
 
-Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-30
+Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-31
 
 Ship summary (newest first): [`CHANGELOG.md`](./CHANGELOG.md).
 
 **PoC (2026-07-08) complete.** Every poc-spec §1 criterion is implemented and
 enforced by automated gates. Later Alpha sections below amend the baseline
 (Phase 2+ subclass UX, mid dungeons, CDs, relics, loadout, etc.).
+
+---
+
+# Level HP + clear point + floor enemy damage — J26 / R5 (2026-07-31)
+
+Status: current · Last verified: 2026-07-31
+
+1. **Progression reshape** — level-ups no longer grant a spendable point.
+   Leveling grants party max HP (Guardian +5, each DPS +2, healer +2 per level
+   above 1) plus the existing ability-unlock tables (lattice Zealous Mending at
+   2, cards `CARD_UNLOCKS`). A spendable point now comes from every dungeon
+   **victory** (first clear or repeat), mode-aware: lattice/radial increment the
+   new `talentPointsEarned`, cards `upgradePoints += 1`. First clear still offers
+   a relic (lattice/radial) but does **not** double-grant the point. Cards
+   level-up upgrade-point banking (`upgradePointsGrantedAtLevel`) is retired;
+   `cardsLevelUpWelcome` is now flavor-only.
+2. **Save v11** (`healgame-save-v10` purged) — adds `talentPointsEarned: number`
+   (0 default, all modes). `availableTalentPoints = max(0, talentPointsEarned −
+   allocatedTalentPoints)`; radial `treeStateFromRadialSave(talentPointsEarned,
+   treeRanks)` (no longer derived from xp/level). Cards still read
+   `upgradePoints`. Rotate-and-wipe (`npm run save:bump`).
+3. **Party HP** — `PARTY_LEVEL_HP` (tank +5 / dps +2 / healer +2 per level) →
+   `partyHpBonusesForLevel(level)` (`levelHp.ts`, mirrors `levelMana.ts`) →
+   loadout `bonusMaxHp` → `CombatEngineOptions.bonusMaxHp`, added to base PARTY
+   maxHp and stacking with relic `roleMaxHp` at construction. Absent at level 1.
+4. **Floor damage** — `FLOOR_ENEMY_DAMAGE = 2`; `compileDungeon` adds
+   `(order − 1) × 2` to every trash + boss `autoDamage` (not to cast ability
+   damage). Ash Gate `order 1` stays baseline (+0); The Maw `order 7` = +12.
+   `content.test.ts` `LEGACY_EQUIVALENT` fixtures carry the scaled autos.
+5. **Balance retune** (bot telemetry, not hand-derived; `balance.test.ts` shape
+   preserved, all 33 gates green). The +65/+26 max-HP buff at the level-14 bot
+   kits quadrupled the tank pool, so the fights are now HP/throughput-shaped:
+   the crown kit's Graven-Scale Solemn Vigil sustains a hard-hitting tank, the
+   slow flat efficiency heals cannot. Levers used to restore the efficiency
+   scrape gates without touching the tree: Iron Pass — `spire-lancer` auto
+   3→6 (tank-kill lever) + Tunnel Vision cadence tightened (interval 16→14s,
+   channel 11→9s) to keep ≥6 focus channels; Cinder Vault — `ember-colossus`
+   HP 260→240 so the fight ends before the whole party falls (efficiency lands
+   at 2 survivors, crown clean), authored autos on mid-floor trash/bosses
+   trimmed where floor scaling double-dipped; Verdant Rift — count-4 thorn-husk
+   burst wave trimmed to 3 so the slow efficiency heals hold the tank. Emberfall
+   / Needle Gaze damage unchanged from pre-J26.
 
 ---
 

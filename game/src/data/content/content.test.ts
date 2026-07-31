@@ -10,6 +10,11 @@ import { formatDungeonPreview } from './preview';
 import type { ContentCatalogs, DungeonDef, EnemyAbilityDef, MobDef } from './types';
 import { validateContent } from './validate';
 
+// J26 floor scaling: compileDungeon adds `(order - 1) * FLOOR_ENEMY_DAMAGE`
+// (FLOOR_ENEMY_DAMAGE = 2) to every trash + boss `autoDamage`. Cast ability
+// damage (Bonehowl/Extinction partyDamage, Tunnel Vision damagePerTick) is NOT
+// scaled. So compiled autos here = authored + floor: Ash Gate order 1 → +0
+// (baseline, unchanged), Iron Pass order 2 → +2, The Maw order 7 → +12.
 const LEGACY_EQUIVALENT_ENCOUNTERS = [
   {
     id: 'ash-gate',
@@ -68,7 +73,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
             name: 'Iron Husk',
             hp: 13,
             count: 2,
-            autoDamage: 2,
+            autoDamage: 4,
             swingIntervalMs: 3000,
           },
         ],
@@ -80,7 +85,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
             name: 'Iron Husk',
             hp: 13,
             count: 3,
-            autoDamage: 2,
+            autoDamage: 4,
             swingIntervalMs: 3000,
           },
         ],
@@ -92,7 +97,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
             name: 'Iron Husk',
             hp: 14,
             count: 3,
-            autoDamage: 2,
+            autoDamage: 4,
             swingIntervalMs: 3000,
           },
         ],
@@ -104,7 +109,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
             name: 'Iron Husk',
             hp: 14,
             count: 4,
-            autoDamage: 2,
+            autoDamage: 4,
             swingIntervalMs: 3000,
           },
         ],
@@ -114,15 +119,15 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
       id: 'spire-lancer',
       name: 'Spire Lancer',
       hp: 340,
-      autoDamage: 3,
+      autoDamage: 8,
       swingIntervalMs: 3500,
       cast: {
         kind: 'tunnelVision',
         name: 'Tunnel Vision',
         telegraphMs: 5000,
         firstCastAtMs: 5000,
-        intervalMs: 16_000,
-        channelMs: 11_000,
+        intervalMs: 14_000,
+        channelMs: 9_000,
         tickMs: 1000,
         damagePerTick: 2,
       },
@@ -140,7 +145,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
             name: 'Ash Husk',
             hp: 6,
             count: 2,
-            autoDamage: 2,
+            autoDamage: 14,
             swingIntervalMs: 3000,
           },
         ],
@@ -150,7 +155,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
       id: 'hollow-king',
       name: 'Hollow King',
       hp: 9999,
-      autoDamage: 4,
+      autoDamage: 16,
       swingIntervalMs: 3500,
       cast: {
         name: 'Extinction',

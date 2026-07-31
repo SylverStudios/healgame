@@ -4,27 +4,27 @@ import { newSaveData } from '../../save/save';
 import { applyCardsLevelUps, loadoutFromCardSave } from './resolve';
 
 describe('applyCardsLevelUps', () => {
-  it('banks upgrade points per level (skips unlucky 4, doubles lucky 8)', () => {
+  it('J26: level-ups never bank upgrade points (points come from clears)', () => {
     const save = newSaveData('cards');
     expect(save.upgradePoints).toBe(0);
     applyCardsLevelUps(save, 1, 1);
     expect(save.upgradePoints).toBe(0);
     applyCardsLevelUps(save, 1, 3);
-    expect(save.upgradePoints).toBe(2); // lv2 + lv3
+    expect(save.upgradePoints).toBe(0);
     applyCardsLevelUps(save, 3, 4);
-    expect(save.upgradePoints).toBe(2); // unlucky 4 grants 0
+    expect(save.upgradePoints).toBe(0);
     applyCardsLevelUps(save, 7, 8);
-    expect(save.upgradePoints).toBe(4); // lucky 8 grants 2
+    expect(save.upgradePoints).toBe(0);
   });
 
-  it('grants mend at level 2 and auto-equips into the first free bar slot', () => {
+  it('grants mend at level 2 and auto-equips into the first free bar slot (no point)', () => {
     const save = newSaveData('cards');
     expect(save.actionBar.slice(0, 2)).toEqual(['bonk', 'heal']);
     applyCardsLevelUps(save, 1, 2);
     expect(save.unlockedSpells).toContain('mend');
     expect(save.unlockedSpells.filter((id) => id === 'mend')).toHaveLength(1);
     expect(save.actionBar[2]).toBe('mend');
-    expect(save.upgradePoints).toBe(1);
+    expect(save.upgradePoints).toBe(0);
   });
 
   it('grants vowstrike at level 5 beside bonk (does not replace)', () => {
@@ -35,15 +35,14 @@ describe('applyCardsLevelUps', () => {
     );
     expect(save.actionBar).toContain('vowstrike');
     expect(save.actionBar).toContain('bonk');
-    // lv2+3+4(0)+5 = 3 points
-    expect(save.upgradePoints).toBe(3);
+    expect(save.upgradePoints).toBe(0);
   });
 
   it('does not push cooldown ids into unlockedSpells; loadout discovers them', () => {
     const save = newSaveData('cards');
     applyCardsLevelUps(save, 5, 6);
     expect(save.unlockedSpells).not.toContain('still-waters');
-    expect(save.upgradePoints).toBe(1); // +1 for lv6
+    expect(save.upgradePoints).toBe(0);
     const mods = loadoutFromCardSave({
       xp: xpForLevel(6),
       actionBar: save.actionBar,

@@ -5,7 +5,8 @@ export const VEIL_CANTOR_MOB = {
   name: 'Veil Cantor',
   tags: ['boss'],
   hp: 300,
-  autoDamage: 4,
+  // J26: floor scaling (+10 at order 6) supplies the boss auto.
+  autoDamage: 0,
   swingIntervalMs: 3_100,
   abilityIds: ['null-psalm'],
   visualKey: 'veil-cantor',

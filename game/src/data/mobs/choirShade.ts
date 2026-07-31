@@ -5,7 +5,8 @@ export const CHOIR_SHADE = {
   name: 'Choir Shade',
   tags: ['trash'],
   hp: 15,
-  autoDamage: 2,
+  // J26: floor scaling (+8 at order 5) supplies this mob's auto pressure.
+  autoDamage: 0,
   swingIntervalMs: 2_800,
   abilityIds: [],
   visualKey: 'choir-shade',

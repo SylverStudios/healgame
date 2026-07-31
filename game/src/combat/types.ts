@@ -204,6 +204,11 @@ export interface CombatEngineOptions {
   /** Adds to the healer's max AND starting mana (e.g. Deep Reserves + level). */
   bonusMaxMana?: number;
   /**
+   * J26: per-role max-HP bonus (level growth) added to base PARTY maxHp,
+   * stacking with relic `roleMaxHp`. Applied to hp and maxHp at construction.
+   */
+  bonusMaxHp?: { tank?: number; dps?: number; healer?: number };
+  /**
    * Alpha 0.2: combat mana regen from level (or loadout). Merged with relic
    * `manaRegen`: amounts sum; interval is the minimum of every contributing
    * source (see combat/README.md).

@@ -23,7 +23,7 @@ function cardsSaveAtLevel(level: number, chips: Record<string, string[]> = {}) {
   save.xp = xpForLevel(level);
   applyCardsLevelUps(save, 1, level);
   save.spellChips = chips;
-  // Level-ups already banked points; smoke doesn't spend them via purchase.
+  // J26: level-ups grant free unlocks only (no points); chips are injected directly.
   return save;
 }
 
@@ -42,6 +42,7 @@ function runCardsAshGate(loadout: CombatMods): {
 } {
   const engine = new CombatEngine(ASH_GATE, loadout.spells, {
     bonusMaxMana: loadout.bonusMaxMana,
+    ...(loadout.bonusMaxHp !== undefined ? { bonusMaxHp: loadout.bonusMaxHp } : {}),
     synergies: loadout.synergies,
     ...(loadout.manaSynergies !== undefined ? { manaSynergies: loadout.manaSynergies } : {}),
     missingHealthBonuses: loadout.missingHealthBonuses,

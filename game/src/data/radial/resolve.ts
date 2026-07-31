@@ -11,6 +11,7 @@
 import { levelForXp } from '../constants';
 import { cooldownById } from '../cooldowns';
 import { manaBonusesForLevel } from '../levelMana';
+import { partyHpBonusesForLevel } from '../levelHp';
 import { spellsFromActionBar, type CombatMods } from '../talentTree';
 import {
   RADIAL_FREE_SPOT_IDS,
@@ -35,19 +36,20 @@ import type { TreeState } from '../../tree';
 // ---------------------------------------------------------------------------
 
 /**
- * Reconstruct radial TreeState from persisted treeRanks + player xp.
+ * Reconstruct radial TreeState from persisted treeRanks + earned talent points.
  * In radial, every spot is single-rank, so spotId === nodeId.
+ *
+ * J26: talent points come from dungeon victories (`talentPointsEarned`), not
+ * level. Free starter spots (`heal`/`bonk`) never consume a point.
  */
 export function treeStateFromRadialSave(
+  talentPointsEarned: number,
   treeRanks: Record<string, number>,
-  xp: number,
 ): TreeState {
   const owned = Object.keys(treeRanks).filter((id) => (treeRanks[id] ?? 0) > 0);
 
-  // Talent points earned = level; free starter spots don't consume points.
-  const level = levelForXp(xp);
   const paidCount = owned.filter((id) => !RADIAL_FREE_SPOT_IDS.has(id)).length;
-  const available = Math.max(0, level - paidCount);
+  const available = Math.max(0, Math.floor(talentPointsEarned) - paidCount);
 
   return create(RADIAL_TREE, { talent: available }, owned);
 }
@@ -290,6 +292,7 @@ export function applyRadialPurchase(
     unlockedSpells: string[];
     actionBar: string[];
     xp: number;
+    talentPointsEarned: number;
   },
   spotId: string,
   choice?: 'a' | 'b',
@@ -303,7 +306,7 @@ export function applyRadialPurchase(
   }
 
   const level = levelForXp(save.xp);
-  const treeState = treeStateFromRadialSave(save.treeRanks, save.xp);
+  const treeState = treeStateFromRadialSave(save.talentPointsEarned, save.treeRanks);
 
   const result = update(RADIAL_TREE, treeState, {
     type: 'purchase',
@@ -346,17 +349,21 @@ export function loadoutFromRadialSave(save: {
 }): CombatMods {
   const treeRanks = save.treeRanks ?? {};
   // Wallet=0 is fine for resolution; we only need owned node ids here.
-  const treeState = treeStateFromRadialSave(treeRanks, 0);
+  const treeState = treeStateFromRadialSave(0, treeRanks);
   const contents = ownedContents<RadialTreeContent>(RADIAL_TREE, treeState);
 
   const mods = resolveRadialCombatMods(contents, save.unlockedSpells);
 
-  // Level-derived mana bonuses (same as lattice path).
+  // Level-derived mana + HP bonuses (same as lattice path).
   const level = levelForXp(save.xp ?? 0);
   const levelMana = manaBonusesForLevel(level);
   mods.bonusMaxMana += levelMana.bonusMaxMana;
   if (levelMana.manaRegen !== null) {
     mods.manaRegen = levelMana.manaRegen;
+  }
+  const levelHp = partyHpBonusesForLevel(level);
+  if (levelHp.tank > 0 || levelHp.dps > 0 || levelHp.healer > 0) {
+    mods.bonusMaxHp = levelHp;
   }
 
   // Action bar ordering.

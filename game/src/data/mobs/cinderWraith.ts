@@ -5,7 +5,9 @@ export const CINDER_WRAITH = {
   name: 'Cinder Wraith',
   tags: ['trash'],
   hp: 14,
-  autoDamage: 3,
+  // J26: floor scaling (+4 at order 3) adds to this; base trimmed so DoT stays
+  // the Cinder Vault threat, not trash burst.
+  autoDamage: 1,
   swingIntervalMs: 3_000,
   abilityIds: [],
   visualKey: 'cinder-wraith',

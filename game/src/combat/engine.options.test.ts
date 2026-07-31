@@ -38,6 +38,28 @@ describe('CombatEngine constructor options', () => {
     expect(healer.maxMana).toBe(PARTY.startingMana);
   });
 
+  it('adds J26 bonusMaxHp per role to both hp and maxHp at construction', () => {
+    const engine = new CombatEngine(makeTestEncounter(), TEST_SPELLS, {
+      bonusMaxHp: { tank: 65, dps: 26, healer: 26 },
+    });
+    const byId = Object.fromEntries(engine.state.party.map((u) => [u.id, u]));
+    expect([byId.tank!.hp, byId.tank!.maxHp]).toEqual([PARTY.tankMaxHp + 65, PARTY.tankMaxHp + 65]);
+    expect([byId.dps1!.hp, byId.dps1!.maxHp]).toEqual([PARTY.dpsMaxHp + 26, PARTY.dpsMaxHp + 26]);
+    expect([byId.dps2!.hp, byId.dps2!.maxHp]).toEqual([PARTY.dpsMaxHp + 26, PARTY.dpsMaxHp + 26]);
+    expect([byId.healer!.hp, byId.healer!.maxHp]).toEqual([
+      PARTY.healerMaxHp + 26,
+      PARTY.healerMaxHp + 26,
+    ]);
+  });
+
+  it('applies a partial bonusMaxHp (missing roles default to +0)', () => {
+    const engine = new CombatEngine(makeTestEncounter(), TEST_SPELLS, { bonusMaxHp: { tank: 5 } });
+    const byId = Object.fromEntries(engine.state.party.map((u) => [u.id, u]));
+    expect(byId.tank!.maxHp).toBe(PARTY.tankMaxHp + 5);
+    expect(byId.dps1!.maxHp).toBe(PARTY.dpsMaxHp);
+    expect(byId.healer!.maxHp).toBe(PARTY.healerMaxHp);
+  });
+
   it('applies options.manaRegen on the simulation interval (Alpha 0.2)', () => {
     const engine = new CombatEngine(makeTestEncounter(), TEST_SPELLS, {
       manaRegen: { amount: 2, intervalMs: 10_000 },

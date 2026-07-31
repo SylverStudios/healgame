@@ -61,6 +61,7 @@ export function makeBalanceSave(overrides: Partial<SaveData>): SaveData {
     unlockedSpells: [],
     actionBar: ['', '', '', ''],
     treeRanks: {},
+    talentPointsEarned: 0,
     subclass: null,
     clearedDungeons: [],
     combatPaceTenths: 10,
@@ -644,6 +645,7 @@ export function runBuildBot(
     loadout.spells,
     {
       bonusMaxMana: loadout.bonusMaxMana,
+      ...(loadout.bonusMaxHp !== undefined ? { bonusMaxHp: loadout.bonusMaxHp } : {}),
       synergies: loadout.synergies,
       missingHealthBonuses: loadout.missingHealthBonuses,
       missingHealthPctBonuses: loadout.missingHealthPctBonuses,

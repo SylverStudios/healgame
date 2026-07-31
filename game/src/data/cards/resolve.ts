@@ -23,11 +23,12 @@ import { placeOnActionBar } from '../../save/save';
 import { levelForXp } from '../constants';
 import { cooldownById } from '../cooldowns';
 import { manaBonusesForLevel } from '../levelMana';
+import { partyHpBonusesForLevel } from '../levelHp';
 import { radialSpellById } from '../radial/spells';
 import { spellsFromActionBar, type CombatMods } from '../talentTree';
 import { chipById, type CardChipEffect } from './chips';
 import { offersForNextSlot } from './draft';
-import { CARD_SLOTS, CARD_UNLOCKS, cooldownIdsAtLevel, upgradePointsGrantedAtLevel } from './unlocks';
+import { CARD_SLOTS, CARD_UNLOCKS, cooldownIdsAtLevel } from './unlocks';
 
 /** Empty CombatMods shell shared by stub + later chip resolve. */
 function emptyMods(spells: SpellDef[]): CombatMods {
@@ -240,6 +241,10 @@ export function loadoutFromCardSave(save: {
   if (levelMana.manaRegen !== null) {
     mods.manaRegen = levelMana.manaRegen;
   }
+  const levelHp = partyHpBonusesForLevel(level);
+  if (levelHp.tank > 0 || levelHp.dps > 0 || levelHp.healer > 0) {
+    mods.bonusMaxHp = levelHp;
+  }
 
   // Cooldown unlocks are not stored on the save — discover via unlock table.
   mods.cooldowns = cooldownIdsAtLevel(level)
@@ -269,15 +274,13 @@ export function ownedSpellsFromCardSave(save: {
 }
 
 /**
- * Cards mode level-up: bank upgrade points per crossed level (unlucky 4 /
- * lucky 8) and grant free unlocks for those levels (handoff §3).
+ * Cards mode level-up: grant free unlocks for the crossed levels (handoff §3).
  *
- * This is the **sole** source of level-up upgrade points in cards mode —
- * callers must not also add `upgradePoints` for the same level range.
- * Unlocks are free (do not spend points). Spells are pushed into
- * `unlockedSpells` and auto-equipped into the first free action-bar slot.
- * Cooldown unlocks are not stored on the save; loadout reads them via
- * `cooldownIdsAtLevel(levelForXp(save.xp))`.
+ * J26: level-ups no longer bank upgrade points — those come only from dungeon
+ * victories (see `applyCombatResult`). Unlocks are free (do not spend points).
+ * Spells are pushed into `unlockedSpells` and auto-equipped into the first
+ * free action-bar slot. Cooldown unlocks are not stored on the save; loadout
+ * reads them via `cooldownIdsAtLevel(levelForXp(save.xp))`.
  */
 export function applyCardsLevelUps(
   save: SaveData,
@@ -287,8 +290,6 @@ export function applyCardsLevelUps(
   if (nextLevel <= prevLevel) return;
 
   for (let level = prevLevel + 1; level <= nextLevel; level++) {
-    save.upgradePoints += upgradePointsGrantedAtLevel(level);
-
     for (const unlock of CARD_UNLOCKS) {
       if (unlock.minLevel !== level) continue;
       if (unlock.kind !== 'spell') continue;

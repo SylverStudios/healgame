@@ -191,6 +191,7 @@ function baseSave(overrides) {
     relicIds: [],
     pendingRelicOffers: [],
     upgradePoints: 0,
+    talentPointsEarned: 0,
     spellChips: {},
     musicVolumePct: 50,
     recentRuns: [],
@@ -415,6 +416,9 @@ try {
     page,
     baseSave({
       xp: 100,
+      // J26: points come from clears (talentPointsEarned), not level; seed
+      // enough to buy Deep Reserves ×2 + oath + Warped Tempo + Patient Vow.
+      talentPointsEarned: 6,
       unlockedSpells: ['solemn-mend', 'zealous-mending'],
       clearedDungeons: ['ash-gate'],
     }),
@@ -478,6 +482,9 @@ try {
     page,
     baseSave({
       xp: 660,
+      // J26: xp 660 (level 12) still clears the crown minLevel gates; the
+      // spendable points now come from clears — seed 12 (3 pre-spent below).
+      talentPointsEarned: 12,
       unlockedSpells: ['solemn-mend', 'zealous-mending'],
       subclass: 'vigil',
       treeRanks: { 'deep-reserves': 1, 'vigil-oath': 1, 'vigil-patient-vow': 1 },
@@ -526,6 +533,8 @@ try {
     page,
     baseSave({
       xp: 30,
+      // J26: seed enough earned points (2 pre-spent) to buy Steady Hands.
+      talentPointsEarned: 3,
       unlockedSpells: ['solemn-mend', 'zealous-mending'],
       subclass: 'zealot',
       treeRanks: { 'deep-reserves': 1, 'zealot-oath': 1 },
@@ -685,7 +694,10 @@ try {
     version: SAVE_SCHEMA,
     progressionMode: 'radial',
     tutorialDone: true,
-    xp: 10,  // level 2 → 2 talent points (buy Mend + heal-s1 specialization)
+    xp: 10,
+    // J26: talent points now come from dungeon victories, not level — seed 2
+    // earned points so the stage can buy Mend + heal-s1 specialization.
+    talentPointsEarned: 2,
     unlockedSpells: ['heal', 'bonk'],
     actionBar: ['bonk', 'heal', '', ''],
     treeRanks: { heal: 1, bonk: 1 },
@@ -777,6 +789,7 @@ try {
     relicIds: [],
     pendingRelicOffers: [],
     upgradePoints: 1,
+    talentPointsEarned: 0,
     spellChips: {},
     musicVolumePct: 50,
     recentRuns: [],

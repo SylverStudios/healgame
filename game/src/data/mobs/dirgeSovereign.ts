@@ -5,7 +5,8 @@ export const DIRGE_SOVEREIGN_MOB = {
   name: 'Dirge Sovereign',
   tags: ['boss'],
   hp: 320,
-  autoDamage: 4,
+  // J26: floor scaling (+8 at order 5) supplies the boss auto.
+  autoDamage: 0,
   swingIntervalMs: 3_200,
   abilityIds: ['soul-toll'],
   visualKey: 'dirge-sovereign',

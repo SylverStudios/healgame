@@ -20,6 +20,7 @@ import {
 import { RADIAL_HEAL, RADIAL_BONK, RADIAL_MEND, RADIAL_BIG_HEAL } from './spells';
 import { update, snapshot } from '../../tree';
 import { RADIAL_TREE } from './tree';
+import { levelForXp } from '../constants';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -30,14 +31,20 @@ function starterSave() {
   return {
     xp: 0,
     treeRanks: { heal: 1, bonk: 1 } as Record<string, number>,
+    talentPointsEarned: 0,
     unlockedSpells: [RADIAL_HEAL.id, RADIAL_BONK.id],
     actionBar: [RADIAL_BONK.id, RADIAL_HEAL.id, '', ''],
   };
 }
 
-/** Starter save at a given XP (for level-gate tests). */
+/**
+ * Starter save at a given XP (for level-gate tests). J26: talent points now
+ * come from victories, not level — but these wheel-mechanics fixtures preserve
+ * the old "one point per level" wallet by mapping `talentPointsEarned` to the
+ * level for `xp`, so purchase/gate coverage is unchanged.
+ */
 function saveAtXp(xp: number) {
-  return { ...starterSave(), xp };
+  return { ...starterSave(), xp, talentPointsEarned: levelForXp(xp) };
 }
 
 // ---------------------------------------------------------------------------
@@ -171,7 +178,7 @@ describe('A/B choice persistence', () => {
   it('restoring treeRanks round-trips through treeStateFromRadialSave', () => {
     const save = saveAtXp(0);
     applyRadialPurchase(save, 'heal-s1', 'a');
-    const state = treeStateFromRadialSave(save.treeRanks, save.xp);
+    const state = treeStateFromRadialSave(save.talentPointsEarned, save.treeRanks);
     const snap = snapshot(state);
     expect(snap.owned).toContain('heal-s1-zealous');
     expect(snap.owned).not.toContain('heal-s1-solemn');
@@ -318,7 +325,7 @@ describe('Arming Mend synergy', () => {
 
 describe('RADIAL_TREE config', () => {
   it('tree service round-trips via treeStateFromRadialSave with starter ranks', () => {
-    const state = treeStateFromRadialSave({ heal: 1, bonk: 1 }, 0);
+    const state = treeStateFromRadialSave(1, { heal: 1, bonk: 1 });
     const snap = snapshot(state);
     expect(snap.owned).toContain('heal');
     expect(snap.owned).toContain('bonk');
@@ -326,7 +333,7 @@ describe('RADIAL_TREE config', () => {
 
   it('direct tree.update rejects purchase of a spot the player cannot afford', () => {
     // Empty treeRanks = only heal root pre-owned via create
-    const state = treeStateFromRadialSave({ heal: 1, bonk: 1 }, 0);
+    const state = treeStateFromRadialSave(1, { heal: 1, bonk: 1 });
     // Wallet = 0 at level 1 (starters free, no paid purchases yet, level=1 → 1 point)
     // Actually level 1 → 1 - 0 paid = 1 available. So "mend" (cost 1) should succeed.
     const result = update(RADIAL_TREE, state, { type: 'purchase', spotId: 'mend' });
@@ -351,6 +358,7 @@ describe('Ring 3 — heal-s3', () => {
   function ring3HealSave() {
     const save = {
       xp: 450, // level 10 (xpForLevel(10) = 450 with the 10n² curve)
+      talentPointsEarned: 10, // J26: victories-earned wallet (was level-derived)
       treeRanks: {
         heal: 1,
         bonk: 1,
@@ -366,6 +374,7 @@ describe('Ring 3 — heal-s3', () => {
   it('cannot buy heal-s3 below level 10', () => {
     const save = {
       xp: 350, // level 9
+      talentPointsEarned: 9,
       treeRanks: { heal: 1, bonk: 1, 'heal-s1-zealous': 1, 'heal-s2-fast': 1 } as Record<string, number>,
       unlockedSpells: ['zealous-heal', 'bonk'],
       actionBar: ['zealous-heal', 'bonk', '', ''],
@@ -405,6 +414,7 @@ describe('Ring 3 — offense-s2', () => {
   function vowstrikeSave() {
     return {
       xp: 450, // level 10
+      talentPointsEarned: 10,
       treeRanks: {
         heal: 1,
         bonk: 1,
@@ -420,6 +430,7 @@ describe('Ring 3 — offense-s2', () => {
   function bonkSave() {
     return {
       xp: 450, // level 10
+      talentPointsEarned: 10,
       treeRanks: {
         heal: 1,
         bonk: 1,
@@ -467,6 +478,7 @@ describe('Ring 3 — crown upgrades', () => {
   function wrathSave() {
     return {
       xp: 450,
+      talentPointsEarned: 10,
       treeRanks: { heal: 1, bonk: 1, wrath: 1 } as Record<string, number>,
       unlockedSpells: ['heal', 'bonk'],
       actionBar: ['heal', 'bonk', '', ''],
@@ -477,6 +489,7 @@ describe('Ring 3 — crown upgrades', () => {
   function watersSave() {
     return {
       xp: 450,
+      talentPointsEarned: 10,
       treeRanks: { heal: 1, bonk: 1, 'still-waters': 1 } as Record<string, number>,
       unlockedSpells: ['heal', 'bonk'],
       actionBar: ['heal', 'bonk', '', ''],
@@ -499,6 +512,7 @@ describe('Ring 3 — crown upgrades', () => {
   it('crown-wrath cannot be bought without wrath', () => {
     const save = {
       xp: 450,
+      talentPointsEarned: 10,
       treeRanks: { heal: 1, bonk: 1 } as Record<string, number>,
       unlockedSpells: ['heal', 'bonk'],
       actionBar: ['heal', 'bonk', '', ''],
@@ -520,6 +534,7 @@ describe('Ring 3 — crown upgrades', () => {
   it('crown-waters cannot be bought without still-waters', () => {
     const save = {
       xp: 450,
+      talentPointsEarned: 10,
       treeRanks: { heal: 1, bonk: 1 } as Record<string, number>,
       unlockedSpells: ['heal', 'bonk'],
       actionBar: ['heal', 'bonk', '', ''],

@@ -14,6 +14,7 @@
 
 import { SPELLS, levelForXp } from './constants';
 import { manaBonusesForLevel } from './levelMana';
+import { partyHpBonusesForLevel } from './levelHp';
 import { spellById } from './spells';
 import { STILL_WATERS, FRENZIED_LITURGY, cooldownById } from './cooldowns';
 import type {
@@ -90,6 +91,12 @@ export interface CombatMods {
   cooldowns: CooldownDef[];
   /** Alpha 0.2 §D2: combat mana regen from level (or future sources). Absent at level 1. */
   manaRegen?: { amount: number; intervalMs: number };
+  /**
+   * J26: level-derived party max-HP bonus (`partyHpBonusesForLevel`). Passed to
+   * the engine's `bonusMaxHp` option; stacks on base PARTY maxHp + relic maxHp.
+   * Absent = no bonus (level 1).
+   */
+  bonusMaxHp?: { tank: number; dps: number; healer: number };
 }
 
 function content(c: TalentTreeContent): TalentTreeContent {
@@ -819,6 +826,10 @@ export function loadoutFromSave(save: {
   mods.bonusMaxMana += levelMana.bonusMaxMana;
   if (levelMana.manaRegen !== null) {
     mods.manaRegen = levelMana.manaRegen;
+  }
+  const levelHp = partyHpBonusesForLevel(level);
+  if (levelHp.tank > 0 || levelHp.dps > 0 || levelHp.healer > 0) {
+    mods.bonusMaxHp = levelHp;
   }
   if (save.actionBar !== undefined && save.actionBar.some((id) => id.length > 0)) {
     mods.spells = spellsFromActionBar(mods.spells, save.actionBar);
