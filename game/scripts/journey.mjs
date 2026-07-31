@@ -825,8 +825,8 @@ try {
   await clickNamed(page, 'cardUpgrade:heal');
   await waitForNamed(page, 'cardChipOffer:heal-mend-link');
   check((await locate(page, 'cardChipOffer:heal-graven')) !== null, 'Heal slot-1 draft shows Graven Light');
-  check((await locate(page, 'cardChipOffer:heal-cost')) !== null, 'Heal slot-1 draft shows Cost Cut');
-  check((await locate(page, 'cardChipOffer:heal-power')) === null, 'Heal slot-1 draft hides Power Up (now slot 2)');
+  check((await locate(page, 'cardChipOffer:heal-surge')) !== null, 'Heal slot-0 draft shows Surge');
+  check((await locate(page, 'cardChipOffer:heal-vigor')) === null, 'Heal slot-0 draft hides Vigor (slot 2 only)');
   check((await locate(page, 'cardChipCancel')) !== null, 'draft modal exposes cancel');
   await shot(page, 'card-chip-draft');
 
