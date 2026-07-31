@@ -14,6 +14,7 @@
 
 import { SPELLS, levelForXp } from './constants';
 import { manaBonusesForLevel } from './levelMana';
+import { partyHpBonusesForLevel } from './levelHp';
 import { spellById } from './spells';
 import { STILL_WATERS, FRENZIED_LITURGY, cooldownById } from './cooldowns';
 import type {
@@ -77,7 +78,12 @@ export interface CombatMods {
   missingHealthBonuses: MissingHealthBonusRule[];
   /** Alpha 0.1 §D4 Graven Scale: percent-of-base-heal missing-health bonus. */
   missingHealthPctBonuses: MissingHealthPctBonusRule[];
-  /** Alpha 0.1 §D4 Steady Hands: bonus heal when target is at/above a health threshold. */
+  /**
+   * Full-health threshold bonus (heal when target is at/above hpPctAtLeast%).
+   * J25: no live tree node emits this anymore — Steady Hands moved to
+   * `missingHealthPctBonus` (10%/band). The engine hook and rule shape remain
+   * for the effect kind and for future content.
+   */
   fullHealthBonuses: FullHealthBonusRule[];
   /** Sorted unique pace multipliers (tenths); always includes 10; adds 15 when tempo owned. */
   paceMultipliersTenths: number[];
@@ -85,6 +91,12 @@ export interface CombatMods {
   cooldowns: CooldownDef[];
   /** Alpha 0.2 §D2: combat mana regen from level (or future sources). Absent at level 1. */
   manaRegen?: { amount: number; intervalMs: number };
+  /**
+   * J26: level-derived party max-HP bonus (`partyHpBonusesForLevel`). Passed to
+   * the engine's `bonusMaxHp` option; stacks on base PARTY maxHp + relic maxHp.
+   * Absent = no bonus (level 1).
+   */
+  bonusMaxHp?: { tank: number; dps: number; healer: number };
 }
 
 function content(c: TalentTreeContent): TalentTreeContent {
@@ -291,14 +303,13 @@ const steadyHands: NodeDef = {
   cost: { currency: 'talent', amount: 1 },
   content: content({
     name: 'Steady Hands',
-    description: `${SPELLS.zealousMending.name}: +2 heal when the target is at 80%+ health`,
+    description: `${SPELLS.zealousMending.name}: +10% of base heal per 10% target health missing (rounds up)`,
     glyph: 'H',
     subclass: 'zealot',
     effect: {
-      kind: 'fullHealthBonus',
+      kind: 'missingHealthPctBonus',
       spellId: SPELLS.zealousMending.id,
-      hpPctAtLeast: 80,
-      bonusHeal: 2,
+      pctPer10PctMissing: 10,
     },
   }),
 };
@@ -815,6 +826,10 @@ export function loadoutFromSave(save: {
   mods.bonusMaxMana += levelMana.bonusMaxMana;
   if (levelMana.manaRegen !== null) {
     mods.manaRegen = levelMana.manaRegen;
+  }
+  const levelHp = partyHpBonusesForLevel(level);
+  if (levelHp.tank > 0 || levelHp.dps > 0 || levelHp.healer > 0) {
+    mods.bonusMaxHp = levelHp;
   }
   if (save.actionBar !== undefined && save.actionBar.some((id) => id.length > 0)) {
     mods.spells = spellsFromActionBar(mods.spells, save.actionBar);

@@ -5,7 +5,8 @@ export const GLOAM_WRETCH = {
   name: 'Gloam Wretch',
   tags: ['trash'],
   hp: 15,
-  autoDamage: 2,
+  // J26: floor scaling (+10 at order 6) supplies this mob's auto pressure.
+  autoDamage: 0,
   swingIntervalMs: 2_700,
   abilityIds: [],
   visualKey: 'gloam-wretch',

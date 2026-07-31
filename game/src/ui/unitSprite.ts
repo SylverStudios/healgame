@@ -24,6 +24,7 @@ import {
   FOCUS_RETICLE_PULSE_MS,
 } from './bossFocusReticle';
 import { UNIT_TEXTURE_KEY } from './sprites';
+import { damageFloatSpawnOffsetY, damageFloatXOffset } from './hitFxLayout';
 import { drawTargetSkyBeam, skyBeamLayout } from './targetSkyBeam';
 import { FONT, FONT_SIZE_XS, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG } from './theme';
 
@@ -95,8 +96,10 @@ const MANA_MOTE_COLOR = 0x8fc4ff;
 const MANA_MOTE_RISE_DISTANCE = 22;
 const MANA_MOTE_DURATION_MS = 520;
 
-/** `-N` damage floats: modest rise + fade (tuned post–Phase 3 for readability). */
-const DAMAGE_FLOAT_RISE_DISTANCE = 20;
+/** `-N` damage floats: modest rise + fade (tuned post–Phase 3 for readability).
+ *  Wave 6 / R2: spawned near the top of the body (below the HP bar) with a short
+ *  rise so the number stays in the gap under the bar rather than crossing it. */
+const DAMAGE_FLOAT_RISE_DISTANCE = 12;
 const DAMAGE_FLOAT_DURATION_MS = 550;
 /** `+N` heal floats linger longer so the basic heal reads as satisfying juice. */
 const HEAL_FLOAT_RISE_DISTANCE = 36;
@@ -501,13 +504,23 @@ export class UnitSprite {
     });
   }
 
-  /** Spawns a `-N` float at this unit's home position for a `damage` event on it. Always
-   *  shown — including 0 and overkill raw amounts (handoff §A: no clamping to remaining HP). */
+  /**
+   * Spawns a `-N` float for a `damage` event on this unit. Always shown —
+   * including 0 and overkill raw amounts (handoff §A: no clamping to remaining
+   * HP). Wave 6 / R2: floats spawn near the top of the body (below the HP bar)
+   * and slightly off-center in X (presentation-only `Math.random`) so they read
+   * as "the enemy took a hit" without colliding with the centered hurt VFX
+   * burst. Float depth (50) sits above the arrow/zap impact (49).
+   */
   spawnDamageFloat(amount: number): void {
-    this.spawnFloatText(
+    const startX = this.homeX + damageFloatXOffset(Math.random());
+    const startY = this.homeY + damageFloatSpawnOffsetY(this.height);
+    this.spawnFloatTextAt(
       `-${amount}`,
       DAMAGE_FLOAT_COLOR,
       floatFontPx(amount),
+      startX,
+      startY,
       DAMAGE_FLOAT_RISE_DISTANCE,
       DAMAGE_FLOAT_DURATION_MS,
     );
@@ -525,6 +538,8 @@ export class UnitSprite {
     );
   }
 
+  /** Heal floats keep spawning at the unit's home center; damage floats override
+   *  the start position (see `spawnDamageFloat`) via `spawnFloatTextAt`. */
   private spawnFloatText(
     text: string,
     color: string,
@@ -532,15 +547,27 @@ export class UnitSprite {
     riseDistance: number,
     durationMs: number,
   ): void {
+    this.spawnFloatTextAt(text, color, fontSize, this.homeX, this.homeY, riseDistance, durationMs);
+  }
+
+  private spawnFloatTextAt(
+    text: string,
+    color: string,
+    fontSize: string,
+    startX: number,
+    startY: number,
+    riseDistance: number,
+    durationMs: number,
+  ): void {
     const obj = this.scene.add
-      .text(this.homeX, this.homeY, text, { fontFamily: FONT, fontSize, color })
+      .text(startX, startY, text, { fontFamily: FONT, fontSize, color })
       .setStroke(FLOAT_STROKE_COLOR, FLOAT_STROKE_WIDTH)
       .setOrigin(0.5)
       .setDepth(FLOAT_DEPTH);
     this.activeFloats.add(obj);
     this.scene.tweens.add({
       targets: obj,
-      y: this.homeY - riseDistance,
+      y: startY - riseDistance,
       alpha: 0,
       duration: durationMs,
       onComplete: () => {

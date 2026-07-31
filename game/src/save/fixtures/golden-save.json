@@ -1,5 +1,5 @@
 {
-  "version": 10,
+  "version": 11,
   "progressionMode": "lattice",
   "tutorialDone": false,
   "xp": 0,
@@ -13,6 +13,7 @@
     ""
   ],
   "treeRanks": {},
+  "talentPointsEarned": 0,
   "subclass": null,
   "clearedDungeons": [],
   "combatPaceTenths": 10,

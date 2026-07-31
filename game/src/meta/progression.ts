@@ -32,9 +32,12 @@ export type { LevelManaBonuses } from '../data/levelMana';
 export { manaBonusesForLevel } from '../data/levelMana';
 
 /**
- * XP always accrues, including on a wipe. Levels grant one tree point each;
- * level 2 also auto-unlocks Zealous Mending. Every distinct dungeon first
- * clear queues a stable three-relic offer.
+ * XP always accrues, including on a wipe. J26 reshape: leveling grants party
+ * max HP (applied at combat construction via `partyHpBonusesForLevel`) plus
+ * ability unlocks, but no spendable point. Every dungeon *victory* — first
+ * clear or repeat — grants one spendable point, mode-aware: lattice/radial
+ * bank `talentPointsEarned`, cards bank `upgradePoints`. Every distinct
+ * dungeon first clear also queues a stable three-relic offer (lattice/radial).
  */
 export function applyCombatResult(
   save: SaveData,
@@ -49,11 +52,9 @@ export function applyCombatResult(
   const levelAfter = levelForXp(save.xp);
 
   if (levelAfter > levelBefore) {
-    const points = levelAfter - levelBefore;
     if (save.progressionMode === 'cards') {
-      // applyCardsLevelUps owns upgrade-point banking + free unlock grants.
+      // applyCardsLevelUps grants free unlocks only (no upgrade points on level).
       applyCardsLevelUps(save, levelBefore, levelAfter);
-      // Upgrade-point count is shown on the Spells CTA — keep the ribbon short.
       notices.push({
         kind: 'levelUp',
         text: cardsLevelUpWelcome(levelAfter),
@@ -73,9 +74,10 @@ export function applyCombatResult(
         }
       }
     } else {
+      // Level-up = tougher party (max HP), no talent point (that comes from clears).
       notices.push({
         kind: 'levelUp',
-        text: `LEVEL ${levelAfter} — +${points} Talent Point${points === 1 ? '' : 's'}`,
+        text: `LEVEL ${levelAfter} — Party Grows Sturdier`,
       });
     }
   }
@@ -96,26 +98,35 @@ export function applyCombatResult(
   }
 
   const dungeon = getDungeonById(result.encounterId);
-  if (
-    result.status === 'victory' &&
-    dungeon !== undefined &&
-    !save.clearedDungeons.includes(dungeon.id)
-  ) {
-    save.clearedDungeons.push(dungeon.id);
+  if (result.status === 'victory' && dungeon !== undefined) {
+    const firstClear = !save.clearedDungeons.includes(dungeon.id);
+    if (firstClear) save.clearedDungeons.push(dungeon.id);
+
     if (save.progressionMode === 'cards') {
-      // Relics fully replaced — first-clear grants a bonus upgrade point.
-      save.pendingRelicOffers = [];
+      // Cards: relics fully replaced by chip drafts; every victory grants a point.
       save.upgradePoints += 1;
       notices.push({
-        kind: 'firstClear',
-        text: 'FIRST CLEAR — +1 Upgrade Point · open Spells',
+        kind: firstClear ? 'firstClear' : 'levelUp',
+        text: firstClear
+          ? 'FIRST CLEAR — +1 Upgrade Point · open Spells'
+          : 'CLEAR — +1 Upgrade Point',
       });
     } else {
-      save.pendingRelicOffers = chooseRelicOffers(save.relicIds, random);
-      notices.push({
-        kind: 'firstClear',
-        text: save.pendingRelicOffers.length > 0 ? 'FIRST CLEAR — CHOOSE A RELIC' : 'FIRST CLEAR!',
-      });
+      // Lattice/radial: every victory grants a talent point; first clear also
+      // offers a relic (the victory grant is the only point — no double-grant).
+      save.talentPointsEarned += 1;
+      if (firstClear) {
+        save.pendingRelicOffers = chooseRelicOffers(save.relicIds, random);
+        notices.push({
+          kind: 'firstClear',
+          text:
+            save.pendingRelicOffers.length > 0
+              ? 'FIRST CLEAR — CHOOSE A RELIC · +1 Talent Point'
+              : 'FIRST CLEAR — +1 Talent Point',
+        });
+      } else {
+        notices.push({ kind: 'levelUp', text: 'CLEAR — +1 Talent Point' });
+      }
     }
   }
 
@@ -166,23 +177,27 @@ export function allocatedTalentPoints(save: Pick<SaveData, 'treeRanks'>): number
   return Object.values(save.treeRanks).reduce((total, ranks) => total + Math.max(0, Math.floor(ranks)), 0);
 }
 
-export function availableTalentPoints(save: Pick<SaveData, 'xp' | 'treeRanks'>): number {
-  return Math.max(0, levelForXp(save.xp) - allocatedTalentPoints(save));
+/**
+ * J26: talent points are earned by dungeon victories (`talentPointsEarned`),
+ * not by level. Available-to-spend is what's earned minus what's allocated.
+ */
+export function availableTalentPoints(save: Pick<SaveData, 'talentPointsEarned' | 'treeRanks'>): number {
+  return Math.max(0, Math.floor(save.talentPointsEarned) - allocatedTalentPoints(save));
 }
 
 /**
  * Hub Talent Tree / Spells CTA unspent count — mode-aware.
  *
- * Lattice: same as {@link availableTalentPoints} (level − sum of treeRanks).
+ * Lattice: same as {@link availableTalentPoints} (earned − sum of treeRanks).
  * Radial: free starter spots (`heal`/`bonk`) do not consume points; matches the
  * talent wallet from {@link treeStateFromRadialSave}.
  * Cards: unspent {@link SaveData.upgradePoints}.
  */
 export function unspentTalentPointsForHub(
-  save: Pick<SaveData, 'xp' | 'treeRanks' | 'progressionMode' | 'upgradePoints'>,
+  save: Pick<SaveData, 'talentPointsEarned' | 'treeRanks' | 'progressionMode' | 'upgradePoints'>,
 ): number {
   if (save.progressionMode === 'radial') {
-    return walletOf(treeStateFromRadialSave(save.treeRanks, save.xp)).talent ?? 0;
+    return walletOf(treeStateFromRadialSave(save.talentPointsEarned, save.treeRanks)).talent ?? 0;
   }
   if (save.progressionMode === 'cards') {
     return Math.max(0, Math.floor(save.upgradePoints));

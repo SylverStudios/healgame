@@ -425,6 +425,13 @@ export interface SpellBarHealBonusOptions {
    * spell. Called once per tooltip show; may read engine state.
    */
   getActiveFlatHealBonus?: (spellId: string) => number;
+  /**
+   * Wave 6 R3: live Bonk castBuff lines for `spellId` right now (Blessed
+   * stacks, armed next-heal potency, pending next-spell mana discount).
+   * Called once per tooltip show; may read engine state. Empty when nothing
+   * is armed.
+   */
+  getLiveBuffNotes?: (spellId: string) => readonly string[];
 }
 
 /** Two-row action bar: QWER spells on the bottom, Shift+QWER major CDs above
@@ -453,6 +460,7 @@ export class SpellBar {
       const spell = spells.find((s) => s.id === spellId);
       if (!spell) return;
       const activeFlatHealBonus = healBonusOptions.getActiveFlatHealBonus?.(spellId) ?? 0;
+      const liveBuffNotes = healBonusOptions.getLiveBuffNotes?.(spellId) ?? [];
       this.tooltip.showCard(
         buttonCenterX,
         buttonTopY,
@@ -462,6 +470,7 @@ export class SpellBar {
             ? { bonusHealing: healBonusOptions.bonusHealing }
             : {}),
           ...(activeFlatHealBonus > 0 ? { activeFlatHealBonus } : {}),
+          ...(liveBuffNotes.length > 0 ? { liveBuffNotes } : {}),
         }),
       );
     };

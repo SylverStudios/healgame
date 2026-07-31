@@ -1,4 +1,5 @@
 import type { BossCastDef, EncounterDef } from '../../combat/types';
+import { FLOOR_ENEMY_DAMAGE } from '../constants';
 import type {
   ContentCatalogs,
   ContentDiagnostic,
@@ -64,6 +65,10 @@ function compileValidatedDungeon(
   if (bossGroup === undefined) {
     throw new Error(`Cannot compile dungeon "${dungeon.id}" without a final boss`);
   }
+  // J26 floor scaling: every dungeon after the first adds a flat auto-damage
+  // bump to trash + boss. Ash Gate (order 1) stays at authored baseline.
+  const floorDamage = Math.max(0, dungeon.order - 1) * FLOOR_ENEMY_DAMAGE;
+
   const bossMob = required(mobById, bossGroup.mobId, 'mob');
   const bossStats = effectiveMobStats(bossMob, bossGroup.statOverrides);
   const abilityId = bossMob.abilityIds[0];
@@ -82,7 +87,7 @@ function compileValidatedDungeon(
           name: mob.name,
           hp: stats.hp,
           count: group.count,
-          autoDamage: stats.autoDamage,
+          autoDamage: stats.autoDamage + floorDamage,
           swingIntervalMs: stats.swingIntervalMs,
         };
       }),
@@ -91,7 +96,7 @@ function compileValidatedDungeon(
       id: bossMob.id,
       name: bossMob.name,
       hp: bossStats.hp,
-      autoDamage: bossStats.autoDamage,
+      autoDamage: bossStats.autoDamage + floorDamage,
       swingIntervalMs: bossStats.swingIntervalMs,
       ...(cast === undefined ? {} : { cast }),
     },

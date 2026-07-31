@@ -47,22 +47,24 @@ describe('applyCombatResult', () => {
     expect(s.xp).toBe(3);
   });
 
-  it('grants one talent point and Zealous Mending when reaching level 2', () => {
+  it('J26: reaching level 2 on a wipe unlocks Zealous Mending + party HP, but no talent point', () => {
     const s = save({ xp: XP_LEVEL_2_THRESHOLD - 1, unlockedSpells: ['solemn-mend'] });
     const notices = applyCombatResult(s, result({ xp: 1 }));
-    expect(availableTalentPoints(s)).toBe(2);
+    // Wipe grants no point; level-ups never grant one under J26.
+    expect(s.talentPointsEarned).toBe(0);
+    expect(availableTalentPoints(s)).toBe(0);
     expect(s.unlockedSpells).toContain(SPELLS.zealousMending.id);
     expect(s.unlockedSpells.filter((id) => id === SPELLS.zealousMending.id)).toHaveLength(1);
     expect(notices).toEqual([
-      { kind: 'levelUp', text: 'LEVEL 2 — +1 Talent Point' },
+      { kind: 'levelUp', text: 'LEVEL 2 — Party Grows Sturdier' },
       { kind: 'spellLearned', text: `${SPELLS.zealousMending.name} learned!` },
     ]);
   });
 
-  it('does not grant the spell or another talent point below the threshold', () => {
+  it('does not grant the spell below the threshold', () => {
     const s = save({ xp: 0, unlockedSpells: ['solemn-mend'] });
     const notices = applyCombatResult(s, result({ xp: 1 }));
-    expect(availableTalentPoints(s)).toBe(1);
+    expect(availableTalentPoints(s)).toBe(0);
     expect(s.unlockedSpells).not.toContain(SPELLS.zealousMending.id);
     expect(notices).toEqual([]);
   });
@@ -106,7 +108,10 @@ describe('applyCombatResult', () => {
       'triage-bell',
       'still-reservoir',
     ]);
-    expect(notices).toEqual([{ kind: 'firstClear', text: 'FIRST CLEAR — CHOOSE A RELIC' }]);
+    expect(s.talentPointsEarned).toBe(1);
+    expect(notices).toEqual([
+      { kind: 'firstClear', text: 'FIRST CLEAR — CHOOSE A RELIC · +1 Talent Point' },
+    ]);
   });
 
   it('excludes owned relics from first-clear offers', () => {
@@ -119,12 +124,13 @@ describe('applyCombatResult', () => {
     ]);
   });
 
-  it('does not replace pending offers on a replay victory', () => {
+  it('J26: a replay victory grants a talent point but does not replace pending offers', () => {
     const pendingRelicOffers = ['vital-ember', 'bastion-plate', 'iron-ward'];
     const s = save({ clearedDungeons: ['ash-gate'], pendingRelicOffers });
     const notices = applyCombatResult(s, result({ status: 'victory' }), () => 0);
     expect(s.pendingRelicOffers).toEqual(pendingRelicOffers);
-    expect(notices).toEqual([]);
+    expect(s.talentPointsEarned).toBe(1);
+    expect(notices).toEqual([{ kind: 'levelUp', text: 'CLEAR — +1 Talent Point' }]);
   });
 
   it('does not queue relic offers on a wipe', () => {
@@ -145,7 +151,7 @@ describe('applyCombatResult', () => {
     ]);
   });
 
-  it('cards level 2 grants Mend + upgrade point (not lattice Zealous Mending)', () => {
+  it('cards level 2 grants Mend (no upgrade point on level-up)', () => {
     const s = save({
       progressionMode: 'cards',
       xp: XP_LEVEL_2_THRESHOLD - 1,
@@ -154,7 +160,7 @@ describe('applyCombatResult', () => {
       upgradePoints: 0,
     });
     const notices = applyCombatResult(s, result({ xp: 1 }));
-    expect(s.upgradePoints).toBe(1);
+    expect(s.upgradePoints).toBe(0);
     expect(s.unlockedSpells).toContain('mend');
     expect(s.actionBar).toContain('mend');
     expect(s.unlockedSpells).not.toContain(SPELLS.zealousMending.id);
@@ -164,17 +170,17 @@ describe('applyCombatResult', () => {
     ]);
   });
 
-  it('cards level 5 grants Vowstrike beside Bonk', () => {
+  it('cards level 5 grants Vowstrike beside Bonk (no upgrade point on level-up)', () => {
     const s = save({
       progressionMode: 'cards',
       xp: xpForLevel(5) - 1,
       unlockedSpells: ['heal', 'bonk', 'mend'],
       actionBar: ['heal', 'bonk', 'mend', ''],
-      upgradePoints: 2, // after lv2–3 (+1 each), skipped unlucky 4
+      upgradePoints: 2,
     });
     const notices = applyCombatResult(s, result({ xp: 1 }));
     expect(levelForXp(s.xp)).toBe(5);
-    expect(s.upgradePoints).toBe(3);
+    expect(s.upgradePoints).toBe(2);
     expect(s.unlockedSpells).toContain('vowstrike');
     expect(s.unlockedSpells).toContain('bonk');
     expect(s.actionBar).toContain('vowstrike');
@@ -184,7 +190,7 @@ describe('applyCombatResult', () => {
     ]);
   });
 
-  it('cards level 4 is unlucky — welcome copy, no upgrade point', () => {
+  it('cards level 4 is flavor-only — welcome copy, no upgrade point', () => {
     const s = save({
       progressionMode: 'cards',
       xp: xpForLevel(4) - 1,
@@ -198,7 +204,7 @@ describe('applyCombatResult', () => {
     expect(notices).toEqual([{ kind: 'levelUp', text: 'Welcome to unlucky level 4' }]);
   });
 
-  it('cards level 8 is lucky — welcome copy, +2 upgrade points + Liturgy', () => {
+  it('cards level 8 grants Liturgy (welcome copy, no upgrade point on level-up)', () => {
     const s = save({
       progressionMode: 'cards',
       xp: xpForLevel(8) - 1,
@@ -208,7 +214,7 @@ describe('applyCombatResult', () => {
     });
     const notices = applyCombatResult(s, result({ xp: 1 }));
     expect(levelForXp(s.xp)).toBe(8);
-    expect(s.upgradePoints).toBe(7);
+    expect(s.upgradePoints).toBe(5);
     expect(buildLoadout(s).cooldowns.map((c) => c.id)).toContain('frenzied-liturgy');
     expect(notices).toEqual([
       { kind: 'levelUp', text: 'Welcome to lucky level 8' },
@@ -216,7 +222,7 @@ describe('applyCombatResult', () => {
     ]);
   });
 
-  it('cards level 6 unlocks Still Waters via loadout (no unlockedSpells entry)', () => {
+  it('cards level 6 unlocks Still Waters via loadout (no unlockedSpells entry, no point)', () => {
     const s = save({
       progressionMode: 'cards',
       xp: xpForLevel(6) - 1,
@@ -226,13 +232,24 @@ describe('applyCombatResult', () => {
     });
     const notices = applyCombatResult(s, result({ xp: 1 }));
     expect(levelForXp(s.xp)).toBe(6);
-    expect(s.upgradePoints).toBe(4);
+    expect(s.upgradePoints).toBe(3);
     expect(s.unlockedSpells).not.toContain('still-waters');
     expect(buildLoadout(s).cooldowns.map((c) => c.id)).toContain('still-waters');
     expect(notices).toEqual([
       { kind: 'levelUp', text: 'Welcome to level 6' },
       { kind: 'spellLearned', text: 'Still Waters learned!' },
     ]);
+  });
+
+  it('cards repeat victory grants +1 upgrade point (not a first clear)', () => {
+    const s = save({
+      progressionMode: 'cards',
+      clearedDungeons: ['ash-gate'],
+      upgradePoints: 0,
+    });
+    const notices = applyCombatResult(s, result({ status: 'victory' }), () => 0);
+    expect(s.upgradePoints).toBe(1);
+    expect(notices).toEqual([{ kind: 'levelUp', text: 'CLEAR — +1 Upgrade Point' }]);
   });
 
   it('does not reward or record an unknown dungeon id', () => {
@@ -249,10 +266,11 @@ describe('applyCombatResult', () => {
 });
 
 describe('XP levels and talent capacity', () => {
-  it('uses an increasing 10/20/30 XP curve and gives level 6 six total points', () => {
+  it('uses an increasing 10/20/30 XP curve; available = earned − allocated', () => {
     expect([2, 3, 4, 5, 6].map(xpForLevel)).toEqual([10, 30, 60, 100, 150]);
     expect(levelForXp(149)).toBe(5);
-    const s = save({ xp: 150, treeRanks: { 'deep-reserves': 4 } });
+    // J26: points come from victories (talentPointsEarned), not level.
+    const s = save({ xp: 150, talentPointsEarned: 6, treeRanks: { 'deep-reserves': 4 } });
     expect(allocatedTalentPoints(s)).toBe(4);
     expect(availableTalentPoints(s)).toBe(2);
   });
@@ -266,51 +284,48 @@ describe('takeHubCombatResult (Wave 0 — sticky Phaser scene data)', () => {
    * leave tree → suddenly leveled / another talent point. This helper is the
    * pure settle step Hub must use (and write back) so Tree and Hub agree.
    */
-  it('re-applying the same combatResult without consuming disagrees Hub vs Tree points', () => {
-    // Fresh save, one wipe worth enough XP to hit level 2 then level 3 on a
-    // second bank of the same payload (10 → L2, +10 → still L2, needs the
-    // double-apply from L2 threshold to L3: start at 0, grant 30 once → L3;
-    // grant 30 again → L4). Use 30 so one sticky re-apply changes points.
+  it('re-applying the same victory without consuming double-grants a talent point', () => {
+    // J26: each victory grants one talent point. A sticky re-apply of the same
+    // payload would bank a second point (and re-bank XP), so Tree and Hub would
+    // disagree after leaving the tree.
     const s = save({ xp: 0, unlockedSpells: ['solemn-mend'] });
-    const combatResult = result({ xp: 30 });
+    const combatResult = result({ status: 'victory', encounterId: 'ash-gate', xp: 1 });
 
-    applyCombatResult(s, combatResult);
+    applyCombatResult(s, combatResult, () => 0);
     const treePointsAfterCombat = availableTalentPoints(s);
-    expect(levelForXp(s.xp)).toBe(3);
-    expect(treePointsAfterCombat).toBe(3);
+    expect(treePointsAfterCombat).toBe(1);
 
-    // Sticky Hub re-entry (pre-fix): same combatResult fed again.
-    applyCombatResult(s, combatResult);
+    // Sticky Hub re-entry (pre-fix): same combatResult fed again → repeat clear.
+    applyCombatResult(s, combatResult, () => 0);
     const hubPointsAfterTreeReturn = availableTalentPoints(s);
-    expect(levelForXp(s.xp)).toBe(4);
-    expect(hubPointsAfterTreeReturn).toBe(4);
-    // Tree opened on the post-combat save; Hub after leave shows a new point.
+    expect(hubPointsAfterTreeReturn).toBe(2);
     expect(hubPointsAfterTreeReturn).not.toBe(treePointsAfterCombat);
   });
 
   it('consumes combatResult so a Tree→Hub round-trip keeps Hub/Tree talent points aligned', () => {
     const s = save({ xp: 0, unlockedSpells: ['solemn-mend'] });
-    let sceneData: HubCombatSceneData = { combatResult: result({ xp: 30 }) };
+    let sceneData: HubCombatSceneData = {
+      combatResult: result({ status: 'victory', encounterId: 'ash-gate', xp: 1 }),
+    };
 
-    const first = takeHubCombatResult(s, sceneData);
+    const first = takeHubCombatResult(s, sceneData, () => 0);
     sceneData = first.sceneData;
-    expect(first.notices.some((n) => n.kind === 'levelUp')).toBe(true);
+    expect(first.notices.some((n) => n.kind === 'firstClear')).toBe(true);
     expect(sceneData.combatResult).toBeUndefined();
 
     const pointsWhenTreeCanOpen = availableTalentPoints(s);
-    expect(levelForXp(s.xp)).toBe(3);
-    expect(pointsWhenTreeCanOpen).toBe(3);
+    expect(pointsWhenTreeCanOpen).toBe(1);
 
     // Tree loads the same save — must match Hub at the moment Tree is openable.
-    expect(availableTalentPoints({ xp: s.xp, treeRanks: s.treeRanks })).toBe(pointsWhenTreeCanOpen);
+    expect(
+      availableTalentPoints({ talentPointsEarned: s.talentPointsEarned, treeRanks: s.treeRanks }),
+    ).toBe(pointsWhenTreeCanOpen);
 
     // Leave Tree → Hub with consumed (empty) scene data, even if Phaser would
     // have sticky-replayed the old payload without this consume write-back.
-    const second = takeHubCombatResult(s, sceneData);
+    const second = takeHubCombatResult(s, sceneData, () => 0);
     expect(second.notices).toEqual([]);
-    expect(s.xp).toBe(30);
     expect(availableTalentPoints(s)).toBe(pointsWhenTreeCanOpen);
-    expect(levelForXp(s.xp)).toBe(3);
   });
 });
 
@@ -350,10 +365,10 @@ describe('buildLoadout', () => {
     ]);
   });
 
-  it('emits full-health bonuses from Steady Hands (Alpha 0.1 §D4, replaces retired Desperate Zeal)', () => {
+  it('emits missing-health pct bonuses from Steady Hands (J25: replaces the retired full-health shape)', () => {
     const s = save({ treeRanks: { 'zealot-oath': 1, 'zealot-steady-hands': 1 }, subclass: 'zealot' });
-    expect(buildLoadout(s).fullHealthBonuses).toEqual([
-      { spellId: 'zealous-mending', hpPctAtLeast: 80, bonusHeal: 2 },
+    expect(buildLoadout(s).missingHealthPctBonuses).toEqual([
+      { spellId: 'zealous-mending', pctPer10PctMissing: 10 },
     ]);
   });
 
@@ -398,49 +413,57 @@ describe('talent points', () => {
     expect(allocatedTalentPoints(save({ treeRanks: { negative: -2, fractional: 2.9 } }))).toBe(2);
   });
 
-  it('grants one available point per level', () => {
-    expect(availableTalentPoints(save({ xp: 0 }))).toBe(1);
-    expect(availableTalentPoints(save({ xp: XP_LEVEL_2_THRESHOLD }))).toBe(2);
-    expect(availableTalentPoints(save({ xp: 30 }))).toBe(3);
+  it('J26: available = earned talent points (from victories), minus allocated', () => {
+    expect(availableTalentPoints(save({ talentPointsEarned: 1 }))).toBe(1);
+    expect(availableTalentPoints(save({ talentPointsEarned: 2 }))).toBe(2);
+    expect(availableTalentPoints(save({ talentPointsEarned: 3 }))).toBe(3);
+    // A fresh save (no victories) has no points.
+    expect(availableTalentPoints(save({ talentPointsEarned: 0 }))).toBe(0);
   });
 
   it('subtracts allocated ranks and never returns a negative balance', () => {
     expect(
       availableTalentPoints(
-        save({ xp: 30, treeRanks: { 'deep-reserves': 2, 'vigil-oath': 1 } }),
+        save({ talentPointsEarned: 3, treeRanks: { 'deep-reserves': 2, 'vigil-oath': 1 } }),
       ),
     ).toBe(0);
-    expect(availableTalentPoints(save({ xp: 0, treeRanks: { 'deep-reserves': 3 } }))).toBe(0);
+    expect(
+      availableTalentPoints(save({ talentPointsEarned: 1, treeRanks: { 'deep-reserves': 3 } })),
+    ).toBe(0);
   });
 });
 
 describe('unspentTalentPointsForHub', () => {
   it('lattice matches availableTalentPoints', () => {
-    expect(unspentTalentPointsForHub(save({ xp: 0 }))).toBe(1);
-    expect(unspentTalentPointsForHub(save({ xp: 0, treeRanks: { 'deep-reserves': 1 } }))).toBe(0);
+    expect(unspentTalentPointsForHub(save({ talentPointsEarned: 1 }))).toBe(1);
+    expect(
+      unspentTalentPointsForHub(save({ talentPointsEarned: 1, treeRanks: { 'deep-reserves': 1 } })),
+    ).toBe(0);
     expect(
       unspentTalentPointsForHub(
-        save({ xp: 30, treeRanks: { 'deep-reserves': 2, 'vigil-oath': 1 } }),
+        save({ talentPointsEarned: 3, treeRanks: { 'deep-reserves': 2, 'vigil-oath': 1 } }),
       ),
     ).toBe(0);
   });
 
   it('radial free starters do not consume CTA points', () => {
-    const fresh = newSaveData('radial');
-    // Lattice-style sum would treat heal+bonk as spent → 0; Hub must still show 1.
-    expect(availableTalentPoints(fresh)).toBe(0);
-    expect(unspentTalentPointsForHub(fresh)).toBe(1);
+    const s = newSaveData('radial');
+    s.talentPointsEarned = 1; // one victory
+    // Lattice-style sum would treat heal+bonk as spent → 0; Hub keeps starters free → 1.
+    expect(availableTalentPoints(s)).toBe(0);
+    expect(unspentTalentPointsForHub(s)).toBe(1);
   });
 
-  it('radial after spending Mend shows 0 unspent at level 1', () => {
+  it('radial after spending an earned point on Mend shows 0 unspent', () => {
     const s = newSaveData('radial');
+    s.talentPointsEarned = 1;
     s.treeRanks = { heal: 1, bonk: 1, mend: 1 };
     expect(unspentTalentPointsForHub(s)).toBe(0);
   });
 
-  it('radial level-up grants another CTA point on top of free starters', () => {
+  it('radial victory points stack on top of free starters', () => {
     const s = newSaveData('radial');
-    s.xp = XP_LEVEL_2_THRESHOLD;
+    s.talentPointsEarned = 2; // two victories, starters still free
     expect(unspentTalentPointsForHub(s)).toBe(2);
   });
 });
@@ -511,14 +534,16 @@ describe('IRON_PASS data sanity', () => {
     ]);
   });
 
-  it('has a boss cast of kind tunnelVision with the PR3 tuned cadence', () => {
+  it('has a boss cast of kind tunnelVision with the J26 tuned cadence', () => {
     const cast = IRON_PASS.boss.cast;
     expect(cast?.name).toBe('Tunnel Vision');
     if (!cast || cast.kind !== 'tunnelVision') throw new Error('Tunnel Vision must be a tunnelVision cast');
     expect(cast.telegraphMs).toBe(5000);
     expect(cast.firstCastAtMs).toBe(5000);
-    expect(cast.intervalMs).toBe(16_000);
-    expect(cast.channelMs).toBe(11_000);
+    // J26: shorter channel + tighter interval so the efficiency kit sees ≥6
+    // focus channels across the Iron Pass boss phase (see tunnelVision.ts).
+    expect(cast.intervalMs).toBe(14_000);
+    expect(cast.channelMs).toBe(9_000);
     expect(cast.tickMs).toBe(1000);
     expect(cast.damagePerTick).toBe(2);
   });

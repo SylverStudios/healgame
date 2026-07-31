@@ -6,7 +6,6 @@ import {
   cooldownIdsAtLevel,
   spellIdsAtLevel,
   unlocksAtOrBelowLevel,
-  upgradePointsGrantedAtLevel,
 } from './unlocks';
 
 describe('CARD_UNLOCKS (§3 table)', () => {
@@ -61,7 +60,7 @@ describe('unlocksAtOrBelowLevel / spellIdsAtLevel / cooldownIdsAtLevel', () => {
     expect(spellIdsAtLevel(8)).toEqual(['heal', 'bonk', 'mend', 'vowstrike']);
   });
 
-  it('level 9+ is upgrade-point-only (same library as 8)', () => {
+  it('level 9+ adds no new unlocks (same library as 8)', () => {
     expect(spellIdsAtLevel(9)).toEqual(spellIdsAtLevel(8));
     expect(cooldownIdsAtLevel(9)).toEqual(cooldownIdsAtLevel(8));
     expect(cooldownIdsAtLevel(12)).toEqual(cooldownIdsAtLevel(8));
@@ -74,17 +73,8 @@ describe('unlocksAtOrBelowLevel / spellIdsAtLevel / cooldownIdsAtLevel', () => {
   });
 });
 
-describe('upgradePointsGrantedAtLevel / cardsLevelUpWelcome', () => {
-  it('unlucky 4 grants 0; lucky 8 grants 2; others grant 1', () => {
-    expect(upgradePointsGrantedAtLevel(2)).toBe(1);
-    expect(upgradePointsGrantedAtLevel(3)).toBe(1);
-    expect(upgradePointsGrantedAtLevel(4)).toBe(0);
-    expect(upgradePointsGrantedAtLevel(5)).toBe(1);
-    expect(upgradePointsGrantedAtLevel(8)).toBe(2);
-    expect(upgradePointsGrantedAtLevel(9)).toBe(1);
-  });
-
-  it('welcome copy calls out unlucky 4 and lucky 8', () => {
+describe('cardsLevelUpWelcome', () => {
+  it('welcome copy calls out unlucky 4 and lucky 8 (flavor only — no point grant)', () => {
     expect(cardsLevelUpWelcome(2)).toBe('Welcome to level 2');
     expect(cardsLevelUpWelcome(4)).toBe('Welcome to unlucky level 4');
     expect(cardsLevelUpWelcome(8)).toBe('Welcome to lucky level 8');

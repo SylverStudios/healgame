@@ -234,6 +234,9 @@ describe('CombatEngine effects: both bonuses stack additively', () => {
 /** Test-only heal-9 spell so the §D4 worked example (9-hp heal, 5%/band, 4 bands) is exact. */
 const TEST_BIG_SPELL: SpellDef = { id: 'test-big', name: 'Big Heal', heal: 9, mana: 3, castMs: 1000 };
 
+/** Test-only heal-4 spell so the J25 Steady Hands example (heal 4, 50% missing -> heal 6) is exact. */
+const TEST_STEADY_SPELL: SpellDef = { id: 'test-steady', name: 'Steady Heal', heal: 4, mana: 3, castMs: 1000 };
+
 describe('CombatEngine effects: missing-health pct bonus (Graven Scale shape)', () => {
   /** Advances exactly `missing` trash swings (3000ms each, 1 damage) against the full-hp tank,
    * landing on the boundary so the trash's timer is freshly reset — 3000ms of cast headroom. */
@@ -258,6 +261,20 @@ describe('CombatEngine effects: missing-health pct bonus (Graven Scale shape)', 
     const h = onlyHeal(castAndComplete(engine, 'tank', TEST_BIG_SPELL.id, TEST_BIG_SPELL.castMs));
     const raw = TEST_BIG_SPELL.heal + 2;
     const applied = Math.min(raw, 8);
+    expect(h.amount).toBe(applied);
+    expect(h.overheal).toBe(raw - applied);
+    expect(h.amount + h.overheal).toBe(raw);
+  });
+
+  it('J25 Steady Hands worked example: heal 4, 10%/band, target at 50% missing -> ceil(4*10*5/100) = 2 -> heal 6', () => {
+    const engine = new CombatEngine(NEVER_DYING_TRASH_ENCOUNTER, [...TEST_SPELLS, TEST_STEADY_SPELL], {
+      missingHealthPctBonuses: [{ spellId: 'test-steady', pctPer10PctMissing: 10 }],
+    });
+    bringTankToMissing(engine, 10); // 10/20 missing = 50% -> bands = 5
+    const h = onlyHeal(castAndComplete(engine, 'tank', TEST_STEADY_SPELL.id, TEST_STEADY_SPELL.castMs));
+    const raw = TEST_STEADY_SPELL.heal + 2; // 4 base + ceil(4*10*5/100) = 4 + 2 = 6
+    const applied = Math.min(raw, 10);
+    expect(raw).toBe(6);
     expect(h.amount).toBe(applied);
     expect(h.overheal).toBe(raw - applied);
     expect(h.amount + h.overheal).toBe(raw);

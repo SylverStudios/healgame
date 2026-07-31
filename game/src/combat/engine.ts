@@ -224,9 +224,11 @@ export class CombatEngine {
       buffRemainingMs: 0,
     }));
 
-    const tankHp = PARTY.tankMaxHp + this.relicStats.maxHp.tank;
-    const dpsHp = PARTY.dpsMaxHp + this.relicStats.maxHp.dps;
-    const healerHp = PARTY.healerMaxHp + this.relicStats.maxHp.healer;
+    // J26: level max-HP growth stacks with base PARTY maxHp and relic roleMaxHp.
+    const levelHp = options?.bonusMaxHp ?? {};
+    const tankHp = PARTY.tankMaxHp + this.relicStats.maxHp.tank + (levelHp.tank ?? 0);
+    const dpsHp = PARTY.dpsMaxHp + this.relicStats.maxHp.dps + (levelHp.dps ?? 0);
+    const healerHp = PARTY.healerMaxHp + this.relicStats.maxHp.healer + (levelHp.healer ?? 0);
     this.party = [
       { id: 'tank', name: 'Guardian', role: 'tank', hp: tankHp, maxHp: tankHp, mana: 0, maxMana: 0, alive: true },
       { id: 'dps1', name: 'Butcher', role: 'dps', hp: dpsHp, maxHp: dpsHp, mana: 0, maxMana: 0, alive: true },

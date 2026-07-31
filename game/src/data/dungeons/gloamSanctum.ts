@@ -17,8 +17,8 @@ export const GLOAM_SANCTUM_DUNGEON = {
   visualKey: 'gloam-sanctum',
   waves: [
     { enemies: [{ mobId: 'gloam-wretch', count: 2 }] },
-    { enemies: [{ mobId: 'gloam-wretch', count: 3 }] },
-    { enemies: [{ mobId: 'gloam-wretch', count: 4, statOverrides: { hp: 16 } }] },
-    { enemies: [{ mobId: 'veil-cantor', count: 1, statOverrides: { hp: 240 } }] },
+    { enemies: [{ mobId: 'gloam-wretch', count: 2 }] },
+    { enemies: [{ mobId: 'gloam-wretch', count: 3, statOverrides: { hp: 16 } }] },
+    { enemies: [{ mobId: 'veil-cantor', count: 1, statOverrides: { hp: 200 } }] },
   ],
 } as const satisfies DungeonDef;

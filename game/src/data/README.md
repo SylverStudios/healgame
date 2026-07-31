@@ -74,6 +74,12 @@ the resolved form reaches `CombatEngine`; the engine never performs catalog
 lookups. `data/encounters.ts` is the live registry and fails during module
 loading when catalog validation fails.
 
+J26 floor scaling: `compileDungeon` adds `(dungeon.order − 1) *
+FLOOR_ENEMY_DAMAGE` (`constants.ts`, = 2) to every resolved trash + boss
+`autoDamage` — cast ability damage is not scaled. Ash Gate (`order 1`) stays at
+its authored baseline; author mid/late mob autos accordingly (they compile
+higher than written). Pinned compiled values live in `content/content.test.ts`.
+
 The current runtime supports at most one scheduled ability on a boss
 (`partyAoE`, `tunnelVision`, `partyDoT`, or `manaSiphon`) and no active trash
 abilities. Add a discriminated `EnemyAbilityDef` member together with its

@@ -27,6 +27,8 @@ function starterSave() {
   return {
     xp: 0,
     treeRanks: { heal: 1, bonk: 1 } as Record<string, number>,
+    // J26: victory-earned wallet (fixtures preserve the old one-point-per-level shape).
+    talentPointsEarned: 1,
     unlockedSpells: ['heal', 'bonk'],
     actionBar: ['bonk', 'heal', '', ''],
   };
@@ -40,6 +42,7 @@ function midKitSave() {
   const save = {
     xp: 100, // level 5
     treeRanks: { heal: 1, bonk: 1 } as Record<string, number>,
+    talentPointsEarned: 5,
     unlockedSpells: ['heal', 'bonk'],
     actionBar: ['bonk', 'heal', '', ''],
   };
@@ -54,6 +57,7 @@ function ring3Save() {
   const save = {
     xp: 450, // level 10
     treeRanks: { heal: 1, bonk: 1 } as Record<string, number>,
+    talentPointsEarned: 10,
     unlockedSpells: ['heal', 'bonk'],
     actionBar: ['bonk', 'heal', '', ''],
   };

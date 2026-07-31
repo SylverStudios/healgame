@@ -22,6 +22,27 @@ export const PARTY = {
 } as const;
 
 /**
+ * J26 — party max-HP growth per character level above 1. Applied via
+ * `partyHpBonusesForLevel` → loadout → `CombatEngineOptions.bonusMaxHp`,
+ * stacking on base PARTY maxHp and relic `roleMaxHp` at engine construction.
+ * Level-up grants HP only; a spendable talent/upgrade point comes from
+ * dungeon victories instead.
+ */
+export const PARTY_LEVEL_HP = {
+  tankPerLevel: 5,
+  dpsPerLevel: 2,
+  healerPerLevel: 2,
+} as const;
+
+/**
+ * J26 — flat enemy auto-damage added per floor after the first. Ash Gate
+ * (`order: 1`) stays at baseline (+0); every later dungeon adds
+ * `(order - 1) * FLOOR_ENEMY_DAMAGE` to compiled trash + boss `autoDamage`
+ * in `compileDungeon`.
+ */
+export const FLOOR_ENEMY_DAMAGE = 2;
+
+/**
  * Alpha 0.2 §D2 — level-derived combat mana. Applied via
  * `manaBonusesForLevel` → loadout → `CombatEngineOptions` (not player HoTs).
  */
