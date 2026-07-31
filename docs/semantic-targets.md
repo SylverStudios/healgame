@@ -1,6 +1,6 @@
 # Semantic click targets
 
-Status: current · Authority: interactive object name inventory for journey · Last verified: 2026-07-30
+Status: current · Authority: interactive object name inventory for journey · Last verified: 2026-07-31
 
 Every interactive game object a journey stage may aim at carries a stable
 Phaser `GameObject.setName(...)`. Journey resolves via
@@ -47,7 +47,13 @@ by name.
 | `settingsProgressionCards` | Talent tree: Spell cards | `SettingsScene.ts` |
 | `settingsProgressionConfirm` | Wipe & restart confirm | `SettingsScene.ts` |
 | `settingsProgressionCancel` | Mode-switch cancel | `SettingsScene.ts` |
+| `settingsCatalogue` | Catalogue (spell/chip review) | `SettingsScene.ts` |
 | `settingsBack` | back button | `SettingsScene.ts` |
+| `catalogueTabSpells` | Catalogue Spells tab | `CatalogueScene.ts` |
+| `catalogueTabChips` | Catalogue Chips tab | `CatalogueScene.ts` |
+| `catalogueBack` | Catalogue back → Settings | `CatalogueScene.ts` |
+| `catalogueSpell:<id>` | Spell / CD row in catalogue | `CatalogueScene.ts` |
+| `catalogueChip:<id>` | Chip row in catalogue | `CatalogueScene.ts` |
 | `cardAlbumBack` | Card album back | `CardAlbumScene.ts` |
 | `cardSpell:<spellId>` | Spell / major-CD card hit target | `CardAlbumScene.ts` |
 | `cardUpgrade:<spellId>` | Upgrade affordance on a spell card | `CardAlbumScene.ts` |
