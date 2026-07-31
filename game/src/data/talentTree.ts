@@ -97,6 +97,16 @@ export interface CombatMods {
    * Absent = no bonus (level 1).
    */
   bonusMaxHp?: { tank: number; dps: number; healer: number };
+  /**
+   * Cards Upgrade secondaries (v1 mechanics). Omitted/zero = today's behavior.
+   * Magnitudes from `data/secondaryStats.ts` via save ranks.
+   */
+  hastePermille?: number;
+  critBonusPermille?: number;
+  /** Tank block every-N post-armor damage; omit/undefined = disabled. */
+  blockThresholdN?: number;
+  /** Player crit every-N completed casts; omit/undefined = disabled. */
+  critThresholdN?: number;
 }
 
 function content(c: TalentTreeContent): TalentTreeContent {

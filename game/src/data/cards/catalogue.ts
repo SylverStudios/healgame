@@ -9,7 +9,7 @@
 
 import type { SpellDef, CooldownDef } from '../../combat/types';
 import { radialSpellById } from '../radial/spells';
-import { cooldownById } from '../cooldowns';
+import { cooldownById, COOLDOWN_SET_A_IDS, COOLDOWN_SET_B_IDS } from '../cooldowns';
 import { CARD_UNLOCKS } from './unlocks';
 import { CARD_CHIPS, type CardChipDef, type CardChipEffect } from './chips';
 import { iconArtFor } from './iconPrompts';
@@ -113,38 +113,45 @@ function fmtDelta(n: number): string {
   return n >= 0 ? `+${n}` : `${n}`;
 }
 
-/** Every cards-mode spell + major CD, unlock order. */
+/** Every cards-mode spell + major CD (Set A @6 / Set B @8), review order. */
 export function catalogueSpells(): CatalogueSpellEntry[] {
-  return CARD_UNLOCKS.map((unlock) => {
+  const spells = CARD_UNLOCKS.filter((u) => u.kind === 'spell').map((unlock) => {
     const icon = resolveIcon(unlock.id);
-    if (unlock.kind === 'spell') {
-      const spell = radialSpellById(unlock.id);
-      const chipIds = CARD_CHIPS.filter((c) => c.spellId === unlock.id).map((c) => c.id);
-      return {
-        kind: 'spell' as const,
-        id: unlock.id,
-        name: spell?.name ?? unlock.id,
-        description: spell?.description ?? '',
-        glyph: spell?.glyph ?? '?',
-        minLevel: unlock.minLevel,
-        stats: spell ? spellStats(spell) : [],
-        icon,
-        chipIds,
-      };
-    }
-    const cd = cooldownById(unlock.id);
+    const spell = radialSpellById(unlock.id);
+    const chipIds = CARD_CHIPS.filter((c) => c.spellId === unlock.id).map((c) => c.id);
     return {
-      kind: 'cooldown' as const,
+      kind: 'spell' as const,
       id: unlock.id,
-      name: cd?.name ?? unlock.id,
-      description: cd?.description ?? '',
-      glyph: cd?.glyph ?? '?',
+      name: spell?.name ?? unlock.id,
+      description: spell?.description ?? '',
+      glyph: spell?.glyph ?? '?',
       minLevel: unlock.minLevel,
-      stats: cd ? cooldownStats(cd) : [],
+      stats: spell ? spellStats(spell) : [],
       icon,
-      chipIds: [],
+      chipIds,
     };
   });
+
+  const cooldownRows: { id: string; minLevel: number }[] = [
+    ...COOLDOWN_SET_A_IDS.map((id) => ({ id, minLevel: 6 })),
+    ...COOLDOWN_SET_B_IDS.map((id) => ({ id, minLevel: 8 })),
+  ];
+  const cooldowns = cooldownRows.map(({ id, minLevel }) => {
+    const cd = cooldownById(id);
+    return {
+      kind: 'cooldown' as const,
+      id,
+      name: cd?.name ?? id,
+      description: cd?.description ?? '',
+      glyph: cd?.glyph ?? '?',
+      minLevel,
+      stats: cd ? cooldownStats(cd) : [],
+      icon: resolveIcon(id),
+      chipIds: [] as readonly string[],
+    };
+  });
+
+  return [...spells, ...cooldowns];
 }
 
 /** Every authored chip, catalog order, with spell name + effect lines. */

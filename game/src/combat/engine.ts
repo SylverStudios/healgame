@@ -100,6 +100,21 @@ export class CombatEngine {
   private readonly cooldowns: CooldownRuntime[];
   private readonly relicStats: RelicStats;
   private relicRegenRemainingMs: number | null = null;
+  /** v1 M2: castMs reduction in permille (0..999). GCD is never shortened. */
+  private readonly hastePermille: number;
+  /** v1 M3: tank block — every-N deterministic mitigation. Undefined = disabled. */
+  private readonly blockThresholdN: number | undefined;
+  /** Running accumulator for block math (integer carry-over across swings). */
+  private blockDamageCarry = 0;
+  /**
+   * Crit every-N completed player casts. Undefined = disabled.
+   * Higher rank → smaller N (see secondaryStats.critThreshold).
+   */
+  private readonly critThresholdN: number | undefined;
+  /** Cast counter for deterministic crit (mirrors blockDamageCarry). */
+  private critCastCarry = 0;
+  /** Crit output bonus in permille above base (e.g. 500 = +50%). */
+  private readonly critBonusPermille: number;
 
   private party: Unit[] = [];
   private activeEnemies: Unit[] = [];
@@ -149,6 +164,10 @@ export class CombatEngine {
   constructor(encounter: EncounterDef, spells: SpellDef[], options?: CombatEngineOptions) {
     this.encounter = encounter;
     this.spells = spells;
+    this.hastePermille = options?.hastePermille ?? 0;
+    this.blockThresholdN = options?.blockThresholdN;
+    this.critThresholdN = options?.critThresholdN;
+    this.critBonusPermille = options?.critBonusPermille ?? 0;
 
     this.relicStats = {
       bonusMaxMana: 0,
@@ -594,7 +613,12 @@ export class CombatEngine {
       }
     }
     healer.mana = Math.max(0, healer.mana - reservedMana);
-    this.playerCast = { spellId, targetId, remainingMs: spell.castMs, totalMs: spell.castMs };
+    // v1 M2: apply haste to the spell's cast duration; GCD is never shortened.
+    const effectiveCastMs = Math.max(
+      0,
+      Math.floor((spell.castMs * (1000 - this.hastePermille)) / 1000),
+    );
+    this.playerCast = { spellId, targetId, remainingMs: effectiveCastMs, totalMs: effectiveCastMs };
     this.playerCastReservedMana = reservedMana;
     this.gcdRemainingMs = GCD_MS;
     if ((spell.cooldownMs ?? 0) > 0) {
@@ -602,9 +626,9 @@ export class CombatEngine {
     }
     out.push({ type: 'castStarted', cast: { ...this.playerCast } });
     if (freeHealCd) out.push({ type: 'cooldownBuffEnded', id: freeHealCd.def.id });
-    // Alpha 0.2 §D4: castMs === 0 is a true instant — heal resolves in this same
-    // call (no cast-bar occupancy). GCD still runs from cast start.
-    if (spell.castMs === 0) {
+    // Alpha 0.2 §D4 / v1 M2: effectiveCastMs === 0 is a true instant (spell had
+    // castMs 0, or haste reduced it to 0). GCD still runs from cast start.
+    if (effectiveCastMs === 0) {
       this.completePlayerCast(out);
     }
   }
@@ -631,13 +655,21 @@ export class CombatEngine {
     // Mana was already reserved/debited at cast start — do not subtract again.
     events.push({ type: 'castFinished', spellId: cast.spellId });
 
+    // Deterministic crit: one tick per completed cast (heal, damage, or hybrid).
+    // Same isCrit applies to every player heal/damage output from this cast.
+    const isCrit = this.consumeCritForCast();
+
     const target = this.getUnit(cast.targetId);
 
     // Damage spells (Bonk / Vowstrike): hit the locked enemy target; then apply
     // castBuff / synergy arming. Heal pipeline is skipped when heal === 0.
     if ((spell.damage ?? 0) > 0) {
       if (target && target.alive) {
-        this.applyDamageToUnit(target, spell.damage!, 'healer', events);
+        let dmgAmount = spell.damage!;
+        if (isCrit) {
+          dmgAmount = Math.floor((dmgAmount * (1000 + this.critBonusPermille)) / 1000);
+        }
+        this.applyDamageToUnit(target, dmgAmount, 'healer', events, isCrit);
       }
       // Mana Bonk: restore mana after a completed damage cast (hit attempted).
       if ((spell.manaOnHit ?? 0) > 0) {
@@ -731,7 +763,8 @@ export class CombatEngine {
         );
         this.bonkHealStackCount = 0;
       }
-      const raw =
+      // Deterministic crit: assembled raw first, then every-N-casts multiply.
+      let raw =
         spell.heal +
         synergyBonus +
         missingHealthBonus +
@@ -740,10 +773,20 @@ export class CombatEngine {
         this.relicStats.bonusHealing +
         healBonus +
         potencyBonus;
+      if (isCrit) {
+        raw = Math.floor((raw * (1000 + this.critBonusPermille)) / 1000);
+      }
       const applied = Math.min(raw, missing);
       const overheal = raw - applied;
       target.hp += applied;
-      events.push({ type: 'heal', targetId: target.id, amount: applied, overheal, spellId: spell.id });
+      events.push({
+        type: 'heal',
+        targetId: target.id,
+        amount: applied,
+        overheal,
+        spellId: spell.id,
+        ...(isCrit ? { crit: true } : {}),
+      });
       // v0.3 §Coyote: a heal that completes on a dying unit (within its grace window, since a
       // truly-dead target would have auto-cancelled this cast instead — see cancelCastIfTargeting)
       // saves them: dying clears, no unitDied ever fires. Mana/overheal rules are unchanged — this
@@ -856,14 +899,50 @@ export class CombatEngine {
     return Math.max(1, amount - this.relicStats.armor[target.role]);
   }
 
-  private applyDamageToUnit(target: Unit, amount: number, sourceId: string, events: CombatEvent[]): void {
+  /**
+   * Deterministic crit tick — once per completed player cast.
+   * `carry += 1; procs = floor(carry / N); carry %= N` (mirrors tank block).
+   */
+  private consumeCritForCast(): boolean {
+    if (this.critThresholdN === undefined) return false;
+    this.critCastCarry += 1;
+    const procs = Math.floor(this.critCastCarry / this.critThresholdN);
+    this.critCastCarry %= this.critThresholdN;
+    return procs > 0;
+  }
+
+  private applyDamageToUnit(
+    target: Unit,
+    amount: number,
+    sourceId: string,
+    events: CombatEvent[],
+    crit?: boolean,
+  ): void {
     // v0.3 §Coyote: a dying (downed) unit is already at 0 hp and takes no further damage — no
     // `damage` event, nothing to clamp. It stays exactly as downed as it was the instant it entered
     // the grace window, until it's saved or its window expires.
     if (target.dying) return;
-    const applied = this.damageAfterArmor(target, amount);
-    target.hp = Math.max(0, target.hp - applied);
-    events.push({ type: 'damage', targetId: target.id, amount: applied, sourceId });
+    // Armor step — floor ≥ 1.
+    const postArmorDamage = this.damageAfterArmor(target, amount);
+    // v1 M3 block: tank only, deterministic every-N carry model. The armor floor-1 applies ONLY
+    // to postArmorDamage; after block the final can be 0 (full block is allowed).
+    let finalDamage = postArmorDamage;
+    let blocked = 0;
+    if (target.role === 'tank' && this.blockThresholdN !== undefined) {
+      this.blockDamageCarry += postArmorDamage;
+      blocked = Math.floor(this.blockDamageCarry / this.blockThresholdN);
+      this.blockDamageCarry = this.blockDamageCarry % this.blockThresholdN;
+      finalDamage = Math.max(0, postArmorDamage - blocked);
+    }
+    target.hp = Math.max(0, target.hp - finalDamage);
+    events.push({
+      type: 'damage',
+      targetId: target.id,
+      amount: finalDamage,
+      sourceId,
+      ...(blocked > 0 ? { blocked } : {}),
+      ...(crit ? { crit: true } : {}),
+    });
     if (target.hp <= 0 && target.alive) {
       if (target.role === 'enemy' || target.role === 'boss') {
         // Enemies/boss never get coyote grace — trash/boss death is instant, as before.

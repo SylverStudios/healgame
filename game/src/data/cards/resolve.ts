@@ -26,9 +26,10 @@ import { manaBonusesForLevel } from '../levelMana';
 import { partyHpBonusesForLevel } from '../levelHp';
 import { radialSpellById } from '../radial/spells';
 import { spellsFromActionBar, type CombatMods } from '../talentTree';
+import { fightModsFromSecondaryRanks } from '../secondaryStats';
 import { chipById, type CardChipEffect } from './chips';
 import { offersForNextSlot } from './draft';
-import { CARD_SLOTS, CARD_UNLOCKS, cooldownIdsAtLevel } from './unlocks';
+import { CARD_SLOTS, CARD_UNLOCKS } from './unlocks';
 
 /** Empty CombatMods shell shared by stub + later chip resolve. */
 function emptyMods(spells: SpellDef[]): CombatMods {
@@ -198,13 +199,18 @@ function applyOwnedChips(
 
 /**
  * Canonical cards fight-start entry: unlocked spells → radial defs → chips →
- * level mana → CDs from unlock table at current level → action-bar order.
+ * level mana → CDs from chosenCooldownIds → action-bar order.
+ *
+ * M5: cooldowns come exclusively from `chosenCooldownIds` (validated via
+ * `cooldownById`). The pre-M5 level-based auto-grant is removed.
  */
 export function loadoutFromCardSave(save: {
   xp: number;
   actionBar: string[];
   unlockedSpells?: readonly string[];
   spellChips?: Record<string, string[]>;
+  secondaryRanks?: Partial<Record<'block' | 'crit' | 'haste' | 'manaRegen', number>>;
+  chosenCooldownIds?: readonly string[];
 }): CombatMods {
   const unlocked = save.unlockedSpells ?? ['heal', 'bonk'];
   const spells: SpellDef[] = unlocked
@@ -246,11 +252,31 @@ export function loadoutFromCardSave(save: {
     mods.bonusMaxHp = levelHp;
   }
 
-  // Cooldown unlocks are not stored on the save — discover via unlock table.
-  mods.cooldowns = cooldownIdsAtLevel(level)
+  // M5: cooldowns come exclusively from the player's explicit choices.
+  const chosen = save.chosenCooldownIds ?? [];
+  mods.cooldowns = [...chosen]
     .map((id) => cooldownById(id))
     .filter((c): c is NonNullable<typeof c> => c !== undefined)
     .map((c) => ({ ...c }));
+
+  // Secondary Upgrade ranks → fight mods (engine applies haste/block/crit).
+  const sec = fightModsFromSecondaryRanks(save.secondaryRanks ?? {});
+  if (sec.hastePermille > 0) mods.hastePermille = sec.hastePermille;
+  if (sec.critThresholdN !== null) {
+    mods.critThresholdN = sec.critThresholdN;
+    mods.critBonusPermille = sec.critBonusPermille;
+  }
+  if (sec.blockThresholdN !== null) mods.blockThresholdN = sec.blockThresholdN;
+  if (sec.manaRegen !== null) {
+    if (mods.manaRegen) {
+      mods.manaRegen = {
+        amount: mods.manaRegen.amount + sec.manaRegen.amount,
+        intervalMs: Math.min(mods.manaRegen.intervalMs, sec.manaRegen.intervalMs),
+      };
+    } else {
+      mods.manaRegen = sec.manaRegen;
+    }
+  }
 
   if (save.actionBar.some((id) => id.length > 0)) {
     mods.spells = spellsFromActionBar(mods.spells, save.actionBar);
@@ -279,8 +305,10 @@ export function ownedSpellsFromCardSave(save: {
  * J26: level-ups no longer bank upgrade points — those come only from dungeon
  * victories (see `applyCombatResult`). Unlocks are free (do not spend points).
  * Spells are pushed into `unlockedSpells` and auto-equipped into the first
- * free action-bar slot. Cooldown unlocks are not stored on the save; loadout
- * reads them via `cooldownIdsAtLevel(levelForXp(save.xp))`.
+ * free action-bar slot.
+ *
+ * M5: cooldown unlocks are not granted here; the player chooses them via the
+ * Hub CD picker when `pendingCooldownSet(save)` is non-null.
  */
 export function applyCardsLevelUps(
   save: SaveData,

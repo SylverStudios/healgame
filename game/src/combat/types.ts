@@ -224,6 +224,16 @@ export interface CombatEngineOptions {
   cooldowns?: CooldownDef[];
   /** Permanent relics selected on prior dungeon first clears. */
   relics?: RelicDef[];
+  /**
+   * Cards Upgrade secondaries (v1). Haste reduces player castMs only (GCD
+   * unchanged). Crit is deterministic every-N completed casts. Block is
+   * tank-only deterministic every-N damage. Omit = pre-upgrade behavior.
+   */
+  hastePermille?: number;
+  critBonusPermille?: number;
+  blockThresholdN?: number;
+  /** Every N completed player casts, that cast crits. Undefined = disabled. */
+  critThresholdN?: number;
 }
 
 export interface CastState {
@@ -242,8 +252,8 @@ export interface BossCastState {
 export type CombatStatus = 'running' | 'victory' | 'wipe';
 
 export type CombatEvent =
-  | { type: 'damage'; targetId: string; amount: number; sourceId: string }
-  | { type: 'heal'; targetId: string; amount: number; overheal: number; spellId: string }
+  | { type: 'damage'; targetId: string; amount: number; sourceId: string; blocked?: number; crit?: boolean }
+  | { type: 'heal'; targetId: string; amount: number; overheal: number; spellId: string; crit?: boolean }
   | { type: 'castStarted'; cast: CastState }
   | { type: 'castFinished'; spellId: string }
   | { type: 'castCancelled'; spellId: string; reason: 'escape' | 'target-dead' }

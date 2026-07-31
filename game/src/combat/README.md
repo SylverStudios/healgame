@@ -1,6 +1,6 @@
 # Combat engine (Chunk 1)
 
-Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-07-30
+Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-07-31
 
 Pure, deterministic TypeScript. No Phaser, no wall-clock, no randomness — driven
 entirely by `advance(dtMs)`. Chunk 2 builds the Phaser view against exactly
@@ -420,6 +420,28 @@ and compiles the ordered dungeon catalog into the engine's resolved
   a single regen ticker; `PARTY.manaRegenPer5s` is retired. Level bonuses are
   computed by `manaBonusesForLevel` (`meta/progression.ts`) and wired through
   loadout in a later chunk.
+- **Tank block (v1 M3)**: `CombatEngineOptions.blockThresholdN` enables
+  deterministic every-N mitigation for the tank only. The engine maintains an
+  integer `blockDamageCarry` (starts 0). On each hit to the tank after armor:
+  `carry += postArmorDamage; blocked = floor(carry / N); carry %= N;
+  finalDamage = max(0, postArmorDamage - blocked)`. The armor step floors at 1
+  (existing `damageAfterArmor` rule) — the block step does **not** re-apply
+  that floor, so a fully blocked hit emits `amount: 0`. The `damage` event
+  carries `blocked?: number` when `blocked > 0`. Non-tank roles: no block.
+  `blockThresholdN` undefined = disabled (default, pre-upgrade behavior).
+- **Crit (v1)**: `CombatEngineOptions.critThresholdN` /
+  `critBonusPermille` enable **deterministic** crits on **player heal and
+  player spell damage only** — not merc or enemy autos. Every completed player
+  cast advances an integer carry (cancelled casts do not):
+  `carry += 1; procs = floor(carry / N); carry %= N`. When `procs > 0`, that
+  cast crits. Hybrid damage+heal spells share one tick (same `crit` flag on
+  both outputs). On a crit, raw is multiplied:
+  `Math.floor(raw * (1000 + critBonusPermille) / 1000)`. For heals, crit is
+  applied to the assembled raw (after all bonuses, before the overheal split).
+  For damage, crit is applied to `spell.damage` before armor. The `heal` and
+  `damage` events carry `crit?: boolean` when it procs. Undefined
+  `critThresholdN` = disabled (default). **No RNG** — same purity model as
+  tank block.
 
 ## Determinism
 

@@ -10,7 +10,6 @@
 import { applyCardsLevelUps } from '../data/cards/resolve';
 import { CARD_UNLOCKS, cardsLevelUpWelcome } from '../data/cards/unlocks';
 import { levelForXp, SPELLS } from '../data/constants';
-import { cooldownById } from '../data/cooldowns';
 import { getDungeonById, isDungeonIdUnlocked, ORDERED_DUNGEONS } from '../data/dungeons';
 import { chooseRelicOffers } from '../data/relics';
 import { loadoutForSave } from '../data/loadout';
@@ -53,19 +52,20 @@ export function applyCombatResult(
 
   if (levelAfter > levelBefore) {
     if (save.progressionMode === 'cards') {
-      // applyCardsLevelUps grants free unlocks only (no upgrade points on level).
+      // applyCardsLevelUps grants free spell unlocks only (no upgrade points on level).
       applyCardsLevelUps(save, levelBefore, levelAfter);
+      // M4: one Upgrade pick per level gained — drained by HubScene modal.
+      save.pendingUpgradePicks += levelAfter - levelBefore;
       notices.push({
         kind: 'levelUp',
         text: cardsLevelUpWelcome(levelAfter),
       });
+      // Spell unlock notices (CDs are no longer in CARD_UNLOCKS — M5).
       for (let level = levelBefore + 1; level <= levelAfter; level++) {
         for (const unlock of CARD_UNLOCKS) {
           if (unlock.minLevel !== level) continue;
-          const name =
-            unlock.kind === 'spell'
-              ? radialSpellById(unlock.id)?.name
-              : cooldownById(unlock.id)?.name;
+          if (unlock.kind !== 'spell') continue;
+          const name = radialSpellById(unlock.id)?.name;
           if (name === undefined) continue;
           notices.push({
             kind: 'spellLearned',

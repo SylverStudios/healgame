@@ -10,11 +10,20 @@ import {
 import { CARD_ICON_ART, iconArtFor } from './iconPrompts';
 
 describe('cards catalogue', () => {
-  it('lists every CARD_UNLOCKS spell and cooldown', () => {
+  it('lists every CARD_UNLOCKS spell plus Set A/B cooldowns', () => {
     const entries = catalogueSpells();
-    expect(entries.map((e) => e.id)).toEqual(CARD_UNLOCKS.map((u) => u.id));
+    const spellIds = CARD_UNLOCKS.filter((u) => u.kind === 'spell').map((u) => u.id);
+    expect(entries.filter((e) => e.kind === 'spell').map((e) => e.id)).toEqual(spellIds);
     expect(entries.some((e) => e.kind === 'spell')).toBe(true);
     expect(entries.some((e) => e.kind === 'cooldown')).toBe(true);
+    expect(entries.filter((e) => e.kind === 'cooldown').map((e) => e.id)).toEqual([
+      'still-waters',
+      'wrath-ascendant',
+      'frenzied-liturgy',
+      'iron-canticle',
+      'mercy-reserve',
+      'ashen-rite',
+    ]);
   });
 
   it('attaches authored chips to their spell entries', () => {
