@@ -100,6 +100,8 @@ export class CombatEngine {
   private readonly cooldowns: CooldownRuntime[];
   private readonly relicStats: RelicStats;
   private relicRegenRemainingMs: number | null = null;
+  /** v1 M2: castMs reduction in permille (0..999). GCD is never shortened. */
+  private readonly hastePermille: number;
 
   private party: Unit[] = [];
   private activeEnemies: Unit[] = [];
@@ -149,6 +151,7 @@ export class CombatEngine {
   constructor(encounter: EncounterDef, spells: SpellDef[], options?: CombatEngineOptions) {
     this.encounter = encounter;
     this.spells = spells;
+    this.hastePermille = options?.hastePermille ?? 0;
 
     this.relicStats = {
       bonusMaxMana: 0,
@@ -594,7 +597,12 @@ export class CombatEngine {
       }
     }
     healer.mana = Math.max(0, healer.mana - reservedMana);
-    this.playerCast = { spellId, targetId, remainingMs: spell.castMs, totalMs: spell.castMs };
+    // v1 M2: apply haste to the spell's cast duration; GCD is never shortened.
+    const effectiveCastMs = Math.max(
+      0,
+      Math.floor((spell.castMs * (1000 - this.hastePermille)) / 1000),
+    );
+    this.playerCast = { spellId, targetId, remainingMs: effectiveCastMs, totalMs: effectiveCastMs };
     this.playerCastReservedMana = reservedMana;
     this.gcdRemainingMs = GCD_MS;
     if ((spell.cooldownMs ?? 0) > 0) {
@@ -602,9 +610,9 @@ export class CombatEngine {
     }
     out.push({ type: 'castStarted', cast: { ...this.playerCast } });
     if (freeHealCd) out.push({ type: 'cooldownBuffEnded', id: freeHealCd.def.id });
-    // Alpha 0.2 §D4: castMs === 0 is a true instant — heal resolves in this same
-    // call (no cast-bar occupancy). GCD still runs from cast start.
-    if (spell.castMs === 0) {
+    // Alpha 0.2 §D4 / v1 M2: effectiveCastMs === 0 is a true instant (spell had
+    // castMs 0, or haste reduced it to 0). GCD still runs from cast start.
+    if (effectiveCastMs === 0) {
       this.completePlayerCast(out);
     }
   }
