@@ -808,20 +808,21 @@ try {
 
   await clickNamed(page, 'cardUpgrade:heal');
   await waitForNamed(page, 'cardChipOffer:heal-mend-link');
-  check((await locate(page, 'cardChipOffer:heal-power')) !== null, 'Heal slot-1 draft shows Power Up');
+  check((await locate(page, 'cardChipOffer:heal-graven')) !== null, 'Heal slot-1 draft shows Graven Light');
   check((await locate(page, 'cardChipOffer:heal-cost')) !== null, 'Heal slot-1 draft shows Cost Cut');
+  check((await locate(page, 'cardChipOffer:heal-power')) === null, 'Heal slot-1 draft hides Power Up (now slot 2)');
   check((await locate(page, 'cardChipCancel')) !== null, 'draft modal exposes cancel');
   await shot(page, 'card-chip-draft');
 
-  // Pick any slot-1 offer (Power Up) → Confirm
-  await clickNamed(page, 'cardChipOffer:heal-power');
+  // Pick any slot-1 offer (Graven Light) → Confirm
+  await clickNamed(page, 'cardChipOffer:heal-graven');
   await clickNamed(page, 'cardChipConfirm');
   await waitForNamed(page, 'cardAlbumBack');
   save = await readSave(page);
   check(save?.upgradePoints === 0, 'chip purchase spends the upgrade point');
   check(
-    Array.isArray(save?.spellChips?.heal) && save.spellChips.heal[0] === 'heal-power',
-    'Heal slot 1 filled with heal-power',
+    Array.isArray(save?.spellChips?.heal) && save.spellChips.heal[0] === 'heal-graven',
+    'Heal slot 1 filled with heal-graven',
   );
   check((await locate(page, 'cardUpgrade:heal')) === null, 'no Upgrade affordance without points');
   await shot(page, 'card-album-after-upgrade');

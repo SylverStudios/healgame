@@ -19,11 +19,12 @@ import { loadSave, saveGame, type SaveData } from '../save/save';
 import { levelForXp } from '../data/constants';
 import {
   CARD_SLOTS,
+  SLOT_2_MIN_LEVEL,
   cooldownIdsAtLevel,
   spellIdsAtLevel,
 } from '../data/cards/unlocks';
 import { chipById, type CardChipDef, type CardChipEffect } from '../data/cards/chips';
-import { offersForNextSlot } from '../data/cards/draft';
+import { canOfferSlot, offersForNextSlot } from '../data/cards/draft';
 import { applyChipPurchase, ownedSpellsFromCardSave } from '../data/cards/resolve';
 import { radialSpellById } from '../data/radial/spells';
 import { cooldownById } from '../data/cooldowns';
@@ -185,8 +186,11 @@ export class CardAlbumScene extends Phaser.Scene {
       radialSpellById(spellId);
     const name = spell?.name ?? spellId;
     const chips = this.save.spellChips[spellId] ?? [];
+    const level = levelForXp(this.save.xp);
     const canUpgrade =
-      points > 0 && chips.length < CARD_SLOTS && offersForNextSlot(spellId, chips) !== null;
+      points > 0 &&
+      chips.length < CARD_SLOTS &&
+      offersForNextSlot(spellId, chips, level) !== null;
 
     const bg = this.add
       .rectangle(x, y, CARD_W, CARD_H, PANEL_COLOR)
@@ -241,7 +245,12 @@ export class CardAlbumScene extends Phaser.Scene {
     for (let slot = 0; slot < CARD_SLOTS; slot++) {
       const chipId = chips[slot];
       const chip = chipId ? chipById(chipId) : undefined;
-      const label = chip ? `${slot + 1}. ${chip.name}` : `${slot + 1}. empty`;
+      const slotLocked = !chip && !canOfferSlot(slot, level);
+      const label = chip
+        ? `${slot + 1}. ${chip.name}`
+        : slotLocked
+          ? `${slot + 1}. Unlocks at level ${SLOT_2_MIN_LEVEL}`
+          : `${slot + 1}. empty`;
       const slotY = cursorY + SLOT_ROW_H / 2;
       const slotBg = this.add
         .rectangle(x, slotY, slotW, SLOT_ROW_H - 2, PANEL_LIGHT)
@@ -298,8 +307,16 @@ export class CardAlbumScene extends Phaser.Scene {
         this.openDraftModal(spellId);
       });
     } else {
-      const hint =
-        chips.length >= CARD_SLOTS ? 'Fully upgraded' : points <= 0 ? 'No points' : '';
+      const nextSlot = chips.length;
+      const slot2Locked =
+        nextSlot === 1 && !canOfferSlot(1, level) && chips.length < CARD_SLOTS;
+      const hint = chips.length >= CARD_SLOTS
+        ? 'Fully upgraded'
+        : slot2Locked
+          ? `Unlocks at level ${SLOT_2_MIN_LEVEL}`
+          : points <= 0
+            ? 'No points'
+            : '';
       if (hint) {
         this.add
           .text(x, footerCenterY, hint, {
@@ -364,7 +381,8 @@ export class CardAlbumScene extends Phaser.Scene {
 
   private openDraftModal(spellId: string): void {
     const owned = this.save.spellChips[spellId] ?? [];
-    const offers = offersForNextSlot(spellId, owned);
+    const level = levelForXp(this.save.xp);
+    const offers = offersForNextSlot(spellId, owned, level);
     if (!offers || this.modalOpen) return;
 
     this.modalOpen = true;

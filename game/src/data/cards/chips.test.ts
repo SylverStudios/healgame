@@ -1,22 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import { xpForLevel } from '../constants';
 import { newSaveData } from '../../save/save';
-import { CARD_CHIPS, chipById, chipOffersForSlot } from './chips';
-import { offersForNextSlot } from './draft';
+import {
+  CARD_CHIPS,
+  chipById,
+  chipOffersForSlot,
+  healSlot2Offers,
+} from './chips';
+import { canOfferSlot, offersForNextSlot } from './draft';
 import { applyChipPurchase, loadoutFromCardSave } from './resolve';
-import { CARD_SLOTS } from './unlocks';
+import { CARD_SLOTS, SLOT_2_MIN_LEVEL } from './unlocks';
 
-const UPGRADABLE = ['heal', 'mend', 'bonk', 'vowstrike'] as const;
-
-describe('CARD_CHIPS catalog (§8)', () => {
-  it('ships exactly 24 chips — 6 per upgradable spell', () => {
-    expect(CARD_CHIPS).toHaveLength(24);
-    for (const spellId of UPGRADABLE) {
+describe('CARD_CHIPS catalog (Wave 7a)', () => {
+  it('ships 25 chips — heal 7 (3+4), others 6 each', () => {
+    expect(CARD_CHIPS).toHaveLength(25);
+    expect(CARD_CHIPS.filter((c) => c.spellId === 'heal')).toHaveLength(7);
+    expect(CARD_CHIPS.filter((c) => c.spellId === 'heal' && c.slotIndex === 0)).toHaveLength(3);
+    expect(CARD_CHIPS.filter((c) => c.spellId === 'heal' && c.slotIndex === 1)).toHaveLength(4);
+    for (const spellId of ['mend', 'bonk', 'vowstrike'] as const) {
       const chips = CARD_CHIPS.filter((c) => c.spellId === spellId);
       expect(chips).toHaveLength(6);
       expect(chips.filter((c) => c.slotIndex === 0)).toHaveLength(3);
       expect(chips.filter((c) => c.slotIndex === 1)).toHaveLength(3);
     }
+    expect(chipById('heal-steady')).toBeUndefined();
   });
 
   it('chipById resolves every catalog id', () => {
@@ -28,17 +35,13 @@ describe('CARD_CHIPS catalog (§8)', () => {
 });
 
 describe('chipOffersForSlot exact trios', () => {
-  it('returns heal slot-1 / slot-2 authored ids in catalog order', () => {
+  it('returns heal slot-1 authored ids; refuses naive heal slot-2', () => {
     expect(chipOffersForSlot('heal', 0)).toEqual([
       'heal-mend-link',
-      'heal-power',
+      'heal-graven',
       'heal-cost',
     ]);
-    expect(chipOffersForSlot('heal', 1)).toEqual([
-      'heal-graven',
-      'heal-heavy',
-      'heal-steady',
-    ]);
+    expect(() => chipOffersForSlot('heal', 1)).toThrow(/heal slot 2 is gated/);
   });
 
   it('returns mend slot-1 / slot-2 authored ids', () => {
@@ -81,12 +84,68 @@ describe('chipOffersForSlot exact trios', () => {
   });
 });
 
-describe('offersForNextSlot', () => {
-  it('returns slot-0 trio when empty, slot-1 after one owned, null when full', () => {
-    expect(offersForNextSlot('heal', [])).toEqual(chipOffersForSlot('heal', 0));
-    expect(offersForNextSlot('heal', ['heal-power'])).toEqual(chipOffersForSlot('heal', 1));
-    expect(offersForNextSlot('heal', ['heal-power', 'heal-graven'])).toBeNull();
+describe('healSlot2Offers (J25b)', () => {
+  it('offers Heavy Cast trio when chip1 is Graven Light', () => {
+    expect(healSlot2Offers('heal-graven')).toEqual([
+      'heal-heavy',
+      'heal-quick',
+      'heal-power',
+    ]);
+  });
+
+  it('offers Bulwark trio when chip1 is not Graven', () => {
+    expect(healSlot2Offers('heal-mend-link')).toEqual([
+      'heal-quick',
+      'heal-power',
+      'heal-bulwark',
+    ]);
+    expect(healSlot2Offers('heal-cost')).toEqual([
+      'heal-quick',
+      'heal-power',
+      'heal-bulwark',
+    ]);
+    expect(healSlot2Offers(undefined)).toEqual([
+      'heal-quick',
+      'heal-power',
+      'heal-bulwark',
+    ]);
+  });
+});
+
+describe('canOfferSlot / offersForNextSlot (J24 + J25b)', () => {
+  it('gates slot 2 behind level 5', () => {
+    expect(canOfferSlot(0, 1)).toBe(true);
+    expect(canOfferSlot(1, 4)).toBe(false);
+    expect(canOfferSlot(1, SLOT_2_MIN_LEVEL)).toBe(true);
+    expect(SLOT_2_MIN_LEVEL).toBe(5);
+  });
+
+  it('returns slot-0 trio regardless of level; null when full', () => {
+    expect(offersForNextSlot('heal', [], 1)).toEqual(chipOffersForSlot('heal', 0));
+    expect(offersForNextSlot('heal', ['heal-graven', 'heal-heavy'], 5)).toBeNull();
     expect(CARD_SLOTS).toBe(2);
+  });
+
+  it('returns null for slot 2 under level 5 even with chip1 filled', () => {
+    expect(offersForNextSlot('heal', ['heal-graven'], 4)).toBeNull();
+    expect(offersForNextSlot('mend', ['mend-arming'], 2)).toBeNull();
+  });
+
+  it('returns heal gated trios at level 5+', () => {
+    expect(offersForNextSlot('heal', ['heal-graven'], 5)).toEqual([
+      'heal-heavy',
+      'heal-quick',
+      'heal-power',
+    ]);
+    expect(offersForNextSlot('heal', ['heal-cost'], 5)).toEqual([
+      'heal-quick',
+      'heal-power',
+      'heal-bulwark',
+    ]);
+  });
+
+  it('returns naive slot-2 trio for non-heal spells at level 5+', () => {
+    expect(offersForNextSlot('mend', ['mend-arming'], 5)).toEqual(chipOffersForSlot('mend', 1));
   });
 });
 
@@ -94,15 +153,16 @@ describe('applyChipPurchase', () => {
   it('spends a point and appends an offered slot-0 chip', () => {
     const save = newSaveData('cards');
     save.upgradePoints = 1;
-    expect(applyChipPurchase(save, 'heal', 'heal-power')).toBe(true);
+    expect(applyChipPurchase(save, 'heal', 'heal-graven')).toBe(true);
     expect(save.upgradePoints).toBe(0);
-    expect(save.spellChips.heal).toEqual(['heal-power']);
+    expect(save.spellChips.heal).toEqual(['heal-graven']);
   });
 
   it('rejects wrong-slot chips (slot-1 while slot-0 empty)', () => {
     const save = newSaveData('cards');
     save.upgradePoints = 1;
-    expect(applyChipPurchase(save, 'heal', 'heal-graven')).toBe(false);
+    expect(applyChipPurchase(save, 'heal', 'heal-heavy')).toBe(false);
+    expect(applyChipPurchase(save, 'heal', 'heal-power')).toBe(false);
     expect(save.upgradePoints).toBe(1);
     expect(save.spellChips.heal).toBeUndefined();
   });
@@ -114,18 +174,50 @@ describe('applyChipPurchase', () => {
     expect(save.upgradePoints).toBe(1);
   });
 
+  it('rejects slot-2 purchase under level 5 even when called directly (J24)', () => {
+    const save = newSaveData('cards');
+    save.xp = xpForLevel(4);
+    save.upgradePoints = 2;
+    expect(applyChipPurchase(save, 'heal', 'heal-graven')).toBe(true);
+    expect(applyChipPurchase(save, 'heal', 'heal-heavy')).toBe(false);
+    expect(applyChipPurchase(save, 'heal', 'heal-quick')).toBe(false);
+    expect(save.spellChips.heal).toEqual(['heal-graven']);
+    expect(save.upgradePoints).toBe(1);
+  });
+
+  it('allows slot-2 purchase at level 5+ (J24)', () => {
+    const save = newSaveData('cards');
+    save.xp = xpForLevel(5);
+    save.upgradePoints = 2;
+    expect(applyChipPurchase(save, 'heal', 'heal-graven')).toBe(true);
+    expect(applyChipPurchase(save, 'heal', 'heal-heavy')).toBe(true);
+    expect(save.spellChips.heal).toEqual(['heal-graven', 'heal-heavy']);
+    expect(save.upgradePoints).toBe(0);
+  });
+
+  it('rejects heal-heavy without graven chip1 (J25b)', () => {
+    const save = newSaveData('cards');
+    save.xp = xpForLevel(5);
+    save.upgradePoints = 2;
+    expect(applyChipPurchase(save, 'heal', 'heal-cost')).toBe(true);
+    expect(applyChipPurchase(save, 'heal', 'heal-heavy')).toBe(false);
+    expect(applyChipPurchase(save, 'heal', 'heal-bulwark')).toBe(true);
+    expect(save.spellChips.heal).toEqual(['heal-cost', 'heal-bulwark']);
+  });
+
   it('rejects unknown spell / insufficient points / full slots', () => {
     const save = newSaveData('cards');
+    save.xp = xpForLevel(5);
     expect(applyChipPurchase(save, 'mend', 'mend-arming')).toBe(false); // not unlocked
-    expect(applyChipPurchase(save, 'heal', 'heal-power')).toBe(false); // no points
-    save.upgradePoints = 1;
-    expect(applyChipPurchase(save, 'heal', 'heal-power')).toBe(true);
-    expect(applyChipPurchase(save, 'heal', 'heal-graven')).toBe(false); // no points left
+    expect(applyChipPurchase(save, 'heal', 'heal-graven')).toBe(false); // no points
     save.upgradePoints = 1;
     expect(applyChipPurchase(save, 'heal', 'heal-graven')).toBe(true);
+    expect(applyChipPurchase(save, 'heal', 'heal-heavy')).toBe(false); // no points left
     save.upgradePoints = 1;
-    expect(applyChipPurchase(save, 'heal', 'heal-heavy')).toBe(false); // full
-    expect(save.spellChips.heal).toEqual(['heal-power', 'heal-graven']);
+    expect(applyChipPurchase(save, 'heal', 'heal-heavy')).toBe(true);
+    save.upgradePoints = 1;
+    expect(applyChipPurchase(save, 'heal', 'heal-quick')).toBe(false); // full
+    expect(save.spellChips.heal).toEqual(['heal-graven', 'heal-heavy']);
   });
 });
 
@@ -167,16 +259,15 @@ describe('loadoutFromCardSave chip application', () => {
     ]);
   });
 
-  it('Graven / Steady land in missing / full HP lists', () => {
-    const graven = modsWithChips({ heal: ['heal-power', 'heal-graven'] });
+  it('Graven lands in missing-HP pct list; Quick Hands shortens cast', () => {
+    const graven = modsWithChips({ heal: ['heal-graven'] });
     expect(graven.missingHealthPctBonuses).toEqual([
       { spellId: 'heal', pctPer10PctMissing: 10 },
     ]);
 
-    const steady = modsWithChips({ heal: ['heal-cost', 'heal-steady'] });
-    expect(steady.fullHealthBonuses).toEqual([
-      { spellId: 'heal', hpPctAtLeast: 80, bonusHeal: 2 },
-    ]);
+    const quick = modsWithChips({ heal: ['heal-graven', 'heal-quick'] });
+    const heal = quick.spells.find((s) => s.id === 'heal');
+    expect(heal?.castMs).toBe(1700); // 2000 - 300
 
     const brink = modsWithChips({ mend: ['mend-quick', 'mend-graven'] });
     expect(brink.missingHealthBonuses).toEqual([
@@ -212,11 +303,12 @@ describe('loadoutFromCardSave chip application', () => {
 
   it('bakes castMod / manaOnHit onto cloned spell defs', () => {
     const mods = modsWithChips({
-      heal: ['heal-power'],
+      heal: ['heal-cost', 'heal-power'],
       bonk: ['bonk-mana', 'bonk-crush'],
       vowstrike: ['vs-battle', 'vs-ready'],
     });
     expect(mods.spells.find((s) => s.id === 'heal')?.heal).toBe(6); // 4+2
+    expect(mods.spells.find((s) => s.id === 'heal')?.mana).toBe(2); // 3-1
     expect(mods.spells.find((s) => s.id === 'bonk')?.manaOnHit).toBe(1);
     expect(mods.spells.find((s) => s.id === 'bonk')?.damage).toBe(3); // 1+2
     expect(mods.spells.find((s) => s.id === 'vowstrike')?.cooldownMs).toBe(8000);

@@ -1,8 +1,8 @@
 /**
- * Cards-mode chip catalog (spell-cards-poc-handoff §7.2 / §8).
+ * Cards-mode chip catalog (spell-cards-poc-handoff §7.2 / §8 + Wave 7a).
  *
- * Exactly 6 chips per upgradable spell (heal / mend / bonk / vowstrike):
- * 3 for slot 0 + 3 for slot 1. Magnitudes are PoC starting points.
+ * Mend / bonk / vowstrike: exactly 6 chips (3 per slot). Heal: 3 slot-0 +
+ * 4 slot-1 catalog members (slot-2 offers are a gated trio — see draft.ts).
  */
 
 import type { SpellCastBuff } from '../../combat/types';
@@ -38,7 +38,7 @@ export interface CardChipDef {
   archetype?: 'Z' | 'S' | 'R' | 'X';
 }
 
-/** All 24 authored chips — handoff §8 ids and magnitudes exactly. */
+/** Authored chips — heal has 7 (gated slot-2 catalog); others 6 each. */
 export const CARD_CHIPS: readonly CardChipDef[] = [
   // ----- heal slot 1 -----
   {
@@ -51,13 +51,13 @@ export const CARD_CHIPS: readonly CardChipDef[] = [
     effects: [{ kind: 'synergy', triggerSpellId: 'mend', buffedSpellId: 'heal', bonusHeal: 2 }],
   },
   {
-    id: 'heal-power',
-    name: 'Power Up',
-    description: 'Heal restores +2.',
+    id: 'heal-graven',
+    name: 'Graven Light',
+    description: 'Heal gains +10% of its base per 10% HP the target is missing.',
     spellId: 'heal',
     slotIndex: 0,
     archetype: 'S',
-    effects: [{ kind: 'castMod', spellId: 'heal', healDelta: 2 }],
+    effects: [{ kind: 'missingHealthPctBonus', spellId: 'heal', pctPer10PctMissing: 10 }],
   },
   {
     id: 'heal-cost',
@@ -68,16 +68,7 @@ export const CARD_CHIPS: readonly CardChipDef[] = [
     archetype: 'Z',
     effects: [{ kind: 'castMod', spellId: 'heal', manaDelta: -1 }],
   },
-  // ----- heal slot 2 -----
-  {
-    id: 'heal-graven',
-    name: 'Graven Light',
-    description: 'Heal gains +10% of its base per 10% HP the target is missing.',
-    spellId: 'heal',
-    slotIndex: 1,
-    archetype: 'S',
-    effects: [{ kind: 'missingHealthPctBonus', spellId: 'heal', pctPer10PctMissing: 10 }],
-  },
+  // ----- heal slot 2 (4 catalog members; offers are a gated trio — draft.ts) -----
   {
     id: 'heal-heavy',
     name: 'Heavy Cast',
@@ -88,13 +79,31 @@ export const CARD_CHIPS: readonly CardChipDef[] = [
     effects: [{ kind: 'castMod', spellId: 'heal', healDelta: 3, castMsDelta: 500 }],
   },
   {
-    id: 'heal-steady',
-    name: 'Steady Hands',
-    description: 'Heal gains +2 when the target is at least 80% HP.',
+    id: 'heal-quick',
+    name: 'Quick Hands',
+    description: 'Heal casts 300ms faster.',
     spellId: 'heal',
     slotIndex: 1,
     archetype: 'Z',
-    effects: [{ kind: 'fullHealthBonus', spellId: 'heal', hpPctAtLeast: 80, bonusHeal: 2 }],
+    effects: [{ kind: 'castMod', spellId: 'heal', castMsDelta: -300 }],
+  },
+  {
+    id: 'heal-power',
+    name: 'Power Up',
+    description: 'Heal restores +2.',
+    spellId: 'heal',
+    slotIndex: 1,
+    archetype: 'S',
+    effects: [{ kind: 'castMod', spellId: 'heal', healDelta: 2 }],
+  },
+  {
+    id: 'heal-bulwark',
+    name: 'Bulwark Mend',
+    description: 'Heal restores +1.',
+    spellId: 'heal',
+    slotIndex: 1,
+    archetype: 'Z',
+    effects: [{ kind: 'castMod', spellId: 'heal', healDelta: 1 }],
   },
 
   // ----- mend slot 1 -----
@@ -319,7 +328,8 @@ export function chipById(id: string): CardChipDef | undefined {
 
 /**
  * Exactly the three authored offers for this spell + slot, in catalog order.
- * Throws if the spell/slot has no authored trio (PoC invariant).
+ * Heal slot 2 is gated (chip1-dependent) — use `offersForNextSlot` / 
+ * `healSlot2Offers` instead. Throws if the spell/slot has no authored trio.
  */
 export function chipOffersForSlot(
   spellId: string,
@@ -331,6 +341,11 @@ export function chipOffersForSlot(
   if (slotIndex >= CARD_SLOTS) {
     throw new Error(`chipOffersForSlot: slotIndex ${slotIndex} >= CARD_SLOTS`);
   }
+  if (spellId === 'heal' && slotIndex === 1) {
+    throw new Error(
+      'chipOffersForSlot: heal slot 2 is gated — use offersForNextSlot / healSlot2Offers',
+    );
+  }
   const ids = CARD_CHIPS.filter((c) => c.spellId === spellId && c.slotIndex === slotIndex).map(
     (c) => c.id,
   );
@@ -340,4 +355,20 @@ export function chipOffersForSlot(
     );
   }
   return ids as [string, string, string];
+}
+
+/** Heal chip1 id that unlocks Heavy Cast in slot-2 offers. */
+export const HEAL_HEAVY_GATE_CHIP1 = 'heal-graven';
+
+/**
+ * Slot-2 offer trio for Heal (Wave 7a J25b). Stable order.
+ * chip1 === heal-graven → Heavy / Quick / Power; else Quick / Power / Bulwark.
+ */
+export function healSlot2Offers(
+  chip1Id: string | undefined,
+): readonly [string, string, string] {
+  if (chip1Id === HEAL_HEAVY_GATE_CHIP1) {
+    return ['heal-heavy', 'heal-quick', 'heal-power'];
+  }
+  return ['heal-quick', 'heal-power', 'heal-bulwark'];
 }
