@@ -319,9 +319,10 @@ export function applyChipPurchase(save: SaveData, spellId: string, chipId: strin
   const owned = save.spellChips[spellId] ?? [];
   if (owned.length >= CARD_SLOTS) return false;
 
-  const offers = offersForNextSlot(spellId, owned);
+  const level = levelForXp(save.xp);
+  const offers = offersForNextSlot(spellId, owned, level);
   if (!offers || !offers.includes(chipId)) return false;
-  // Wrong-slot chips are rejected by offersForNextSlot matching slotIndex.
+  // Wrong-slot / level-gated / heal-heavy gate rejected via offers.
 
   if (chip.slotIndex !== owned.length) return false;
 

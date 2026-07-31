@@ -375,7 +375,8 @@ const liturgyEntry = radialSpot(
   {
     name: 'Frenzied Liturgy',
     glyph: 'L',
-    description: 'Grant Frenzied Liturgy — 30s window heals cost 1 less mana. Great for fast casters.',
+    description:
+      'Grant Frenzied Liturgy — 30s window heals cost 1 less mana, then 10s recovery. Great for fast casters.',
     effects: [{ kind: 'grantCooldown', cooldownId: 'frenzied-liturgy' }],
   },
   { minLevel: 5, requires: { mode: 'all', nodes: ['heal'] } },

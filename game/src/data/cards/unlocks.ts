@@ -7,6 +7,9 @@
 
 export const CARD_SLOTS = 2;
 
+/** J24: second chip slot unlocks at this player level. */
+export const SLOT_2_MIN_LEVEL = 5;
+
 export interface CardUnlock {
   id: string;
   kind: 'spell' | 'cooldown';

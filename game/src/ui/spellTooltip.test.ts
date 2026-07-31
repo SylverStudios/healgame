@@ -6,7 +6,7 @@ describe('buildCooldownTooltipLines', () => {
   it('describes a timed buff and its independent reuse timer', () => {
     expect(buildCooldownTooltipLines(FRENZIED_LITURGY).map((line) => line.text)).toEqual([
       'Frenzied Liturgy',
-      'For 30s, heals cost 1 less mana.',
+      'For 30s, heals cost 1 less mana. Then 10s recovery before reuse.',
       'Duration: 30s',
       'Cooldown: 40s',
     ]);
