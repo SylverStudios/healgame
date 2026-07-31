@@ -1,6 +1,6 @@
 # AGENTS.md — healgame documentation system
 
-Status: current · Authority: doc conventions for all agents · Last verified: 2026-07-30
+Status: current · Authority: doc conventions for all agents · Last verified: 2026-07-31
 
 
 How we keep docs trustworthy. Operating rules for the game itself live in
@@ -74,6 +74,7 @@ agents should prefer `verify`.
 | Art ops | `docs/unit-art.md` · density law + exemplar: [`art/STYLE.md`](art/STYLE.md) (armored-paladin healer) |
 | Long-term design | `docs/GDD.md` |
 | GitHub auto-merge (ops) | [`docs/github-automerge.md`](docs/github-automerge.md) — repo Allow auto-merge ≠ merge on ready; need per-PR `--auto` |
+| GitHub stacked PRs (ops) | [`docs/github-stacked-prs.md`](docs/github-stacked-prs.md) — `gh stack` + cloud/local install via `scripts/setup-gh-stack.sh` / `.cursor/environment.json` |
 
 ## Doc hygiene
 
@@ -98,9 +99,13 @@ Client-only Phaser + Vite browser game under `game/`; no backend, DB, or Docker.
 Standard commands live in [`CLAUDE.md`](CLAUDE.md) (run from `game/`); the
 quality gate is `npm run verify` / `verify:fast`.
 
-- Dependencies are refreshed automatically on startup (the update script runs
-  `npm install` in `game/` plus `npx playwright install chromium`). You do not
-  need to reinstall.
+- Dependencies are refreshed automatically on startup via
+  [`.cursor/environment.json`](.cursor/environment.json) (`scripts/setup-gh-stack.sh`,
+  then `npm install` in `game/` plus `npx playwright install chromium`). You do
+  not need to reinstall.
+- Stacked PRs: `gh stack` is installed by that bootstrap. Skill + workflow:
+  [`docs/github-stacked-prs.md`](docs/github-stacked-prs.md) and
+  `.claude/skills/gh-stack` (also `.agents/skills/gh-stack`).
 - Playwright Chromium is required only for the `smoke` and `journey` stages of
   `npm run verify`; `npm run dev`, `typecheck`, `lint`, `test`, and `build` do
   not need it.
