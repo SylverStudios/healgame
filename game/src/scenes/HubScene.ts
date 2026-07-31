@@ -274,17 +274,13 @@ export class HubScene extends Phaser.Scene {
       : unspent > 0
         ? `Talent Tree  •  ${unspent}`
         : 'Talent Tree';
-    // Cards mode: single Spells entry (hubTree → album); hide Spellbook.
-    const treeX = cards ? centerX : centerX - 160;
-    this.makeButton(treeX, metaButtonY, 280, META_BUTTON_H, treeLabel, openTree, 'hubTree', {
+    this.makeButton(centerX - 160, metaButtonY, 280, META_BUTTON_H, treeLabel, openTree, 'hubTree', {
       ...treeHighlight,
       keycap: 'T',
     });
-    if (!cards) {
-      this.makeButton(centerX + 160, metaButtonY, 280, META_BUTTON_H, 'Spellbook', openLoadout, 'hubLoadout', {
-        keycap: 'S',
-      });
-    }
+    this.makeButton(centerX + 160, metaButtonY, 280, META_BUTTON_H, 'Spellbook', openLoadout, 'hubLoadout', {
+      keycap: 'S',
+    });
     // v0.3 chunk H: small Settings entry — sits in the unused margin to the
     // right of the meta-button row (right edge of Spellbook is centerX+300,
     // well clear of the canvas edge at 960) so it never competes with the
@@ -301,13 +297,11 @@ export class HubScene extends Phaser.Scene {
         event.preventDefault();
         openTree();
       });
-      if (!cards) {
-        keyboard.on('keydown-S', (event: KeyboardEvent) => {
-          if (this.restartPhase !== 'idle') return;
-          event.preventDefault();
-          openLoadout();
-        });
-      }
+      keyboard.on('keydown-S', (event: KeyboardEvent) => {
+        if (this.restartPhase !== 'idle') return;
+        event.preventDefault();
+        openLoadout();
+      });
     }
 
     const dungeonStartY = metaButtonY + 52;

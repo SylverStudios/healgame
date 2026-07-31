@@ -805,8 +805,15 @@ try {
   });
   save = await readSave(page);
   check(save?.progressionMode === 'cards' && save?.tutorialDone === true, 'seeded cards Hub save');
-  check((await locate(page, 'hubLoadout')) === null, 'cards Hub hides Spellbook (hubLoadout)');
+  check((await locate(page, 'hubLoadout')) !== null, 'cards Hub shows Spellbook (hubLoadout)');
   await shot(page, 'hub-cards-mode');
+
+  // Briefly visit Loadout and return to confirm hubLoadout navigates correctly.
+  await clickNamed(page, 'hubLoadout');
+  await waitForNamed(page, 'loadoutBack');
+  check((await locate(page, 'loadoutBack')) !== null, 'cards hubLoadout opens LoadoutScene');
+  await clickNamed(page, 'loadoutBack');
+  await waitForNamed(page, 'hubTree');
 
   await clickNamed(page, 'hubTree');
   await waitForNamed(page, 'cardAlbumBack');

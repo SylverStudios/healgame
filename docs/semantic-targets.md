@@ -18,7 +18,7 @@ by name.
 | `tutorialLearn` | learn-button rect | `TutorialScene.ts` |
 | `hubDungeon:<id>` (e.g. `hubDungeon:ash-gate`) | dungeon button rects | `HubScene.ts` via `hubDungeonTargetName` |
 | `hubTree` | Talent Tree button (lattice/radial) or Spells (cards) | `HubScene.ts` |
-| `hubLoadout` | Spellbook button (hidden in cards mode) | `HubScene.ts` |
+| `hubLoadout` | Spellbook button (all progression modes) | `HubScene.ts` |
 | `hubRestart` | restart text label | `HubScene.ts` |
 | `hubSendFeedback` | "✨ Send Aaron feedback" text (bottom-left) | `HubScene.ts` |
 | `hubWipePrompt` | wipe-confirm telemetry prompt | `HubScene.ts` |
