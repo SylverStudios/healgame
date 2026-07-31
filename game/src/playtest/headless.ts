@@ -4,7 +4,7 @@
  */
 
 import { CombatEngine } from '../combat/engine';
-import type { EncounterDef } from '../combat/types';
+import type { CombatEngineOptions, EncounterDef } from '../combat/types';
 import type { CombatMods } from '../data/talentTree';
 import { createSeededRng } from './rng';
 import type { PlaytestPlayer, PlaytestRunOptions, PlaytestRunResult } from './types';
@@ -14,17 +14,24 @@ export const PLAYTEST_MAX_MS = 10 * 60 * 1000;
 /** Default LCG seed for reproducible sweeps (`HEAL` in ASCII hex). */
 export const PLAYTEST_DEFAULT_SEED = 0x4845414c;
 
-function engineOptionsFromLoadout(loadout: CombatMods) {
+/** Mirror of scenes/combatOptions — kept here so playtest never imports scenes/. */
+function engineOptionsFromLoadout(lo: CombatMods): CombatEngineOptions {
   return {
-    bonusMaxMana: loadout.bonusMaxMana,
-    ...(loadout.bonusMaxHp !== undefined ? { bonusMaxHp: loadout.bonusMaxHp } : {}),
-    synergies: loadout.synergies,
-    ...(loadout.manaSynergies !== undefined ? { manaSynergies: loadout.manaSynergies } : {}),
-    missingHealthBonuses: loadout.missingHealthBonuses,
-    missingHealthPctBonuses: loadout.missingHealthPctBonuses,
-    fullHealthBonuses: loadout.fullHealthBonuses,
-    cooldowns: loadout.cooldowns,
-    ...(loadout.manaRegen !== undefined ? { manaRegen: loadout.manaRegen } : {}),
+    bonusMaxMana: lo.bonusMaxMana,
+    ...(lo.bonusMaxHp !== undefined ? { bonusMaxHp: lo.bonusMaxHp } : {}),
+    ...(lo.manaRegen !== undefined ? { manaRegen: lo.manaRegen } : {}),
+    synergies: lo.synergies,
+    ...(lo.manaSynergies !== undefined ? { manaSynergies: lo.manaSynergies } : {}),
+    missingHealthBonuses: lo.missingHealthBonuses,
+    missingHealthPctBonuses: lo.missingHealthPctBonuses,
+    fullHealthBonuses: lo.fullHealthBonuses,
+    cooldowns: lo.cooldowns,
+    relics: [],
+    ...(lo.hastePermille != null ? { hastePermille: lo.hastePermille } : {}),
+    ...(lo.critThresholdN != null
+      ? { critThresholdN: lo.critThresholdN, critBonusPermille: lo.critBonusPermille }
+      : {}),
+    ...(lo.blockThresholdN != null ? { blockThresholdN: lo.blockThresholdN } : {}),
   };
 }
 

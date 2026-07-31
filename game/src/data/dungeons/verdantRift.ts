@@ -14,7 +14,7 @@ export const VERDANT_RIFT_DUNGEON = {
   },
   visualKey: 'verdant-rift',
   /** Headless playtest curve — regenerate via `npm run content -- playtest`. */
-  playtestLevelRange: { god: 10, basic: 14 },
+  playtestLevelRange: { god: 5, basic: 6 },
   waves: [
     { enemies: [{ mobId: 'thorn-husk', count: 2 }] },
     { enemies: [{ mobId: 'thorn-husk', count: 3 }] },

@@ -26,17 +26,8 @@ function validatePlaytestLevelRange(
   if (!isPositiveInteger(range.basic)) {
     error('invalid-positive-integer', `${path}.basic`, 'basic clear level must be a positive integer');
   }
-  if (
-    isPositiveInteger(range.god) &&
-    isPositiveInteger(range.basic) &&
-    range.god > range.basic
-  ) {
-    error(
-      'playtest-range-order',
-      path,
-      `god clear level (${range.god}) must be ≤ basic clear level (${range.basic})`,
-    );
-  }
+  // god > basic is allowed (a signal the "skillful" kit underperformed the
+  // simple kit for these bots). Hub formats min–max for the difficulty band.
 }
 
 function diagnostic(

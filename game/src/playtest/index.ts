@@ -22,7 +22,13 @@ export {
   isEmergency,
   pickHealTarget,
 } from './heals';
-export { kitAtLevel } from './kit';
+export { kitAtLevel, saveAtLevel } from './kit';
+export type { KitProfile } from './kit';
+export {
+  BASIC_CHIP_PLAN,
+  GOD_CHIP_PLAN,
+  chipPlanFor,
+} from './loadouts';
 export { formatPlaytestReport } from './report';
 export { createSeededRng } from './rng';
 export type {
@@ -32,3 +38,8 @@ export type {
   PlaytestRunResult,
   SpellBias,
 } from './types';
+export {
+  armedSynergyBonus,
+  effectiveHealAmount,
+  willBuffSpell,
+} from './effective';

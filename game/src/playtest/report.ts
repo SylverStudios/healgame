@@ -7,9 +7,9 @@ import type { DungeonPlaytestResult } from './types';
 /** Human-readable multi-line report for `npm run content -- playtest`. */
 export function formatPlaytestReport(results: readonly DungeonPlaytestResult[]): string {
   const lines = [
-    'Headless playtest curve (cards kit, no chips)',
-    '  god   = efficient GCD-perfect bot (bias retry on wipe, then level up)',
-    '  basic = random heals + idle gaps (overheals freely)',
+    'Headless playtest curve (cards kit + chips + secondaries + chosen CDs)',
+    '  god   = GCD-perfect, combo-aware (mend→heal), bias retry then level up',
+    '  basic = random heals + idle gaps, simple chips (overheals freely)',
     '',
   ];
   for (const row of results) {

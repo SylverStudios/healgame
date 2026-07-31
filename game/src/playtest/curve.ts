@@ -39,7 +39,7 @@ export function findBasicClearLevel(
   const seed = opts.seed ?? PLAYTEST_DEFAULT_SEED;
 
   for (let level = min; level <= max; level++) {
-    const loadout = kitAtLevel(level);
+    const loadout = kitAtLevel(level, 'basic');
     const player = createBasicPlayer(loadout.spells);
     const run = runHeadless(encounter, player, {
       loadout,
@@ -64,11 +64,11 @@ export function findGodClearLevel(
   const seed = opts.seed ?? PLAYTEST_DEFAULT_SEED;
 
   for (let level = min; level <= max; level++) {
-    const loadout = kitAtLevel(level);
+    const loadout = kitAtLevel(level, 'god');
     let bias: SpellBias = null;
 
     for (let attempt = 0; attempt < 2; attempt++) {
-      const player = createGodPlayer(loadout.spells, loadout.cooldowns);
+      const player = createGodPlayer(loadout);
       const run = runHeadless(encounter, player, {
         loadout,
         bias,
@@ -113,11 +113,13 @@ export function toPlaytestLevelRange(result: DungeonPlaytestResult): PlaytestLev
 }
 
 /**
- * Hub copy: god-gamer clear level → basic-gamer clear level.
- * Equal levels collapse to `Lv N`.
+ * Hub copy: difficulty band from the two clear levels (low–high).
+ * Equal levels collapse to `Lv N`. Stored metadata keeps god/basic distinct.
  */
 export function formatPlaytestLevelRange(range: PlaytestLevelRange | null | undefined): string {
   if (range === null || range === undefined) return '';
-  if (range.god === range.basic) return `Lv ${range.god}`;
-  return `Lv ${range.god}–${range.basic}`;
+  const low = Math.min(range.god, range.basic);
+  const high = Math.max(range.god, range.basic);
+  if (low === high) return `Lv ${low}`;
+  return `Lv ${low}–${high}`;
 }

@@ -40,8 +40,8 @@ out overrides. `balance` runs the shared disciplined bots from
 before pinning gates.
 
 `playtest` runs the headless cards-kit curve in `src/playtest/`: a basic bot
-(random heals + idle gaps) and a god-gamer bot (GCD-perfect, no overheal,
-Bonk filler, bias retry on wipe). Bake the resulting
+(random heals + idle gaps, simple chips) and a god-gamer bot (GCD-perfect,
+combo-aware mend→heal, chips + secondaries + chosen CDs). Bake the resulting
 `playtestLevelRange: { god, basic }` onto each dungeon and the Hub shows
 `Lv god–basic` beside the title. Re-run after retunes and update the field.
 
