@@ -29,6 +29,7 @@ import { levelForXp, SPELLS, xpForLevel } from '../data/constants';
 import { ORDERED_DUNGEONS, hubDungeonTargetName } from '../data/dungeons';
 import { cooldownById, COOLDOWN_SET_A_IDS, COOLDOWN_SET_B_IDS } from '../data/cooldowns';
 import { pendingCooldownSet, applyCooldownChoice } from '../data/cards/cooldownsChoice';
+import { formatPlaytestLevelRange } from '../playtest/curve';
 import { RunModsBar } from '../ui/runModsBar';
 import { buildRunSummary, hasBuildGlyph, runRecordFromSummary } from '../ui/runSummary';
 import { drawBuildGlyph } from '../ui/buildGlyph';
@@ -437,13 +438,25 @@ export class HubScene extends Phaser.Scene {
 
     const orderLabel = dungeon.order === 1 ? '' : ` · ${dungeon.order}`;
     const titleColor = isCurrent ? ACCENT_COLOR : TEXT_COLOR;
-    this.add
-      .text(x - DUNGEON_BUTTON_WIDTH / 2 + 16, y, `${dungeon.name}${orderLabel}`, {
+    const title = `${dungeon.name}${orderLabel}`;
+    const titleText = this.add
+      .text(x - DUNGEON_BUTTON_WIDTH / 2 + 16, y, title, {
         fontFamily: FONT,
         fontSize: FONT_SIZE_SM,
         color: titleColor,
       })
       .setOrigin(0, 0.5);
+
+    const rangeLabel = formatPlaytestLevelRange(dungeon.playtestLevelRange ?? null);
+    if (rangeLabel.length > 0) {
+      this.add
+        .text(titleText.x + titleText.width + 10, y, rangeLabel, {
+          fontFamily: FONT,
+          fontSize: FONT_SIZE_SM,
+          color: DIM_COLOR,
+        })
+        .setOrigin(0, 0.5);
+    }
 
     if (isCurrent) {
       this.add

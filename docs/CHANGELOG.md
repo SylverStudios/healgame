@@ -7,6 +7,7 @@ Newest first. Numbers and rule detail live in `game/src/data/` and
 
 ---
 
+<<<<<<< HEAD
 ## 2026-07-31 — Enemy mechanics: trash cast curriculum
 
 Trash teaches the boss verb before the exam (playtest cluster A).
@@ -25,6 +26,16 @@ Trash teaches the boss verb before the exam (playtest cluster A).
 Handoff: [`v1-enemy-mechanics-handoff.md`](./v1-enemy-mechanics-handoff.md).
 
 ---
+=======
+## 2026-07-31 — Headless balance playtest curve
+
+- **`src/playtest/`** — headless `CombatEngine` runner with basic (random heals
+  + idle gaps) and god-gamer (GCD-perfect, no overheal, Bonk filler, wipe→bias
+  retry) bots. `npm run content -- playtest` sweeps clear levels per dungeon.
+- **Dungeon metadata** — `playtestLevelRange: { god, basic }`; Hub shows
+  `Lv god–basic` beside each dungeon title. Gloam/Maw remain unmeasured/null.
+- Kits use **cards mode** with chips + secondary upgrades + chosen CDs.
+>>>>>>> 949d8c5 (feat(playtest): headless god/basic bots and dungeon level ranges)
 
 ## 2026-07-31 — Road to 1.0: Player mechanics (cards default)
 

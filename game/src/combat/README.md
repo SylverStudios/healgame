@@ -459,6 +459,16 @@ and compiles the ordered dungeon catalog into the engine's resolved
   `critThresholdN` = disabled (default). **No RNG** — same purity model as
   tank block.
 
+## Balance bots vs headless playtest
+
+- **Gate bots** (`balanceBot.ts` / `balance.test.ts`) — maxed lattice crown kits
+  with `none` / `naive` / `disciplined` styles. These pin the difficulty shape
+  and must stay green when retuning.
+- **Headless playtest curve** (`src/playtest/`) — cards no-chip kits swept by
+  player level with basic + god-gamer rule bots. Run
+  `npm run content -- playtest`; bake `playtestLevelRange` onto dungeon defs
+  for Hub `Lv god–basic` labels. Complements gates; does not replace them.
+
 ## Determinism
 
 Simultaneous events resolve in a fixed priority each tick: **cooldown buff

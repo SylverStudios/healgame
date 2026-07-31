@@ -15,6 +15,8 @@ export const GLOAM_SANCTUM_DUNGEON = {
     xpPerEnemy: 2,
   },
   visualKey: 'gloam-sanctum',
+  /** Uncleared by basic within Lv20 sweep; god scrapes at cap — leave unmeasured. */
+  playtestLevelRange: null,
   waves: [
     { enemies: [{ mobId: 'gloam-wretch', count: 2 }] },
     { enemies: [{ mobId: 'gloam-wretch', count: 2 }] },

@@ -5,6 +5,7 @@ import { validateContent } from '../src/data/content/validate';
 import { ORDERED_DUNGEONS } from '../src/data/dungeons';
 import { getEncounterById } from '../src/data/encounters';
 import { formatMaxedBalanceReport } from '../src/combat/balanceBot';
+import { formatPlaytestReport, sweepPlaytestCurve } from '../src/playtest';
 
 const usage = `Usage:
   npm run content -- validate
@@ -12,7 +13,9 @@ const usage = `Usage:
   npm run content -- preview <dungeon-id>
   npm run content -- preview --all
   npm run content -- balance <dungeon-id>
-  npm run content -- balance --all`;
+  npm run content -- balance --all
+  npm run content -- playtest
+  npm run content -- playtest <dungeon-id>`;
 
 function validateOrExit(): void {
   const result = validateContent(CONTENT_CATALOGS);
@@ -103,6 +106,24 @@ switch (command) {
       }
       console.log(formatMaxedBalanceReport(encounter));
     }
+    break;
+
+  case 'playtest':
+    validateOrExit();
+    if (args.length > 1) {
+      console.error(usage);
+      process.exit(1);
+    }
+    if (args.length === 1 && args[0] !== undefined) {
+      const encounter = getEncounterById(args[0]);
+      if (encounter === undefined) {
+        console.error(`Cannot playtest unknown dungeon "${args[0]}"`);
+        process.exit(1);
+      }
+      console.log(formatPlaytestReport(sweepPlaytestCurve({ dungeonIds: [args[0]] })));
+      break;
+    }
+    console.log(formatPlaytestReport(sweepPlaytestCurve()));
     break;
 
   default:
