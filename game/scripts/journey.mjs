@@ -6,9 +6,9 @@
  * between stages, screenshots every scene, and fails on any console error.
  *
  * Stages:
- *   A  fresh save → tutorial → learn Solemn Mend → Ash Gate → naive-heal to a
- *      wipe → hub applies kill XP (save is v7 from birth)
- *   A2 seeded 8 XP → one more run crosses level 2 (Zealous auto-grant ribbon)
+ *   A  fresh save (cards default) → tutorial → Enter with Heal → Ash Gate →
+ *      naive-heal to a wipe → hub applies kill XP
+ *   A2 seeded lattice 8 XP → one more run crosses level 2 (Zealous auto-grant)
  *   M  seeded stale v4 payload → boot discards it and starts fresh
  *   Relic  seeded post-first-clear save with a pending three-card offer
  *      → Hub redirects straight to RelicScene → pick card 2 → relic persists,
@@ -31,7 +31,9 @@
  *      relative offset from the located center (0%) → settingsBack → hub
  *   Radial  seeded radial save → Hub → Tree → Mend → heal-s1 A/B specialize
  *   Cards  Settings → Spell cards → confirm wipe → Tutorial → Hub (seeded
- *      post-tutorial) → Spells album → upgrade Heal (slot-1 chip) → Ash Gate
+ *      post-tutorial) → Spellbook + Spells album → chip draft → Ash Gate
+ *   Upgrades  seeded pendingUpgradePicks → pick haste → ranks persist
+ *   CDChoice  seeded L6 → pick Still Waters → chosenCooldownIds persists
  *
  * Ash Gate / Iron Pass victory itself is proven deterministically at engine
  * level (src/combat/balance.test.ts); stages B/B3/D2 seed the relevant save
@@ -203,9 +205,9 @@ function baseSave(overrides) {
 }
 
 /**
- * Naive combat loop: target the tank, then every 2s cast Solemn Mend (by
- * semantic name so Bonk-on-Q loadouts still heal) and click Return when the
- * result overlay exists. Ends when `until(save)` first holds.
+ * Naive combat loop: target the tank, then every 2s cast Heal or Solemn Mend
+ * (by semantic name so Bonk-on-Q / cards kits still heal) and click Return when
+ * the result overlay exists. Ends when `until(save)` first holds.
  *
  * `resultShotName`, if given: the first time combatReturn is located (the
  * result object exists immediately, alpha-staged — see CombatScene), wait
@@ -216,8 +218,8 @@ function baseSave(overrides) {
  * `castShotNames`, if given ({ castPose, healLand }): no pre-loop shot ever
  * catches the healer casting — every earlier wait in this file has no spell
  * click near it, so the healer is always idle at those frames. The very
- * first Solemn Mend click this loop already makes is reused (no new click)
- * to grab a mid-cast frame (~700ms into Solemn Mend's 2000ms cast bar, v0.3
+ * first heal click this loop already makes is reused (no new click)
+ * to grab a mid-cast frame (~700ms into a ~2000ms cast bar, v0.3
  * chunk F healer cast pose) and a heal-landed frame shortly after
  * completion (heal-vfx sparkle).
  *
@@ -237,8 +239,14 @@ async function playCombat(page, until, timeoutMs = 180_000, resultShotName, cast
   let castShotDone = false;
   let bubbleShot = false;
   while (Date.now() - start < timeoutMs) {
-    if (await locate(page, 'combatSpell:solemn-mend')) {
-      await clickNamed(page, 'combatSpell:solemn-mend');
+    const healSpell =
+      (await locate(page, 'combatSpell:heal'))
+        ? 'combatSpell:heal'
+        : (await locate(page, 'combatSpell:solemn-mend'))
+          ? 'combatSpell:solemn-mend'
+          : null;
+    if (healSpell) {
+      await clickNamed(page, healSpell);
       if (castShotNames && !castShotDone) {
         castShotDone = true;
         await page.waitForTimeout(700);
@@ -281,7 +289,7 @@ try {
   page.on('pageerror', (e) => consoleErrors.push(e.message));
 
   // ---- Stage A: fresh save → tutorial → wipe run → hub -----------------------
-  console.log('Stage A: tutorial → Ash Gate first run (expected wipe) → hub');
+  console.log('Stage A: cards tutorial → Ash Gate first run (expected wipe) → hub');
   await page.goto(`http://localhost:${PORT}/`, { waitUntil: 'load' });
   await page.evaluate((key) => localStorage.removeItem(key), SAVE_KEY);
   await page.reload({ waitUntil: 'load' });
@@ -293,11 +301,12 @@ try {
   await page.waitForTimeout(800);
   let save = await readSave(page);
   check(save?.version === SAVE_SCHEMA, `new saves are written as v${SAVE_SCHEMA}`);
+  check(save?.progressionMode === 'cards', 'fresh save defaults to cards mode');
   check(save?.tutorialDone === true, 'tutorial click sets tutorialDone');
-  check(save?.unlockedSpells.includes('solemn-mend') === true, 'Solemn Mend unlocked via tutorial');
+  check(save?.unlockedSpells.includes('heal') === true, 'Heal unlocked via cards tutorial');
   check(save?.unlockedSpells.includes('bonk') === true, 'Bonk is unlocked from the start');
   check(save?.actionBar?.[0] === 'bonk', 'Bonk sits on Q by default');
-  check(save?.actionBar?.[1] === 'solemn-mend', 'Solemn Mend sits on W after tutorial');
+  check(save?.actionBar?.[1] === 'heal', 'Heal sits on W after tutorial');
   check(save?.relicIds.length === 0 && save?.pendingRelicOffers.length === 0, 'fresh save has no relic pick pending');
   await page.waitForTimeout(3500); // let autos land so lunge/'*' feedback is in frame
   await shot(page, 'ash-gate-first-run-feedback');
@@ -849,6 +858,81 @@ try {
   await waitForNamed(page, 'combatSpell:heal');
   check((await locate(page, 'combatSpell:heal')) !== null, 'cards Hub can re-enter Ash Gate after upgrade');
   await shot(page, 'ash-gate-cards-after-upgrade');
+
+  // ---- Stage Upgrades: pending secondary pick → haste → ranks persist --------
+  console.log('Stage Upgrades: pendingUpgradePicks → pick haste → secondaryRanks');
+  await seedSave(page, {
+    version: SAVE_SCHEMA,
+    progressionMode: 'cards',
+    tutorialDone: true,
+    xp: 10,
+    unlockedSpells: ['heal', 'bonk', 'mend'],
+    actionBar: ['bonk', 'heal', 'mend', ''],
+    treeRanks: {},
+    subclass: null,
+    clearedDungeons: [],
+    combatPaceTenths: 10,
+    relicIds: [],
+    pendingRelicOffers: [],
+    upgradePoints: 0,
+    talentPointsEarned: 0,
+    spellChips: {},
+    secondaryRanks: {},
+    chosenCooldownIds: [],
+    pendingUpgradePicks: 1,
+    musicVolumePct: 50,
+    recentRuns: [],
+  });
+  await waitForNamed(page, 'upgradeOffer:haste');
+  check((await locate(page, 'upgradeOffer:block')) !== null, 'Upgrade modal offers block');
+  check((await locate(page, 'upgradeOffer:crit')) !== null, 'Upgrade modal offers crit');
+  check((await locate(page, 'upgradeOffer:manaRegen')) !== null, 'Upgrade modal offers manaRegen');
+  await shot(page, 'upgrade-pick-modal');
+  await clickNamed(page, 'upgradeOffer:haste');
+  await clickNamed(page, 'upgradeConfirm');
+  await waitForNamed(page, 'hubTree');
+  save = await readSave(page);
+  check(save?.pendingUpgradePicks === 0, 'Upgrade pick clears pendingUpgradePicks');
+  check(save?.secondaryRanks?.haste === 1, 'haste rank persisted on save');
+
+  // ---- Stage CDChoice: L6 Set A → Still Waters --------------------------------
+  console.log('Stage CDChoice: level 6 → pick Still Waters from Set A');
+  await seedSave(page, {
+    version: SAVE_SCHEMA,
+    progressionMode: 'cards',
+    tutorialDone: true,
+    // Level 6 threshold — enough XP without auto-granting CDs (choices only).
+    xp: 150,
+    unlockedSpells: ['heal', 'bonk', 'mend', 'vowstrike'],
+    actionBar: ['bonk', 'heal', 'mend', 'vowstrike'],
+    treeRanks: {},
+    subclass: null,
+    clearedDungeons: ['ash-gate'],
+    combatPaceTenths: 10,
+    relicIds: [],
+    pendingRelicOffers: [],
+    upgradePoints: 0,
+    talentPointsEarned: 0,
+    spellChips: {},
+    secondaryRanks: { haste: 1 },
+    chosenCooldownIds: [],
+    pendingUpgradePicks: 0,
+    musicVolumePct: 50,
+    recentRuns: [],
+  });
+  await waitForNamed(page, 'cooldownOffer:still-waters');
+  check((await locate(page, 'cooldownOffer:wrath-ascendant')) !== null, 'Set A offers Wrath');
+  check((await locate(page, 'cooldownOffer:frenzied-liturgy')) !== null, 'Set A offers Liturgy');
+  check((await locate(page, 'cooldownOffer:iron-canticle')) === null, 'Set B not offered at first CD pick');
+  await shot(page, 'cooldown-pick-set-a');
+  await clickNamed(page, 'cooldownOffer:still-waters');
+  await clickNamed(page, 'cooldownConfirm');
+  await waitForNamed(page, 'hubTree');
+  save = await readSave(page);
+  check(
+    Array.isArray(save?.chosenCooldownIds) && save.chosenCooldownIds[0] === 'still-waters',
+    'Set A choice persists still-waters',
+  );
 } finally {
   await browser?.close();
   if (preview) {

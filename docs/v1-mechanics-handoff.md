@@ -326,12 +326,12 @@ fantasy later.
 
 ## 9. Definition of done checklist
 
-- [ ] Default new save is cards
-- [ ] Loadout reachable in cards Hub
-- [ ] Modifiers = significant-only offers
-- [ ] Level-up Upgrade picker (4 secondaries) works + persists ranks
-- [ ] Block every-N tank-only deterministic; crit/haste/regen work
-- [ ] CD choice Set A @6, Set B @8; persist; distinct Set B defs
-- [ ] Future gear-slot hint comment present
+- [x] Default new save is cards
+- [x] Loadout reachable in cards Hub
+- [x] Modifiers = significant-only offers
+- [x] Level-up Upgrade picker (4 secondaries) works + persists ranks
+- [x] Block every-N tank-only deterministic; crit/haste/regen work
+- [x] CD choice Set A @6, Set B @8; persist; distinct Set B defs
+- [x] Future gear-slot hint comment present
 - [ ] Save version OK; journey names; `npm run verify` green
 - [ ] PR opened with try-steps

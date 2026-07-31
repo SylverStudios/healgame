@@ -7,6 +7,26 @@ Newest first. Numbers and rule detail live in `game/src/data/` and
 
 ---
 
+## 2026-07-31 — Road to 1.0: Player mechanics (cards default)
+
+Cards is the real progression path; lattice/radial remain dual-shipped.
+
+- **Save v12** — default `progressionMode: 'cards'`; `secondaryRanks`,
+  `chosenCooldownIds`, `pendingUpgradePicks`.
+- **Loadout** — cards Hub shows Spellbook (`hubLoadout`) beside Spells album.
+- **Modifiers** — significant-only chip offers (flat power bumps parked).
+- **Upgrades** — every level-up pick 1 of block / crit / haste / manaRegen;
+  ranks apply in combat (tank block every-N, crit via injected rng, haste =
+  castMs only, manaRegen merge).
+- **Cooldown choice** — L6 Set A (Still / Wrath / Liturgy); L8 Set B
+  (`iron-canticle` / `mercy-reserve` / `ashen-rite`); no auto-grant of all
+  three legacy majors.
+- Stub magnitudes — Balance retunes later.
+
+Handoff (until closeout): [`v1-mechanics-handoff.md`](./v1-mechanics-handoff.md).
+
+---
+
 ## 2026-07-31 — Catalogue (spell cards content review)
 
 - **Settings → Catalogue** — scrollable Spells / Chips tabs listing every
