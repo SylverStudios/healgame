@@ -9,6 +9,9 @@ cast bars, and trash→boss curriculum. Magnitudes are tuneable stubs that must
 pass `balance.test.ts` / content balance bots — expect a retune pass inside
 this phase, not a separate Balance phase for enemy numbers.
 
+**Implementation landed on `v1/enemy-mechanics` (PR pending merge).** Close
+out via ship-phase after merge (retire this handoff).
+
 Remote agent entry prompt:
 [`v1-enemy-mechanics-agent-prompt.md`](v1-enemy-mechanics-agent-prompt.md).
 
@@ -233,9 +236,9 @@ exist so bots feel the casts.
 
 ## 8. Definition of done checklist
 
-- [ ] Trash may have 0–1 abilities; validate + compile + engine + UI agree
-- [ ] Cast bar + cooldown cadence for trash and boss casters
-- [ ] Each dungeon: lesser trash teach + greater boss exam (same kind)
-- [ ] Balance gates green (retuned if needed)
-- [ ] `data/README.md` + `combat/README.md` updated (trash abilities supported)
-- [ ] CHANGELOG + poc-qa note; `npm run verify` green; PR with try-steps
+- [x] Trash may have 0–1 abilities; validate + compile + engine + UI agree
+- [x] Cast bar + cooldown cadence for trash and boss casters
+- [x] Each dungeon: lesser trash teach + greater boss exam (same kind)
+- [x] Balance gates green (retuned if needed)
+- [x] `data/README.md` + `combat/README.md` updated (trash abilities supported)
+- [x] CHANGELOG + poc-qa note; `npm run verify` green; PR with try-steps

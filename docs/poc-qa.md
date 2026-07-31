@@ -10,6 +10,33 @@ enforced by automated gates. Later Alpha sections below amend the baseline
 
 ---
 
+# Enemy mechanics — trash cast curriculum (2026-07-31)
+
+Status: current · Last verified: 2026-07-31
+
+Playtest cluster A (#1): trash packs teach the boss verb, then the boss is
+the louder exam. Locked decisions from
+[`v1-enemy-mechanics-handoff.md`](./v1-enemy-mechanics-handoff.md):
+
+1. **0 or 1 ability** per mob — lifted `trash-abilities-unsupported`; max-1
+   kept for trash and boss.
+2. **Same kinds** — `partyAoE` / `tunnelVision` / `partyDoT` / `manaSiphon`;
+   no new kinds; no interrupt / esuna / cling DoT / summons this slice.
+3. **Lesser → greater** — one signature trash caster per dungeon
+   (`*-lesser` ≈ 40–60% intensity, often longer cast / clearer firstCast);
+   boss keeps the greater. The Maw: unique `extinction-lesser` on
+   `hollow-husk` (reuses ash-husk visual) so Ash Gate ash-husk keeps
+   `bonehowl-lesser`.
+4. **Multi-caster** — per-unit cast schedule; `CombatState.enemyCasts`;
+   `bossCast` derived for boss only. Focus: at most one channel globally
+   (boss first, else lowest unit id).
+5. **UI** — cast bar + telegraph cue on the casting unit (active casts only).
+6. **Balance** — mid-ladder lesser cadence/damage softened after bot
+   telemetry so Vigil efficiency / shallow crown scrapes still clear;
+   `balance.test.ts` assertion shape unchanged; Ash Gate + Maw untouched.
+
+---
+
 # Level HP + clear point + floor enemy damage — J26 / R5 (2026-07-31)
 
 Status: current · Last verified: 2026-07-31

@@ -1,6 +1,6 @@
 # Combat engine (Chunk 1)
 
-Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-07-30
+Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-07-31
 
 Pure, deterministic TypeScript. No Phaser, no wall-clock, no randomness — driven
 entirely by `advance(dtMs)`. Chunk 2 builds the Phaser view against exactly
@@ -272,27 +272,41 @@ and compiles the ordered dungeon catalog into the engine's resolved
   independently of generated per-wave `Unit.id`. Presentation uses `mobId` to
   resolve `MobDef.visualKey`; combat decisions use only resolved encounter
   values.
-- **Boss cast union**: `BossDef.cast` is a discriminated union,
-  `BossCastDef = PartyAoECastDef | TunnelVisionCastDef | PartyDoTCastDef |
-  ManaSiphonCastDef`. `kind` is optional on `PartyAoECastDef` (defaults to
-  that arm) so every pre-existing encounter (Ash Gate's Bonehowl, The Maw's
-  Extinction) keeps compiling and behaving identically without setting `kind`
-  at all — `tunnelVision`, `partyDoT`, and `manaSiphon` require an explicit
-  `kind`.
+- **Enemy cast union**: `EnemyCastDef` (= `BossCastDef`) is a discriminated
+  union, `PartyAoECastDef | TunnelVisionCastDef | PartyDoTCastDef |
+  ManaSiphonCastDef`. Bosses expose it on `BossDef.cast`; trash groups expose
+  the same shape on `EnemyGroupDef.cast` when the mob authors `abilityIds[0]`.
+  `kind` is optional on `PartyAoECastDef` (defaults to that arm) so every
+  pre-existing encounter (Ash Gate's Bonehowl, The Maw's Extinction) keeps
+  compiling and behaving identically without setting `kind` at all —
+  `tunnelVision`, `partyDoT`, and `manaSiphon` require an explicit `kind`.
+- **Multi-caster scheduling** (v1 enemy mechanics): every living enemy with a
+  cast def owns its own cadence timer + active cast bar. `CombatState.enemyCasts`
+  lists every active telegraph/cast (boss + trash), sorted by `sourceId`.
+  `bossCast` remains a derived convenience = the boss unit's active cast (or
+  null). Cast events (`bossCastStarted` / `bossCastFinished` / focus events)
+  carry optional `sourceId` = the casting unit. Same-tick completions process
+  boss-first then ascending unit id; new-cast starts process ascending unit
+  id. On caster death: drop that unit's cast state; if it owned the global
+  focus channel, end it (`bossFocusEnded`).
 - **Bonehowl / Extinction (`partyAoE`)**: `firstCastAtMs`/`intervalMs` are
   start-to-start; the gap before each subsequent cast is `intervalMs - castMs`.
-  The boss keeps auto-attacking while casting (not a channel).
+  The caster keeps auto-attacking while casting (not a channel).
+  `intervalMs` is the cooldown cadence (start-to-start).
 - **Tunnel Vision (`tunnelVision`)** — telegraph, then a single-target channel:
-  - **Telegraph**: on activation, `state.bossCast` is set with
-    `totalMs = telegraphMs` (same `BossCastState` the cast bar already
-    renders), and `bossCastStarted` fires exactly as for a `partyAoE` cast.
-    The boss keeps auto-attacking the tank throughout — same "not a full
-    interrupt" rule as Bonehowl — during **both** the telegraph and the
-    channel that follows.
+  - **Telegraph**: on activation, that caster's entry in `enemyCasts` (and
+    `bossCast` when the caster is the boss) is set with
+    `totalMs = telegraphMs`, and `bossCastStarted` fires exactly as for a
+    `partyAoE` cast. The caster keeps auto-attacking the tank throughout —
+    same "not a full interrupt" rule as Bonehowl — during **both** the
+    telegraph and the channel that follows.
   - **Telegraph → channel**: when the telegraph completes, `bossCastFinished`
-    fires, `bossCast` clears (the channel is represented by focus events, not
-    the cast bar), a focus target is picked (see rotation below), and
-    `bossFocusStarted { targetId, name, totalMs: channelMs }` fires.
+    fires, that caster's cast bar clears (the channel is represented by focus
+    events, not the cast bar), a focus target is picked (see rotation below),
+    and `bossFocusStarted { targetId, name, totalMs: channelMs, sourceId }`
+    fires. **At most one focus channel globally** — if two tunnelVision
+    telegraphs would open a channel together, prefer the boss, else the
+    lowest unit id; the loser waits.
   - **Channel ticks**: every `tickMs` (for `channelMs / tickMs` ticks total),
     `damagePerTick` is applied to the focus target through the *same* damage
     pipeline as any other hit — the normal `damage` event, `unitDied` +
@@ -305,22 +319,24 @@ and compiles the ordered dungeon catalog into the engine's resolved
     `firstCastAtMs`/`intervalMs` measure telegraph-start-to-telegraph-start.
     The interval timer is reset the instant a telegraph starts (not when the
     channel ends), so it keeps running underneath the whole telegraph+channel
-    occupancy. Defensive rule: a new telegraph can never start while a channel
-    is active — if the interval elapses first, it just waits and fires the
-    instant the channel ends (the next boundary after it ends).
+    occupancy. Defensive rule: a new telegraph can never start on that caster
+    while its own channel is active — if the interval elapses first, it just
+    waits and fires the instant the channel ends (the next boundary after it
+    ends). Globally, only one focus channel may run at a time (see above).
   - **Deterministic target rotation (no `Math.random`, ever)**: eligible =
     living party members with `role !== 'tank'`, sorted by stable unit `id`;
-    pick `eligible[focusIndex % eligible.length]`, then increment
-    `focusIndex` once per activation. `focusIndex` starts at 0 and lives in
-    engine state for the fight's lifetime — a unit that dies is simply
-    excluded from `eligible` on the next activation without resetting or
-    skipping the cursor (e.g. with `[dps1, dps2, healer]` and `dps1` dead,
-    `focusIndex` continuing at 1 lands on `healer`, not `dps2`).
+    pick `eligible[focusIndex % eligible.length]`, then increment that
+    caster's `focusIndex` once per activation. Each caster owns its own
+    cursor for the fight's lifetime — a unit that dies is simply excluded
+    from `eligible` on the next activation without resetting or skipping the
+    cursor (e.g. with `[dps1, dps2, healer]` and `dps1` dead, `focusIndex`
+    continuing at 1 lands on `healer`, not `dps2`).
 - **Emberfall (`partyDoT`)**: telegraphed with `castMs` like `partyAoE`. On
   finish, starts a party-wide DoT that ticks `damagePerTick` every `tickMs`
   for `durationMs` against every living party member (via the shared damage
-  pipeline). Emits `partyDoTStarted` / `partyDoTEnded`. A refreshed cast
-  replaces any prior DoT window (no stacking). Cadence matches `partyAoE`;
+  pipeline; tick `sourceId` = current DoT owner). Emits `partyDoTStarted` /
+  `partyDoTEnded`. A refreshed cast replaces any prior DoT window (no
+  stacking; last-writer-wins across casters). Cadence matches `partyAoE`;
   the lingering DoT does **not** block the next telegraph.
 - **Soul Toll (`manaSiphon`)**: telegraphed like `partyAoE`. On finish,
   applies `partyDamage` to every living party member, then drains up to
@@ -429,13 +445,14 @@ player cast completes → queued cast fires → **coyote windows that expired
 this tick** (v0.3 §Coyote — any `dying` party member whose grace window hit 0
 and wasn't saved by a heal completing in one of the two previous steps;
 `finalizeDeath` → `unitDied`, `target-dead` cancel of any cast still
-targeting them, then a wipe check) → boss cast completes (`partyAoE` /
-`manaSiphon` party damage, a `partyDoT` window starting, or a `tunnelVision`
-telegraph finishing into a channel) → boss focus tick (`tunnelVision` channel
-damage, if one landed this tick) → party DoT tick (`partyDoT`, if active) →
-merc autos (tank, dps1, dps2) → enemy/boss autos (spawn order) → boss cast
-timer starts a new telegraph/cast (blocked while a `tunnelVision` channel is
-active). `advance()` sub-steps to the next timer boundary — cooldown
+targeting them, then a wipe check) → enemy cast completes (boss-first then
+ascending unit id; `partyAoE` / `manaSiphon` party damage, a `partyDoT`
+window starting, or a `tunnelVision` telegraph finishing into a channel) →
+focus tick (`tunnelVision` channel damage, if one landed this tick) → party
+DoT tick (`partyDoT`, if active) → merc autos (tank, dps1, dps2) →
+enemy/boss autos (spawn order) → enemy cast timers start a new
+telegraph/cast (ascending unit id; a caster's own `tunnelVision` channel
+blocks its next telegraph; a second global focus waits). `advance()` sub-steps to the next timer boundary — cooldown
 (`remainingCooldownMs`), buff-window (`manaCostReduction`'s
 `buffRemainingMs`), and **coyote (`coyoteRemainingMs`, while `dying`)**
 timers participate in that boundary calculation too, so a cooldown becoming

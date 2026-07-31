@@ -1,6 +1,6 @@
 # Dungeon content authoring
 
-Status: current · Authority: enemy ability, mob, dungeon, validation, assembly, and preview contracts · Last verified: 2026-07-19
+Status: current · Authority: enemy ability, mob, dungeon, validation, assembly, and preview contracts · Last verified: 2026-07-31
 
 Dungeon content is typed TypeScript data. The game and authoring tools consume
 the same validated catalogs; there is no generated file or second JSON/YAML
@@ -80,15 +80,19 @@ FLOOR_ENEMY_DAMAGE` (`constants.ts`, = 2) to every resolved trash + boss
 its authored baseline; author mid/late mob autos accordingly (they compile
 higher than written). Pinned compiled values live in `content/content.test.ts`.
 
-The current runtime supports at most one scheduled ability on a boss
-(`partyAoE`, `tunnelVision`, `partyDoT`, or `manaSiphon`) and no active trash
-abilities. Add a discriminated `EnemyAbilityDef` member together with its
-engine behavior before authoring content that uses another mechanic. Do not
-turn ability data into an arbitrary scripting language.
+Each mob (trash or boss) may author **0 or 1** ability
+(`partyAoE`, `tunnelVision`, `partyDoT`, or `manaSiphon`). Compile attaches
+that ability as `EnemyCastDef` on `BossDef.cast` or `EnemyGroupDef.cast`.
+Curriculum pattern: one signature trash caster per dungeon teaches a **lesser**
+intensity of the boss verb (`*-lesser` ability ids); other trash may stay
+autos-only. Prefer reusing an existing `kind` with data only. Add a
+discriminated `EnemyAbilityDef` member together with its engine behavior
+before authoring content that uses another mechanic. Do not turn ability data
+into an arbitrary scripting language.
 
 Reusing an existing `kind` requires data changes only. A new `kind` also
 requires coordinated changes in `content/types.ts`, `validate.ts`,
-`compile.ts`, `preview.ts`, `combat/types.ts` (`BossCastDef`),
+`compile.ts`, `preview.ts`, `combat/types.ts` (`EnemyCastDef` / `BossCastDef`),
 `combat/engine.ts`, `combat/README.md`, mechanic tests, and any new event/VFX
 handling in `scenes/CombatScene.ts`.
 
