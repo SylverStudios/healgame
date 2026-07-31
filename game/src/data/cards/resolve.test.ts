@@ -38,17 +38,21 @@ describe('applyCardsLevelUps', () => {
     expect(save.upgradePoints).toBe(0);
   });
 
-  it('does not push cooldown ids into unlockedSpells; loadout discovers them', () => {
+  it('M5: does not push cooldown ids into unlockedSpells and does not auto-grant them', () => {
     const save = newSaveData('cards');
-    applyCardsLevelUps(save, 5, 6);
+    applyCardsLevelUps(save, 5, 8);
     expect(save.unlockedSpells).not.toContain('still-waters');
+    expect(save.unlockedSpells).not.toContain('wrath-ascendant');
+    expect(save.unlockedSpells).not.toContain('frenzied-liturgy');
     expect(save.upgradePoints).toBe(0);
+    // loadout has no CDs without an explicit choice
     const mods = loadoutFromCardSave({
       xp: xpForLevel(6),
       actionBar: save.actionBar,
       unlockedSpells: save.unlockedSpells,
+      chosenCooldownIds: [],
     });
-    expect(mods.cooldowns.map((c) => c.id)).toContain('still-waters');
+    expect(mods.cooldowns).toEqual([]);
   });
 
   it('skips re-adding a spell already on the save', () => {
@@ -59,24 +63,56 @@ describe('applyCardsLevelUps', () => {
   });
 });
 
-describe('loadoutFromCardSave cooldowns', () => {
-  it('includes still-waters / wrath / liturgy at the matching levels', () => {
-    const base = {
-      actionBar: ['heal', 'bonk', '', ''] as string[],
-      unlockedSpells: ['heal', 'bonk', 'mend', 'vowstrike'],
-    };
+describe('loadoutFromCardSave cooldowns (M5: from chosenCooldownIds only)', () => {
+  const base = {
+    actionBar: ['heal', 'bonk', '', ''] as string[],
+    unlockedSpells: ['heal', 'bonk', 'mend', 'vowstrike'],
+  };
+
+  it('no chosen CDs → empty cooldowns regardless of level', () => {
     expect(
-      loadoutFromCardSave({ ...base, xp: xpForLevel(5) }).cooldowns.map((c) => c.id),
+      loadoutFromCardSave({ ...base, xp: xpForLevel(8), chosenCooldownIds: [] }).cooldowns,
     ).toEqual([]);
     expect(
-      loadoutFromCardSave({ ...base, xp: xpForLevel(6) }).cooldowns.map((c) => c.id),
+      loadoutFromCardSave({ ...base, xp: xpForLevel(6) }).cooldowns,
+    ).toEqual([]);
+  });
+
+  it('chosenCooldownIds drives the loadout cooldowns', () => {
+    expect(
+      loadoutFromCardSave({
+        ...base,
+        xp: xpForLevel(6),
+        chosenCooldownIds: ['still-waters'],
+      }).cooldowns.map((c) => c.id),
     ).toEqual(['still-waters']);
     expect(
-      loadoutFromCardSave({ ...base, xp: xpForLevel(7) }).cooldowns.map((c) => c.id),
-    ).toEqual(['still-waters', 'wrath-ascendant']);
+      loadoutFromCardSave({
+        ...base,
+        xp: xpForLevel(8),
+        chosenCooldownIds: ['wrath-ascendant', 'iron-canticle'],
+      }).cooldowns.map((c) => c.id),
+    ).toEqual(['wrath-ascendant', 'iron-canticle']);
+  });
+
+  it('unknown chosen CD ids are silently dropped', () => {
     expect(
-      loadoutFromCardSave({ ...base, xp: xpForLevel(8) }).cooldowns.map((c) => c.id),
-    ).toEqual(['still-waters', 'wrath-ascendant', 'frenzied-liturgy']);
+      loadoutFromCardSave({
+        ...base,
+        xp: xpForLevel(8),
+        chosenCooldownIds: ['not-a-cd', 'still-waters'],
+      }).cooldowns.map((c) => c.id),
+    ).toEqual(['still-waters']);
+  });
+
+  it('level 8+ with two chosen CDs includes both', () => {
     expect(levelForXp(xpForLevel(8))).toBe(8);
+    expect(
+      loadoutFromCardSave({
+        ...base,
+        xp: xpForLevel(8),
+        chosenCooldownIds: ['still-waters', 'iron-canticle'],
+      }).cooldowns.map((c) => c.id),
+    ).toEqual(['still-waters', 'iron-canticle']);
   });
 });

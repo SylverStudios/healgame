@@ -204,40 +204,42 @@ describe('applyCombatResult', () => {
     expect(notices).toEqual([{ kind: 'levelUp', text: 'Welcome to unlucky level 4' }]);
   });
 
-  it('cards level 8 grants Liturgy (welcome copy, no upgrade point on level-up)', () => {
+  it('M5: cards level 8 shows CD choice notice (no auto-grant, no upgrade point)', () => {
     const s = save({
       progressionMode: 'cards',
       xp: xpForLevel(8) - 1,
       unlockedSpells: ['heal', 'bonk', 'mend', 'vowstrike'],
       actionBar: ['heal', 'bonk', 'mend', 'vowstrike'],
       upgradePoints: 5,
+      chosenCooldownIds: [],
     });
     const notices = applyCombatResult(s, result({ xp: 1 }));
     expect(levelForXp(s.xp)).toBe(8);
     expect(s.upgradePoints).toBe(5);
-    expect(buildLoadout(s).cooldowns.map((c) => c.id)).toContain('frenzied-liturgy');
+    // M5: no auto-grant — CDs require explicit choice via Hub picker.
+    expect(buildLoadout(s).cooldowns).toEqual([]);
     expect(notices).toEqual([
-      { kind: 'levelUp', text: 'Welcome to lucky level 8' },
-      { kind: 'spellLearned', text: 'Frenzied Liturgy learned!' },
+      { kind: 'levelUp', text: 'Welcome to lucky level 8 — choose your second cooldown' },
     ]);
   });
 
-  it('cards level 6 unlocks Still Waters via loadout (no unlockedSpells entry, no point)', () => {
+  it('M5: cards level 6 shows CD choice notice; still-waters NOT in loadout until chosen', () => {
     const s = save({
       progressionMode: 'cards',
       xp: xpForLevel(6) - 1,
       unlockedSpells: ['heal', 'bonk', 'mend', 'vowstrike'],
       actionBar: ['heal', 'bonk', 'mend', 'vowstrike'],
       upgradePoints: 3,
+      chosenCooldownIds: [],
     });
     const notices = applyCombatResult(s, result({ xp: 1 }));
     expect(levelForXp(s.xp)).toBe(6);
     expect(s.upgradePoints).toBe(3);
     expect(s.unlockedSpells).not.toContain('still-waters');
-    expect(buildLoadout(s).cooldowns.map((c) => c.id)).toContain('still-waters');
+    // No auto-grant: loadout has no CDs until the player picks one.
+    expect(buildLoadout(s).cooldowns).toEqual([]);
     expect(notices).toEqual([
-      { kind: 'levelUp', text: 'Welcome to level 6' },
-      { kind: 'spellLearned', text: 'Still Waters learned!' },
+      { kind: 'levelUp', text: 'Welcome to level 6 — choose a major cooldown' },
     ]);
   });
 

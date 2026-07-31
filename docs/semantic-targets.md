@@ -61,6 +61,8 @@ by name.
 | `cardChipOffer:<chipId>` | Chip draft modal offer card | `CardAlbumScene.ts` |
 | `cardChipConfirm` | Confirm chip purchase | `CardAlbumScene.ts` |
 | `cardChipCancel` | Cancel chip draft | `CardAlbumScene.ts` |
+| `cooldownOffer:<cooldownId>` | CD choice card (e.g. `cooldownOffer:still-waters`) | `HubScene.ts` |
+| `cooldownConfirm` | Confirm CD pick button | `HubScene.ts` |
 
 ## Hook API
 

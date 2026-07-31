@@ -29,7 +29,7 @@ import { spellsFromActionBar, type CombatMods } from '../talentTree';
 import { fightModsFromSecondaryRanks } from '../secondaryStats';
 import { chipById, type CardChipEffect } from './chips';
 import { offersForNextSlot } from './draft';
-import { CARD_SLOTS, CARD_UNLOCKS, cooldownIdsAtLevel } from './unlocks';
+import { CARD_SLOTS, CARD_UNLOCKS } from './unlocks';
 
 /** Empty CombatMods shell shared by stub + later chip resolve. */
 function emptyMods(spells: SpellDef[]): CombatMods {
@@ -199,7 +199,10 @@ function applyOwnedChips(
 
 /**
  * Canonical cards fight-start entry: unlocked spells → radial defs → chips →
- * level mana → CDs from unlock table at current level → action-bar order.
+ * level mana → CDs from chosenCooldownIds → action-bar order.
+ *
+ * M5: cooldowns come exclusively from `chosenCooldownIds` (validated via
+ * `cooldownById`). The pre-M5 level-based auto-grant is removed.
  */
 export function loadoutFromCardSave(save: {
   xp: number;
@@ -249,11 +252,9 @@ export function loadoutFromCardSave(save: {
     mods.bonusMaxHp = levelHp;
   }
 
-  // Cooldown unlocks: prefer chosenCooldownIds (cards CD choice). Until M5
-  // removes auto rows, fall back to unlock-table ids when none chosen yet.
+  // M5: cooldowns come exclusively from the player's explicit choices.
   const chosen = save.chosenCooldownIds ?? [];
-  const cdIds = chosen.length > 0 ? [...chosen] : cooldownIdsAtLevel(level);
-  mods.cooldowns = cdIds
+  mods.cooldowns = [...chosen]
     .map((id) => cooldownById(id))
     .filter((c): c is NonNullable<typeof c> => c !== undefined)
     .map((c) => ({ ...c }));
@@ -302,8 +303,10 @@ export function ownedSpellsFromCardSave(save: {
  * J26: level-ups no longer bank upgrade points — those come only from dungeon
  * victories (see `applyCombatResult`). Unlocks are free (do not spend points).
  * Spells are pushed into `unlockedSpells` and auto-equipped into the first
- * free action-bar slot. Cooldown unlocks are not stored on the save; loadout
- * reads them via `cooldownIdsAtLevel(levelForXp(save.xp))`.
+ * free action-bar slot.
+ *
+ * M5: cooldown unlocks are not granted here; the player chooses them via the
+ * Hub CD picker when `pendingCooldownSet(save)` is non-null.
  */
 export function applyCardsLevelUps(
   save: SaveData,

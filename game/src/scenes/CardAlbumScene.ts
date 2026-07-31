@@ -20,7 +20,6 @@ import { levelForXp } from '../data/constants';
 import {
   CARD_SLOTS,
   SLOT_2_MIN_LEVEL,
-  cooldownIdsAtLevel,
   spellIdsAtLevel,
 } from '../data/cards/unlocks';
 import { chipById, type CardChipDef, type CardChipEffect } from '../data/cards/chips';
@@ -113,7 +112,8 @@ export class CardAlbumScene extends Phaser.Scene {
       spellIds.length > 0
         ? spellIds
         : this.save.unlockedSpells.filter((id) => radialSpellById(id) !== undefined);
-    const cdIds = cooldownIdsAtLevel(level);
+    // M5: CDs come from the player's explicit choices, not the auto-unlock table.
+    const cdIds = this.save.chosenCooldownIds ?? [];
 
     this.add
       .text(cx, 28, 'Spells', {
