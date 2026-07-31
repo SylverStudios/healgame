@@ -247,11 +247,16 @@ export type CombatEvent =
   | { type: 'castStarted'; cast: CastState }
   | { type: 'castFinished'; spellId: string }
   | { type: 'castCancelled'; spellId: string; reason: 'escape' | 'target-dead' }
-  | { type: 'bossCastStarted'; cast: BossCastState }
-  | { type: 'bossCastFinished'; name: string }
-  | { type: 'bossFocusStarted'; targetId: string; name: string; totalMs: number }
-  | { type: 'bossFocusTick'; targetId: string; amount: number }
-  | { type: 'bossFocusEnded'; targetId: string; name: string }
+  // v1 enemy mechanics: `sourceId` (optional) identifies the casting unit so
+  // trash casters are distinguishable from the boss. Omitted only by legacy
+  // callers/tests — every engine-emitted cast/focus event now carries it. The
+  // event NAMES are unchanged (bossCast*/bossFocus*) so existing UI/log/tests
+  // keep working until E3.
+  | { type: 'bossCastStarted'; cast: BossCastState; sourceId?: string }
+  | { type: 'bossCastFinished'; name: string; sourceId?: string }
+  | { type: 'bossFocusStarted'; targetId: string; name: string; totalMs: number; sourceId?: string }
+  | { type: 'bossFocusTick'; targetId: string; amount: number; sourceId?: string }
+  | { type: 'bossFocusEnded'; targetId: string; name: string; sourceId?: string }
   | { type: 'partyDoTStarted'; name: string; totalMs: number }
   | { type: 'partyDoTEnded'; name: string }
   | { type: 'manaBurned'; amount: number }
@@ -271,7 +276,20 @@ export interface CombatState {
   /** Live (and just-died-this-tick) units of the current wave, or the boss once spawned. */
   enemies: Unit[];
   playerCast: CastState | null;
+  /**
+   * v1 enemy mechanics: derived convenience — the BOSS unit's active telegraphed
+   * cast bar, or null. Kept byte-compatible with the pre-multi-caster surface so
+   * existing UI/tests read the boss's cast bar exactly as before. Trash casts do
+   * NOT appear here; read `enemyCasts` for every caster (boss + trash).
+   */
   bossCast: BossCastState | null;
+  /**
+   * v1 enemy mechanics: every living enemy (boss or trash) with an active
+   * telegraphed cast bar, keyed by the casting unit's id. Active casts only —
+   * idle cooldown chrome is not represented. Sorted by `sourceId` ascending for
+   * a stable render order.
+   */
+  enemyCasts: Array<{ sourceId: string; name: string; remainingMs: number; totalMs: number }>;
   targetId: string | null;
   gcdRemainingMs: number;
   /**

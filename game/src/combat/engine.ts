@@ -17,6 +17,7 @@ import type {
   CombatStatus,
   CooldownDef,
   CooldownState,
+  EnemyCastDef,
   EncounterDef,
   FullHealthBonusRule,
   MissingHealthBonusRule,
@@ -33,8 +34,14 @@ import type {
  * Internal engine-only state for an active Tunnel Vision channel (telegraph
  * already finished). Not part of the public CombatState surface — VFX/log
  * consumers drive off the bossFocusStarted/Tick/Ended events instead.
+ *
+ * v1 enemy mechanics: at most ONE focus channel exists globally (locked rule —
+ * see startEnemyFocus). `sourceId` records which enemy (boss or trash) owns it,
+ * so channel damage/events attribute to the caster and the owner's own cadence
+ * cannot open a second telegraph while its channel runs.
  */
 interface BossFocusState {
+  sourceId: string;
   targetId: string;
   name: string;
   /** Total ms remaining in the channel (ends the channel at/below 0). */
@@ -49,13 +56,40 @@ interface BossFocusState {
  * Internal engine-only state for an active party-wide DoT after a partyDoT
  * telegraph finishes. Presentation drives off partyDoTStarted/Ended plus the
  * normal damage events from each tick.
+ *
+ * v1 enemy mechanics: one global DoT window (last-writer-wins on refresh, even
+ * across casters). `sourceId` is the current owner — tick `damage` events
+ * attribute to it.
  */
 interface PartyDoTState {
+  sourceId: string;
   name: string;
   remainingMs: number;
   tickRemainingMs: number;
   tickMs: number;
   damagePerTick: number;
+}
+
+/**
+ * Internal per-caster runtime for any living enemy (boss or trash) that carries
+ * a telegraphed cast def (v1 enemy mechanics). Replaces the single global boss
+ * cast pipeline: one entry per casting unit, keyed by unit id. Created at
+ * spawn (spawnWave / spawnBoss) and dropped on death (onEnemyDeath).
+ */
+interface EnemyCasterRuntime {
+  unitId: string;
+  cast: EnemyCastDef;
+  /** Active telegraph/cast bar; null when idle (between casts, or mid-channel for tunnelVision). */
+  castState: BossCastState | null;
+  /**
+   * Countdown to the next cast/telegraph start. Null while a partyAoE / partyDoT
+   * / manaSiphon cast bar is occupying (rescheduled to intervalMs - castMs on
+   * completion); for tunnelVision it is reset to intervalMs at telegraph start
+   * and keeps running under the telegraph + channel (start-to-start cadence).
+   */
+  timerRemainingMs: number | null;
+  /** Per-caster deterministic round-robin cursor into the eligible focus targets; never Math.random. */
+  focusIndex: number;
 }
 
 /**
@@ -128,15 +162,20 @@ export class CombatEngine {
   /** Blessed Bonk stacks: % per stack, updated from the most recent stackNextHealPotencyPct buff applied. */
   private bonkHealStackPct = 0;
 
-  private bossCastState: BossCastState | null = null;
-  /** Countdown to the next boss cast start; null while a party-AoE cast is active or the boss has no cast. */
-  private bossCastTimerRemainingMs: number | null = null;
+  /**
+   * v1 enemy mechanics: per-caster cast runtime keyed by unit id — one entry
+   * per living enemy (boss + trash spawned from a group with `cast`). Replaces
+   * the single global boss cast pipeline.
+   */
+  private readonly casters = new Map<string, EnemyCasterRuntime>();
 
-  /** Active Tunnel Vision channel (telegraph already finished); null otherwise. */
+  /**
+   * Active Tunnel Vision channel (telegraph already finished); null otherwise.
+   * Locked rule (v1 enemy mechanics): at most ONE focus channel globally —
+   * `sourceId` records the owning caster.
+   */
   private bossFocusState: BossFocusState | null = null;
   private partyDoTState: PartyDoTState | null = null;
-  /** Deterministic round-robin cursor into the eligible (non-tank, living) focus targets; never Math.random. */
-  private focusIndex = 0;
 
   private waveIndex = 0;
   private status: CombatStatus = 'running';
@@ -372,7 +411,8 @@ export class CombatEngine {
       party: this.party.map((u) => ({ ...u })),
       enemies: this.activeEnemies.map((u) => ({ ...u })),
       playerCast: this.playerCast ? { ...this.playerCast } : null,
-      bossCast: this.bossCastState ? { ...this.bossCastState } : null,
+      bossCast: this.bossCastForState(),
+      enemyCasts: this.enemyCastsForState(),
       targetId: this.targetId,
       gcdRemainingMs: Math.max(0, this.gcdRemainingMs),
       queuedSpellId: this.queuedCast?.spellId ?? null,
@@ -415,8 +455,12 @@ export class CombatEngine {
       min = Math.min(min, this.playerCast.remainingMs);
     }
     for (const remaining of this.swingTimers.values()) min = Math.min(min, remaining);
-    if (this.bossCastState) min = Math.min(min, this.bossCastState.remainingMs);
-    if (this.bossCastTimerRemainingMs !== null) min = Math.min(min, this.bossCastTimerRemainingMs);
+    // v1 enemy mechanics: every caster's active cast bar and pending cast timer
+    // participate in sub-stepping, exactly like the old single boss pipeline did.
+    for (const caster of this.casters.values()) {
+      if (caster.castState) min = Math.min(min, caster.castState.remainingMs);
+      if (caster.timerRemainingMs !== null) min = Math.min(min, caster.timerRemainingMs);
+    }
     if (this.bossFocusState) {
       min = Math.min(min, this.bossFocusState.remainingMs, this.bossFocusState.tickRemainingMs);
     }
@@ -444,8 +488,10 @@ export class CombatEngine {
     if (this.playerCast) this.playerCast.remainingMs -= step;
     if (this.gcdRemainingMs > 0) this.gcdRemainingMs -= step;
     for (const [id, remaining] of this.swingTimers) this.swingTimers.set(id, remaining - step);
-    if (this.bossCastState) this.bossCastState.remainingMs -= step;
-    if (this.bossCastTimerRemainingMs !== null) this.bossCastTimerRemainingMs -= step;
+    for (const caster of this.casters.values()) {
+      if (caster.castState) caster.castState.remainingMs -= step;
+      if (caster.timerRemainingMs !== null) caster.timerRemainingMs -= step;
+    }
     if (this.bossFocusState) {
       this.bossFocusState.remainingMs -= step;
       this.bossFocusState.tickRemainingMs -= step;
@@ -505,9 +551,19 @@ export class CombatEngine {
     if (this.status === 'running') {
       this.resolveCoyoteExpiries(events);
     }
-    // 4. boss cast completes -> partyAoE / manaSiphon damage, partyDoT start, or tunnelVision channel
-    if (this.status === 'running' && this.bossCastState && this.bossCastState.remainingMs <= 0) {
-      this.completeBossCast(events);
+    // 4. enemy casts complete -> partyAoE / manaSiphon damage, partyDoT start, or tunnelVision channel.
+    // Deterministic multi-caster order: BOSS FIRST, then ascending unit id — so a tunnelVision
+    // focus-channel tie (two telegraphs completing the same tick) resolves boss-first (locked
+    // rule; see startEnemyFocus). Snapshot the ready set before applying effects so party deaths
+    // this tick can't perturb iteration.
+    if (this.status === 'running') {
+      const ready = this.castersInCompletionOrder().filter(
+        (c) => c.castState !== null && c.castState.remainingMs <= 0,
+      );
+      for (const caster of ready) {
+        if (this.status !== 'running') break;
+        this.completeEnemyCast(caster, events);
+      }
     }
     // 5. boss focus tick (Tunnel Vision channel damage)
     if (this.status === 'running' && this.bossFocusState && this.bossFocusState.tickRemainingMs <= 0) {
@@ -543,15 +599,26 @@ export class CombatEngine {
         }
       }
     }
-    // 8. boss cast timer elapses -> start a new telegraphed cast (blocked while a focus channel is active)
-    if (
-      this.status === 'running' &&
-      this.bossCastTimerRemainingMs !== null &&
-      this.bossCastTimerRemainingMs <= 0 &&
-      this.bossCastState === null &&
-      this.bossFocusState === null
-    ) {
-      this.startBossCast(events);
+    // 8. enemy cast timers elapse -> start a new telegraphed cast. Deterministic order:
+    // ascending unit id (boss id sorts naturally with them — no special boss priority here).
+    // A caster only starts when it isn't already casting; a tunnelVision caster additionally
+    // waits while ITS OWN focus channel is active (start-to-start cadence keeps running
+    // underneath, so it fires the instant that channel ends). Another caster's active channel
+    // does NOT block this one's telegraph — global exclusivity is enforced at channel open.
+    if (this.status === 'running') {
+      for (const caster of this.castersInStartOrder()) {
+        if (this.status !== 'running') break;
+        if (caster.timerRemainingMs === null || caster.timerRemainingMs > 0) continue;
+        if (caster.castState !== null) continue;
+        if (
+          caster.cast.kind === 'tunnelVision' &&
+          this.bossFocusState !== null &&
+          this.bossFocusState.sourceId === caster.unitId
+        ) {
+          continue;
+        }
+        this.startEnemyCast(caster, events);
+      }
     }
   }
 
@@ -916,57 +983,95 @@ export class CombatEngine {
     }
   }
 
-  // ---- internal: boss cast ----------------------------------------------------------
+  // ---- internal: enemy cast (multi-caster; v1 enemy mechanics) ----------------------
 
-  private startBossCast(events: CombatEvent[]): void {
-    const castDef = this.encounter.boss.cast;
-    if (!castDef || !this.boss || !this.boss.alive) return;
-    if (castDef.kind === 'tunnelVision') {
-      this.bossCastState = { name: castDef.name, remainingMs: castDef.telegraphMs, totalMs: castDef.telegraphMs };
-      // Start-to-start cadence (D3/D8): reset the interval timer now, right at
-      // telegraph start, so it keeps counting through both the telegraph and
-      // the channel. Step 7's `bossFocusState === null` guard stops a new
-      // telegraph from starting while the channel is still active — if the
-      // interval elapses first (this goes <= 0) it just waits and fires the
-      // instant the channel ends (the "next boundary after it ends").
-      this.bossCastTimerRemainingMs = castDef.intervalMs;
-    } else {
-      // partyAoE / partyDoT / manaSiphon: cast-bar occupancy is castMs only.
-      this.bossCastState = { name: castDef.name, remainingMs: castDef.castMs, totalMs: castDef.castMs };
-      this.bossCastTimerRemainingMs = null;
-    }
-    events.push({ type: 'bossCastStarted', cast: { ...this.bossCastState } });
+  /**
+   * v1 enemy mechanics helpers: deterministic caster iteration orders.
+   * - Start order (a new telegraph/cast fires): ascending unit id, boss id
+   *   sorting naturally among them (no special boss priority).
+   * - Completion order: BOSS FIRST, then ascending unit id — so a tunnelVision
+   *   focus-channel tie (two telegraphs completing the same tick) resolves in
+   *   the boss's favor per the locked rule (see startEnemyFocus).
+   */
+  private castersInStartOrder(): EnemyCasterRuntime[] {
+    return [...this.casters.values()].sort((a, b) =>
+      a.unitId < b.unitId ? -1 : a.unitId > b.unitId ? 1 : 0,
+    );
   }
 
-  private completeBossCast(events: CombatEvent[]): void {
-    const cast = this.bossCastState!;
-    const castDef = this.encounter.boss.cast!;
-    this.bossCastState = null;
-    events.push({ type: 'bossCastFinished', name: cast.name });
+  private castersInCompletionOrder(): EnemyCasterRuntime[] {
+    const bossId = this.boss?.id;
+    return [...this.casters.values()].sort((a, b) => {
+      if (bossId !== undefined) {
+        if (a.unitId === bossId && b.unitId !== bossId) return -1;
+        if (b.unitId === bossId && a.unitId !== bossId) return 1;
+      }
+      return a.unitId < b.unitId ? -1 : a.unitId > b.unitId ? 1 : 0;
+    });
+  }
+
+  /** Register a per-caster cast runtime for a freshly spawned enemy with a cast def. */
+  private registerCaster(unitId: string, cast: EnemyCastDef): void {
+    this.casters.set(unitId, {
+      unitId,
+      cast,
+      castState: null,
+      timerRemainingMs: cast.firstCastAtMs,
+      focusIndex: 0,
+    });
+  }
+
+  private startEnemyCast(caster: EnemyCasterRuntime, events: CombatEvent[]): void {
+    const unit = this.getUnit(caster.unitId);
+    if (!unit || !unit.alive) return;
+    const castDef = caster.cast;
+    if (castDef.kind === 'tunnelVision') {
+      caster.castState = { name: castDef.name, remainingMs: castDef.telegraphMs, totalMs: castDef.telegraphMs };
+      // Start-to-start cadence (D3/D8): reset this caster's interval timer now, at
+      // telegraph start, so it keeps counting through both the telegraph and the
+      // channel. Step 8's own-channel guard stops this caster from starting a new
+      // telegraph while ITS channel is active — if the interval elapses first it
+      // just waits and fires the instant that channel ends.
+      caster.timerRemainingMs = castDef.intervalMs;
+    } else {
+      // partyAoE / partyDoT / manaSiphon: cast-bar occupancy is castMs only.
+      caster.castState = { name: castDef.name, remainingMs: castDef.castMs, totalMs: castDef.castMs };
+      caster.timerRemainingMs = null;
+    }
+    events.push({ type: 'bossCastStarted', cast: { ...caster.castState }, sourceId: caster.unitId });
+  }
+
+  private completeEnemyCast(caster: EnemyCasterRuntime, events: CombatEvent[]): void {
+    const cast = caster.castState!;
+    const castDef = caster.cast;
+    caster.castState = null;
+    events.push({ type: 'bossCastFinished', name: cast.name, sourceId: caster.unitId });
 
     if (castDef.kind === 'tunnelVision') {
-      // Telegraph finished -> channel begins. The start-to-start cadence
-      // timer is already running (set in startBossCast), so nothing to
-      // reschedule here.
-      this.startBossFocus(castDef, events);
+      // Telegraph finished -> channel begins (if it wins the global focus slot).
+      // The start-to-start cadence timer is already running (set in
+      // startEnemyCast), so nothing to reschedule here.
+      this.startEnemyFocus(caster, castDef, events);
       return;
     }
 
     if (castDef.kind === 'partyDoT') {
-      this.startPartyDoT(castDef, events);
+      this.startPartyDoT(caster, castDef, events);
       if (this.status === 'running') {
-        this.bossCastTimerRemainingMs = castDef.intervalMs - castDef.castMs;
+        caster.timerRemainingMs = castDef.intervalMs - castDef.castMs;
       }
       return;
     }
 
     const partyDamage = castDef.partyDamage;
-    const bossId = this.boss!.id;
+    // v1 enemy mechanics: sourceId is the CASTER (boss or trash), not always the boss —
+    // `this.boss` may be null while trash cast in an early wave.
+    const sourceId = caster.unitId;
     // v0.3 §Coyote: routed through the shared damage pipeline so a party-wide one-shot enters
     // dying (grace window) exactly like any other lethal hit, instead of dying instantly.
     for (const unit of this.party) {
       if (!unit.alive) continue;
-      this.applyDamageToUnit(unit, partyDamage, bossId, events);
+      this.applyDamageToUnit(unit, partyDamage, sourceId, events);
     }
     if (castDef.kind === 'manaSiphon' && this.status === 'running') {
       const healer = this.getUnit('healer');
@@ -981,13 +1086,16 @@ export class CombatEngine {
     // any, resolves later via resolveCoyoteExpiries once the last downed member's window expires.
     if (this.status === 'running') {
       // Start-to-start cadence: the gap before the next cast is intervalMs - castMs.
-      this.bossCastTimerRemainingMs = castDef.intervalMs - castDef.castMs;
+      caster.timerRemainingMs = castDef.intervalMs - castDef.castMs;
     }
   }
 
-  private startPartyDoT(castDef: PartyDoTCastDef, events: CombatEvent[]): void {
-    // A refreshed Emberfall replaces any previous DoT window (no stacking).
+  private startPartyDoT(caster: EnemyCasterRuntime, castDef: PartyDoTCastDef, events: CombatEvent[]): void {
+    // One global DoT window: a refreshed Emberfall (even from a different caster —
+    // last-writer-wins) replaces any previous window (no stacking). `sourceId`
+    // becomes the new owner so tick damage attributes to it.
     this.partyDoTState = {
+      sourceId: caster.unitId,
       name: castDef.name,
       remainingMs: castDef.durationMs,
       tickRemainingMs: castDef.tickMs,
@@ -999,11 +1107,10 @@ export class CombatEngine {
 
   private resolvePartyDoTTick(events: CombatEvent[]): void {
     const dot = this.partyDoTState!;
-    const bossId = this.boss!.id;
     for (const unit of [...this.party]) {
       if (this.status !== 'running') break;
       if (!unit.alive) continue;
-      this.applyDamageToUnit(unit, dot.damagePerTick, bossId, events);
+      this.applyDamageToUnit(unit, dot.damagePerTick, dot.sourceId, events);
     }
     if (dot.remainingMs <= 0 || this.status !== 'running') {
       this.partyDoTState = null;
@@ -1014,13 +1121,27 @@ export class CombatEngine {
   }
 
   /**
-   * Begin a Tunnel Vision channel right after its telegraph completes.
+   * Begin a Tunnel Vision channel right after this caster's telegraph completes.
+   *
+   * Focus rule (LOCKED, v1 enemy mechanics): at most ONE focus channel exists
+   * globally. If another caster already owns an active channel, this completed
+   * telegraph yields — no channel opens (its cadence timer keeps running, so it
+   * telegraphs again later). When two telegraphs complete in the SAME tick,
+   * completion order (boss first, else lowest unit id — see
+   * castersInCompletionOrder) decides who claims the slot.
+   *
    * Deterministic target selection (D3/D8, no Math.random): eligible = living
    * party members with role !== 'tank', sorted by stable unit id;
-   * eligible[focusIndex % eligible.length], then focusIndex increments once
-   * per activation.
+   * eligible[focusIndex % eligible.length], then this caster's focusIndex
+   * increments once per activation.
    */
-  private startBossFocus(castDef: TunnelVisionCastDef, events: CombatEvent[]): void {
+  private startEnemyFocus(caster: EnemyCasterRuntime, castDef: TunnelVisionCastDef, events: CombatEvent[]): void {
+    if (this.bossFocusState !== null) {
+      // A channel is already active (owned by an earlier-priority caster this
+      // tick, or still running from before) — global exclusivity: don't open a
+      // second one. The telegraph still finished (bossCastFinished already fired).
+      return;
+    }
     // v0.3 §Coyote: a dying (downed) party member reads as dead — excluded from focus eligibility,
     // same as the enemy auto-attack target pick.
     const eligible = this.party
@@ -1032,9 +1153,10 @@ export class CombatEngine {
       // already-running cadence timer.
       return;
     }
-    const target = eligible[this.focusIndex % eligible.length]!;
-    this.focusIndex += 1;
+    const target = eligible[caster.focusIndex % eligible.length]!;
+    caster.focusIndex += 1;
     this.bossFocusState = {
+      sourceId: caster.unitId,
       targetId: target.id,
       name: castDef.name,
       remainingMs: castDef.channelMs,
@@ -1042,7 +1164,13 @@ export class CombatEngine {
       tickMs: castDef.tickMs,
       damagePerTick: castDef.damagePerTick,
     };
-    events.push({ type: 'bossFocusStarted', targetId: target.id, name: castDef.name, totalMs: castDef.channelMs });
+    events.push({
+      type: 'bossFocusStarted',
+      targetId: target.id,
+      name: castDef.name,
+      totalMs: castDef.channelMs,
+      sourceId: caster.unitId,
+    });
   }
 
   /**
@@ -1056,21 +1184,23 @@ export class CombatEngine {
     const focus = this.bossFocusState!;
     const target = this.getUnit(focus.targetId);
     if (target && target.alive && !target.dying) {
-      this.applyDamageToUnit(target, focus.damagePerTick, this.boss!.id, events);
-      events.push({ type: 'bossFocusTick', targetId: focus.targetId, amount: focus.damagePerTick });
+      this.applyDamageToUnit(target, focus.damagePerTick, focus.sourceId, events);
+      events.push({ type: 'bossFocusTick', targetId: focus.targetId, amount: focus.damagePerTick, sourceId: focus.sourceId });
     }
 
     const after = this.getUnit(focus.targetId);
     if (!after || !after.alive || after.dying) {
-      // v0.3 §Coyote: a downed (dying) focus target reads as dead to the boss — the channel ends
+      // v0.3 §Coyote: a downed (dying) focus target reads as dead — the channel ends
       // early the tick that downs it, no retarget, and does NOT resume if a heal later saves them.
+      const sourceId = focus.sourceId;
       this.bossFocusState = null;
-      events.push({ type: 'bossFocusEnded', targetId: focus.targetId, name: focus.name });
+      events.push({ type: 'bossFocusEnded', targetId: focus.targetId, name: focus.name, sourceId });
       return;
     }
     if (focus.remainingMs <= 0) {
+      const sourceId = focus.sourceId;
       this.bossFocusState = null;
-      events.push({ type: 'bossFocusEnded', targetId: focus.targetId, name: focus.name });
+      events.push({ type: 'bossFocusEnded', targetId: focus.targetId, name: focus.name, sourceId });
       return;
     }
     focus.tickRemainingMs = focus.tickMs;
@@ -1103,6 +1233,10 @@ export class CombatEngine {
         enemies.push(unit);
         this.enemyStats.set(id, stats);
         this.swingTimers.set(id, stats.swingIntervalMs);
+        // v1 enemy mechanics: arm this trash unit's cast timer to firstCastAtMs
+        // (E1 compiles `cast` onto the group from its single ability). Every unit
+        // in a casting group casts on its own per-unit schedule.
+        if (group.cast) this.registerCaster(id, group.cast);
       }
     });
     this.activeEnemies = enemies;
@@ -1128,7 +1262,7 @@ export class CombatEngine {
       swingIntervalMs: b.swingIntervalMs,
     });
     this.swingTimers.set(b.id, b.swingIntervalMs);
-    if (b.cast) this.bossCastTimerRemainingMs = b.cast.firstCastAtMs;
+    if (b.cast) this.registerCaster(b.id, b.cast);
   }
 
   private onEnemyDeath(unit: Unit, events: CombatEvent[]): void {
@@ -1137,6 +1271,15 @@ export class CombatEngine {
     this.swingTimers.delete(unit.id);
     this.enemyStats.delete(unit.id);
     events.push({ type: 'unitDied', unitId: unit.id });
+    // v1 enemy mechanics: drop this unit's cast runtime (clears any active cast
+    // bar / pending cast timer). If it owned the single global focus channel,
+    // end that channel now (bossFocusEnded) — a dead caster can't keep channeling.
+    this.casters.delete(unit.id);
+    if (this.bossFocusState !== null && this.bossFocusState.sourceId === unit.id) {
+      const focus = this.bossFocusState;
+      this.bossFocusState = null;
+      events.push({ type: 'bossFocusEnded', targetId: focus.targetId, name: focus.name, sourceId: focus.sourceId });
+    }
     this.rewardsXp += this.encounter.xpPerEnemy ?? REWARDS.xpPerEnemy;
     this.checkWaveOrVictory(events);
   }
@@ -1169,6 +1312,30 @@ export class CombatEngine {
       this.status = 'wipe';
       events.push({ type: 'combatEnded', status: 'wipe' });
     }
+  }
+
+  // ---- internal: state projection -----------------------------------------------------
+
+  /**
+   * Derived convenience: the BOSS unit's active cast bar, or null. Byte-compatible
+   * with the pre-multi-caster surface (existing UI/tests read exactly this).
+   */
+  private bossCastForState(): BossCastState | null {
+    if (!this.boss) return null;
+    const bossCaster = this.casters.get(this.boss.id);
+    return bossCaster?.castState ? { ...bossCaster.castState } : null;
+  }
+
+  /** Every caster with an active cast bar, sorted by unit id for stable render order. */
+  private enemyCastsForState(): CombatState['enemyCasts'] {
+    return this.castersInStartOrder()
+      .filter((c) => c.castState !== null)
+      .map((c) => ({
+        sourceId: c.unitId,
+        name: c.castState!.name,
+        remainingMs: Math.max(0, c.castState!.remainingMs),
+        totalMs: c.castState!.totalMs,
+      }));
   }
 
   // ---- internal: lookups -------------------------------------------------------------
