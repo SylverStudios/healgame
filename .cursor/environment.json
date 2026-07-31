@@ -1,0 +1,4 @@
+{
+  "name": "healgame",
+  "install": "bash scripts/setup-gh-stack.sh && cd game && npm install && npx playwright install chromium"
+}
