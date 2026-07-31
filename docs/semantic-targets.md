@@ -1,6 +1,6 @@
 # Semantic click targets
 
-Status: current · Authority: interactive object name inventory for journey · Last verified: 2026-07-31
+Status: current · Authority: interactive object name inventory for journey · Last verified: 2026-07-31 (M4 upgrade offer names added)
 
 Every interactive game object a journey stage may aim at carries a stable
 Phaser `GameObject.setName(...)`. Journey resolves via
@@ -63,6 +63,11 @@ by name.
 | `cardChipCancel` | Cancel chip draft | `CardAlbumScene.ts` |
 | `cooldownOffer:<cooldownId>` | CD choice card (e.g. `cooldownOffer:still-waters`) | `HubScene.ts` |
 | `cooldownConfirm` | Confirm CD pick button | `HubScene.ts` |
+| `upgradeOffer:block` | Secondary upgrade card — Block | `ui/upgradePickModal.ts` |
+| `upgradeOffer:crit` | Secondary upgrade card — Critical | `ui/upgradePickModal.ts` |
+| `upgradeOffer:haste` | Secondary upgrade card — Haste | `ui/upgradePickModal.ts` |
+| `upgradeOffer:manaRegen` | Secondary upgrade card — Mana Regen | `ui/upgradePickModal.ts` |
+| `upgradeConfirm` | Confirm upgrade pick button | `ui/upgradePickModal.ts` |
 
 ## Hook API
 

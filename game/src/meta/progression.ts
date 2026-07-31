@@ -54,6 +54,8 @@ export function applyCombatResult(
     if (save.progressionMode === 'cards') {
       // applyCardsLevelUps grants free spell unlocks only (no upgrade points on level).
       applyCardsLevelUps(save, levelBefore, levelAfter);
+      // M4: one Upgrade pick per level gained — drained by HubScene modal.
+      save.pendingUpgradePicks += levelAfter - levelBefore;
       notices.push({
         kind: 'levelUp',
         text: cardsLevelUpWelcome(levelAfter),

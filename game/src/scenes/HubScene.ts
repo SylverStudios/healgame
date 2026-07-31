@@ -39,6 +39,8 @@ import { FONT, FONT_SIZE_SM, FONT_SIZE_LG, FONT_SIZE_MD, PALETTE, PALETTE_NUM } 
 import { addBanner, addButton, addPanel, type FrameState } from '../ui/panels';
 import { COMBAT_ENTRY_FADE_OUT_MS, fadeInOnCreate, fadeToScene } from '../ui/transitions';
 import { KEYCAP_FRAME_TEXTURE_KEY } from '../ui/spellSprites';
+import { buildUpgradePickModal } from '../ui/upgradePickModal';
+import { applyUpgradePick } from '../data/secondaryStats';
 
 type HubSceneData = HubCombatSceneData;
 
@@ -182,11 +184,22 @@ export class HubScene extends Phaser.Scene {
     this.buildLastRunGlyph(save);
     new RunModsBar(this, runModsFromSave(save));
 
-    // M5: cards mode — interrupt with CD picker if a choice is pending.
+    // M4/M5: cards mode — O8 order: drain Upgrade picks first, then CD modal.
     if (save.progressionMode === 'cards') {
-      const pending = pendingCooldownSet(save);
-      if (pending !== null) {
-        this.buildCooldownPickModal(save, pending);
+      if (save.pendingUpgradePicks > 0) {
+        // M4: one pick per level gained — sequential via scene.restart().
+        buildUpgradePickModal(this, save.pendingUpgradePicks, (id) => {
+          if (applyUpgradePick(save, id)) {
+            saveGame(save);
+            this.scene.restart();
+          }
+        });
+      } else {
+        // M5: CD modal only appears after all upgrade picks are drained.
+        const pending = pendingCooldownSet(save);
+        if (pending !== null) {
+          this.buildCooldownPickModal(save, pending);
+        }
       }
     }
   }

@@ -151,6 +151,55 @@ describe('applyCombatResult', () => {
     ]);
   });
 
+  it('M4: cards level-up adds one pendingUpgradePick per level gained', () => {
+    const s = save({
+      progressionMode: 'cards',
+      xp: XP_LEVEL_2_THRESHOLD - 1,
+      unlockedSpells: ['heal', 'bonk'],
+      actionBar: ['heal', 'bonk', '', ''],
+      pendingUpgradePicks: 0,
+    });
+    applyCombatResult(s, result({ xp: 1 }));
+    expect(levelForXp(s.xp)).toBe(2);
+    expect(s.pendingUpgradePicks).toBe(1);
+  });
+
+  it('M4: cards multi-level jump adds one pick per level gained', () => {
+    // Jump from level 1 straight to level 4 (3 levels gained).
+    const s = save({
+      progressionMode: 'cards',
+      xp: 0,
+      unlockedSpells: ['heal', 'bonk'],
+      actionBar: ['heal', 'bonk', '', ''],
+      pendingUpgradePicks: 0,
+    });
+    const xpNeeded = xpForLevel(4); // XP required to reach level 4 from 0
+    applyCombatResult(s, result({ xp: xpNeeded }));
+    expect(levelForXp(s.xp)).toBe(4);
+    expect(s.pendingUpgradePicks).toBe(3);
+  });
+
+  it('M4: pendingUpgradePicks is 0 on a wipe that does not cross a level boundary', () => {
+    const s = save({
+      progressionMode: 'cards',
+      xp: 0,
+      pendingUpgradePicks: 0,
+    });
+    applyCombatResult(s, result({ xp: 1 }));
+    expect(levelForXp(s.xp)).toBe(1); // still level 1
+    expect(s.pendingUpgradePicks).toBe(0);
+  });
+
+  it('M4: non-cards level-up does not touch pendingUpgradePicks', () => {
+    const s = save({
+      progressionMode: 'lattice',
+      xp: XP_LEVEL_2_THRESHOLD - 1,
+      pendingUpgradePicks: 0,
+    });
+    applyCombatResult(s, result({ xp: 1 }));
+    expect(s.pendingUpgradePicks).toBe(0);
+  });
+
   it('cards level 2 grants Mend (no upgrade point on level-up)', () => {
     const s = save({
       progressionMode: 'cards',

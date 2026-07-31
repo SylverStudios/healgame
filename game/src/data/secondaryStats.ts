@@ -85,3 +85,19 @@ export function bumpSecondaryRank(ranks: SecondaryRanks, id: SecondaryId): Secon
   next[id] = Math.max(0, Math.floor(next[id] ?? 0)) + 1;
   return next;
 }
+
+/**
+ * Consume one pending upgrade pick and bump the chosen secondary rank.
+ * Returns false (no mutation) when there are no picks remaining or `id` is
+ * not a valid SecondaryId.
+ */
+export function applyUpgradePick(
+  save: { pendingUpgradePicks: number; secondaryRanks: SecondaryRanks },
+  id: SecondaryId,
+): boolean {
+  if (save.pendingUpgradePicks < 1) return false;
+  if (!(SECONDARY_IDS as readonly string[]).includes(id)) return false;
+  save.pendingUpgradePicks -= 1;
+  save.secondaryRanks = bumpSecondaryRank(save.secondaryRanks, id);
+  return true;
+}
