@@ -13,7 +13,7 @@ export const THE_MAW_DUNGEON = {
     {
       enemies: [
         {
-          mobId: 'ash-husk',
+          mobId: 'hollow-husk',
           count: 2,
           statOverrides: { hp: 6 },
         },

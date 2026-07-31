@@ -7,6 +7,6 @@ export const ASH_HUSK = {
   hp: 15,
   autoDamage: 2,
   swingIntervalMs: 3_000,
-  abilityIds: [],
+  abilityIds: ['bonehowl-lesser'],
   visualKey: 'ash-husk',
 } as const satisfies MobDef;

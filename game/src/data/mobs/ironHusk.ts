@@ -7,6 +7,6 @@ export const IRON_HUSK = {
   hp: 13,
   autoDamage: 2,
   swingIntervalMs: 3_000,
-  abilityIds: [],
+  abilityIds: ['tunnel-vision-lesser'],
   visualKey: 'iron-husk',
 } as const satisfies MobDef;
