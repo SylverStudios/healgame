@@ -224,6 +224,21 @@ export interface CombatEngineOptions {
   cooldowns?: CooldownDef[];
   /** Permanent relics selected on prior dungeon first clears. */
   relics?: RelicDef[];
+  /**
+   * Cards Upgrade secondaries (v1). Haste reduces player castMs only (GCD
+   * unchanged). Crit uses `rng`. Block is tank-only deterministic every-N.
+   * Omit = pre-upgrade behavior.
+   */
+  hastePermille?: number;
+  critChancePermille?: number;
+  critBonusPermille?: number;
+  blockThresholdN?: number;
+  /**
+   * Injected RNG for crit only (`() => number` in [0,1)). Tests/bots should
+   * pass `() => 0` (never crit) or a fixed sequence. Never Math.random inside
+   * the engine.
+   */
+  rng?: () => number;
 }
 
 export interface CastState {

@@ -26,7 +26,7 @@ import type { CombatResult } from '../scenes/CombatScene';
 
 function save(overrides: Partial<SaveData> = {}): SaveData {
   // Empty actionBar → loadoutFromSave keeps all owned spells (bar not under test).
-  return { ...newSaveData(), actionBar: ['', '', '', ''], ...overrides };
+  return { ...newSaveData('lattice'), actionBar: ['', '', '', ''], ...overrides };
 }
 
 function result(overrides: Partial<CombatResult> = {}): CombatResult {

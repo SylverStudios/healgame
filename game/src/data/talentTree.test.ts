@@ -32,7 +32,7 @@ import {
 
 function save(overrides: Partial<SaveData> = {}): SaveData {
   // Empty actionBar → loadoutFromSave keeps all owned spells (bar not under test).
-  return { ...newSaveData(), actionBar: ['', '', '', ''], ...overrides };
+  return { ...newSaveData('lattice'), actionBar: ['', '', '', ''], ...overrides };
 }
 
 describe('TALENT_TREE config', () => {

@@ -1,5 +1,5 @@
 {
-  "version": 11,
+  "version": 12,
   "progressionMode": "lattice",
   "tutorialDone": false,
   "xp": 0,
@@ -21,6 +21,9 @@
   "pendingRelicOffers": [],
   "upgradePoints": 0,
   "spellChips": {},
+  "secondaryRanks": {},
+  "chosenCooldownIds": [],
+  "pendingUpgradePicks": 0,
   "musicVolumePct": 50,
   "recentRuns": []
 }

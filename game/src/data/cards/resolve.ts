@@ -26,6 +26,7 @@ import { manaBonusesForLevel } from '../levelMana';
 import { partyHpBonusesForLevel } from '../levelHp';
 import { radialSpellById } from '../radial/spells';
 import { spellsFromActionBar, type CombatMods } from '../talentTree';
+import { fightModsFromSecondaryRanks } from '../secondaryStats';
 import { chipById, type CardChipEffect } from './chips';
 import { offersForNextSlot } from './draft';
 import { CARD_SLOTS, CARD_UNLOCKS, cooldownIdsAtLevel } from './unlocks';
@@ -205,6 +206,8 @@ export function loadoutFromCardSave(save: {
   actionBar: string[];
   unlockedSpells?: readonly string[];
   spellChips?: Record<string, string[]>;
+  secondaryRanks?: Partial<Record<'block' | 'crit' | 'haste' | 'manaRegen', number>>;
+  chosenCooldownIds?: readonly string[];
 }): CombatMods {
   const unlocked = save.unlockedSpells ?? ['heal', 'bonk'];
   const spells: SpellDef[] = unlocked
@@ -246,11 +249,31 @@ export function loadoutFromCardSave(save: {
     mods.bonusMaxHp = levelHp;
   }
 
-  // Cooldown unlocks are not stored on the save — discover via unlock table.
-  mods.cooldowns = cooldownIdsAtLevel(level)
+  // Cooldown unlocks: prefer chosenCooldownIds (cards CD choice). Until M5
+  // removes auto rows, fall back to unlock-table ids when none chosen yet.
+  const chosen = save.chosenCooldownIds ?? [];
+  const cdIds = chosen.length > 0 ? [...chosen] : cooldownIdsAtLevel(level);
+  mods.cooldowns = cdIds
     .map((id) => cooldownById(id))
     .filter((c): c is NonNullable<typeof c> => c !== undefined)
     .map((c) => ({ ...c }));
+
+  // Secondary Upgrade ranks → fight mods (engine applies in M2/M3).
+  const sec = fightModsFromSecondaryRanks(save.secondaryRanks ?? {});
+  if (sec.hastePermille > 0) mods.hastePermille = sec.hastePermille;
+  if (sec.critChancePermille > 0) mods.critChancePermille = sec.critChancePermille;
+  if (sec.critChancePermille > 0) mods.critBonusPermille = sec.critBonusPermille;
+  if (sec.blockThresholdN !== null) mods.blockThresholdN = sec.blockThresholdN;
+  if (sec.manaRegen !== null) {
+    if (mods.manaRegen) {
+      mods.manaRegen = {
+        amount: mods.manaRegen.amount + sec.manaRegen.amount,
+        intervalMs: Math.min(mods.manaRegen.intervalMs, sec.manaRegen.intervalMs),
+      };
+    } else {
+      mods.manaRegen = sec.manaRegen;
+    }
+  }
 
   if (save.actionBar.some((id) => id.length > 0)) {
     mods.spells = spellsFromActionBar(mods.spells, save.actionBar);
