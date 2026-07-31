@@ -1,6 +1,6 @@
 # GitHub auto-merge — what the repo setting actually does
 
-Status: current · Authority: none — agent/ops note · Last verified: 2026-07-27
+Status: current · Authority: none — agent/ops note · Last verified: 2026-07-31
 
 Verified against healgame on 2026-07-27 while landing Playtest Wave 3
 ([#42](https://github.com/SylverStudios/healgame/pull/42)–[#44](https://github.com/SylverStudios/healgame/pull/44)).
@@ -40,12 +40,16 @@ Notes:
 
 ## Stacked PRs
 
-Merge **bottom-up** (base of the stack into `main` first).
+Prefer GitHub's native stacked PRs + `gh stack` (see
+[`github-stacked-prs.md`](github-stacked-prs.md)). Merge **bottom-up**, or
+merge a higher layer to land everything below it in one operation.
 
-When the merged branch is deleted, GitHub typically **retargets** the next PR’s
-base from the deleted stack branch onto `main`. Confirm with
-`gh pr view <n> --json baseRefName` before enabling auto-merge on the next one
-— do not auto-merge a PR into a temporary stack branch if the intent is `main`.
+When using ad-hoc dependent PRs without a Stack object: after the lower branch
+is deleted on merge, confirm the next PR retargeted onto `main` with
+`gh pr view <n> --json baseRefName` before enabling auto-merge — do not
+auto-merge a PR into a temporary stack branch if the intent is `main`.
+
+For stacks, prefer `gh stack merge --yes` over `gh pr merge`.
 
 ## What “ready + CI green” alone does
 

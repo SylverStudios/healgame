@@ -4,7 +4,7 @@
 
 [![play — live demo](https://img.shields.io/badge/play-live%20demo-1a1210?style=flat-square&labelColor=3a2a22&color=f2c14e)](https://astounding-blancmange-940175.netlify.app/)
 
-Status: current · Authority: repo landing / vibe · Last verified: 2026-07-27
+Status: current · Authority: repo landing / vibe · Last verified: 2026-07-31
 
 A healer-focused indie game inspired by *Master Healer Kale with useless party*, rebuilt around exclusive builds, readable casting, and old-school MMO healing — in a heavy-metal dark fantasy skin.
 
@@ -54,6 +54,7 @@ Doc conventions + authority: [`AGENTS.md`](AGENTS.md). Operating rules:
 | [Unit art](docs/unit-art.md) | Kenney tile mapping |
 | [Ideas](docs/ideas.md) | Uncommitted backlog |
 | [GDD](docs/GDD.md) | Long-term design only |
+| [Stacked PRs](docs/github-stacked-prs.md) | `gh stack` for local + Cursor Cloud |
 | [Kale research](docs/research/master-healer-kale.md) | Inspiration |
 
 ## In one breath
