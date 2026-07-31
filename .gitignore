@@ -8,6 +8,7 @@ node_modules/
 dist/
 build/
 .cursor/
+!.cursor/environment.json
 .claude/worktrees/
 *.canvas.tsx
 /kenney_tiny-dungeon/
