@@ -76,7 +76,12 @@ import {
 } from '../ui/midCombatBanter';
 import { showSpeechBubble } from '../ui/speechBubble';
 import { presentNoTargetHealCue } from '../ui/noTargetHealCue';
-import { syncBattleMendIcon, type BattleMendIcon } from '../ui/battleMendIcon';
+import { liveBonkBuffNotes } from '../ui/bonkStacksIcon';
+import {
+  syncHealerCues,
+  emptyHealerCueHandles,
+  type HealerCueHandles,
+} from '../ui/healerCues';
 import { portraitTextureKey, revealResultPortrait } from '../ui/portraitSprites';
 import { chunkyWipeIn, fadeToScene } from '../ui/transitions';
 import { MOB_REGISTRY } from '../data/mobs';
@@ -235,8 +240,9 @@ export class CombatScene extends Phaser.Scene {
 
   private paceToggle!: PaceToggle;
   private combatPaceTenths = 10;
-  private healerRune: Phaser.GameObjects.Triangle | null = null;
-  private battleMendIcon: BattleMendIcon | null = null;
+  // Overhead healer cues (rune + Battle Mend + Blessed Bonk stacks); icon id backs the stack cue.
+  private healerCues: HealerCueHandles = emptyHealerCueHandles();
+  private bonkStackIconSpellId = 'bonk';
   /** Presentation-only DBZ-style aura: intensity from mana spent in the last 30s. */
   private manaAura: ManaSpendAura | null = null;
   /** Wall-clock delta of the last update() tick — drives aura pulse without pacing. */
@@ -283,6 +289,8 @@ export class CombatScene extends Phaser.Scene {
     this.encounter = encounter;
 
     const spells = this.sceneData.loadout.spells;
+    this.bonkStackIconSpellId =
+      spells.find((s) => s.castBuff?.kind === 'stackNextHealPotencyPct')?.id ?? 'bonk';
 
     // Loaded once: relics feed engine + reused for pace toggle (avoids a second loadSave() call).
     const save = loadSave();
@@ -336,6 +344,8 @@ export class CombatScene extends Phaser.Scene {
       {
         ...(relicBonusHealing > 0 ? { bonusHealing: relicBonusHealing } : {}),
         getActiveFlatHealBonus: (spellId) => this.computeActiveFlatHealBonus(spellId),
+        getLiveBuffNotes: (spellId) =>
+          liveBonkBuffNotes(this.engine.state, this.sceneData.loadout.spells, spellId),
       },
     );
     this.registerHotkeys(spells, this.sceneData.loadout.cooldowns);
@@ -993,21 +1003,12 @@ export class CombatScene extends Phaser.Scene {
   }
 
   private syncHealerRune(state: CombatState): void {
-    const healerSprite = this.partySprites.get('healer');
-    if (state.armedBuffedSpellIds.length === 0 || !healerSprite) {
-      this.healerRune?.destroy();
-      this.healerRune = null;
-    } else {
-      const x = healerSprite.getHomeX() - 36;
-      const y = healerSprite.getHomeY() - 24;
-      this.healerRune ??= this.add
-        .triangle(x, y, 0, -7, 6, 3, -6, 3, 0xf2c14e)
-        .setStrokeStyle(1, 0x8a7868)
-        .setDepth(40);
-      this.healerRune.setPosition(x, y);
-    }
-    this.battleMendIcon = syncBattleMendIcon(
-      this, this.battleMendIcon, state.armedManaDiscountSpellIds, healerSprite,
+    this.healerCues = syncHealerCues(
+      this,
+      this.healerCues,
+      state,
+      this.bonkStackIconSpellId,
+      this.partySprites.get('healer'),
     );
   }
 

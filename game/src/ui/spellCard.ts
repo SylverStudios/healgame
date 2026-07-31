@@ -50,6 +50,13 @@ export interface BuildSpellCardOptions {
    * spell. NOT for target-conditional bonuses (missing/full-health).
    */
   activeFlatHealBonus?: number;
+  /**
+   * Live combat buff lines to append after the static/loadout notes (gold
+   * accent). Wave 6 R3: active Bonk castBuff state (Blessed stacks, armed
+   * next-heal potency, pending next-spell mana discount). Empty/omit outside
+   * combat (tree unlock cards).
+   */
+  liveBuffNotes?: readonly string[];
 }
 
 function formatCast(castMs: number): string {
@@ -97,6 +104,9 @@ function castBuffNotes(spell: SpellDef): string[] {
   if (spell.castBuff?.kind === 'nextHealPotencyPct') {
     return [`Next heal +${spell.castBuff.pct}% potency`];
   }
+  if (spell.castBuff?.kind === 'stackNextHealPotencyPct') {
+    return [`Each hit stacks +${spell.castBuff.pct}% next heal (cap ${spell.castBuff.cap})`];
+  }
   return [];
 }
 
@@ -142,6 +152,7 @@ export function buildSpellCard(spell: SpellDef, options: BuildSpellCardOptions =
   const notes = [
     ...castBuffNotes(spell),
     ...(options.loadout ? loadoutNotes(spell, options.loadout) : []),
+    ...(options.liveBuffNotes ?? []),
   ];
 
   return {

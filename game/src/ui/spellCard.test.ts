@@ -42,6 +42,22 @@ describe('buildSpellCard', () => {
     expect(card.notes).toEqual(['Next spell costs 2 less mana']);
   });
 
+  it('describes a stacking next-heal cast buff', () => {
+    const stackSpell: SpellDef = {
+      ...SPELLS.solemnMend,
+      castBuff: { kind: 'stackNextHealPotencyPct', pct: 10, cap: 3 },
+    };
+    const card = buildSpellCard(stackSpell);
+    expect(card.notes).toContain('Each hit stacks +10% next heal (cap 3)');
+  });
+
+  it('appends live buff notes after static/loadout notes', () => {
+    const card = buildSpellCard(SPELLS.solemnMend, {
+      liveBuffNotes: ['Blessed stacks: 2 (+20% next heal)'],
+    });
+    expect(card.notes).toEqual(['Blessed stacks: 2 (+20% next heal)']);
+  });
+
   it('includes loadout synergies as gold notes', () => {
     const loadout: CombatMods = {
       ...emptyLoadout,
