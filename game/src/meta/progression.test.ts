@@ -350,10 +350,10 @@ describe('buildLoadout', () => {
     ]);
   });
 
-  it('emits full-health bonuses from Steady Hands (Alpha 0.1 §D4, replaces retired Desperate Zeal)', () => {
+  it('emits missing-health pct bonuses from Steady Hands (J25: replaces the retired full-health shape)', () => {
     const s = save({ treeRanks: { 'zealot-oath': 1, 'zealot-steady-hands': 1 }, subclass: 'zealot' });
-    expect(buildLoadout(s).fullHealthBonuses).toEqual([
-      { spellId: 'zealous-mending', hpPctAtLeast: 80, bonusHeal: 2 },
+    expect(buildLoadout(s).missingHealthPctBonuses).toEqual([
+      { spellId: 'zealous-mending', pctPer10PctMissing: 10 },
     ]);
   });
 

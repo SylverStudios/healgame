@@ -77,7 +77,12 @@ export interface CombatMods {
   missingHealthBonuses: MissingHealthBonusRule[];
   /** Alpha 0.1 §D4 Graven Scale: percent-of-base-heal missing-health bonus. */
   missingHealthPctBonuses: MissingHealthPctBonusRule[];
-  /** Alpha 0.1 §D4 Steady Hands: bonus heal when target is at/above a health threshold. */
+  /**
+   * Full-health threshold bonus (heal when target is at/above hpPctAtLeast%).
+   * J25: no live tree node emits this anymore — Steady Hands moved to
+   * `missingHealthPctBonus` (10%/band). The engine hook and rule shape remain
+   * for the effect kind and for future content.
+   */
   fullHealthBonuses: FullHealthBonusRule[];
   /** Sorted unique pace multipliers (tenths); always includes 10; adds 15 when tempo owned. */
   paceMultipliersTenths: number[];
@@ -291,14 +296,13 @@ const steadyHands: NodeDef = {
   cost: { currency: 'talent', amount: 1 },
   content: content({
     name: 'Steady Hands',
-    description: `${SPELLS.zealousMending.name}: +2 heal when the target is at 80%+ health`,
+    description: `${SPELLS.zealousMending.name}: +10% of base heal per 10% target health missing (rounds up)`,
     glyph: 'H',
     subclass: 'zealot',
     effect: {
-      kind: 'fullHealthBonus',
+      kind: 'missingHealthPctBonus',
       spellId: SPELLS.zealousMending.id,
-      hpPctAtLeast: 80,
-      bonusHeal: 2,
+      pctPer10PctMissing: 10,
     },
   }),
 };

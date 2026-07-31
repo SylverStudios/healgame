@@ -382,13 +382,15 @@ and compiles the ordered dungeon catalog into the engine's resolved
     matching entries each ceil independently, then sum (mirrors the flat
     rule's duplicate handling). Pure integer inputs; `Math.ceil` on the one
     division keeps outputs integer.
-  - **Full-health bonus** (Alpha 0.1 §D4, Steady Hands shape —
-    `fullHealthBonuses`): on a completed cast of a matching `spellId`, adds
-    `bonusHeal` when the target's **pre-heal** HP is at least `hpPctAtLeast`
-    percent of maxHp — checked as `target.hp * 100 >= hpPctAtLeast * target.maxHp`
-    (integer-safe, no floats), **inclusive** at the threshold. A full-HP
-    target qualifies: the bonus applies even when the whole heal overheals
-    (the existing `overheal` field carries it). Multiple matching entries sum.
+  - **Full-health bonus** (`fullHealthBonuses` — full-health-threshold shape):
+    on a completed cast of a matching `spellId`, adds `bonusHeal` when the
+    target's **pre-heal** HP is at least `hpPctAtLeast` percent of maxHp —
+    checked as `target.hp * 100 >= hpPctAtLeast * target.maxHp` (integer-safe,
+    no floats), **inclusive** at the threshold. A full-HP target qualifies:
+    the bonus applies even when the whole heal overheals (the existing
+    `overheal` field carries it). Multiple matching entries sum. Wave 6 J25:
+    Steady Hands left this hook for `missingHealthPctBonus` (10%/band); no
+    live tree node emits `fullHealthBonus` today, but the engine rule remains.
     Note ≥80% implies ≤2 missing-health bands, so in practice this rule and
     big pct-bonus payoffs are near-mutually exclusive — but both are computed
     independently and can land on the same heal (e.g. an 85% target: bands = 1

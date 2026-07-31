@@ -1313,7 +1313,7 @@ describe('parity with buildLoadout', () => {
       'bonusMaxMana',
       'bonusMaxMana',
       'grantSpell',
-      'fullHealthBonus',
+      'missingHealthPctBonus',
     ]);
   });
 
@@ -1366,14 +1366,14 @@ describe('parity with buildLoadout', () => {
     expect(mods.missingHealthPctBonuses).toEqual([{ spellId: 'solemn-vigil', pctPer10PctMissing: 5 }]);
   });
 
-  it('resolveCombatMods emits fullHealthBonus for a purchased Steady Hands', () => {
+  it('resolveCombatMods emits missingHealthPctBonus for a purchased Steady Hands', () => {
     const state = treeStateFromLegacy(
       { 'deep-reserves': 1, 'zealot-oath': 1, 'zealot-steady-hands': 1 },
       0,
     );
     const mods = combatModsFromTree(state, ['zealous-mending']);
-    expect(mods.fullHealthBonuses).toEqual([
-      { spellId: 'zealous-mending', hpPctAtLeast: 80, bonusHeal: 2 },
+    expect(mods.missingHealthPctBonuses).toEqual([
+      { spellId: 'zealous-mending', pctPer10PctMissing: 10 },
     ]);
   });
 
