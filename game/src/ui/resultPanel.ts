@@ -14,6 +14,7 @@ import Phaser from 'phaser';
 import { addButton } from './panels';
 import { KEYCAP_FRAME_TEXTURE_KEY } from './spellSprites';
 import { FONT, FONT_SIZE_SM, FONT_SIZE_XS, PALETTE, PALETTE_NUM } from './theme';
+import { buildLevelUpDeltas } from './levelUpDeltas';
 
 export const OVERLAY_DEPTH = 1000;
 export const OVERLAY_ALPHA = 0.85;
@@ -21,6 +22,21 @@ export const OVERLAY_FADE_MS = 300;
 
 export const PANEL_WIDTH = 420;
 export const PANEL_HEIGHT = 280;
+/**
+ * When HP/mana delta lines are shown under the level label, the three items
+ * shift up so they clear the XP line at -28. Gaps are ~2px — intentionally
+ * compact per spec ("compact formatting OK"). Panel height is unchanged (280).
+ */
+/** Y from centerY for the "Level N → M" label when delta lines accompany it. */
+export const LEVEL_UP_DELTA_Y_OFFSET = -72;
+/** Y from centerY for the HP delta line. */
+export const HP_DELTA_Y_OFFSET = -58;
+/** Y from centerY for the mana/regen delta line. */
+export const MANA_DELTA_Y_OFFSET = -44;
+/** Reveal delays for HP and mana delta lines (staggered after the level label). */
+export const HP_DELTA_DELAY_MS = 760;
+export const MANA_DELTA_DELAY_MS = 780;
+export const DELTA_REVEAL_MS = 200;
 export const PANEL_SLIDE_OFFSET = 50;
 export const PANEL_SLIDE_DELAY_MS = 120;
 export const PANEL_SLIDE_MS = 500;
@@ -93,6 +109,69 @@ export function mountDamageList(scene: Phaser.Scene, opts: MountDamageListOption
     .setDepth(depth)
     .setAlpha(0);
   scene.tweens.add({ targets: text, alpha: 1, delay: DAMAGE_DELAY_MS, duration: DAMAGE_REVEAL_MS });
+}
+
+export interface MountLevelUpDeltasOptions {
+  centerX: number;
+  centerY: number;
+  depth: number;
+  levelBefore: number;
+  levelAfter: number;
+  /** Non-null "Level N → M" label — only call when leveledUp is true. */
+  levelUpLabel: string;
+}
+
+/**
+ * Renders the level-up section on the result overlay: "Level N → M" label
+ * (at `LEVEL_UP_DELTA_Y_OFFSET`) followed by compact HP-gain and mana/regen
+ * lines. Replaces the ad-hoc level label in CombatScene — call this instead
+ * of rendering lvlText inline.
+ *
+ * Positions are chosen to clear the title at centerY−80 (gap ~14px above)
+ * and the XP line at centerY−28 (gap ~2px below), fitting within the
+ * unmodified 280px panel.
+ */
+export function mountLevelUpDeltas(scene: Phaser.Scene, opts: MountLevelUpDeltasOptions): void {
+  const { centerX, centerY, depth, levelBefore, levelAfter, levelUpLabel } = opts;
+
+  const lvlText = scene.add
+    .text(centerX, centerY + LEVEL_UP_DELTA_Y_OFFSET, levelUpLabel, {
+      fontFamily: FONT,
+      fontSize: FONT_SIZE_XS,
+      color: '#a89888',
+    })
+    .setOrigin(0.5)
+    .setDepth(depth)
+    .setAlpha(0);
+  scene.tweens.add({ targets: lvlText, alpha: 1, delay: LEVEL_UP_DELAY_MS, duration: LEVEL_UP_REVEAL_MS });
+
+  const { hpLine, manaLine } = buildLevelUpDeltas(levelBefore, levelAfter);
+
+  if (hpLine !== 'HP') {
+    const hpText = scene.add
+      .text(centerX, centerY + HP_DELTA_Y_OFFSET, hpLine, {
+        fontFamily: FONT,
+        fontSize: FONT_SIZE_XS,
+        color: PALETTE.health,
+      })
+      .setOrigin(0.5)
+      .setDepth(depth)
+      .setAlpha(0);
+    scene.tweens.add({ targets: hpText, alpha: 1, delay: HP_DELTA_DELAY_MS, duration: DELTA_REVEAL_MS });
+  }
+
+  if (manaLine) {
+    const manaText = scene.add
+      .text(centerX, centerY + MANA_DELTA_Y_OFFSET, manaLine, {
+        fontFamily: FONT,
+        fontSize: FONT_SIZE_XS,
+        color: PALETTE.mana,
+      })
+      .setOrigin(0.5)
+      .setDepth(depth)
+      .setAlpha(0);
+    scene.tweens.add({ targets: manaText, alpha: 1, delay: MANA_DELTA_DELAY_MS, duration: DELTA_REVEAL_MS });
+  }
 }
 
 /** Single-fire wrapper so click + Space share one dismiss path. */
