@@ -141,6 +141,17 @@ export interface DungeonRewardsDef {
   xpPerEnemy: number;
 }
 
+/**
+ * Headless playtest curve baked from `npm run content -- playtest`.
+ * `god` = first clear level for the GCD-perfect bot; `basic` = first clear
+ * for the random-heal bot. Hub shows `Lv god–basic`. `null` = neither (or
+ * not both) cleared within the sweep cap — leave unset until re-measured.
+ */
+export interface PlaytestLevelRangeDef {
+  god: number;
+  basic: number;
+}
+
 /** Authoring form: unlike EncounterDef, the final boss is an ordinary ordered wave. */
 export interface DungeonDef {
   id: string;
@@ -150,6 +161,8 @@ export interface DungeonDef {
   rewards: DungeonRewardsDef;
   visualKey: string;
   waves: readonly DungeonWaveDef[];
+  /** Optional; Hub omits the level range when absent/null. */
+  playtestLevelRange?: PlaytestLevelRangeDef | null;
 }
 
 export interface ContentCatalogs {

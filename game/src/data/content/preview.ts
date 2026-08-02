@@ -23,6 +23,11 @@ export function formatDungeonPreview(
     }`,
     `Rewards: XP ${dungeon.rewards.xpPerEnemy}/enemy, relic offer on first clear`,
     `Visual: ${dungeon.visualKey}`,
+    `Playtest: ${
+      dungeon.playtestLevelRange
+        ? `Lv ${dungeon.playtestLevelRange.god}–${dungeon.playtestLevelRange.basic} (god–basic)`
+        : 'unmeasured'
+    }`,
   ];
 
   dungeon.waves.forEach((wave, waveIndex) => {

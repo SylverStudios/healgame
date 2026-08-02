@@ -9,6 +9,8 @@ export const ASH_GATE_DUNGEON = {
     xpPerEnemy: 1,
   },
   visualKey: 'ash-gate',
+  /** Headless playtest curve — regenerate via `npm run content -- playtest`. */
+  playtestLevelRange: { god: 2, basic: 4 },
   waves: [
     { enemies: [{ mobId: 'ash-husk', count: 2 }] },
     { enemies: [{ mobId: 'ash-husk', count: 3 }] },

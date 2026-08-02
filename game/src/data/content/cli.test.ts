@@ -64,6 +64,21 @@ describe('content CLI', () => {
     }
   });
 
+  it('runs the headless playtest curve for a dungeon and for --all', () => {
+    const sample = ORDERED_DUNGEONS[0]!;
+    const one = runContent('playtest', sample.id);
+    expect(one.status).toBe(0);
+    expect(one.stdout).toContain(`${sample.name} [${sample.id}]`);
+    expect(one.stdout).toContain('god');
+    expect(one.stdout).toContain('basic');
+
+    const all = runContent('playtest');
+    expect(all.status).toBe(0);
+    for (const dungeon of ORDERED_DUNGEONS) {
+      expect(all.stdout).toContain(`[${dungeon.id}]`);
+    }
+  });
+
   it('exits nonzero for bad arguments and unknown dungeon ids', () => {
     const missingArgument = runContent('preview');
     expect(missingArgument.status).toBe(1);
@@ -76,5 +91,9 @@ describe('content CLI', () => {
     const unknownBalance = runContent('balance', 'missing-dungeon');
     expect(unknownBalance.status).toBe(1);
     expect(unknownBalance.stderr).toContain('Cannot balance unknown dungeon "missing-dungeon"');
+
+    const unknownPlaytest = runContent('playtest', 'missing-dungeon');
+    expect(unknownPlaytest.status).toBe(1);
+    expect(unknownPlaytest.stderr).toContain('Cannot playtest unknown dungeon "missing-dungeon"');
   });
 });

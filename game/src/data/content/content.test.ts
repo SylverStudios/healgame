@@ -293,6 +293,7 @@ describe('live dungeon content', () => {
         'Unlock: clear gloam-sanctum',
         'Rewards: XP 3/enemy, relic offer on first clear',
         'Visual: the-maw',
+        'Playtest: unmeasured',
         'Wave 1:',
         '  2x Hollow Husk [hollow-husk] — HP 6, auto 2/3000ms, boss no, overrides hp=6',
         '    Ability: Lesser Extinction [extinction-lesser] partyAoE — cast 8000ms, first 4000ms, interval 12000ms, party damage 4',

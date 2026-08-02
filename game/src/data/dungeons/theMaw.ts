@@ -9,6 +9,8 @@ export const THE_MAW_DUNGEON = {
     xpPerEnemy: 3,
   },
   visualKey: 'the-maw',
+  /** Intentionally unwinnable — no playtest clear level. */
+  playtestLevelRange: null,
   waves: [
     {
       enemies: [

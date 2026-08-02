@@ -10,6 +10,29 @@ enforced by automated gates. Later Alpha sections below amend the baseline
 
 ---
 
+# Headless balance playtest curve (2026-07-31)
+
+Status: current · Last verified: 2026-07-31
+
+1. **Harness** — `game/src/playtest/` drives `CombatEngine` headlessly (no Phaser /
+   animations). `npm run content -- playtest` sweeps player levels with two
+   rule bots on **cards mode** kits (chips + secondary upgrades + chosen CDs).
+2. **Basic bot** — random affordable heal, injured-target triage, idle gap
+   between casts (overheals freely); simple chip plan (Graven/Heavy, etc.).
+   **God bot** — queues to never waste GCD, Bonk filler, never overheals against
+   *effective* heal, efficiency unless emergency HP% then HPS; **combo-aware**
+   (Mend→Heal arming, armed synergy scoring); on wipe prefers throughput (mana
+   left) or efficiency (OOM), retries once, then levels up. Chip picks are
+   authored in `playtest/loadouts.ts` (deterministic — chosen offline, not RNG).
+3. **Baked metadata** — `DungeonDef.playtestLevelRange: { god, basic } | null`.
+   Hub shows `Lv low–high` beside the dungeon title. Measured with chips on
+   the enemy-mechanics stack (max Lv20): Ash 2–4, Iron 5–7, Cinder 5–6,
+   Verdant 5–6, Choir 5–8, Gloam 7–9; Maw uncleared. Re-run after retunes.
+4. **Gates unchanged** — `combat/balanceBot.ts` + `balance.test.ts` remain the
+   difficulty-shape pins; playtest is the curve signal, not a gate replacement.
+
+---
+
 # Enemy mechanics — trash cast curriculum (2026-07-31)
 
 Status: current · Last verified: 2026-07-31

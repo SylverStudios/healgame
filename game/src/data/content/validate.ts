@@ -14,6 +14,22 @@ function isNonNegativeInteger(value: number): boolean {
   return Number.isInteger(value) && value >= 0;
 }
 
+function validatePlaytestLevelRange(
+  range: DungeonDef['playtestLevelRange'],
+  path: string,
+  error: (code: string, path: string, message: string) => void,
+): void {
+  if (range === undefined || range === null) return;
+  if (!isPositiveInteger(range.god)) {
+    error('invalid-positive-integer', `${path}.god`, 'god clear level must be a positive integer');
+  }
+  if (!isPositiveInteger(range.basic)) {
+    error('invalid-positive-integer', `${path}.basic`, 'basic clear level must be a positive integer');
+  }
+  // god > basic is allowed (a signal the "skillful" kit underperformed the
+  // simple kit for these bots). Hub formats min–max for the difficulty band.
+}
+
 function diagnostic(
   severity: ContentDiagnostic['severity'],
   code: string,
@@ -224,6 +240,7 @@ export function validateContent(catalogs: ContentCatalogs): ContentValidationRes
         'xpPerEnemy must be a non-negative integer',
       );
     }
+    validatePlaytestLevelRange(dungeon.playtestLevelRange, `${path}.playtestLevelRange`, error);
     checkVisualKey(dungeon.visualKey, `${path}.visualKey`);
     if (dungeon.unlock.kind === 'dungeonClear') {
       const target = dungeonById.get(dungeon.unlock.dungeonId);

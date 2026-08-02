@@ -27,6 +27,8 @@ source of truth.
    npm run content -- preview --all
    npm run content -- balance <dungeon-id>   # maxed-kit disciplined bots
    npm run content -- balance --all
+   npm run content -- playtest              # headless god/basic level curve
+   npm run content -- playtest <dungeon-id>
    npm run verify:fast
    # Run full `npm run verify` when progression, scenes, or journey targets change.
    ```
@@ -36,6 +38,12 @@ a mob's base profile. Preview output always prints effective values and calls
 out overrides. `balance` runs the shared disciplined bots from
 `combat/balanceBot.ts` (same harness as `balance.test.ts`) so you can tune
 before pinning gates.
+
+`playtest` runs the headless cards-kit curve in `src/playtest/`: a basic bot
+(random heals + idle gaps, simple chips) and a god-gamer bot (GCD-perfect,
+combo-aware mend→heal, chips + secondaries + chosen CDs). Bake the resulting
+`playtestLevelRange: { god, basic }` onto each dungeon and the Hub shows
+`Lv god–basic` beside the title. Re-run after retunes and update the field.
 
 Dungeon reward data contains only `xpPerEnemy`. Every kill pays that XP even
 when the party later wipes. Rates scale by dungeon tier (Ash Gate 1, Iron
