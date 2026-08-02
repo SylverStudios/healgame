@@ -80,15 +80,15 @@ describe('applyCombatResult', () => {
   ])('queues three deterministic relic offers on the first %s clear', (encounterId) => {
     const priorById: Record<string, string[]> = {
       'ash-gate': [],
-      'iron-pass': ['ash-gate'],
-      'cinder-vault': ['ash-gate', 'iron-pass'],
-      'verdant-rift': ['ash-gate', 'iron-pass', 'cinder-vault'],
-      'black-choir': ['ash-gate', 'iron-pass', 'cinder-vault', 'verdant-rift'],
-      'gloam-sanctum': ['ash-gate', 'iron-pass', 'cinder-vault', 'verdant-rift', 'black-choir'],
+      'cinder-vault': ['ash-gate'],
+      'iron-pass': ['ash-gate', 'cinder-vault'],
+      'verdant-rift': ['ash-gate', 'cinder-vault', 'iron-pass'],
+      'black-choir': ['ash-gate', 'cinder-vault', 'iron-pass', 'verdant-rift'],
+      'gloam-sanctum': ['ash-gate', 'cinder-vault', 'iron-pass', 'verdant-rift', 'black-choir'],
       'the-maw': [
         'ash-gate',
-        'iron-pass',
         'cinder-vault',
+        'iron-pass',
         'verdant-rift',
         'black-choir',
         'gloam-sanctum',
@@ -524,8 +524,9 @@ describe('isIronPassUnlocked', () => {
     expect(isIronPassUnlocked(save())).toBe(false);
   });
 
-  it('is true once ash-gate has been cleared', () => {
-    expect(isIronPassUnlocked(save({ clearedDungeons: ['ash-gate'] }))).toBe(true);
+  it('is true once cinder-vault has been cleared (iron-pass now unlocks after cinder-vault)', () => {
+    expect(isIronPassUnlocked(save({ clearedDungeons: ['ash-gate'] }))).toBe(false);
+    expect(isIronPassUnlocked(save({ clearedDungeons: ['ash-gate', 'cinder-vault'] }))).toBe(true);
   });
 });
 
@@ -610,13 +611,14 @@ describe('isDungeonUnlocked', () => {
     expect(isDungeonUnlocked(fresh, 'black-choir')).toBe(false);
     expect(isDungeonUnlocked(fresh, 'gloam-sanctum')).toBe(false);
     expect(isDungeonUnlocked(fresh, 'the-maw')).toBe(false);
-    expect(isDungeonUnlocked(save({ clearedDungeons: ['ash-gate'] }), 'iron-pass')).toBe(true);
+    expect(isDungeonUnlocked(save({ clearedDungeons: ['ash-gate'] }), 'cinder-vault')).toBe(true);
+    expect(isDungeonUnlocked(save({ clearedDungeons: ['ash-gate'] }), 'iron-pass')).toBe(false);
     expect(isDungeonUnlocked(save({ clearedDungeons: ['ash-gate'] }), 'the-maw')).toBe(false);
     expect(
-      isDungeonUnlocked(save({ clearedDungeons: ['ash-gate', 'iron-pass'] }), 'cinder-vault'),
+      isDungeonUnlocked(save({ clearedDungeons: ['ash-gate', 'cinder-vault'] }), 'iron-pass'),
     ).toBe(true);
     expect(
-      isDungeonUnlocked(save({ clearedDungeons: ['ash-gate', 'iron-pass', 'cinder-vault'] }), 'verdant-rift'),
+      isDungeonUnlocked(save({ clearedDungeons: ['ash-gate', 'cinder-vault', 'iron-pass'] }), 'verdant-rift'),
     ).toBe(true);
     expect(
       isDungeonUnlocked(save({ clearedDungeons: ['ash-gate', 'iron-pass'] }), 'the-maw'),
@@ -662,10 +664,10 @@ describe('currentChallengeDungeon', () => {
   });
 
   it('advances to the next unlocked uncleared dungeon', () => {
-    expect(currentChallengeDungeon(save({ clearedDungeons: ['ash-gate'] }))?.id).toBe('iron-pass');
+    expect(currentChallengeDungeon(save({ clearedDungeons: ['ash-gate'] }))?.id).toBe('cinder-vault');
     expect(
-      currentChallengeDungeon(save({ clearedDungeons: ['ash-gate', 'iron-pass'] }))?.id,
-    ).toBe('cinder-vault');
+      currentChallengeDungeon(save({ clearedDungeons: ['ash-gate', 'cinder-vault'] }))?.id,
+    ).toBe('iron-pass');
   });
 
   it('is null when the full progression is cleared', () => {

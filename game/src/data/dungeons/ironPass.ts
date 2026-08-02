@@ -3,8 +3,8 @@ import type { DungeonDef } from '../content/types';
 export const IRON_PASS_DUNGEON = {
   id: 'iron-pass',
   name: 'Iron Pass',
-  order: 2,
-  unlock: { kind: 'dungeonClear', dungeonId: 'ash-gate' },
+  order: 3,
+  unlock: { kind: 'dungeonClear', dungeonId: 'cinder-vault' },
   rewards: {
     xpPerEnemy: 1,
   },

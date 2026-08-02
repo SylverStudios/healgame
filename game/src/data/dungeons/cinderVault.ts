@@ -1,11 +1,11 @@
 import type { DungeonDef } from '../content/types';
 
-/** Dungeon 3 — hard but clearable with a maxed current kit (Emberfall DoT). */
+/** Dungeon 2 — hard but clearable with a maxed current kit (Emberfall DoT). */
 export const CINDER_VAULT_DUNGEON = {
   id: 'cinder-vault',
   name: 'Cinder Vault',
-  order: 3,
-  unlock: { kind: 'dungeonClear', dungeonId: 'iron-pass' },
+  order: 2,
+  unlock: { kind: 'dungeonClear', dungeonId: 'ash-gate' },
   rewards: {
     xpPerEnemy: 1,
   },
