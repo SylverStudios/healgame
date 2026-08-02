@@ -332,6 +332,15 @@ export interface CombatState {
    * all stacks clear. 0 when no stacks are active.
    */
   bonkHealStacks: number;
+  /**
+   * Secondary progress for combat HUD (v1 playtest UI).
+   * Present only when the corresponding threshold is enabled.
+   * remaining casts/dmg until next proc = n - carry.
+   */
+  secondaries?: {
+    crit?: { n: number; carry: number };
+    block?: { n: number; carry: number };
+  };
 }
 
 /**

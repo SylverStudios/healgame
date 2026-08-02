@@ -456,6 +456,19 @@ export class CombatEngine {
       nextSpellManaReduction: this.nextSpellManaReduction,
       nextHealPotencyPct: this.nextHealPotencyPct,
       bonkHealStacks: this.bonkHealStackCount,
+      ...this.buildSecondaries(),
+    };
+  }
+
+  private buildSecondaries(): Pick<import('./types').CombatState, 'secondaries'> {
+    const hasCrit = this.critThresholdN !== undefined;
+    const hasBlock = this.blockThresholdN !== undefined;
+    if (!hasCrit && !hasBlock) return {};
+    return {
+      secondaries: {
+        ...(hasCrit ? { crit: { n: this.critThresholdN!, carry: this.critCastCarry } } : {}),
+        ...(hasBlock ? { block: { n: this.blockThresholdN!, carry: this.blockDamageCarry } } : {}),
+      },
     };
   }
 

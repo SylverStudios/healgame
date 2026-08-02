@@ -458,6 +458,11 @@ and compiles the ordered dungeon catalog into the engine's resolved
   `damage` events carry `crit?: boolean` when it procs. Undefined
   `critThresholdN` = disabled (default). **No RNG** — same purity model as
   tank block.
+- **Secondaries HUD** (v1 playtest UI): `CombatState.secondaries` exposes the
+  live carry values for the HUD without changing carry math. Present only when
+  the corresponding threshold is enabled: `secondaries.crit = { n, carry }` and
+  `secondaries.block = { n, carry }`. Omitted entirely when neither threshold is
+  set. `remaining = n - carry` gives casts/damage until the next proc.
 
 ## Balance bots vs headless playtest
 
