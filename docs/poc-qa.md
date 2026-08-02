@@ -10,6 +10,30 @@ enforced by automated gates. Later Alpha sections below amend the baseline
 
 ---
 
+# Playtest UI + dungeon order (2026-08-02)
+
+Status: current · Last verified: 2026-08-02
+
+Readability + light mid-game balance after player/enemy mechanics ships.
+Handoff: [`v1-playtest-ui-balance-handoff.md`](./v1-playtest-ui-balance-handoff.md).
+
+1. **Crit/block HUD** — `CombatState.secondaries` exposes `{n, carry}`; UI
+   shows remaining (`n - carry`) on healer (crit) and tank (block). Floats on
+   `crit` / `blocked` events. Haste/regen stay picker-only (no combat chrome).
+2. **Upgrade picker** — current → next via `blockThreshold` / `critThreshold` /
+   `hastePermille` / `manaRegenFromRank`. Block copy = post-armor **damage**,
+   not hits.
+3. **Results** — `engine.damageDealt` (party order) → `CombatResult.partyDamage`
+   → compact overlay list. Damage done only this slice.
+4. **Level-up** — result overlay shows per-role HP deltas + healer mana pool
+   (+ regen note when a `LEVEL_MANA` threshold is crossed).
+5. **Order** — `DUNGEON_ORDER`: ash-gate → cinder-vault → iron-pass → … .
+   Unlocks: Cinder←Ash, Iron←Cinder, Verdant←Iron.
+6. **Cinder ease** — Ember Colossus HP 240→170 (autoDamage 3→4). Baked
+   playtest: Ash 2–4, **Cinder 4–5**, Iron 6–9. Crown balance gates green.
+
+---
+
 # Headless balance playtest curve (2026-07-31)
 
 Status: current · Last verified: 2026-07-31

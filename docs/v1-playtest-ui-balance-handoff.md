@@ -3,6 +3,9 @@
 Status: planning · Authority: this file wins for the playtest UI + light
 balance slice · Last verified: 2026-08-02
 
+Implementation complete on branch `v1/playtest-ui-balance` — checkboxes below
+track DoD; retire this handoff on ship-phase closeout after merge.
+
 Systems (player mechanics + enemy trash curriculum) are **shipped on main**.
 This handoff covers readability and a small mid-game order/tune pass after
 playtesting.
@@ -178,9 +181,9 @@ or parallel if ownership is clean.
 
 ## 7. Definition of done
 
-- [ ] Crit/block combat readability live when ranks > 0
-- [ ] Upgrade picker shows current→next for all four
-- [ ] Results show damage done per party character
-- [ ] Level-up shows HP + mana increases
-- [ ] Order Ash→Cinder→Iron; Cinder ~Lv 4–5; gates green
+- [x] Crit/block combat readability live when ranks > 0
+- [x] Upgrade picker shows current→next for all four
+- [x] Results show damage done per party character
+- [x] Level-up shows HP + mana increases
+- [x] Order Ash→Cinder→Iron; Cinder ~Lv 4–5; gates green
 - [ ] `npm run verify` green; PR with try-steps

@@ -1,9 +1,24 @@
 # Changelog — healgame
 
-Status: current · Authority: shipped-history summary (details in poc-qa) · Last verified: 2026-07-31
+Status: current · Authority: shipped-history summary (details in poc-qa) · Last verified: 2026-08-02
 
 Newest first. Numbers and rule detail live in `game/src/data/` and
 [`poc-qa.md`](./poc-qa.md) — this file is the short ship log.
+
+---
+
+## 2026-08-02 — Playtest UI + Ash→Cinder→Iron
+
+- **Secondary HUD** — crit casts-remaining on healer + CRIT float; block
+  damage-remaining on tank + BLOCK float (`CombatState.secondaries`).
+- **Upgrade picker** — current → next numbers for block/crit/haste/manaRegen
+  (block copy = damage points, not hits).
+- **Results** — party damage dealt list; on level-up, HP/mana deltas per role.
+- **Dungeon order** — Ash Gate → **Cinder Vault** → **Iron Pass** → …; unlock
+  graph updated. Cinder eased (Ember Colossus HP 240→170); playtest
+  **god≈4 / basic≈5**.
+
+Handoff: [`v1-playtest-ui-balance-handoff.md`](./v1-playtest-ui-balance-handoff.md).
 
 ---
 
