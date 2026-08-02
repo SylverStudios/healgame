@@ -1,6 +1,6 @@
 # Combat engine (Chunk 1)
 
-Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-07-31
+Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-08-02
 
 Pure, deterministic TypeScript. No Phaser, no wall-clock, no randomness — driven
 entirely by `advance(dtMs)`. Chunk 2 builds the Phaser view against exactly
@@ -29,6 +29,10 @@ engine.cancelCast(): void             // cancel active cast (+ any queue) and re
 engine.activateCooldown(cooldownId): void // off-GCD; see "Cooldowns" below
 engine.state: Readonly<CombatState>    // includes queuedSpellId when a one-slot queue is armed
 engine.rewards: { xp }                // accrued per kill, immediately, even on a later wipe
+engine.damageDealt: ReadonlyArray<{ unitId: string; amount: number }>
+  // Accumulated finalDamage dealt by each party member (tank, dps1, dps2, healer), in party
+  // order. Enemy sources are omitted. Always includes all four roles; 0 when no damage was
+  // dealt. Used by CombatScene to populate CombatResult.partyDamage for the result overlay.
 ```
 
 Data: `data/spells.ts` (`ALL_SPELLS`, sourced from `constants.ts`) and the

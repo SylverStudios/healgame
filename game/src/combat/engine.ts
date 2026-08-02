@@ -196,6 +196,8 @@ export class CombatEngine {
   private status: CombatStatus = 'running';
 
   private rewardsXp = 0;
+  /** Accumulated finalDamage dealt by each party member (sourceId) to any target. Enemy sources omitted. */
+  private readonly damageTallies = new Map<string, number>();
 
   /** Events produced synchronously by commands (castSpell), flushed on the next advance(). */
   private pending: CombatEvent[] = [];
@@ -305,6 +307,7 @@ export class CombatEngine {
     for (const u of this.party) {
       if (u.role === 'tank') this.swingTimers.set(u.id, this.mercSwingInterval('tank'));
       else if (u.role === 'dps') this.swingTimers.set(u.id, this.mercSwingInterval('dps'));
+      this.damageTallies.set(u.id, 0);
     }
 
     this.spawnWave(0);
@@ -474,6 +477,15 @@ export class CombatEngine {
 
   get rewards(): { xp: number } {
     return { xp: this.rewardsXp };
+  }
+
+  /**
+   * Accumulated finalDamage dealt by each party member this fight, in stable party order
+   * (tank, dps1, dps2, healer). Enemy sources are omitted. Always includes all four roles,
+   * even if their tally is 0.
+   */
+  get damageDealt(): ReadonlyArray<{ unitId: string; amount: number }> {
+    return this.party.map((u) => ({ unitId: u.id, amount: this.damageTallies.get(u.id) ?? 0 }));
   }
 
   // ---- internal: time stepping -------------------------------------------------
@@ -1015,6 +1027,9 @@ export class CombatEngine {
       finalDamage = Math.max(0, postArmorDamage - blocked);
     }
     target.hp = Math.max(0, target.hp - finalDamage);
+    if (finalDamage > 0 && this.damageTallies.has(sourceId)) {
+      this.damageTallies.set(sourceId, (this.damageTallies.get(sourceId) ?? 0) + finalDamage);
+    }
     events.push({
       type: 'damage',
       targetId: target.id,

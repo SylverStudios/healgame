@@ -45,6 +45,7 @@ import {
   PANEL_SLIDE_DELAY_MS, PANEL_SLIDE_MS, TITLE_DELAY_MS, TITLE_REVEAL_MS, XP_DELAY_MS, XP_REVEAL_MS,
   LEVEL_UP_DELAY_MS, LEVEL_UP_REVEAL_MS, GLYPH_DELAY_MS, GLYPH_REVEAL_MS, GLYPH_CELL, GLYPH_COLOR,
   mountResultReturn,
+  mountDamageList,
 } from '../ui/resultPanel';
 import { CombatLog } from '../ui/combatLog';
 import { FONT, FONT_SIZE_XS, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG } from '../ui/theme';
@@ -66,7 +67,7 @@ import { RunModsBar } from '../ui/runModsBar';
 import { ACTION_HOTKEY_LETTERS, MAX_ACTION_HOTKEYS, actionHotkeySlot } from '../ui/actionHotkeys';
 import type { CombatMods } from '../data/talentTree';
 import { beginRun, finalizeRun, recordPress, type PressSource } from '../telemetry';
-import { buildRunSummary, hasBuildGlyph } from '../ui/runSummary';
+import { buildRunSummary, hasBuildGlyph, formatPartyDamage } from '../ui/runSummary';
 import { drawBuildGlyph } from '../ui/buildGlyph';
 import { pickBanterLine, type BanterSpeaker, type BanterTrigger } from '../data/banter';
 import {
@@ -102,6 +103,8 @@ export interface CombatResult {
   encounterId: string;
   status: 'victory' | 'wipe';
   xp: number;
+  /** Party damage dealt this fight, in party order. Optional for back-compat. */
+  partyDamage?: Array<{ unitId: string; amount: number }>;
 }
 
 // ---- layout constants ------------------------------------------------------
@@ -1149,6 +1152,11 @@ export class CombatScene extends Phaser.Scene {
       this.tweens.add({ targets: lvlText, alpha: 1, delay: LEVEL_UP_DELAY_MS, duration: LEVEL_UP_REVEAL_MS });
     }
 
+    const dmgLabel = formatPartyDamage(this.engine.damageDealt, (id) => this.resolveUnitName(id));
+    if (dmgLabel) {
+      mountDamageList(this, { centerX, centerY, depth: OVERLAY_DEPTH + 2, label: dmgLabel });
+    }
+
     if (hasBuildGlyph(summary.glyph)) {
       const glyphLabel = this.add
         .text(centerX, centerY + 8, 'BUILD', { fontFamily: FONT, fontSize: FONT_SIZE_SM, color: '#a89888' })
@@ -1176,7 +1184,12 @@ export class CombatScene extends Phaser.Scene {
       centerY,
       depth: OVERLAY_DEPTH + 2,
       onReturn: () => {
-        const combatResult: CombatResult = { encounterId: this.sceneData.encounterId, status, xp };
+        const combatResult: CombatResult = {
+          encounterId: this.sceneData.encounterId,
+          status,
+          xp,
+          partyDamage: [...this.engine.damageDealt],
+        };
         fadeToScene(this, this.sceneData.returnTo, { combatResult });
       },
     });

@@ -20,7 +20,7 @@ export const OVERLAY_ALPHA = 0.85;
 export const OVERLAY_FADE_MS = 300;
 
 export const PANEL_WIDTH = 420;
-export const PANEL_HEIGHT = 260;
+export const PANEL_HEIGHT = 280;
 export const PANEL_SLIDE_OFFSET = 50;
 export const PANEL_SLIDE_DELAY_MS = 120;
 export const PANEL_SLIDE_MS = 500;
@@ -34,13 +34,17 @@ export const GLYPH_DELAY_MS = 860;
 export const GLYPH_REVEAL_MS = 240;
 export const GLYPH_CELL = 20;
 export const GLYPH_COLOR = 0xfff2df;
+export const DAMAGE_DELAY_MS = 790;
+export const DAMAGE_REVEAL_MS = 220;
+/** Y offset from panel centerY for the compact party-damage tally line. */
+export const DAMAGE_Y_OFFSET = -8;
 export const RETURN_DELAY_MS = 940;
 export const RETURN_REVEAL_MS = 220;
 
 export const RETURN_BUTTON_WIDTH = 180;
 export const RETURN_BUTTON_HEIGHT = 40;
 /** Y offset from panel center for the Return hit rect / chrome. */
-export const RETURN_BUTTON_Y_OFFSET = 105;
+export const RETURN_BUTTON_Y_OFFSET = 115;
 
 /**
  * Slightly wider than spellBar's 18×14 Shift chips so the three-char `Spc`
@@ -64,6 +68,31 @@ export function resultReturnKeycapPosition(
     x: buttonX - buttonWidth / 2 + KEYCAP_INSET + KEYCAP_WIDTH / 2,
     y: buttonY,
   };
+}
+
+export interface MountDamageListOptions {
+  centerX: number;
+  centerY: number;
+  depth: number;
+  label: string;
+}
+
+/**
+ * Renders a compact one-line party-damage tally below the XP line.
+ * Fades in after XP and level-up, before the build glyph.
+ */
+export function mountDamageList(scene: Phaser.Scene, opts: MountDamageListOptions): void {
+  const { centerX, centerY, depth, label } = opts;
+  const text = scene.add
+    .text(centerX, centerY + DAMAGE_Y_OFFSET, label, {
+      fontFamily: FONT,
+      fontSize: FONT_SIZE_XS,
+      color: '#a89888',
+    })
+    .setOrigin(0.5)
+    .setDepth(depth)
+    .setAlpha(0);
+  scene.tweens.add({ targets: text, alpha: 1, delay: DAMAGE_DELAY_MS, duration: DAMAGE_REVEAL_MS });
 }
 
 /** Single-fire wrapper so click + Space share one dismiss path. */
