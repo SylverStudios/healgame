@@ -186,6 +186,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
         tickMs: 1000,
         damagePerTick: 2,
       },
+      enrageAtMs: 90_000,
     },
   },
   {

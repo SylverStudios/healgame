@@ -52,6 +52,7 @@ function bareState(overrides: Partial<CombatState> = {}): CombatState {
     nextSpellManaReduction: 0,
     nextHealPotencyPct: 0,
     bonkHealStacks: 0,
+    enrageRemainingMs: null,
     ...overrides,
   };
 }

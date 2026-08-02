@@ -502,7 +502,7 @@ describe('resolveCombatMods', () => {
     );
     const virtue = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVirtue.id);
     expect(virtue?.damage).toBe((SPELLS.vowstrikeVirtue.damage ?? 0) + 1);
-    expect(SPELLS.vowstrikeVirtue.damage).toBe(5); // catalog untouched
+    expect(SPELLS.vowstrikeVirtue.damage).toBe(7); // catalog untouched
   });
 
   it('ampOwnedSpells skips spells not in the loadout', () => {
@@ -1096,7 +1096,7 @@ describe('oath × vowstrike twists (Alpha 0.2 §D5)', () => {
     const vengeance = mods.spells.find((sp) => sp.id === SPELLS.vowstrikeVengeance.id);
     expect(vengeance?.damage).toBe((SPELLS.vowstrikeVengeance.damage ?? 0) + 1);
     expect(vengeance?.mana).toBe(SPELLS.vowstrikeVengeance.mana);
-    expect(SPELLS.vowstrikeVengeance.damage).toBe(5); // catalog untouched
+    expect(SPELLS.vowstrikeVengeance.damage).toBe(7); // catalog untouched
   });
 
   it('no twist when aspect is absent', () => {

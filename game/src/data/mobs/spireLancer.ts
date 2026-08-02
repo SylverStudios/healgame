@@ -12,4 +12,9 @@ export const SPIRE_LANCER_MOB = {
   swingIntervalMs: 3_500,
   abilityIds: ['tunnel-vision'],
   visualKey: 'spire-lancer',
+  // Vowstrike teaching beat: players who only heal wipe here; weaving Vowstrike
+  // (6s CD at 7 dmg) shortens the boss phase enough to clear before enrage.
+  // 90_000ms chosen so the disciplined Zealot crown balance bot (~78s boss
+  // phase) clears with room to spare. Retune once playtest bots + UI land.
+  enrageAtMs: 90_000,
 } as const satisfies MobDef;

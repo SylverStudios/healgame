@@ -313,6 +313,6 @@ describe('loadoutFromCardSave chip application', () => {
     expect(mods.spells.find((s) => s.id === 'heal')?.castMs).toBe(2500); // 2000+500 (heal-heavy)
     expect(mods.spells.find((s) => s.id === 'mend')?.mana).toBe(0); // 1-1 (mend-penny)
     expect(mods.spells.find((s) => s.id === 'bonk')?.manaOnHit).toBe(1); // bonk-mana
-    expect(mods.spells.find((s) => s.id === 'vowstrike')?.damage).toBe(5); // 4+1 (vs-weight)
+    expect(mods.spells.find((s) => s.id === 'vowstrike')?.damage).toBe(7); // 6+1 (vs-weight)
   });
 });

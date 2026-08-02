@@ -131,13 +131,15 @@ describe('Cinder Vault difficulty shape (Dungeon 2)', () => {
     expect(run.partyDoTStarted).toBeGreaterThanOrEqual(3);
   });
 
-  it('the Vigil efficiency crown build also clears Cinder Vault (order-2); Emberfall fires at least 3 times', () => {
+  it('the Vigil efficiency crown build also clears Cinder Vault (order-2); Emberfall fires at least 2 times', () => {
     // Measured Devotion conserves mana at the cost of throughput; Cinder is
     // within reach — Iron Pass (order 3) is where efficiency wipes.
+    // Vowstrike DPS buff (dmg 5→7, CD 10s→6s) shortens the boss phase enough
+    // that only 2 Emberfalls land before the kill (was 3 pre-buff).
     const run = runBuildBot(CINDER_VAULT, VIGIL_EFFICIENCY_LOADOUT, 'disciplined');
     expect(run.status).toBe('victory');
     expect(run.survivors).toBeGreaterThanOrEqual(3);
-    expect(run.partyDoTStarted).toBeGreaterThanOrEqual(3);
+    expect(run.partyDoTStarted).toBeGreaterThanOrEqual(2);
   });
 
   it('a maxed Zealot crown build clears Cinder Vault with disciplined play', () => {

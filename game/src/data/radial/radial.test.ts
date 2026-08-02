@@ -448,7 +448,7 @@ describe('Ring 3 — offense-s2', () => {
     expect(ok).toBe(true);
     const mods = loadoutFromRadialSave(save);
     const vs = mods.spells.find((s) => s.id === 'vowstrike-absolution');
-    expect(vs?.cooldownMs).toBe(8_000); // 10s - 2s
+    expect(vs?.cooldownMs).toBe(4_000); // 6s - 2s
   });
 
   it('Crushing Blow (B) adds +2 damage to Vowstrike variants', () => {
@@ -457,7 +457,7 @@ describe('Ring 3 — offense-s2', () => {
     expect(ok).toBe(true);
     const mods = loadoutFromRadialSave(save);
     const vs = mods.spells.find((s) => s.id === 'vowstrike-absolution');
-    expect(vs?.damage).toBe(7); // 5 base + 2
+    expect(vs?.damage).toBe(9); // 7 base + 2
   });
 
   it('Crushing Blow (B) increases Blessed Bonk stack cap to 4', () => {

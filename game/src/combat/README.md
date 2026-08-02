@@ -478,6 +478,17 @@ and compiles the ordered dungeon catalog into the engine's resolved
   `npm run content -- playtest`; bake `playtestLevelRange` onto dungeon defs
   for Hub `Lv god–basic` labels. Complements gates; does not replace them.
 
+## Boss-phase hard enrage
+
+`BossDef.enrageAtMs?: number` — if present, the engine tracks
+`bossPhaseElapsedMs` starting from `spawnBoss()`. When elapsed ≥ enrageAtMs
+and the boss is still alive, the engine pushes `{ type: 'enrage', sourceId:
+boss.id }` then immediately `{ type: 'combatEnded', status: 'wipe' }` (no
+party deaths required). The deadline participates in `nextTimerBoundary()` so
+the wipe lands on the exact millisecond. `CombatState.enrageRemainingMs` is
+`null` during trash waves (boss not yet out) or when no enrageAtMs is set;
+once the boss spawns it counts down to 0.
+
 ## Determinism
 
 Simultaneous events resolve in a fixed priority each tick: **cooldown buff
@@ -493,18 +504,19 @@ focus tick (`tunnelVision` channel damage, if one landed this tick) → party
 DoT tick (`partyDoT`, if active) → merc autos (tank, dps1, dps2) →
 enemy/boss autos (spawn order) → enemy cast timers start a new
 telegraph/cast (ascending unit id; a caster's own `tunnelVision` channel
-blocks its next telegraph; a second global focus waits). `advance()` sub-steps to the next timer boundary — cooldown
+blocks its next telegraph; a second global focus waits) → **boss-phase enrage
+check** (if `enrageAtMs` set and elapsed ≥ deadline). `advance()` sub-steps to the next timer boundary — cooldown
 (`remainingCooldownMs`), buff-window (`manaCostReduction`'s
-`buffRemainingMs`), and **coyote (`coyoteRemainingMs`, while `dying`)**
-timers participate in that boundary calculation too, so a cooldown becoming
-ready, a buff window expiring, or a coyote window closing always lands on an
-exact sub-step — so the event log for a given command sequence is independent
-of how the caller chunks `dtMs`. The coyote-expiry step is placed
-deliberately *after* cast completion and the queued-cast fire: if a heal
-completes in the exact same tick a dying target's window would otherwise
-close, the heal resolves first (clearing `dying` via `unitSaved`), so the
-expiry check simply finds nothing left to finalize — the boundary is
-inclusive in the heal's favor. Commands issued between `advance()` calls
-(`castSpell` may emit `castStarted`; `cancelCast` may emit `castCancelled`;
-`activateCooldown` may emit `cooldownActivated`) are buffered and flushed at
-the start of the next `advance()`.
+`buffRemainingMs`), **coyote (`coyoteRemainingMs`, while `dying`)**, and
+**enrage deadline** timers participate in that boundary calculation too, so a
+cooldown becoming ready, a buff window expiring, a coyote window closing, or
+an enrage always lands on an exact sub-step — so the event log for a given
+command sequence is independent of how the caller chunks `dtMs`. The
+coyote-expiry step is placed deliberately *after* cast completion and the
+queued-cast fire: if a heal completes in the exact same tick a dying target's
+window would otherwise close, the heal resolves first (clearing `dying` via
+`unitSaved`), so the expiry check simply finds nothing left to finalize — the
+boundary is inclusive in the heal's favor. Commands issued between `advance()`
+calls (`castSpell` may emit `castStarted`; `cancelCast` may emit
+`castCancelled`; `activateCooldown` may emit `cooldownActivated`) are buffered
+and flushed at the start of the next `advance()`.

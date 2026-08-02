@@ -115,6 +115,11 @@ export interface MobDef {
   swingIntervalMs: number;
   abilityIds: readonly string[];
   visualKey: MobVisualKey;
+  /**
+   * Boss-phase hard enrage deadline in ms of boss-phase sim time. Bosses only;
+   * trash mobs must omit this field. Copied onto BossDef during compilation.
+   */
+  enrageAtMs?: number;
 }
 
 export interface MobStatOverrides {

@@ -199,6 +199,22 @@ export function validateContent(catalogs: ContentCatalogs): ContentValidationRes
         );
       }
     });
+    // enrageAtMs is boss-only.
+    if (mob.enrageAtMs !== undefined) {
+      if (mob.tags.includes('trash')) {
+        error(
+          'trash-enrage-unsupported',
+          `${path}.enrageAtMs`,
+          'enrageAtMs is only valid on boss mobs',
+        );
+      } else if (!isPositiveInteger(mob.enrageAtMs)) {
+        error(
+          'invalid-positive-integer',
+          `${path}.enrageAtMs`,
+          'enrageAtMs must be a positive integer',
+        );
+      }
+    }
     checkVisualKey(mob.visualKey, `${path}.visualKey`);
   });
 

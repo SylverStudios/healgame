@@ -33,9 +33,9 @@ describe('Vowstrike (damage + castBuff + personal CD)', () => {
       (e): e is Extract<CombatEvent, { type: 'damage' }> => e.type === 'damage',
     );
 
-    expect(damage?.amount).toBe(5);
+    expect(damage?.amount).toBe(7);
     expect(damage?.targetId).toBe(engine.state.enemies[0]!.id);
-    expect(engine.state.enemies[0]!.hp).toBe(enemyBefore - 5);
+    expect(engine.state.enemies[0]!.hp).toBe(enemyBefore - 7);
   });
 
   it('virtue arms nextSpellManaReduction for the following spell', () => {

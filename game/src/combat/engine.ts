@@ -194,6 +194,11 @@ export class CombatEngine {
 
   private waveIndex = 0;
   private status: CombatStatus = 'running';
+  /**
+   * Sim-time elapsed since the boss spawned. null until spawnBoss() runs.
+   * Only advances while the boss is alive and status is 'running' (via tick).
+   */
+  private bossPhaseElapsedMs: number | null = null;
 
   private rewardsXp = 0;
   /** Accumulated finalDamage dealt by each party member (sourceId) to any target. Enemy sources omitted. */
@@ -459,8 +464,15 @@ export class CombatEngine {
       nextSpellManaReduction: this.nextSpellManaReduction,
       nextHealPotencyPct: this.nextHealPotencyPct,
       bonkHealStacks: this.bonkHealStackCount,
+      enrageRemainingMs: this.computeEnrageRemainingMs(),
       ...this.buildSecondaries(),
     };
+  }
+
+  private computeEnrageRemainingMs(): number | null {
+    const enrageAtMs = this.encounter.boss.enrageAtMs;
+    if (enrageAtMs === undefined || this.bossPhaseElapsedMs === null) return null;
+    return Math.max(0, enrageAtMs - this.bossPhaseElapsedMs);
   }
 
   private buildSecondaries(): Pick<import('./types').CombatState, 'secondaries'> {
@@ -524,6 +536,15 @@ export class CombatEngine {
     for (const unit of this.party) {
       if (unit.dying && unit.coyoteRemainingMs !== undefined) min = Math.min(min, unit.coyoteRemainingMs);
     }
+    // Boss-phase hard enrage: include the deadline in sub-stepping so the wipe
+    // lands on the exact ms boundary, not one step later.
+    if (this.bossPhaseElapsedMs !== null && this.boss?.alive) {
+      const enrageAtMs = this.encounter.boss.enrageAtMs;
+      if (enrageAtMs !== undefined) {
+        const remaining = enrageAtMs - this.bossPhaseElapsedMs;
+        if (remaining > 0) min = Math.min(min, remaining);
+      }
+    }
     return min;
   }
 
@@ -531,6 +552,10 @@ export class CombatEngine {
   private tick(step: number, events: CombatEvent[]): void {
     if (this.playerCast) this.playerCast.remainingMs -= step;
     if (this.gcdRemainingMs > 0) this.gcdRemainingMs -= step;
+    // Boss-phase elapsed time ticks whenever the boss is alive and combat is running.
+    if (this.bossPhaseElapsedMs !== null && this.boss?.alive) {
+      this.bossPhaseElapsedMs += step;
+    }
     for (const [id, remaining] of this.swingTimers) this.swingTimers.set(id, remaining - step);
     for (const caster of this.casters.values()) {
       if (caster.castState) caster.castState.remainingMs -= step;
@@ -663,6 +688,10 @@ export class CombatEngine {
         }
         this.startEnemyCast(caster, events);
       }
+    }
+    // 9. Boss-phase hard enrage: wipe without requiring the party to be dead.
+    if (this.status === 'running') {
+      this.checkEnrage(events);
     }
   }
 
@@ -1363,6 +1392,7 @@ export class CombatEngine {
       alive: true,
     };
     this.boss = boss;
+    this.bossPhaseElapsedMs = 0;
     this.activeEnemies = [boss];
     this.enemyStats.set(b.id, {
       autoDamage: b.autoDamage,
@@ -1370,6 +1400,24 @@ export class CombatEngine {
     });
     this.swingTimers.set(b.id, b.swingIntervalMs);
     if (b.cast) this.registerCaster(b.id, b.cast);
+  }
+
+  /**
+   * Boss-phase hard enrage check. Fires only once per fight — once the boss
+   * dies or victory is set the check is skipped by the outer status guard.
+   * Does NOT require any party member to be dead: enrage is a standalone fail
+   * condition, not an extension of the wipe path.
+   */
+  private checkEnrage(events: CombatEvent[]): void {
+    const enrageAtMs = this.encounter.boss.enrageAtMs;
+    if (enrageAtMs === undefined) return;
+    if (this.bossPhaseElapsedMs === null) return;
+    if (!this.boss?.alive) return;
+    if (this.bossPhaseElapsedMs < enrageAtMs) return;
+    // Enrage fires: push the event then wipe via the existing wipe path.
+    events.push({ type: 'enrage', sourceId: this.boss.id });
+    this.status = 'wipe';
+    events.push({ type: 'combatEnded', status: 'wipe' });
   }
 
   private onEnemyDeath(unit: Unit, events: CombatEvent[]): void {

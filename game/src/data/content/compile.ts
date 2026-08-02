@@ -105,6 +105,7 @@ function compileValidatedDungeon(
       autoDamage: bossStats.autoDamage + floorDamage,
       swingIntervalMs: bossStats.swingIntervalMs,
       ...(cast === undefined ? {} : { cast }),
+      ...(bossMob.enrageAtMs !== undefined ? { enrageAtMs: bossMob.enrageAtMs } : {}),
     },
   };
 }
