@@ -173,7 +173,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
     boss: {
       id: 'spire-lancer',
       name: 'Spire Lancer',
-      hp: 340,
+      hp: 260,
       autoDamage: 10,
       swingIntervalMs: 3500,
       cast: {
@@ -186,7 +186,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
         tickMs: 1000,
         damagePerTick: 2,
       },
-      enrageAtMs: 90_000,
+      enrageAtMs: 58_000,
     },
   },
   {

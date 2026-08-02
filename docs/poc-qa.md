@@ -1266,3 +1266,48 @@ survivors, Emberfall fires 3× (fight shortened from 4 to 3 boss Emberfalls).
 Efficiency crown also clears Cinder (order 2 is within its range); Iron Pass
 efficiency still wipes at order-3 floor scaling. Gates tightened from the U6
 `partyDoTStarted ≥ 4` placeholder to `≥ 3` matching the actual shorter fight.
+
+---
+
+# Iron Pass enrage DPS-check — Spire Lancer retune (2026-08-02)
+
+Status: current · Last verified: 2026-08-02
+
+Vowstrike teaching beat: Iron Pass (order 3) now has a boss-phase enrage timer
+that forces DPS weaving. Players who only heal wipe; players who weave Vowstrike
+clear before enrage.
+
+**Tune** — `spire-lancer` mob (`game/src/data/mobs/spireLancer.ts`):
+- `hp`: 340 → 260 (shorter boss phase, merc DPS can get close alone)
+- `enrageAtMs`: 90_000 → 58_000ms (forces healer DPS contribution)
+
+**Balance gate matrix (disciplined bot, crown kits):**
+
+| Kit | Iron Pass result |
+|-----|-----------------|
+| VIGIL_LOADOUT (crown) | victory — survivors 4, 78.3s, focus 4, cds 1 |
+| ZEALOT_LOADOUT (crown) | victory — survivors 4, 88.0s, focus 5, cds 3 |
+| VIGIL_EFFICIENCY_LOADOUT | wipe (can't sustain tank at order-3 floor) |
+| VIGIL stripped (no vowstrike) | wipe (enrage — not enough DPS) |
+| ZEALOT stripped (no vowstrike) | wipe (enrage — not enough DPS) |
+
+Gates: 34/34 green (`balance.test.ts`). New gate added: "Vowstrike teaching
+beat: crown builds stripped of vowstrike wipe on enrage."
+
+**UI** — `game/src/ui/enrageCue.ts`: red/orange countdown "Enrage Xs" above
+boss HP bar (`enrageRemainingMs`); "ENRAGE!" float on `enrage` event. Wired
+in `CombatScene.ts` (+5 lines). Combat log line on enrage.
+
+**Bots** — `basicPlayer.ts`: weaves Vowstrike when party stable (no ally <40%
+HP) and off CD. `godPlayer.ts`: interleaves Vowstrike before non-urgent heals.
+
+**Measured playtest (headless, cards-mode kit):**
+
+| Dungeon | Before | After |
+|---------|--------|-------|
+| Iron Pass | god Lv5, basic Lv7 | god Lv6, basic Lv8 |
+| Black Choir | god Lv5, basic Lv8 | god Lv6, basic Lv7 |
+| Gloam Sanctum | god Lv7, basic Lv9 | god Lv6, basic Lv9 |
+
+(Black Choir / Gloam Sanctum shifted because `godPlayer.ts` now weaves
+Vowstrike more aggressively between heals.)

@@ -16,7 +16,7 @@ export const BLACK_CHOIR_DUNGEON = {
   },
   visualKey: 'black-choir',
   /** Headless playtest curve — regenerate via `npm run content -- playtest`. */
-  playtestLevelRange: { god: 5, basic: 8 },
+  playtestLevelRange: { god: 6, basic: 7 },
   waves: [
     { enemies: [{ mobId: 'choir-shade', count: 2 }] },
     { enemies: [{ mobId: 'choir-shade', count: 3 }] },

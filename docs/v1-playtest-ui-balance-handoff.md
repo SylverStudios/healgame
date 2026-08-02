@@ -187,3 +187,13 @@ or parallel if ownership is clean.
 - [x] Level-up shows HP + mana increases
 - [x] Order Ash→Cinder→Iron; Cinder ~Lv 4–5; gates green
 - [x] `npm run verify` green; PR with try-steps
+
+---
+
+## 8. Post-ship notes (Iron Pass DPS-check, 2026-08-02)
+
+- Spire Lancer: hp 340→260, enrageAtMs 90s→58s. Crown kits clear; heal-only
+  and efficiency wipe. Measured matrix in `poc-qa.md`.
+- `ui/enrageCue.ts`: countdown + enrage float; 5 wiring lines in CombatScene.
+- `basicPlayer.ts` + `godPlayer.ts`: weave Vowstrike between heals.
+- Playtest: Iron Pass god Lv6 / basic Lv8 (Black Choir / Gloam also shifted).

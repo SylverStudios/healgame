@@ -7,6 +7,21 @@ Newest first. Numbers and rule detail live in `game/src/data/` and
 
 ---
 
+## 2026-08-02 — Iron Pass enrage DPS-check (Vowstrike teaching)
+
+- **Spire Lancer retune** — hp 340→260, enrageAtMs 90s→58s; crowns weaving
+  Vowstrike clear before enrage; heal-only and efficiency builds wipe.
+- **Enrage countdown UI** — `ui/enrageCue.ts`: red/orange "Enrage Xs" above
+  boss HP; "ENRAGE!" float on `enrage` event; combat log line.
+- **Bots** — `basicPlayer.ts` and `godPlayer.ts` both weave Vowstrike between
+  heals; playtest: Iron Pass **god Lv6 / basic Lv8**.
+- **Balance gates** — 34/34 green; new gate: stripped-vowstrike builds wipe
+  on enrage.
+
+Handoff: [`v1-playtest-ui-balance-handoff.md`](./v1-playtest-ui-balance-handoff.md).
+
+---
+
 ## 2026-08-02 — Playtest UI + Ash→Cinder→Iron
 
 - **Secondary HUD** — crit casts-remaining on healer + CRIT float; block

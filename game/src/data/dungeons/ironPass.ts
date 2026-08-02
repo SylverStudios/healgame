@@ -10,7 +10,7 @@ export const IRON_PASS_DUNGEON = {
   },
   visualKey: 'iron-pass',
   /** Headless playtest curve — regenerate via `npm run content -- playtest`. */
-  playtestLevelRange: { god: 5, basic: 7 },
+  playtestLevelRange: { god: 6, basic: 8 },
   waves: [
     { enemies: [{ mobId: 'iron-husk', count: 2 }] },
     { enemies: [{ mobId: 'iron-husk', count: 3 }] },

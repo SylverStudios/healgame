@@ -121,6 +121,15 @@ describe('Iron Pass difficulty shape (alpha-0.1-handoff §D2/§D3, chunk 9a)', (
     expect(run.bossFocusStarted).toBeGreaterThanOrEqual(4);
     expect(run.cdActivations).toBeGreaterThanOrEqual(1);
   });
+
+  it('Vowstrike teaching beat: crown builds stripped of vowstrike wipe on enrage', () => {
+    // Players who only heal (no Vowstrike DPS) cannot kill the boss before the
+    // 58s boss-phase enrage. This is the explicit lesson Iron Pass teaches.
+    const vigilStripped = { ...VIGIL_LOADOUT, spells: VIGIL_LOADOUT.spells.filter((s) => !s.id.includes('vowstrike')) };
+    const zealotStripped = { ...ZEALOT_LOADOUT, spells: ZEALOT_LOADOUT.spells.filter((s) => !s.id.includes('vowstrike')) };
+    expect(runBuildBot(IRON_PASS, vigilStripped, 'disciplined').status).toBe('wipe');
+    expect(runBuildBot(IRON_PASS, zealotStripped, 'disciplined').status).toBe('wipe');
+  });
 });
 
 describe('Cinder Vault difficulty shape (Dungeon 2)', () => {
