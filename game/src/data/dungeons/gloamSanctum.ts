@@ -16,7 +16,7 @@ export const GLOAM_SANCTUM_DUNGEON = {
   },
   visualKey: 'gloam-sanctum',
   /** Headless playtest curve — regenerate via `npm run content -- playtest`. */
-  playtestLevelRange: { god: 7, basic: 9 },
+  playtestLevelRange: { god: 6, basic: 9 },
   waves: [
     { enemies: [{ mobId: 'gloam-wretch', count: 2 }] },
     { enemies: [{ mobId: 'gloam-wretch', count: 2 }] },

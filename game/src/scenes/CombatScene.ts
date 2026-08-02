@@ -43,8 +43,8 @@ import { addBanner, addPanel } from '../ui/panels';
 import {
   OVERLAY_DEPTH, OVERLAY_ALPHA, OVERLAY_FADE_MS, PANEL_WIDTH, PANEL_HEIGHT, PANEL_SLIDE_OFFSET,
   PANEL_SLIDE_DELAY_MS, PANEL_SLIDE_MS, TITLE_DELAY_MS, TITLE_REVEAL_MS, XP_DELAY_MS, XP_REVEAL_MS,
-  LEVEL_UP_DELAY_MS, LEVEL_UP_REVEAL_MS, GLYPH_DELAY_MS, GLYPH_REVEAL_MS, GLYPH_CELL, GLYPH_COLOR,
-  mountResultReturn,
+  GLYPH_DELAY_MS, GLYPH_REVEAL_MS, GLYPH_CELL, GLYPH_COLOR,
+  mountResultReturn, mountDamageList, mountLevelUpDeltas,
 } from '../ui/resultPanel';
 import { CombatLog } from '../ui/combatLog';
 import { FONT, FONT_SIZE_XS, FONT_SIZE_SM, FONT_SIZE_MD, FONT_SIZE_LG } from '../ui/theme';
@@ -66,7 +66,7 @@ import { RunModsBar } from '../ui/runModsBar';
 import { ACTION_HOTKEY_LETTERS, MAX_ACTION_HOTKEYS, actionHotkeySlot } from '../ui/actionHotkeys';
 import type { CombatMods } from '../data/talentTree';
 import { beginRun, finalizeRun, recordPress, type PressSource } from '../telemetry';
-import { buildRunSummary, hasBuildGlyph } from '../ui/runSummary';
+import { buildRunSummary, hasBuildGlyph, formatPartyDamage } from '../ui/runSummary';
 import { drawBuildGlyph } from '../ui/buildGlyph';
 import { pickBanterLine, type BanterSpeaker, type BanterTrigger } from '../data/banter';
 import {
@@ -82,6 +82,8 @@ import {
   emptyHealerCueHandles,
   type HealerCueHandles,
 } from '../ui/healerCues';
+import { syncSecondaryCues, emptySecondaryCueHandles, spawnCritFloat, spawnBlockFloat, type SecondaryCueHandles } from '../ui/secondaryCues';
+import { syncEnrageCue, emptyEnrageCueHandles, spawnEnrageFloat, type EnrageCueHandles } from '../ui/enrageCue';
 import { portraitTextureKey, revealResultPortrait } from '../ui/portraitSprites';
 import { chunkyWipeIn, fadeToScene } from '../ui/transitions';
 import { EnemyCastBars } from '../ui/enemyCastBars';
@@ -101,6 +103,8 @@ export interface CombatResult {
   encounterId: string;
   status: 'victory' | 'wipe';
   xp: number;
+  /** Party damage dealt this fight, in party order. Optional for back-compat. */
+  partyDamage?: Array<{ unitId: string; amount: number }>;
 }
 
 // ---- layout constants ------------------------------------------------------
@@ -239,6 +243,8 @@ export class CombatScene extends Phaser.Scene {
   private combatPaceTenths = 10;
   // Overhead healer cues (rune + Battle Mend + Blessed Bonk stacks); icon id backs the stack cue.
   private healerCues: HealerCueHandles = emptyHealerCueHandles();
+  private secondaryCues: SecondaryCueHandles = emptySecondaryCueHandles();
+  private enrageCue: EnrageCueHandles = emptyEnrageCueHandles();
   private bonkStackIconSpellId = 'bonk';
   /** Presentation-only DBZ-style aura: intensity from mana spent in the last 30s. */
   private manaAura: ManaSpendAura | null = null;
@@ -723,6 +729,8 @@ export class CombatScene extends Phaser.Scene {
           this.combatLog.push(
             `${this.formatTimestamp()} ${this.resolveUnitName(event.sourceId)} hits ${this.resolveUnitName(event.targetId)} -${event.amount}`,
           );
+          if (event.crit === true) { const _h = this.partySprites.get('healer'); if (_h) spawnCritFloat(this, _h); }
+          if ((event.blocked ?? 0) > 0) { const _t = this.partySprites.get('tank'); if (_t) spawnBlockFloat(this, _t); }
           break;
         }
         case 'heal': {
@@ -741,6 +749,7 @@ export class CombatScene extends Phaser.Scene {
           this.combatLog.push(
             `${this.formatTimestamp()} ${this.resolveSpellName(event.spellId)} heals ${this.resolveUnitName(event.targetId)} +${rawHeal}`,
           );
+          if (event.crit === true) { const _h = this.partySprites.get('healer'); if (_h) spawnCritFloat(this, _h); }
           break;
         }
         case 'castStarted': {
@@ -870,6 +879,7 @@ export class CombatScene extends Phaser.Scene {
           this.rebuildEnemies(this.engine.state.enemies);
           this.showWaveBanner(event.waveIndex);
           break;
+        case 'enrage': { const _b = this.bossUnitId(); if (_b) { const _bs = this.enemySprites.get(_b); if (_bs) spawnEnrageFloat(this, _bs); } this.combatLog.push(`${this.formatTimestamp()} ${this.encounter.boss.name} enrages!`); break; }
         case 'combatEnded':
           // A channel can be live when the fight ends (e.g. boss dies mid-
           // Tunnel-Vision) — the engine stops before emitting bossFocusEnded,
@@ -965,6 +975,7 @@ export class CombatScene extends Phaser.Scene {
     this.spellBar.updateSpellCooldowns(state.spellCooldowns);
     this.spellBar.setGcd(state.gcdRemainingMs, GCD_MS);
     this.syncHealerRune(state);
+    this.secondaryCues = syncSecondaryCues(this, this.secondaryCues, state, this.partySprites.get('healer'), this.partySprites.get('tank')); { const _bId = this.bossUnitId(); this.enrageCue = syncEnrageCue(this, this.enrageCue, state, _bId ? this.enemySprites.get(_bId) : null); }
     this.syncManaAura();
 
     this.waveText.setText(
@@ -1138,9 +1149,15 @@ export class CombatScene extends Phaser.Scene {
     this.tweens.add({ targets: xpText, alpha: 1, delay: XP_DELAY_MS, duration: XP_REVEAL_MS });
 
     if (summary.levelUpLabel !== null) {
-      const lvlText = this.add.text(centerX, centerY - 50, summary.levelUpLabel,
-        { fontFamily: FONT, fontSize: FONT_SIZE_XS, color: '#a89888' }).setOrigin(0.5).setDepth(OVERLAY_DEPTH + 2).setAlpha(0);
-      this.tweens.add({ targets: lvlText, alpha: 1, delay: LEVEL_UP_DELAY_MS, duration: LEVEL_UP_REVEAL_MS });
+      mountLevelUpDeltas(this, {
+        centerX, centerY, depth: OVERLAY_DEPTH + 2,
+        levelBefore: summary.levelBefore, levelAfter: summary.levelAfter, levelUpLabel: summary.levelUpLabel,
+      });
+    }
+
+    const dmgLabel = formatPartyDamage(this.engine.damageDealt, (id) => this.resolveUnitName(id));
+    if (dmgLabel) {
+      mountDamageList(this, { centerX, centerY, depth: OVERLAY_DEPTH + 2, label: dmgLabel });
     }
 
     if (hasBuildGlyph(summary.glyph)) {
@@ -1170,7 +1187,12 @@ export class CombatScene extends Phaser.Scene {
       centerY,
       depth: OVERLAY_DEPTH + 2,
       onReturn: () => {
-        const combatResult: CombatResult = { encounterId: this.sceneData.encounterId, status, xp };
+        const combatResult: CombatResult = {
+          encounterId: this.sceneData.encounterId,
+          status,
+          xp,
+          partyDamage: [...this.engine.damageDealt],
+        };
         fadeToScene(this, this.sceneData.returnTo, { combatResult });
       },
     });

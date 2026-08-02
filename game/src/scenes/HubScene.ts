@@ -194,7 +194,7 @@ export class HubScene extends Phaser.Scene {
             saveGame(save);
             this.scene.restart();
           }
-        });
+        }, save.secondaryRanks);
       } else {
         // M5: CD modal only appears after all upgrade picks are drained.
         const pending = pendingCooldownSet(save);

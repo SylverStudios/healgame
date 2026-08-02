@@ -63,6 +63,8 @@ export function createGodPlayer(loadout: CombatMods): PlaytestPlayer {
 
       maybeActivateCooldowns(engine, healer, target, heals, loadout, state, armedFreeHeal, ctx.bias);
 
+      const enemiesAlive = state.enemies.some((e) => e.alive);
+
       if (target) {
         // Setup: cast Mend first to arm mend→heal when the buffed Heal is worth it.
         if (
@@ -75,22 +77,31 @@ export function createGodPlayer(loadout: CombatMods): PlaytestPlayer {
 
         const spell = pickHeal(heals, healer, target, state, loadout, armedFreeHeal, ctx.bias);
         if (spell) {
+          const emergency = isEmergency(target);
+          // Interleave Vowstrike before a non-urgent heal (DPS-weaving lesson: deal damage
+          // when the party has HP headroom, then follow with the heal next GCD).
+          if (
+            !emergency &&
+            enemiesAlive &&
+            vowstrike &&
+            spellOffCd(vowstrike.id, state.spellCooldowns) &&
+            canAfford(healer, vowstrike)
+          ) {
+            engine.castSpell(vowstrike.id);
+            return;
+          }
           engine.setTarget(target.id);
           engine.castSpell(spell.id);
           return;
         }
       }
 
-      // Amp setup while stable: Vowstrike potency before a needed heal, else Bonk.
-      const enemiesAlive = state.enemies.some((e) => e.alive);
+      // Filler while party is topped: Vowstrike (higher damage, cooldown), then Bonk.
       if (
         enemiesAlive &&
         vowstrike &&
         spellOffCd(vowstrike.id, state.spellCooldowns) &&
-        canAfford(healer, vowstrike) &&
-        target &&
-        isEmergency(target) &&
-        state.nextHealPotencyPct === 0
+        canAfford(healer, vowstrike)
       ) {
         engine.castSpell(vowstrike.id);
         return;

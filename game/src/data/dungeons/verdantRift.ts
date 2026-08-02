@@ -1,14 +1,14 @@
 import type { DungeonDef } from '../content/types';
 
 /**
- * Dungeon 4 — proof add via catalog + balance harness. Harder than Cinder
- * Vault, still clearable with maxed current kits; unlocks Black Choir.
+ * Dungeon 4 — proof add via catalog + balance harness. Harder than Iron
+ * Pass, still clearable with maxed current kits; unlocks Black Choir.
  */
 export const VERDANT_RIFT_DUNGEON = {
   id: 'verdant-rift',
   name: 'Verdant Rift',
   order: 4,
-  unlock: { kind: 'dungeonClear', dungeonId: 'cinder-vault' },
+  unlock: { kind: 'dungeonClear', dungeonId: 'iron-pass' },
   rewards: {
     xpPerEnemy: 2,
   },

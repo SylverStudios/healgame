@@ -279,6 +279,11 @@ export type CombatEvent =
   /** Party members: only after an unsaved coyote window expires. Enemies/boss: instant, as before. */
   | { type: 'unitDied'; unitId: string }
   | { type: 'waveStarted'; waveIndex: number }
+  /**
+   * Boss-phase hard enrage fired. Emitted the same tick as `combatEnded`
+   * (status: wipe) — always appears before it in the event list.
+   */
+  | { type: 'enrage'; sourceId: string }
   | { type: 'combatEnded'; status: CombatStatus };
 
 export interface CombatState {
@@ -322,6 +327,12 @@ export interface CombatState {
   cooldowns: CooldownState[];
   /** Personal spell reuse timers (Vowstrike etc.), keyed by spell id. */
   spellCooldowns: Array<{ spellId: string; remainingMs: number }>;
+  /**
+   * Countdown to boss-phase hard enrage (ms), or null when there is no enrage
+   * on this encounter or the boss has not yet spawned. Reaches 0 the tick the
+   * enrage fires (the wipe lands that same tick).
+   */
+  enrageRemainingMs: number | null;
   /** Pending Absolution-style discount for the next cast start. */
   nextSpellManaReduction: number;
   /** Pending Reckoning-style potency for the next heal completion. */
@@ -332,6 +343,15 @@ export interface CombatState {
    * all stacks clear. 0 when no stacks are active.
    */
   bonkHealStacks: number;
+  /**
+   * Secondary progress for combat HUD (v1 playtest UI).
+   * Present only when the corresponding threshold is enabled.
+   * remaining casts/dmg until next proc = n - carry.
+   */
+  secondaries?: {
+    crit?: { n: number; carry: number };
+    block?: { n: number; carry: number };
+  };
 }
 
 /**
@@ -444,6 +464,12 @@ export interface BossDef {
   autoDamage: number;
   swingIntervalMs: number;
   cast?: EnemyCastDef;
+  /**
+   * Boss-phase hard enrage: if the boss is still alive after this many ms of
+   * boss-phase sim time, emit an `enrage` event then immediately end the fight
+   * as a wipe. Omit for no enrage. Trash waves never enrage.
+   */
+  enrageAtMs?: number;
 }
 
 export interface EncounterDef {

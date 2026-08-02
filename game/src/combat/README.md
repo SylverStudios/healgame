@@ -1,6 +1,6 @@
 # Combat engine (Chunk 1)
 
-Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-07-31
+Status: current · Authority: combat engine API + rule decisions · Last verified: 2026-08-02
 
 Pure, deterministic TypeScript. No Phaser, no wall-clock, no randomness — driven
 entirely by `advance(dtMs)`. Chunk 2 builds the Phaser view against exactly
@@ -29,6 +29,10 @@ engine.cancelCast(): void             // cancel active cast (+ any queue) and re
 engine.activateCooldown(cooldownId): void // off-GCD; see "Cooldowns" below
 engine.state: Readonly<CombatState>    // includes queuedSpellId when a one-slot queue is armed
 engine.rewards: { xp }                // accrued per kill, immediately, even on a later wipe
+engine.damageDealt: ReadonlyArray<{ unitId: string; amount: number }>
+  // Accumulated finalDamage dealt by each party member (tank, dps1, dps2, healer), in party
+  // order. Enemy sources are omitted. Always includes all four roles; 0 when no damage was
+  // dealt. Used by CombatScene to populate CombatResult.partyDamage for the result overlay.
 ```
 
 Data: `data/spells.ts` (`ALL_SPELLS`, sourced from `constants.ts`) and the
@@ -458,6 +462,11 @@ and compiles the ordered dungeon catalog into the engine's resolved
   `damage` events carry `crit?: boolean` when it procs. Undefined
   `critThresholdN` = disabled (default). **No RNG** — same purity model as
   tank block.
+- **Secondaries HUD** (v1 playtest UI): `CombatState.secondaries` exposes the
+  live carry values for the HUD without changing carry math. Present only when
+  the corresponding threshold is enabled: `secondaries.crit = { n, carry }` and
+  `secondaries.block = { n, carry }`. Omitted entirely when neither threshold is
+  set. `remaining = n - carry` gives casts/damage until the next proc.
 
 ## Balance bots vs headless playtest
 
@@ -468,6 +477,17 @@ and compiles the ordered dungeon catalog into the engine's resolved
   player level with basic + god-gamer rule bots. Run
   `npm run content -- playtest`; bake `playtestLevelRange` onto dungeon defs
   for Hub `Lv god–basic` labels. Complements gates; does not replace them.
+
+## Boss-phase hard enrage
+
+`BossDef.enrageAtMs?: number` — if present, the engine tracks
+`bossPhaseElapsedMs` starting from `spawnBoss()`. When elapsed ≥ enrageAtMs
+and the boss is still alive, the engine pushes `{ type: 'enrage', sourceId:
+boss.id }` then immediately `{ type: 'combatEnded', status: 'wipe' }` (no
+party deaths required). The deadline participates in `nextTimerBoundary()` so
+the wipe lands on the exact millisecond. `CombatState.enrageRemainingMs` is
+`null` during trash waves (boss not yet out) or when no enrageAtMs is set;
+once the boss spawns it counts down to 0.
 
 ## Determinism
 
@@ -484,18 +504,19 @@ focus tick (`tunnelVision` channel damage, if one landed this tick) → party
 DoT tick (`partyDoT`, if active) → merc autos (tank, dps1, dps2) →
 enemy/boss autos (spawn order) → enemy cast timers start a new
 telegraph/cast (ascending unit id; a caster's own `tunnelVision` channel
-blocks its next telegraph; a second global focus waits). `advance()` sub-steps to the next timer boundary — cooldown
+blocks its next telegraph; a second global focus waits) → **boss-phase enrage
+check** (if `enrageAtMs` set and elapsed ≥ deadline). `advance()` sub-steps to the next timer boundary — cooldown
 (`remainingCooldownMs`), buff-window (`manaCostReduction`'s
-`buffRemainingMs`), and **coyote (`coyoteRemainingMs`, while `dying`)**
-timers participate in that boundary calculation too, so a cooldown becoming
-ready, a buff window expiring, or a coyote window closing always lands on an
-exact sub-step — so the event log for a given command sequence is independent
-of how the caller chunks `dtMs`. The coyote-expiry step is placed
-deliberately *after* cast completion and the queued-cast fire: if a heal
-completes in the exact same tick a dying target's window would otherwise
-close, the heal resolves first (clearing `dying` via `unitSaved`), so the
-expiry check simply finds nothing left to finalize — the boundary is
-inclusive in the heal's favor. Commands issued between `advance()` calls
-(`castSpell` may emit `castStarted`; `cancelCast` may emit `castCancelled`;
-`activateCooldown` may emit `cooldownActivated`) are buffered and flushed at
-the start of the next `advance()`.
+`buffRemainingMs`), **coyote (`coyoteRemainingMs`, while `dying`)**, and
+**enrage deadline** timers participate in that boundary calculation too, so a
+cooldown becoming ready, a buff window expiring, a coyote window closing, or
+an enrage always lands on an exact sub-step — so the event log for a given
+command sequence is independent of how the caller chunks `dtMs`. The
+coyote-expiry step is placed deliberately *after* cast completion and the
+queued-cast fire: if a heal completes in the exact same tick a dying target's
+window would otherwise close, the heal resolves first (clearing `dying` via
+`unitSaved`), so the expiry check simply finds nothing left to finalize — the
+boundary is inclusive in the heal's favor. Commands issued between `advance()`
+calls (`castSpell` may emit `castStarted`; `cancelCast` may emit
+`castCancelled`; `activateCooldown` may emit `cooldownActivated`) are buffered
+and flushed at the start of the next `advance()`.

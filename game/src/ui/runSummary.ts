@@ -77,6 +77,21 @@ export function buildRunSummary(args: {
   };
 }
 
+/**
+ * Pure: compact damage-tally line for the result overlay.
+ * Calls `resolveName` for each entry; skips entries with amount 0.
+ * Returns an empty string when the array is empty or all amounts are 0.
+ */
+export function formatPartyDamage(
+  partyDamage: ReadonlyArray<{ unitId: string; amount: number }>,
+  resolveName: (unitId: string) => string,
+): string {
+  const parts = partyDamage
+    .filter(({ amount }) => amount > 0)
+    .map(({ unitId, amount }) => `${resolveName(unitId)} ${amount}`);
+  return parts.join('  ');
+}
+
 /** Pure: the persisted record for `pushRecentRun` — same glyph as the summary shown. */
 export function runRecordFromSummary(summary: RunSummaryViewModel, dungeonId: string): RunRecord {
   const glyph: SavedGlyph = {

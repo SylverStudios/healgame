@@ -14,7 +14,8 @@ import { validateContent } from './validate';
 // (FLOOR_ENEMY_DAMAGE = 2) to every trash + boss `autoDamage`. Cast ability
 // damage (Bonehowl/Extinction partyDamage, Tunnel Vision damagePerTick) is NOT
 // scaled. So compiled autos here = authored + floor: Ash Gate order 1 → +0
-// (baseline, unchanged), Iron Pass order 2 → +2, The Maw order 7 → +12.
+// (baseline, unchanged), Cinder Vault order 2 → +2, Iron Pass order 3 → +4,
+// The Maw order 7 → +12.
 const LEGACY_EQUIVALENT_ENCOUNTERS = [
   {
     id: 'ash-gate',
@@ -87,7 +88,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
             name: 'Iron Husk',
             hp: 13,
             count: 2,
-            autoDamage: 3,
+            autoDamage: 5,
             swingIntervalMs: 3000,
             cast: {
               kind: 'tunnelVision',
@@ -109,7 +110,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
             name: 'Iron Husk',
             hp: 13,
             count: 3,
-            autoDamage: 3,
+            autoDamage: 5,
             swingIntervalMs: 3000,
             cast: {
               kind: 'tunnelVision',
@@ -131,7 +132,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
             name: 'Iron Husk',
             hp: 14,
             count: 3,
-            autoDamage: 3,
+            autoDamage: 5,
             swingIntervalMs: 3000,
             cast: {
               kind: 'tunnelVision',
@@ -153,7 +154,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
             name: 'Iron Husk',
             hp: 14,
             count: 4,
-            autoDamage: 3,
+            autoDamage: 5,
             swingIntervalMs: 3000,
             cast: {
               kind: 'tunnelVision',
@@ -172,8 +173,8 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
     boss: {
       id: 'spire-lancer',
       name: 'Spire Lancer',
-      hp: 340,
-      autoDamage: 8,
+      hp: 260,
+      autoDamage: 10,
       swingIntervalMs: 3500,
       cast: {
         kind: 'tunnelVision',
@@ -185,6 +186,7 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
         tickMs: 1000,
         damagePerTick: 2,
       },
+      enrageAtMs: 58_000,
     },
   },
   {
@@ -245,15 +247,15 @@ describe('live dungeon content', () => {
     const all = compileAllDungeons(CONTENT_CATALOGS);
     expect(all.map((e) => e.id)).toEqual([
       'ash-gate',
-      'iron-pass',
       'cinder-vault',
+      'iron-pass',
       'verdant-rift',
       'black-choir',
       'gloam-sanctum',
       'the-maw',
     ]);
     expect(all[0]).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[0]);
-    expect(all[1]).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[1]);
+    expect(all[2]).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[1]);
     expect(all[6]).toEqual(LEGACY_EQUIVALENT_ENCOUNTERS[2]);
   });
 
@@ -266,8 +268,8 @@ describe('live dungeon content', () => {
     };
     expect(compileAllDungeons(reordered).map((e) => e.id)).toEqual([
       'ash-gate',
-      'iron-pass',
       'cinder-vault',
+      'iron-pass',
       'verdant-rift',
       'black-choir',
       'gloam-sanctum',

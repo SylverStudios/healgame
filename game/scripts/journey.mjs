@@ -398,28 +398,28 @@ try {
   check(save?.relicIds.includes('triage-bell'), 'relic choice survives a full reload without being re-offered');
   await shot(page, 'hub-relic-after-reload');
 
-  // ---- Stage D2: Ash Gate clear unlocks Iron Pass (not yet Cinder Vault / Maw) --------
-  console.log('Stage D2: Ash-Gate-cleared save → Iron Pass unlocked on hub, later dungeons still gated');
+  // ---- Stage D2: Ash Gate clear unlocks Cinder Vault (not yet Iron Pass / Maw) --------
+  console.log('Stage D2: Ash-Gate-cleared save → Cinder Vault unlocked on hub, later dungeons still gated');
   await seedSave(page, baseSave({ clearedDungeons: ['ash-gate'] }));
-  await waitForNamed(page, 'hubDungeon:iron-pass');
-  await shot(page, 'hub-iron-pass-unlocked'); // visual: Iron Pass button present, no Maw button below it
+  await waitForNamed(page, 'hubDungeon:cinder-vault');
+  await shot(page, 'hub-cinder-vault-unlocked'); // visual: Cinder Vault button present, no Maw button below it
 
   // Later dungeon buttons must not exist yet — locate is null (not an inert pixel click).
   check((await locate(page, 'hubDungeon:the-maw')) === null, 'The Maw button absent before Gloam Sanctum is cleared');
-  check((await locate(page, 'hubDungeon:cinder-vault')) === null, 'Cinder Vault absent before Iron Pass is cleared');
-  check((await locate(page, 'hubDungeon:iron-pass')) !== null, 'Iron Pass button present after Ash Gate clear');
+  check((await locate(page, 'hubDungeon:iron-pass')) === null, 'Iron Pass absent before Cinder Vault is cleared');
+  check((await locate(page, 'hubDungeon:cinder-vault')) !== null, 'Cinder Vault button present after Ash Gate clear');
 
-  await clickNamed(page, 'hubDungeon:iron-pass');
+  await clickNamed(page, 'hubDungeon:cinder-vault');
   await page.waitForTimeout(1200);
-  await shot(page, 'iron-pass-combat-entered'); // visual: Iron Pass encounter running (Iron Husk wave)
-  // No need to play this out live — Iron Pass's clearability is an engine-level
-  // gate (balance.test.ts gates 6/7). Reload to bail out without winning/wiping.
+  await shot(page, 'cinder-vault-combat-entered'); // visual: Cinder Vault encounter running (Cinder Wraith wave)
+  // No need to play this out live — Cinder Vault's clearability is an engine-level
+  // gate (balance.test.ts gates 9). Reload to bail out without winning/wiping.
   await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(800);
   save = await readSave(page);
   check(
-    save?.clearedDungeons?.length === 1 && !save.clearedDungeons.includes('iron-pass'),
-    'leaving Iron Pass mid-fight records neither a clear nor a wipe',
+    save?.clearedDungeons?.length === 1 && !save.clearedDungeons.includes('cinder-vault'),
+    'leaving Cinder Vault mid-fight records neither a clear nor a wipe',
   );
 
   // ---- Stage B: post-first-clear → tree graph → oath in-tree -----------------
@@ -619,10 +619,10 @@ try {
 
   // ---- Stage C: Maw gating — gated on Gloam Sanctum, still unwinnable -----
   console.log('Stage C: Maw gating — absent after Black Choir alone, present + unwinnable after Gloam Sanctum');
-  await seedSave(page, baseSave({ clearedDungeons: ['ash-gate', 'iron-pass'] }));
-  await waitForNamed(page, 'hubDungeon:cinder-vault');
-  check((await locate(page, 'hubDungeon:cinder-vault')) !== null, 'Cinder Vault present after Iron Pass clear');
-  check((await locate(page, 'hubDungeon:the-maw')) === null, 'The Maw still gated after Iron Pass alone');
+  await seedSave(page, baseSave({ clearedDungeons: ['ash-gate', 'cinder-vault'] }));
+  await waitForNamed(page, 'hubDungeon:iron-pass');
+  check((await locate(page, 'hubDungeon:iron-pass')) !== null, 'Iron Pass present after Cinder Vault clear');
+  check((await locate(page, 'hubDungeon:the-maw')) === null, 'The Maw still gated after Cinder Vault alone');
   await seedSave(
     page,
     baseSave({

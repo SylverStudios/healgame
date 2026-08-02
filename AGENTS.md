@@ -1,6 +1,6 @@
 # AGENTS.md — healgame documentation system
 
-Status: current · Authority: doc conventions for all agents · Last verified: 2026-07-31
+Status: current · Authority: doc conventions for all agents · Last verified: 2026-08-02
 
 
 How we keep docs trustworthy. Operating rules for the game itself live in
@@ -66,7 +66,7 @@ agents should prefer `verify`.
 |------|----------|
 | Living rules | `CLAUDE.md`, `docs/poc-spec.md`, `docs/poc-qa.md` |
 | Ship log | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) |
-| Active mission | [`docs/v1-enemy-mechanics-handoff.md`](docs/v1-enemy-mechanics-handoff.md) (`Status: planning`) — enemy cast curriculum; player mechanics code is on `main` ([`docs/v1-mechanics-handoff.md`](docs/v1-mechanics-handoff.md) still `planning` pending ship-phase closeout; prompt [`docs/v1-mechanics-agent-prompt.md`](docs/v1-mechanics-agent-prompt.md)) |
+| Active mission | [`docs/v1-playtest-ui-balance-handoff.md`](docs/v1-playtest-ui-balance-handoff.md) (`Status: planning`, branch `v1/playtest-ui-balance`) — secondary HUD, results damage, Ash→Cinder→Iron; prompt [`docs/v1-playtest-ui-balance-agent-prompt.md`](docs/v1-playtest-ui-balance-agent-prompt.md). Prior mechanics handoffs pending ship-phase closeout. |
 | Module contracts | Colocated `AGENTS.md` / `README.md` |
 | Journey names | [`docs/semantic-targets.md`](docs/semantic-targets.md) |
 | Idea backlog | [`docs/ideas.md`](docs/ideas.md) (`Status: current`, not a handoff) |

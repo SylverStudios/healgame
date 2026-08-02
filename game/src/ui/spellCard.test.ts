@@ -35,10 +35,10 @@ describe('buildSpellCard', () => {
 
   it('formats a damage spell with cooldown and cast-buff note', () => {
     const card = buildSpellCard(SPELLS.vowstrikeVirtue);
-    expect(card.effect).toBe('Damage front 5');
+    expect(card.effect).toBe('Damage front 7');
     expect(card.effectTone).toBe('damage');
     expect(card.cast).toBe('Instant');
-    expect(card.cooldown).toBe('10s');
+    expect(card.cooldown).toBe('6s');
     expect(card.notes).toEqual(['Next spell costs 2 less mana']);
   });
 
@@ -117,7 +117,7 @@ describe('buildSpellCard (+N) heal bonus', () => {
 
   it('leaves damage spell effect unchanged when bonusHealing is set', () => {
     const card = buildSpellCard(SPELLS.vowstrikeVirtue, { bonusHealing: 5, activeFlatHealBonus: 2 });
-    expect(card.effect).toBe('Damage front 5');
+    expect(card.effect).toBe('Damage front 7');
   });
 
   it('does not include target-conditional bonuses (missing/full health) in (+N)', () => {

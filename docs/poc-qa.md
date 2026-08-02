@@ -1,12 +1,36 @@
 # QA log — journey checklist & verification
 
-Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-31
+Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-08-02
 
 Ship summary (newest first): [`CHANGELOG.md`](./CHANGELOG.md).
 
 **PoC (2026-07-08) complete.** Every poc-spec §1 criterion is implemented and
 enforced by automated gates. Later Alpha sections below amend the baseline
 (Phase 2+ subclass UX, mid dungeons, CDs, relics, loadout, etc.).
+
+---
+
+# Playtest UI + dungeon order (2026-08-02)
+
+Status: current · Last verified: 2026-08-02
+
+Readability + light mid-game balance after player/enemy mechanics ships.
+Handoff: [`v1-playtest-ui-balance-handoff.md`](./v1-playtest-ui-balance-handoff.md).
+
+1. **Crit/block HUD** — `CombatState.secondaries` exposes `{n, carry}`; UI
+   shows remaining (`n - carry`) on healer (crit) and tank (block). Floats on
+   `crit` / `blocked` events. Haste/regen stay picker-only (no combat chrome).
+2. **Upgrade picker** — current → next via `blockThreshold` / `critThreshold` /
+   `hastePermille` / `manaRegenFromRank`. Block copy = post-armor **damage**,
+   not hits.
+3. **Results** — `engine.damageDealt` (party order) → `CombatResult.partyDamage`
+   → compact overlay list. Damage done only this slice.
+4. **Level-up** — result overlay shows per-role HP deltas + healer mana pool
+   (+ regen note when a `LEVEL_MANA` threshold is crossed).
+5. **Order** — `DUNGEON_ORDER`: ash-gate → cinder-vault → iron-pass → … .
+   Unlocks: Cinder←Ash, Iron←Cinder, Verdant←Iron.
+6. **Cinder ease** — Ember Colossus HP 240→170 (autoDamage 3→4). Baked
+   playtest: Ash 2–4, **Cinder 4–5**, Iron 6–9. Crown balance gates green.
 
 ---
 
@@ -26,7 +50,7 @@ Status: current · Last verified: 2026-07-31
    authored in `playtest/loadouts.ts` (deterministic — chosen offline, not RNG).
 3. **Baked metadata** — `DungeonDef.playtestLevelRange: { god, basic } | null`.
    Hub shows `Lv low–high` beside the dungeon title. Measured with chips on
-   the enemy-mechanics stack (max Lv20): Ash 2–4, Iron 5–7, Cinder 5–6,
+   the enemy-mechanics stack (max Lv20): Ash 2–4, Cinder 4–5, Iron 6–9,
    Verdant 5–6, Choir 5–8, Gloam 7–9; Maw uncleared. Re-run after retunes.
 4. **Gates unchanged** — `combat/balanceBot.ts` + `balance.test.ts` remain the
    difficulty-shape pins; playtest is the curve signal, not a gate replacement.
@@ -1215,3 +1239,75 @@ Decided micro-choices shipped this phase (full detail: module docs +
    (14×4 frames of 64px; right-facing row, cast columns with golden light)
    and `heal-vfx.png` (6×32px sparkle) replace the healer's Kenney tile and
    accompany heal landings.
+
+---
+
+# Cinder Vault balance retune — order-2 ease (2026-08-02)
+
+Status: current · Last verified: 2026-08-02
+
+U7 retune after U6 swapped dungeon order (Ash → Cinder → Iron). Cinder Vault
+moved from order 3 to order 2; playtest showed god cleared at Lv5 (target Lv4).
+
+**Lever used** — `ember-colossus` HP 240 → 170 (shorter fight, less cumulative
+mana pressure on a Lv4 kit), autoDamage 3 → 4 (compiled 5 → 6 at order 2;
+higher per-swing pressure reinstates threat). Net fight time: ~88s → ~73s.
+
+**Measured playtest (headless, cards-mode kit):**
+
+| Dungeon | Before | After |
+|---------|--------|-------|
+| Ash Gate | god Lv2, basic Lv4 | god Lv2, basic Lv4 (unchanged) |
+| Cinder Vault | god Lv5, basic Lv5 | god Lv4, basic Lv5 ✓ |
+| Iron Pass | god Lv6, basic Lv9 | god Lv6, basic Lv9 (unchanged) |
+
+**Balance gates (33/33 green):** Vigil/Zealot crown kits clear Cinder with ≥3
+survivors, Emberfall fires 3× (fight shortened from 4 to 3 boss Emberfalls).
+Efficiency crown also clears Cinder (order 2 is within its range); Iron Pass
+efficiency still wipes at order-3 floor scaling. Gates tightened from the U6
+`partyDoTStarted ≥ 4` placeholder to `≥ 3` matching the actual shorter fight.
+
+---
+
+# Iron Pass enrage DPS-check — Spire Lancer retune (2026-08-02)
+
+Status: current · Last verified: 2026-08-02
+
+Vowstrike teaching beat: Iron Pass (order 3) now has a boss-phase enrage timer
+that forces DPS weaving. Players who only heal wipe; players who weave Vowstrike
+clear before enrage.
+
+**Tune** — `spire-lancer` mob (`game/src/data/mobs/spireLancer.ts`):
+- `hp`: 340 → 260 (shorter boss phase, merc DPS can get close alone)
+- `enrageAtMs`: 90_000 → 58_000ms (forces healer DPS contribution)
+
+**Balance gate matrix (disciplined bot, crown kits):**
+
+| Kit | Iron Pass result |
+|-----|-----------------|
+| VIGIL_LOADOUT (crown) | victory — survivors 4, 78.3s, focus 4, cds 1 |
+| ZEALOT_LOADOUT (crown) | victory — survivors 4, 88.0s, focus 5, cds 3 |
+| VIGIL_EFFICIENCY_LOADOUT | wipe (can't sustain tank at order-3 floor) |
+| VIGIL stripped (no vowstrike) | wipe (enrage — not enough DPS) |
+| ZEALOT stripped (no vowstrike) | wipe (enrage — not enough DPS) |
+
+Gates: 34/34 green (`balance.test.ts`). New gate added: "Vowstrike teaching
+beat: crown builds stripped of vowstrike wipe on enrage."
+
+**UI** — `game/src/ui/enrageCue.ts`: red/orange countdown "Enrage Xs" above
+boss HP bar (`enrageRemainingMs`); "ENRAGE!" float on `enrage` event. Wired
+in `CombatScene.ts` (+5 lines). Combat log line on enrage.
+
+**Bots** — `basicPlayer.ts`: weaves Vowstrike when party stable (no ally <40%
+HP) and off CD. `godPlayer.ts`: interleaves Vowstrike before non-urgent heals.
+
+**Measured playtest (headless, cards-mode kit):**
+
+| Dungeon | Before | After |
+|---------|--------|-------|
+| Iron Pass | god Lv5, basic Lv7 | god Lv6, basic Lv8 |
+| Black Choir | god Lv5, basic Lv8 | god Lv6, basic Lv7 |
+| Gloam Sanctum | god Lv7, basic Lv9 | god Lv6, basic Lv9 |
+
+(Black Choir / Gloam Sanctum shifted because `godPlayer.ts` now weaves
+Vowstrike more aggressively between heals.)

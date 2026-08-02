@@ -18,8 +18,8 @@ export { hubDungeonTargetName } from './hubTarget';
 
 export const DUNGEON_ORDER = [
   'ash-gate',
-  'iron-pass',
   'cinder-vault',
+  'iron-pass',
   'verdant-rift',
   'black-choir',
   'gloam-sanctum',
@@ -28,8 +28,8 @@ export const DUNGEON_ORDER = [
 
 export const DUNGEONS = [
   ASH_GATE_DUNGEON,
-  IRON_PASS_DUNGEON,
   CINDER_VAULT_DUNGEON,
+  IRON_PASS_DUNGEON,
   VERDANT_RIFT_DUNGEON,
   BLACK_CHOIR_DUNGEON,
   GLOAM_SANCTUM_DUNGEON,

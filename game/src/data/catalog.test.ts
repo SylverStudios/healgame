@@ -22,9 +22,9 @@ describe('Vowstrike spells', () => {
   it('vowstrike-virtue has locked numbers', () => {
     const spell = spellById('vowstrike-virtue');
     expect(spell!.heal).toBe(0);
-    expect(spell!.damage).toBe(5);
+    expect(spell!.damage).toBe(7);
     expect(spell!.mana).toBe(3);
-    expect(spell!.cooldownMs).toBe(10_000);
+    expect(spell!.cooldownMs).toBe(6_000);
     expect(spell!.id).toBe('vowstrike-virtue');
     expect(spell!.name).toBe('Vowstrike: Absolution');
     expect(spell!.castBuff).toEqual({ kind: 'nextSpellManaReduction', amount: 2 });
@@ -33,9 +33,9 @@ describe('Vowstrike spells', () => {
   it('vowstrike-vengeance has locked numbers', () => {
     const spell = spellById('vowstrike-vengeance');
     expect(spell!.heal).toBe(0);
-    expect(spell!.damage).toBe(5);
+    expect(spell!.damage).toBe(7);
     expect(spell!.mana).toBe(3);
-    expect(spell!.cooldownMs).toBe(10_000);
+    expect(spell!.cooldownMs).toBe(6_000);
     expect(spell!.id).toBe('vowstrike-vengeance');
     expect(spell!.name).toBe('Vowstrike: Reckoning');
     expect(spell!.castBuff).toEqual({ kind: 'nextHealPotencyPct', pct: 25 });
