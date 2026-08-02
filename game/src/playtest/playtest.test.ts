@@ -39,6 +39,7 @@ function bareState(overrides: Partial<CombatState> = {}): CombatState {
     enemies: [],
     playerCast: null,
     bossCast: null,
+    enemyCasts: [],
     targetId: null,
     gcdRemainingMs: 0,
     queuedSpellId: null,

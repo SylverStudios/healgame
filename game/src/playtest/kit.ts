@@ -64,7 +64,7 @@ function applyCooldownPicks(save: SaveData, profile: KitProfile, level: number):
   }
 }
 
-function applyChipPlan(save: SaveData, profile: KitProfile, level: number): void {
+function applyChipPlan(save: SaveData, profile: KitProfile): void {
   for (const step of chipPlanFor(profile)) {
     if (!save.unlockedSpells.includes(step.spellId)) continue;
     // Grant exactly the point needed for this purchase (victories bank points in live play).
