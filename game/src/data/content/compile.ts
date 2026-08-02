@@ -1,4 +1,4 @@
-import type { BossCastDef, EncounterDef } from '../../combat/types';
+import type { EnemyCastDef, EncounterDef } from '../../combat/types';
 import { FLOOR_ENEMY_DAMAGE } from '../constants';
 import type {
   ContentCatalogs,
@@ -82,6 +82,11 @@ function compileValidatedDungeon(
       enemies: wave.enemies.map((group) => {
         const mob = required(mobById, group.mobId, 'mob');
         const stats = effectiveMobStats(mob, group.statOverrides);
+        const trashAbilityId = mob.abilityIds[0];
+        const trashCast =
+          trashAbilityId === undefined
+            ? undefined
+            : compileAbility(required(abilityById, trashAbilityId, 'ability'));
         return {
           mobId: mob.id,
           name: mob.name,
@@ -89,6 +94,7 @@ function compileValidatedDungeon(
           count: group.count,
           autoDamage: stats.autoDamage + floorDamage,
           swingIntervalMs: stats.swingIntervalMs,
+          ...(trashCast === undefined ? {} : { cast: trashCast }),
         };
       }),
     })),
@@ -118,7 +124,7 @@ function assertValid(catalogs: ContentCatalogs): void {
   }
 }
 
-function compileAbility(ability: EnemyAbilityDef): BossCastDef {
+function compileAbility(ability: EnemyAbilityDef): EnemyCastDef {
   switch (ability.kind) {
     case 'partyAoE':
       return {

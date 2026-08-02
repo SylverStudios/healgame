@@ -9,6 +9,6 @@ export const CINDER_WRAITH = {
   // the Cinder Vault threat, not trash burst.
   autoDamage: 1,
   swingIntervalMs: 3_000,
-  abilityIds: [],
+  abilityIds: ['emberfall-lesser'],
   visualKey: 'cinder-wraith',
 } as const satisfies MobDef;

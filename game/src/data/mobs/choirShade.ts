@@ -8,6 +8,6 @@ export const CHOIR_SHADE = {
   // J26: floor scaling (+8 at order 5) supplies this mob's auto pressure.
   autoDamage: 0,
   swingIntervalMs: 2_800,
-  abilityIds: [],
+  abilityIds: ['soul-toll-lesser'],
   visualKey: 'choir-shade',
 } as const satisfies MobDef;

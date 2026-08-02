@@ -172,13 +172,7 @@ export function validateContent(catalogs: ContentCatalogs): ContentValidationRes
         `current runtime supports at most one ability; found ${mob.abilityIds.length}`,
       );
     }
-    if (mob.tags.includes('trash') && mob.abilityIds.length > 0) {
-      error(
-        'trash-abilities-unsupported',
-        `${path}.abilityIds`,
-        'trash abilities are unsupported by the current runtime',
-      );
-    }
+    // Trash and boss both allow 0 or 1 ability (v1 enemy mechanics curriculum).
     mob.abilityIds.forEach((abilityId, abilityIndex) => {
       usedAbilities.add(abilityId);
       if (!abilityIds.has(abilityId)) {

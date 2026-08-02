@@ -30,6 +30,13 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
             count: 2,
             autoDamage: 2,
             swingIntervalMs: 3000,
+            cast: {
+              name: 'Lesser Bonehowl',
+              castMs: 6_000,
+              firstCastAtMs: 1_500,
+              intervalMs: 10_000,
+              partyDamage: 2,
+            },
           },
         ],
       },
@@ -42,6 +49,13 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
             count: 3,
             autoDamage: 2,
             swingIntervalMs: 3000,
+            cast: {
+              name: 'Lesser Bonehowl',
+              castMs: 6_000,
+              firstCastAtMs: 1_500,
+              intervalMs: 10_000,
+              partyDamage: 2,
+            },
           },
         ],
       },
@@ -73,8 +87,18 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
             name: 'Iron Husk',
             hp: 13,
             count: 2,
-            autoDamage: 4,
+            autoDamage: 3,
             swingIntervalMs: 3000,
+            cast: {
+              kind: 'tunnelVision',
+              name: 'Lesser Tunnel Vision',
+              telegraphMs: 7_000,
+              firstCastAtMs: 4_000,
+              intervalMs: 13_000,
+              channelMs: 3_000,
+              tickMs: 1_000,
+              damagePerTick: 1,
+            },
           },
         ],
       },
@@ -85,8 +109,18 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
             name: 'Iron Husk',
             hp: 13,
             count: 3,
-            autoDamage: 4,
+            autoDamage: 3,
             swingIntervalMs: 3000,
+            cast: {
+              kind: 'tunnelVision',
+              name: 'Lesser Tunnel Vision',
+              telegraphMs: 7_000,
+              firstCastAtMs: 4_000,
+              intervalMs: 13_000,
+              channelMs: 3_000,
+              tickMs: 1_000,
+              damagePerTick: 1,
+            },
           },
         ],
       },
@@ -97,8 +131,18 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
             name: 'Iron Husk',
             hp: 14,
             count: 3,
-            autoDamage: 4,
+            autoDamage: 3,
             swingIntervalMs: 3000,
+            cast: {
+              kind: 'tunnelVision',
+              name: 'Lesser Tunnel Vision',
+              telegraphMs: 7_000,
+              firstCastAtMs: 4_000,
+              intervalMs: 13_000,
+              channelMs: 3_000,
+              tickMs: 1_000,
+              damagePerTick: 1,
+            },
           },
         ],
       },
@@ -109,8 +153,18 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
             name: 'Iron Husk',
             hp: 14,
             count: 4,
-            autoDamage: 4,
+            autoDamage: 3,
             swingIntervalMs: 3000,
+            cast: {
+              kind: 'tunnelVision',
+              name: 'Lesser Tunnel Vision',
+              telegraphMs: 7_000,
+              firstCastAtMs: 4_000,
+              intervalMs: 13_000,
+              channelMs: 3_000,
+              tickMs: 1_000,
+              damagePerTick: 1,
+            },
           },
         ],
       },
@@ -141,12 +195,19 @@ const LEGACY_EQUIVALENT_ENCOUNTERS = [
       {
         enemies: [
           {
-            mobId: 'ash-husk',
-            name: 'Ash Husk',
+            mobId: 'hollow-husk',
+            name: 'Hollow Husk',
             hp: 6,
             count: 2,
             autoDamage: 14,
             swingIntervalMs: 3000,
+            cast: {
+              name: 'Lesser Extinction',
+              castMs: 8_000,
+              firstCastAtMs: 4_000,
+              intervalMs: 12_000,
+              partyDamage: 4,
+            },
           },
         ],
       },
@@ -233,8 +294,8 @@ describe('live dungeon content', () => {
         'Rewards: XP 3/enemy, relic offer on first clear',
         'Visual: the-maw',
         'Wave 1:',
-        '  2x Ash Husk [ash-husk] — HP 6, auto 2/3000ms, boss no, overrides hp=6',
-        '    Abilities: none',
+        '  2x Hollow Husk [hollow-husk] — HP 6, auto 2/3000ms, boss no, overrides hp=6',
+        '    Ability: Lesser Extinction [extinction-lesser] partyAoE — cast 8000ms, first 4000ms, interval 12000ms, party damage 4',
         'Wave 2 (boss):',
         '  1x Hollow King [hollow-king] — HP 9999, auto 4/3500ms, boss yes, overrides hp=9999',
         '    Ability: Extinction [extinction] partyAoE — cast 10000ms, first 15000ms, interval 25000ms, party damage 10',
@@ -278,7 +339,7 @@ describe('content diagnostics', () => {
     expect(compiled.waves[0]?.enemies[0]?.autoDamage).toBe(0);
   });
 
-  it('rejects empty names, ambiguous mob tags, and trash abilities', () => {
+  it('rejects empty names and ambiguous mob tags', () => {
     const malformed: ContentCatalogs = {
       ...CONTENT_CATALOGS,
       abilities: [
@@ -302,9 +363,52 @@ describe('content diagnostics', () => {
 
     const codes = validateContent(malformed).errors.map(({ code }) => code);
     expect(codes.filter((code) => code === 'empty-name')).toHaveLength(3);
-    expect(codes).toEqual(
-      expect.arrayContaining(['invalid-mob-tags', 'trash-abilities-unsupported']),
-    );
+    expect(codes).toEqual(expect.arrayContaining(['invalid-mob-tags']));
+    expect(codes).not.toContain('trash-abilities-unsupported');
+  });
+
+  it('accepts trash mobs with one ability and compiles cast onto the group', () => {
+    const withTrashCast: ContentCatalogs = {
+      ...CONTENT_CATALOGS,
+      abilities: [
+        ...CONTENT_CATALOGS.abilities,
+        {
+          id: 'trial-teach-lesser',
+          name: 'Trial Teach',
+          kind: 'partyAoE',
+          castMs: 4_000,
+          firstCastAtMs: 1_500,
+          intervalMs: 10_000,
+          partyDamage: 2,
+          visualKey: 'bonehowl',
+        },
+      ],
+      mobs: CONTENT_CATALOGS.mobs.map((mob) =>
+        mob.id === 'ash-husk' ? { ...mob, abilityIds: ['trial-teach-lesser'] } : mob,
+      ),
+    };
+
+    expect(validateContent(withTrashCast).errors).toEqual([]);
+    const compiled = compileDungeon('ash-gate', withTrashCast);
+    expect(compiled.waves[0]?.enemies[0]?.cast).toEqual({
+      name: 'Trial Teach',
+      castMs: 4_000,
+      firstCastAtMs: 1_500,
+      intervalMs: 10_000,
+      partyDamage: 2,
+    });
+    expect(compiled.boss.cast?.name).toBe('Bonehowl');
+  });
+
+  it('rejects trash and boss mobs with more than one ability', () => {
+    const tooMany: ContentCatalogs = {
+      ...CONTENT_CATALOGS,
+      mobs: CONTENT_CATALOGS.mobs.map((mob) =>
+        mob.id === 'ash-husk' ? { ...mob, abilityIds: ['bonehowl', 'extinction'] } : mob,
+      ),
+    };
+    const codes = validateContent(tooMany).errors.map(({ code }) => code);
+    expect(codes).toContain('runtime-ability-limit');
   });
 
   it('returns all errors and unused-content warnings for an invalid fixture', () => {

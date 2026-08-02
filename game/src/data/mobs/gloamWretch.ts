@@ -8,6 +8,6 @@ export const GLOAM_WRETCH = {
   // J26: floor scaling (+10 at order 6) supplies this mob's auto pressure.
   autoDamage: 0,
   swingIntervalMs: 2_700,
-  abilityIds: [],
+  abilityIds: ['null-psalm-lesser'],
   visualKey: 'gloam-wretch',
 } as const satisfies MobDef;

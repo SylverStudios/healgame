@@ -7,6 +7,25 @@ Newest first. Numbers and rule detail live in `game/src/data/` and
 
 ---
 
+## 2026-07-31 — Enemy mechanics: trash cast curriculum
+
+Trash teaches the boss verb before the exam (playtest cluster A).
+
+- **0 or 1 ability** per mob (trash ban lifted; max-1 kept). Compile puts
+  `EnemyCastDef` on trash groups and bosses.
+- **Multi-caster engine** — per-unit cast timers; `enemyCasts` on combat
+  state; at most one focus channel globally (boss first, else lowest id).
+- **UI** — cast bars + telegraphs on any casting unit (not boss-only).
+- **Curriculum** — lesser trash + greater boss pairs for all 7 dungeons
+  (`*-lesser` abilities). The Maw uses unique `extinction-lesser` via
+  `hollow-husk` (ash-husk visual).
+- **Balance** — lesser magnitudes / cadence retuned so crown scrapes stay
+  clearable; Ash Gate + Maw gates unchanged.
+
+Handoff: [`v1-enemy-mechanics-handoff.md`](./v1-enemy-mechanics-handoff.md).
+
+---
+
 ## 2026-07-31 — Road to 1.0: Player mechanics (cards default)
 
 Cards is the real progression path; lattice/radial remain dual-shipped.

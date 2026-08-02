@@ -57,7 +57,6 @@ import {
   showHealSparkle,
   showZapImpact,
 } from '../ui/combatFx';
-import { castBarShakeOffset } from '../ui/castBarShake';
 import { showArrowHit } from '../ui/arrowHitFx';
 import { PaceToggle } from '../ui/paceToggle';
 import { loadSave, saveGame, type SaveData } from '../save/save';
@@ -85,6 +84,7 @@ import {
 } from '../ui/healerCues';
 import { portraitTextureKey, revealResultPortrait } from '../ui/portraitSprites';
 import { chunkyWipeIn, fadeToScene } from '../ui/transitions';
+import { EnemyCastBars } from '../ui/enemyCastBars';
 import { MOB_REGISTRY } from '../data/mobs';
 import { ENEMY_ABILITY_REGISTRY } from '../data/enemyAbilities';
 import type { BossTelegraphCue } from '../data/content/types';
@@ -160,14 +160,11 @@ const PLAYER_CAST_FILL_COLOR = 0xf2c14e;
 const QUEUED_SPELL_GAP = 6;
 const QUEUED_SPELL_COLOR = '#a89888';
 
-// v0.3 chunk F "Boss telegraphs": the named cast bar is demoted — an unlabeled
-// sliver near the boss sprite (its own wind-up/glow cue is the primary teach;
-// the combat log still names the ability via the existing bossCastStarted line).
-const BOSS_CAST_BAR_WIDTH = 70;
-const BOSS_CAST_BAR_HEIGHT = 5;
-/** Gap between the boss sprite's top edge and the sliver's bottom edge. */
-const BOSS_CAST_BAR_GAP = 14;
-const BOSS_CAST_FILL_COLOR = 0xe05a4e;
+// v0.3 chunk F "Boss telegraphs" (E3-generalized): the demoted cast sliver now
+// serves ANY casting enemy — geometry/pooling live in ui/enemyCastBars.ts.
+/** Softer camera nudge when a trash cast lands (the boss keeps shakeBossImpact). */
+const TRASH_CAST_SHAKE_DURATION_MS = 90;
+const TRASH_CAST_SHAKE_INTENSITY = 0.002;
 
 const SPELL_BAR_Y = 508;
 
@@ -219,10 +216,9 @@ export class CombatScene extends Phaser.Scene {
   private playerCastBar!: Bar;
   private playerCastLabel!: Phaser.GameObjects.Text;
   private queuedSpellLabel!: Phaser.GameObjects.Text;
-  /** Demoted per v0.3 chunk F: unlabeled sliver near the boss, not a named top bar. */
-  private bossCastBar!: Bar;
-  /** Data-driven wind-up cue for the current encounter's boss ability, resolved once in create(). */
-  private bossTelegraphCue: BossTelegraphCue = 'glow';
+  /** Demoted per v0.3 chunk F, generalized in E3: one unlabeled sliver per active
+   *  enemy caster (boss or trash), pooled by caster id (see ui/enemyCastBars.ts). */
+  private enemyCastBars!: EnemyCastBars;
 
   private waveText!: Phaser.GameObjects.Text;
   private rewardsText!: Phaser.GameObjects.Text;
@@ -313,6 +309,9 @@ export class CombatScene extends Phaser.Scene {
       partyCenterX: (PARTY_SLOT_LEFT + PARTY_SLOT_RIGHT) / 2,
       enemyCenterX: (ENEMY_SLOT_LEFT + ENEMY_SLOT_RIGHT) / 2,
     });
+    // Enemy cast slivers: pooled per caster (ui/enemyCastBars.ts). Built before rebuildEnemies
+    // so the first wave's anchor heights land in the pool.
+    this.enemyCastBars = new EnemyCastBars(this);
     this.buildPartySprites();
     this.rebuildEnemies(this.engine.state.enemies);
     this.buildHud();
@@ -354,19 +353,20 @@ export class CombatScene extends Phaser.Scene {
     this.combatLog = new CombatLog(this, VIEW_WIDTH);
     this.buildToast();
     this.manaAura = new ManaSpendAura(this);
-    this.bossTelegraphCue = this.resolveBossTelegraphCue();
     this.lastHealerMana = this.engine.state.party.find((u) => u.role === 'healer')?.mana ?? null;
 
     this.syncView();
     chunkyWipeIn(this, VIEW_WIDTH, VIEW_HEIGHT); // chunk 6: "into battle" reveal
   }
 
-  /** Data-driven wind-up cue (handoff "Boss telegraphs") for this encounter's boss ability, looked
-   *  up from the same authoring catalogs the content pipeline compiled from — the compiled
-   *  EncounterDef/BossCastDef never carries this field (presentation-only, engine untouched). */
-  private resolveBossTelegraphCue(): BossTelegraphCue {
-    const bossMob = MOB_REGISTRY[this.encounter.boss.id];
-    const abilityId = bossMob?.abilityIds[0];
+  /** Data-driven wind-up cue (handoff "Boss telegraphs", E3-generalized to any caster) for a mob's
+   *  telegraphed ability, looked up from the same authoring catalogs the content pipeline compiled
+   *  from — the compiled EncounterDef/BossCastDef never carries this field (presentation-only,
+   *  engine untouched). Resolves by the CASTER's mobId (boss unit's mobId equals its catalog id;
+   *  trash carry their group's mobId), so trash and boss share one telegraph path. */
+  private resolveTelegraphCueForMob(mobId: string | undefined): BossTelegraphCue {
+    const mob = mobId !== undefined ? MOB_REGISTRY[mobId] : undefined;
+    const abilityId = mob?.abilityIds[0];
     const ability = abilityId !== undefined ? ENEMY_ABILITY_REGISTRY[abilityId] : undefined;
     return ability?.telegraph ?? 'glow';
   }
@@ -468,6 +468,9 @@ export class CombatScene extends Phaser.Scene {
   private rebuildEnemies(enemies: Unit[]): void {
     for (const sprite of this.enemySprites.values()) sprite.destroy();
     this.enemySprites.clear();
+    // Cast bars belong to the outgoing sprites — a cast can't survive its caster's
+    // wave, so destroy the whole pool and rebuild anchor heights from scratch.
+    this.enemyCastBars?.reset();
     const isBoss = enemies.length === 1 && enemies[0]?.role === 'boss';
     enemies.forEach((unit, i) => {
       this.unitNames.set(unit.id, unit.name);
@@ -475,6 +478,7 @@ export class CombatScene extends Phaser.Scene {
       const custom = presentation.kind === 'texture';
       const width = isBoss ? BOSS_UNIT_WIDTH : custom ? TRASH_CUSTOM_WIDTH : TRASH_KENNEY_WIDTH;
       const height = isBoss ? BOSS_UNIT_HEIGHT : custom ? TRASH_CUSTOM_HEIGHT : TRASH_KENNEY_HEIGHT;
+      this.enemyCastBars.setAnchorHeight(unit.id, height);
       const attackAnimKey = attackAnimKeyForUnit(unit);
       const hurtAnimKey = hurtAnimKeyForUnit(unit);
       this.enemySprites.set(
@@ -564,18 +568,6 @@ export class CombatScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setVisible(false);
-
-    // Boss cast: unlabeled sliver; initial position is a placeholder (syncBossCastBar repositions each frame).
-    this.bossCastBar = new Bar(
-      this,
-      centerX - BOSS_CAST_BAR_WIDTH / 2,
-      BOSS_CAST_BAR_GAP,
-      BOSS_CAST_BAR_WIDTH,
-      BOSS_CAST_BAR_HEIGHT,
-      BOSS_CAST_FILL_COLOR,
-    );
-    this.bossCastBar.setDepth(46);
-    this.bossCastBar.setVisible(false);
   }
 
   /** Short-lived status line for castCancelled (handoff §D) — only toast source in the scene. */
@@ -791,18 +783,25 @@ export class CombatScene extends Phaser.Scene {
           }
           break;
         case 'bossCastStarted': {
-          // v0.3 chunk F "Boss telegraphs": wind-up/glow cue on the boss sprite for the
-          // bossCastStarted → bossCastFinished window (Tunnel Vision's telegraph phase too —
-          // its own crimson focus brand only starts later, at bossFocusStarted, so this never
-          // double-signals with it).
-          const bossUnit = this.engine.state.enemies.find((u) => u.role === 'boss');
-          if (bossUnit) this.findSprite(bossUnit.id)?.startTelegraph(this.bossTelegraphCue);
+          // v0.3 chunk F "Boss telegraphs", E3-generalized: wind-up/glow cue on the CASTER's
+          // sprite (boss or trash) for the bossCastStarted → bossCastFinished window. The cue
+          // is resolved from the caster's mobId (Tunnel Vision's telegraph phase too — its own
+          // crimson focus brand only starts later, at bossFocusStarted, so this never
+          // double-signals with it). Legacy events without sourceId fall back to the boss.
+          const casterId = event.sourceId ?? this.bossUnitId();
+          const caster = this.engine.state.enemies.find((u) => u.id === casterId);
+          if (casterId !== undefined) {
+            this.findSprite(casterId)?.startTelegraph(this.resolveTelegraphCueForMob(caster?.mobId));
+          }
           break;
         }
         case 'bossCastFinished': {
-          shakeBossImpact(this);
-          const bossUnit = this.engine.state.enemies.find((u) => u.role === 'boss');
-          if (bossUnit) this.findSprite(bossUnit.id)?.stopTelegraph();
+          const casterId = event.sourceId ?? this.bossUnitId();
+          const isBoss = this.engine.state.enemies.find((u) => u.id === casterId)?.role === 'boss';
+          // Boss keeps the meatier camera punch; trash lands a softer nudge (reversible default).
+          if (isBoss || casterId === undefined) shakeBossImpact(this);
+          else this.cameras.main.shake(TRASH_CAST_SHAKE_DURATION_MS, TRASH_CAST_SHAKE_INTENSITY);
+          if (casterId !== undefined) this.findSprite(casterId)?.stopTelegraph();
           break;
         }
         case 'partyDoTStarted':
@@ -892,6 +891,11 @@ export class CombatScene extends Phaser.Scene {
     return this.partySprites.get(unitId) ?? this.enemySprites.get(unitId);
   }
 
+  /** Current boss unit id, if any — fallback caster for legacy cast events that omit sourceId. */
+  private bossUnitId(): string | undefined {
+    return this.engine.state.enemies.find((u) => u.role === 'boss')?.id;
+  }
+
   /** Resolves a unit id to its display name from the seen-units cache; falls back to the raw id. */
   private resolveUnitName(unitId: string): string {
     return this.unitNames.get(unitId) ?? unitId;
@@ -947,7 +951,7 @@ export class CombatScene extends Phaser.Scene {
     }
 
     this.syncPlayerCastBar(state);
-    this.syncBossCastBar(state);
+    this.syncEnemyCastBars(state);
 
     const healer = state.party.find((u) => u.role === 'healer');
     this.spellBar.setState(
@@ -1041,25 +1045,11 @@ export class CombatScene extends Phaser.Scene {
     }
   }
 
-  /** Boss cast bar: unlabeled sliver above boss sprite; shakes harder as fill nears full. */
-  private syncBossCastBar(state: CombatState): void {
-    const cast = state.bossCast;
-    if (cast) {
-      const fillProgress = cast.totalMs > 0 ? 1 - cast.remainingMs / cast.totalMs : 0;
-      const bossUnit = state.enemies.find((u) => u.role === 'boss');
-      const bossSprite = bossUnit ? this.findSprite(bossUnit.id) : undefined;
-      if (bossSprite) {
-        const { dx, dy } = castBarShakeOffset(fillProgress, this.elapsedMs);
-        this.bossCastBar.setPosition(
-          bossSprite.getHomeX() - BOSS_CAST_BAR_WIDTH / 2 + dx,
-          bossSprite.getHomeY() - BOSS_UNIT_HEIGHT / 2 - BOSS_CAST_BAR_GAP + dy,
-        );
-      }
-      this.bossCastBar.setRatio(fillProgress);
-      this.bossCastBar.setVisible(true);
-    } else {
-      this.bossCastBar.setVisible(false);
-    }
+  /** Enemy cast slivers: one unlabeled bar per active caster in state.enemyCasts (boss + trash),
+   *  anchored above each caster sprite and shaking harder as its fill nears full — see
+   *  ui/enemyCastBars.ts for pooling/positioning. */
+  private syncEnemyCastBars(state: CombatState): void {
+    this.enemyCastBars.sync(state, this.elapsedMs, (id) => this.findSprite(id));
   }
 
   // ---- end of combat -------------------------------------------------------------

@@ -5,6 +5,7 @@ import { DIRGE_SOVEREIGN_MOB } from './dirgeSovereign';
 import { EMBER_COLOSSUS_MOB } from './emberColossus';
 import { GATE_WARDEN_MOB } from './gateWarden';
 import { GLOAM_WRETCH } from './gloamWretch';
+import { HOLLOW_HUSK } from './hollowHusk';
 import { HOLLOW_KING_MOB } from './hollowKing';
 import { IRON_HUSK } from './ironHusk';
 import { SPIRE_LANCER_MOB } from './spireLancer';
@@ -20,6 +21,7 @@ export { DIRGE_SOVEREIGN_MOB } from './dirgeSovereign';
 export { EMBER_COLOSSUS_MOB } from './emberColossus';
 export { GATE_WARDEN_MOB } from './gateWarden';
 export { GLOAM_WRETCH } from './gloamWretch';
+export { HOLLOW_HUSK } from './hollowHusk';
 export { HOLLOW_KING_MOB } from './hollowKing';
 export { IRON_HUSK } from './ironHusk';
 export { SPIRE_LANCER_MOB } from './spireLancer';
@@ -41,6 +43,7 @@ export const MOBS = [
   THORN_MATRIARCH_MOB,
   GLOAM_WRETCH,
   VEIL_CANTOR_MOB,
+  HOLLOW_HUSK,
 ] as const satisfies readonly MobDef[];
 
 export const MOB_REGISTRY: Readonly<Record<string, MobDef>> = Object.freeze(

@@ -9,6 +9,6 @@ export const THORN_HUSK = {
   // authored base drops so grouped trash swings don't burst the tank.
   autoDamage: 0,
   swingIntervalMs: 2_900,
-  abilityIds: [],
+  abilityIds: ['needle-gaze-lesser'],
   visualKey: 'thorn-husk',
 } as const satisfies MobDef;
