@@ -10,12 +10,13 @@
 
 import Phaser from 'phaser';
 import { SECONDARY_IDS } from '../data/secondaryStats';
-import type { SecondaryId } from '../data/secondaryStats';
+import type { SecondaryId, SecondaryRanks } from '../data/secondaryStats';
 import { FONT, FONT_SIZE_SM, FONT_SIZE_MD, PALETTE_NUM } from './theme';
+import { blockValueLine, critValueLine, hasteValueLine, manaRegenValueLine } from './upgradePickCopy';
 
 const MODAL_DEPTH = 2000;
 const CARD_W = 170;
-const CARD_H = 160;
+const CARD_H = 180;
 const CARD_GAP = 16;
 const BUTTON_COLOR = 0x3a2a22;
 const BORDER_COLOR = 0x0a0605;
@@ -31,22 +32,34 @@ const UPGRADE_LABELS: Record<SecondaryId, string> = {
 };
 
 const UPGRADE_DESCS: Record<SecondaryId, string> = {
-  block: 'Tank blocks 1 damage every N hits taken. Higher rank blocks more often.',
+  block: 'Tank blocks 1 post-armor damage every N damage taken. Higher rank reduces N.',
   crit: 'Every N casts, that cast critically heals/damages for +50%. Higher ranks crit more often.',
   haste: 'Reduces cast time, letting you heal faster.',
   manaRegen: 'Restores mana over time, enabling more casts.',
 };
 
+function getValueLine(id: SecondaryId, rank: number): string {
+  switch (id) {
+    case 'block': return blockValueLine(rank);
+    case 'crit': return critValueLine(rank);
+    case 'haste': return hasteValueLine(rank);
+    case 'manaRegen': return manaRegenValueLine(rank);
+  }
+}
+
 /**
  * Overlay a blocking upgrade-pick modal over the current scene.
  * `pendingCount` is shown in the subtitle when > 1 so the player knows
- * multiple picks are queued. `onConfirm` is called with the chosen id; the
- * caller is responsible for mutating save, persisting, and restarting.
+ * multiple picks are queued. `ranks` is the player's current secondary ranks
+ * (from `save.secondaryRanks`) so each card shows current → next-if-selected
+ * values. `onConfirm` is called with the chosen id; the caller is responsible
+ * for mutating save, persisting, and restarting.
  */
 export function buildUpgradePickModal(
   scene: Phaser.Scene,
   pendingCount: number,
   onConfirm: (id: SecondaryId) => void,
+  ranks: SecondaryRanks,
 ): void {
   const { width, height } = scene.scale;
   const cx = width / 2;
@@ -98,6 +111,7 @@ export function buildUpgradePickModal(
 
   SECONDARY_IDS.forEach((id, i) => {
     const ox = cardsStartX + i * (CARD_W + CARD_GAP);
+    const rank = Math.max(0, Math.floor(ranks[id] ?? 0));
 
     const cardBg = scene.add
       .rectangle(ox, cardY, CARD_W, CARD_H, PALETTE_NUM.panelLight)
@@ -140,7 +154,7 @@ export function buildUpgradePickModal(
     );
     overlay.add(
       scene.add
-        .text(ox, top + 60, UPGRADE_DESCS[id], {
+        .text(ox, top + 62, UPGRADE_DESCS[id], {
           fontFamily: FONT,
           fontSize: '10px',
           color: DIM_COLOR,
@@ -148,6 +162,19 @@ export function buildUpgradePickModal(
           align: 'center',
         })
         .setOrigin(0.5, 0),
+    );
+
+    // Current → next-if-selected value line near the bottom of the card.
+    overlay.add(
+      scene.add
+        .text(ox, cardY + CARD_H / 2 - 22, getValueLine(id, rank), {
+          fontFamily: FONT,
+          fontSize: '10px',
+          color: ACCENT_COLOR,
+          align: 'center',
+          wordWrap: { width: CARD_W - 16 },
+        })
+        .setOrigin(0.5, 1),
     );
   });
 
