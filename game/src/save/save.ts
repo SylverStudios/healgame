@@ -19,8 +19,11 @@ const RADIAL_STARTER_BONK_ID = 'bonk';
 
 export type SubclassId = 'vigil' | 'zealot';
 
-/** Talent / spell progression topology. Default for fresh installs: lattice. */
+/** Talent / spell progression topology. Default for fresh installs: cards. */
 export type ProgressionMode = 'lattice' | 'radial' | 'cards';
+
+/** Level-up secondary upgrade ids (v1 mechanics). Magnitudes live in data/secondaryStats. */
+export type SecondaryId = 'block' | 'crit' | 'haste' | 'manaRegen';
 
 /**
  * Compact lit-path silhouette captured at run end. Structurally identical to
@@ -78,6 +81,21 @@ export interface SaveData {
    * Index 0 = slot-1 pick; index 1 = slot-2 pick. Cards mode only; others `{}`.
    */
   spellChips: Record<string, string[]>;
+  /**
+   * Cards: ranks in block / crit / haste / manaRegen from level-up Upgrade
+   * picks. Lattice/radial keep `{}` (engine ignores empty/zero ranks).
+   */
+  secondaryRanks: Partial<Record<SecondaryId, number>>;
+  /**
+   * Cards: major CD ids chosen at L6 (Set A) and L8 (Set B), acquisition
+   * order. Max length 2. Lattice/radial keep `[]` (tree grants CDs).
+   */
+  chosenCooldownIds: string[];
+  /**
+   * Cards: unclaimed level-up Upgrade picks (one per level gained). Hub
+   * interrupts until drained. Lattice/radial keep 0.
+   */
+  pendingUpgradePicks: number;
   /** Master music volume 0..100 (integer). 0 fully stops playback. */
   musicVolumePct: number;
   /** Last few combat runs, newest first (run summary / Hub display). */
@@ -104,7 +122,7 @@ export function defaultRadialActionBar(): string[] {
   return bar;
 }
 
-export function newSaveData(mode: ProgressionMode = 'lattice'): SaveData {
+export function newSaveData(mode: ProgressionMode = 'cards'): SaveData {
   if (mode === 'radial') {
     return {
       version: SAVE_SCHEMA,
@@ -122,18 +140,21 @@ export function newSaveData(mode: ProgressionMode = 'lattice'): SaveData {
       pendingRelicOffers: [],
       upgradePoints: 0,
       spellChips: {},
+      secondaryRanks: {},
+      chosenCooldownIds: [],
+      pendingUpgradePicks: 0,
       musicVolumePct: 50,
       recentRuns: [],
     };
   }
-  if (mode === 'cards') {
+  if (mode === 'lattice') {
     return {
       version: SAVE_SCHEMA,
-      progressionMode: 'cards',
+      progressionMode: 'lattice',
       tutorialDone: false,
       xp: 0,
-      unlockedSpells: [RADIAL_STARTER_HEAL_ID, RADIAL_STARTER_BONK_ID],
-      actionBar: defaultRadialActionBar(),
+      unlockedSpells: [SPELLS.bonk.id],
+      actionBar: defaultActionBar(),
       treeRanks: {},
       talentPointsEarned: 0,
       subclass: null,
@@ -141,20 +162,23 @@ export function newSaveData(mode: ProgressionMode = 'lattice'): SaveData {
       combatPaceTenths: 10,
       relicIds: [],
       pendingRelicOffers: [],
-      // First upgrade point arrives at level 2 (with Mend) — no spend at Lv1.
       upgradePoints: 0,
       spellChips: {},
+      secondaryRanks: {},
+      chosenCooldownIds: [],
+      pendingUpgradePicks: 0,
       musicVolumePct: 50,
       recentRuns: [],
     };
   }
+  // Default / cards: Heal+Bonk album path (v1 player mechanics).
   return {
     version: SAVE_SCHEMA,
-    progressionMode: 'lattice',
+    progressionMode: 'cards',
     tutorialDone: false,
     xp: 0,
-    unlockedSpells: [SPELLS.bonk.id],
-    actionBar: defaultActionBar(),
+    unlockedSpells: [RADIAL_STARTER_HEAL_ID, RADIAL_STARTER_BONK_ID],
+    actionBar: defaultRadialActionBar(),
     treeRanks: {},
     talentPointsEarned: 0,
     subclass: null,
@@ -162,8 +186,12 @@ export function newSaveData(mode: ProgressionMode = 'lattice'): SaveData {
     combatPaceTenths: 10,
     relicIds: [],
     pendingRelicOffers: [],
+    // Modifier points come from dungeon victories (J26) — no spend at Lv1.
     upgradePoints: 0,
     spellChips: {},
+    secondaryRanks: {},
+    chosenCooldownIds: [],
+    pendingUpgradePicks: 0,
     musicVolumePct: 50,
     recentRuns: [],
   };
@@ -180,6 +208,7 @@ export const LEGACY_SAVE_KEYS = [
   'healgame-save-v8',
   'healgame-save-v9',
   'healgame-save-v10',
+  'healgame-save-v11',
 ] as const;
 
 /** Minimal storage interface so tests can inject an in-memory store. */
@@ -288,6 +317,22 @@ export function validateSaveData(value: unknown): value is SaveData {
   ) {
     return false;
   }
+  const secondaryRanks = v.secondaryRanks;
+  if (
+    typeof secondaryRanks !== 'object' ||
+    secondaryRanks === null ||
+    Array.isArray(secondaryRanks)
+  ) {
+    return false;
+  }
+  if (!Object.values(secondaryRanks).every((r) => typeof r === 'number')) return false;
+  if (
+    !Array.isArray(v.chosenCooldownIds) ||
+    !v.chosenCooldownIds.every((id) => typeof id === 'string')
+  ) {
+    return false;
+  }
+  if (typeof v.pendingUpgradePicks !== 'number') return false;
   if (!Array.isArray(v.recentRuns) || !v.recentRuns.every(isRunRecord)) return false;
   return (
     Array.isArray(v.relicIds) &&

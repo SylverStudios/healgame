@@ -39,7 +39,7 @@ describe('chipOffersForSlot exact trios', () => {
     expect(chipOffersForSlot('heal', 0)).toEqual([
       'heal-mend-link',
       'heal-graven',
-      'heal-cost',
+      'heal-surge',
     ]);
     expect(() => chipOffersForSlot('heal', 1)).toThrow(/heal slot 2 is gated/);
   });
@@ -48,12 +48,12 @@ describe('chipOffersForSlot exact trios', () => {
     expect(chipOffersForSlot('mend', 0)).toEqual([
       'mend-arming',
       'mend-battle',
-      'mend-quick',
+      'mend-surge',
     ]);
     expect(chipOffersForSlot('mend', 1)).toEqual([
       'mend-penny',
       'mend-graven',
-      'mend-spark',
+      'mend-fullbloom',
     ]);
   });
 
@@ -64,7 +64,7 @@ describe('chipOffersForSlot exact trios', () => {
       'bonk-mana',
     ]);
     expect(chipOffersForSlot('bonk', 1)).toEqual([
-      'bonk-crush',
+      'bonk-vow-link',
       'bonk-reckoning',
       'bonk-quicksteel',
     ]);
@@ -77,37 +77,37 @@ describe('chipOffersForSlot exact trios', () => {
       'vs-reckoning',
     ]);
     expect(chipOffersForSlot('vowstrike', 1)).toEqual([
-      'vs-ready',
-      'vs-crush',
+      'vs-harrow',
+      'vs-wellspring',
       'vs-weight',
     ]);
   });
 });
 
-describe('healSlot2Offers (J25b)', () => {
+describe('healSlot2Offers (J25b / M7)', () => {
   it('offers Heavy Cast trio when chip1 is Graven Light', () => {
     expect(healSlot2Offers('heal-graven')).toEqual([
       'heal-heavy',
-      'heal-quick',
-      'heal-power',
+      'heal-crest',
+      'heal-tempo',
     ]);
   });
 
-  it('offers Bulwark trio when chip1 is not Graven', () => {
+  it('offers Vigor trio when chip1 is not Graven', () => {
     expect(healSlot2Offers('heal-mend-link')).toEqual([
-      'heal-quick',
-      'heal-power',
-      'heal-bulwark',
+      'heal-vigor',
+      'heal-crest',
+      'heal-tempo',
     ]);
-    expect(healSlot2Offers('heal-cost')).toEqual([
-      'heal-quick',
-      'heal-power',
-      'heal-bulwark',
+    expect(healSlot2Offers('heal-surge')).toEqual([
+      'heal-vigor',
+      'heal-crest',
+      'heal-tempo',
     ]);
     expect(healSlot2Offers(undefined)).toEqual([
-      'heal-quick',
-      'heal-power',
-      'heal-bulwark',
+      'heal-vigor',
+      'heal-crest',
+      'heal-tempo',
     ]);
   });
 });
@@ -134,13 +134,13 @@ describe('canOfferSlot / offersForNextSlot (J24 + J25b)', () => {
   it('returns heal gated trios at level 5+', () => {
     expect(offersForNextSlot('heal', ['heal-graven'], 5)).toEqual([
       'heal-heavy',
-      'heal-quick',
-      'heal-power',
+      'heal-crest',
+      'heal-tempo',
     ]);
-    expect(offersForNextSlot('heal', ['heal-cost'], 5)).toEqual([
-      'heal-quick',
-      'heal-power',
-      'heal-bulwark',
+    expect(offersForNextSlot('heal', ['heal-surge'], 5)).toEqual([
+      'heal-vigor',
+      'heal-crest',
+      'heal-tempo',
     ]);
   });
 
@@ -199,10 +199,10 @@ describe('applyChipPurchase', () => {
     const save = newSaveData('cards');
     save.xp = xpForLevel(5);
     save.upgradePoints = 2;
-    expect(applyChipPurchase(save, 'heal', 'heal-cost')).toBe(true);
+    expect(applyChipPurchase(save, 'heal', 'heal-surge')).toBe(true);
     expect(applyChipPurchase(save, 'heal', 'heal-heavy')).toBe(false);
-    expect(applyChipPurchase(save, 'heal', 'heal-bulwark')).toBe(true);
-    expect(save.spellChips.heal).toEqual(['heal-cost', 'heal-bulwark']);
+    expect(applyChipPurchase(save, 'heal', 'heal-vigor')).toBe(true);
+    expect(save.spellChips.heal).toEqual(['heal-surge', 'heal-vigor']);
   });
 
   it('rejects unknown spell / insufficient points / full slots', () => {
@@ -216,7 +216,7 @@ describe('applyChipPurchase', () => {
     save.upgradePoints = 1;
     expect(applyChipPurchase(save, 'heal', 'heal-heavy')).toBe(true);
     save.upgradePoints = 1;
-    expect(applyChipPurchase(save, 'heal', 'heal-quick')).toBe(false); // full
+    expect(applyChipPurchase(save, 'heal', 'heal-crest')).toBe(false); // full
     expect(save.spellChips.heal).toEqual(['heal-graven', 'heal-heavy']);
   });
 });
@@ -259,17 +259,18 @@ describe('loadoutFromCardSave chip application', () => {
     ]);
   });
 
-  it('Graven lands in missing-HP pct list; Quick Hands shortens cast', () => {
+  it('Graven lands in missing-HP pct list; heal-heavy modifies castMs and heal', () => {
     const graven = modsWithChips({ heal: ['heal-graven'] });
     expect(graven.missingHealthPctBonuses).toEqual([
       { spellId: 'heal', pctPer10PctMissing: 10 },
     ]);
 
-    const quick = modsWithChips({ heal: ['heal-graven', 'heal-quick'] });
-    const heal = quick.spells.find((s) => s.id === 'heal');
-    expect(heal?.castMs).toBe(1700); // 2000 - 300
+    const heavy = modsWithChips({ heal: ['heal-graven', 'heal-heavy'] });
+    const heal = heavy.spells.find((s) => s.id === 'heal');
+    expect(heal?.castMs).toBe(2500); // 2000 + 500 (heal-heavy)
+    expect(heal?.heal).toBe(7); // 4 + 3 (heal-heavy)
 
-    const brink = modsWithChips({ mend: ['mend-quick', 'mend-graven'] });
+    const brink = modsWithChips({ mend: ['mend-arming', 'mend-graven'] });
     expect(brink.missingHealthBonuses).toEqual([
       { spellId: 'mend', healPer10PctMissing: 1 },
     ]);
@@ -303,14 +304,15 @@ describe('loadoutFromCardSave chip application', () => {
 
   it('bakes castMod / manaOnHit onto cloned spell defs', () => {
     const mods = modsWithChips({
-      heal: ['heal-cost', 'heal-power'],
-      bonk: ['bonk-mana', 'bonk-crush'],
-      vowstrike: ['vs-battle', 'vs-ready'],
+      heal: ['heal-graven', 'heal-heavy'],
+      mend: ['mend-penny'],
+      bonk: ['bonk-mana'],
+      vowstrike: ['vs-absolution', 'vs-weight'],
     });
-    expect(mods.spells.find((s) => s.id === 'heal')?.heal).toBe(6); // 4+2
-    expect(mods.spells.find((s) => s.id === 'heal')?.mana).toBe(2); // 3-1
-    expect(mods.spells.find((s) => s.id === 'bonk')?.manaOnHit).toBe(1);
-    expect(mods.spells.find((s) => s.id === 'bonk')?.damage).toBe(3); // 1+2
-    expect(mods.spells.find((s) => s.id === 'vowstrike')?.cooldownMs).toBe(8000);
+    expect(mods.spells.find((s) => s.id === 'heal')?.heal).toBe(7); // 4+3 (heal-heavy)
+    expect(mods.spells.find((s) => s.id === 'heal')?.castMs).toBe(2500); // 2000+500 (heal-heavy)
+    expect(mods.spells.find((s) => s.id === 'mend')?.mana).toBe(0); // 1-1 (mend-penny)
+    expect(mods.spells.find((s) => s.id === 'bonk')?.manaOnHit).toBe(1); // bonk-mana
+    expect(mods.spells.find((s) => s.id === 'vowstrike')?.damage).toBe(5); // 4+1 (vs-weight)
   });
 });

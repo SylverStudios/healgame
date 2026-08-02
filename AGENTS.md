@@ -66,7 +66,7 @@ agents should prefer `verify`.
 |------|----------|
 | Living rules | `CLAUDE.md`, `docs/poc-spec.md`, `docs/poc-qa.md` |
 | Ship log | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) |
-| Active mission | Parallel planning: [`docs/v1-mechanics-handoff.md`](docs/v1-mechanics-handoff.md) (player, branch `v1/player-mechanics`) · [`docs/v1-enemy-mechanics-handoff.md`](docs/v1-enemy-mechanics-handoff.md) (enemy, branch `v1/enemy-mechanics`) |
+| Active mission | [`docs/v1-enemy-mechanics-handoff.md`](docs/v1-enemy-mechanics-handoff.md) (`Status: planning`) — enemy cast curriculum; player mechanics code is on `main` ([`docs/v1-mechanics-handoff.md`](docs/v1-mechanics-handoff.md) still `planning` pending ship-phase closeout; prompt [`docs/v1-mechanics-agent-prompt.md`](docs/v1-mechanics-agent-prompt.md)) |
 | Module contracts | Colocated `AGENTS.md` / `README.md` |
 | Journey names | [`docs/semantic-targets.md`](docs/semantic-targets.md) |
 | Idea backlog | [`docs/ideas.md`](docs/ideas.md) (`Status: current`, not a handoff) |
@@ -74,6 +74,7 @@ agents should prefer `verify`.
 | Art ops | `docs/unit-art.md` · density law + exemplar: [`art/STYLE.md`](art/STYLE.md) (armored-paladin healer) |
 | Long-term design | `docs/GDD.md` |
 | GitHub auto-merge (ops) | [`docs/github-automerge.md`](docs/github-automerge.md) — repo Allow auto-merge ≠ merge on ready; need per-PR `--auto` |
+| GitHub stacked PRs (ops) | [`docs/github-stacked-prs.md`](docs/github-stacked-prs.md) — `gh stack` + cloud/local install via `scripts/setup-gh-stack.sh` / `.cursor/environment.json` |
 
 ## Doc hygiene
 
@@ -98,9 +99,13 @@ Client-only Phaser + Vite browser game under `game/`; no backend, DB, or Docker.
 Standard commands live in [`CLAUDE.md`](CLAUDE.md) (run from `game/`); the
 quality gate is `npm run verify` / `verify:fast`.
 
-- Dependencies are refreshed automatically on startup (the update script runs
-  `npm install` in `game/` plus `npx playwright install chromium`). You do not
-  need to reinstall.
+- Dependencies are refreshed automatically on startup via
+  [`.cursor/environment.json`](.cursor/environment.json) (`scripts/setup-gh-stack.sh`,
+  then `npm install` in `game/` plus `npx playwright install chromium`). You do
+  not need to reinstall.
+- Stacked PRs: `gh stack` is installed by that bootstrap. Skill + workflow:
+  [`docs/github-stacked-prs.md`](docs/github-stacked-prs.md) and
+  `.claude/skills/gh-stack` (also `.agents/skills/gh-stack`).
 - Playwright Chromium is required only for the `smoke` and `journey` stages of
   `npm run verify`; `npm run dev`, `typecheck`, `lint`, `test`, and `build` do
   not need it.

@@ -36,16 +36,16 @@ describe('save', () => {
     expect(SAVE_KEY).toBe(`healgame-save-v${SAVE_SCHEMA}`);
   });
 
-  it('returns a fresh lattice save when nothing is stored', () => {
+  it('returns a fresh cards save when nothing is stored', () => {
     const save = loadSave(memoryStore());
     expect(save).toEqual(newSaveData());
     expect(save).toEqual({
       version: SAVE_SCHEMA,
-      progressionMode: 'lattice',
+      progressionMode: 'cards',
       tutorialDone: false,
       xp: 0,
-      unlockedSpells: [SPELLS.bonk.id],
-      actionBar: [SPELLS.bonk.id, '', '', ''],
+      unlockedSpells: [RADIAL_HEAL.id, RADIAL_BONK.id],
+      actionBar: [RADIAL_BONK.id, RADIAL_HEAL.id, '', ''],
       treeRanks: {},
       talentPointsEarned: 0,
       subclass: null,
@@ -55,6 +55,9 @@ describe('save', () => {
       pendingRelicOffers: [],
       upgradePoints: 0,
       spellChips: {},
+      secondaryRanks: {},
+      chosenCooldownIds: [],
+      pendingUpgradePicks: 0,
       musicVolumePct: 50,
       recentRuns: [],
     });
@@ -70,6 +73,9 @@ describe('save', () => {
     expect(save.treeRanks).toEqual({ heal: 1, bonk: 1 });
     expect(save.upgradePoints).toBe(0);
     expect(save.spellChips).toEqual({});
+    expect(save.secondaryRanks).toEqual({});
+    expect(save.chosenCooldownIds).toEqual([]);
+    expect(save.pendingUpgradePicks).toBe(0);
   });
 
   it('cards newSaveData starts Heal+Bonk with 0 upgrade points', () => {
@@ -82,6 +88,16 @@ describe('save', () => {
     expect(save.spellChips).toEqual({});
     expect(save.relicIds).toEqual([]);
     expect(save.pendingRelicOffers).toEqual([]);
+    expect(save.secondaryRanks).toEqual({});
+    expect(save.chosenCooldownIds).toEqual([]);
+    expect(save.pendingUpgradePicks).toBe(0);
+  });
+
+  it('lattice newSaveData still starts Bonk-only classic kit', () => {
+    const save = newSaveData('lattice');
+    expect(save.progressionMode).toBe('lattice');
+    expect(save.unlockedSpells).toEqual([SPELLS.bonk.id]);
+    expect(save.actionBar).toEqual([SPELLS.bonk.id, '', '', '']);
   });
 
   it('round-trips a full save', () => {
@@ -102,6 +118,9 @@ describe('save', () => {
       pendingRelicOffers: ['still-reservoir', 'vital-ember', 'bastion-plate'],
       upgradePoints: 0,
       spellChips: {},
+      secondaryRanks: { haste: 2 },
+      chosenCooldownIds: ['still-waters'],
+      pendingUpgradePicks: 1,
       musicVolumePct: 30,
       recentRuns: [
         {

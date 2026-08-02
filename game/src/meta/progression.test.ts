@@ -26,7 +26,7 @@ import type { CombatResult } from '../scenes/CombatScene';
 
 function save(overrides: Partial<SaveData> = {}): SaveData {
   // Empty actionBar → loadoutFromSave keeps all owned spells (bar not under test).
-  return { ...newSaveData(), actionBar: ['', '', '', ''], ...overrides };
+  return { ...newSaveData('lattice'), actionBar: ['', '', '', ''], ...overrides };
 }
 
 function result(overrides: Partial<CombatResult> = {}): CombatResult {
@@ -151,6 +151,55 @@ describe('applyCombatResult', () => {
     ]);
   });
 
+  it('M4: cards level-up adds one pendingUpgradePick per level gained', () => {
+    const s = save({
+      progressionMode: 'cards',
+      xp: XP_LEVEL_2_THRESHOLD - 1,
+      unlockedSpells: ['heal', 'bonk'],
+      actionBar: ['heal', 'bonk', '', ''],
+      pendingUpgradePicks: 0,
+    });
+    applyCombatResult(s, result({ xp: 1 }));
+    expect(levelForXp(s.xp)).toBe(2);
+    expect(s.pendingUpgradePicks).toBe(1);
+  });
+
+  it('M4: cards multi-level jump adds one pick per level gained', () => {
+    // Jump from level 1 straight to level 4 (3 levels gained).
+    const s = save({
+      progressionMode: 'cards',
+      xp: 0,
+      unlockedSpells: ['heal', 'bonk'],
+      actionBar: ['heal', 'bonk', '', ''],
+      pendingUpgradePicks: 0,
+    });
+    const xpNeeded = xpForLevel(4); // XP required to reach level 4 from 0
+    applyCombatResult(s, result({ xp: xpNeeded }));
+    expect(levelForXp(s.xp)).toBe(4);
+    expect(s.pendingUpgradePicks).toBe(3);
+  });
+
+  it('M4: pendingUpgradePicks is 0 on a wipe that does not cross a level boundary', () => {
+    const s = save({
+      progressionMode: 'cards',
+      xp: 0,
+      pendingUpgradePicks: 0,
+    });
+    applyCombatResult(s, result({ xp: 1 }));
+    expect(levelForXp(s.xp)).toBe(1); // still level 1
+    expect(s.pendingUpgradePicks).toBe(0);
+  });
+
+  it('M4: non-cards level-up does not touch pendingUpgradePicks', () => {
+    const s = save({
+      progressionMode: 'lattice',
+      xp: XP_LEVEL_2_THRESHOLD - 1,
+      pendingUpgradePicks: 0,
+    });
+    applyCombatResult(s, result({ xp: 1 }));
+    expect(s.pendingUpgradePicks).toBe(0);
+  });
+
   it('cards level 2 grants Mend (no upgrade point on level-up)', () => {
     const s = save({
       progressionMode: 'cards',
@@ -204,40 +253,42 @@ describe('applyCombatResult', () => {
     expect(notices).toEqual([{ kind: 'levelUp', text: 'Welcome to unlucky level 4' }]);
   });
 
-  it('cards level 8 grants Liturgy (welcome copy, no upgrade point on level-up)', () => {
+  it('M5: cards level 8 shows CD choice notice (no auto-grant, no upgrade point)', () => {
     const s = save({
       progressionMode: 'cards',
       xp: xpForLevel(8) - 1,
       unlockedSpells: ['heal', 'bonk', 'mend', 'vowstrike'],
       actionBar: ['heal', 'bonk', 'mend', 'vowstrike'],
       upgradePoints: 5,
+      chosenCooldownIds: [],
     });
     const notices = applyCombatResult(s, result({ xp: 1 }));
     expect(levelForXp(s.xp)).toBe(8);
     expect(s.upgradePoints).toBe(5);
-    expect(buildLoadout(s).cooldowns.map((c) => c.id)).toContain('frenzied-liturgy');
+    // M5: no auto-grant — CDs require explicit choice via Hub picker.
+    expect(buildLoadout(s).cooldowns).toEqual([]);
     expect(notices).toEqual([
-      { kind: 'levelUp', text: 'Welcome to lucky level 8' },
-      { kind: 'spellLearned', text: 'Frenzied Liturgy learned!' },
+      { kind: 'levelUp', text: 'Welcome to lucky level 8 — choose your second cooldown' },
     ]);
   });
 
-  it('cards level 6 unlocks Still Waters via loadout (no unlockedSpells entry, no point)', () => {
+  it('M5: cards level 6 shows CD choice notice; still-waters NOT in loadout until chosen', () => {
     const s = save({
       progressionMode: 'cards',
       xp: xpForLevel(6) - 1,
       unlockedSpells: ['heal', 'bonk', 'mend', 'vowstrike'],
       actionBar: ['heal', 'bonk', 'mend', 'vowstrike'],
       upgradePoints: 3,
+      chosenCooldownIds: [],
     });
     const notices = applyCombatResult(s, result({ xp: 1 }));
     expect(levelForXp(s.xp)).toBe(6);
     expect(s.upgradePoints).toBe(3);
     expect(s.unlockedSpells).not.toContain('still-waters');
-    expect(buildLoadout(s).cooldowns.map((c) => c.id)).toContain('still-waters');
+    // No auto-grant: loadout has no CDs until the player picks one.
+    expect(buildLoadout(s).cooldowns).toEqual([]);
     expect(notices).toEqual([
-      { kind: 'levelUp', text: 'Welcome to level 6' },
-      { kind: 'spellLearned', text: 'Still Waters learned!' },
+      { kind: 'levelUp', text: 'Welcome to level 6 — choose a major cooldown' },
     ]);
   });
 

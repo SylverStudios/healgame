@@ -1,6 +1,7 @@
 /**
- * Cards-mode chip catalog (spell-cards-poc-handoff §7.2 / §8 + Wave 7a).
+ * Cards-mode chip catalog (spell-cards-poc-handoff §7.2 / §8 + Wave 7a / M7).
  *
+ * Significant-only offers (M7 D4 policy): pure flat number bumps parked.
  * Mend / bonk / vowstrike: exactly 6 chips (3 per slot). Heal: 3 slot-0 +
  * 4 slot-1 catalog members (slot-2 offers are a gated trio — see draft.ts).
  */
@@ -60,13 +61,13 @@ export const CARD_CHIPS: readonly CardChipDef[] = [
     effects: [{ kind: 'missingHealthPctBonus', spellId: 'heal', pctPer10PctMissing: 10 }],
   },
   {
-    id: 'heal-cost',
-    name: 'Cost Cut',
-    description: 'Heal costs 1 less mana (never below 1).',
+    id: 'heal-surge',
+    name: 'Surge',
+    description: 'After Heal, your next Heal gains +15%.',
     spellId: 'heal',
     slotIndex: 0,
-    archetype: 'Z',
-    effects: [{ kind: 'castMod', spellId: 'heal', manaDelta: -1 }],
+    archetype: 'S',
+    effects: [{ kind: 'setCastBuff', spellId: 'heal', castBuff: { kind: 'nextHealPotencyPct', pct: 15 } }],
   },
   // ----- heal slot 2 (4 catalog members; offers are a gated trio — draft.ts) -----
   {
@@ -79,31 +80,31 @@ export const CARD_CHIPS: readonly CardChipDef[] = [
     effects: [{ kind: 'castMod', spellId: 'heal', healDelta: 3, castMsDelta: 500 }],
   },
   {
-    id: 'heal-quick',
-    name: 'Quick Hands',
-    description: 'Heal casts 300ms faster.',
+    id: 'heal-crest',
+    name: 'Crest',
+    description: 'Heal gains +2 when the target is \u226590% HP.',
     spellId: 'heal',
     slotIndex: 1,
     archetype: 'Z',
-    effects: [{ kind: 'castMod', spellId: 'heal', castMsDelta: -300 }],
+    effects: [{ kind: 'fullHealthBonus', spellId: 'heal', hpPctAtLeast: 90, bonusHeal: 2 }],
   },
   {
-    id: 'heal-power',
-    name: 'Power Up',
-    description: 'Heal restores +2.',
+    id: 'heal-tempo',
+    name: 'Tempo',
+    description: 'After Heal, your next spell costs 1 less mana.',
+    spellId: 'heal',
+    slotIndex: 1,
+    archetype: 'X',
+    effects: [{ kind: 'setCastBuff', spellId: 'heal', castBuff: { kind: 'nextSpellManaReduction', amount: 1 } }],
+  },
+  {
+    id: 'heal-vigor',
+    name: 'Vigor',
+    description: 'Heal gains +1 per 10% HP the target is missing.',
     spellId: 'heal',
     slotIndex: 1,
     archetype: 'S',
-    effects: [{ kind: 'castMod', spellId: 'heal', healDelta: 2 }],
-  },
-  {
-    id: 'heal-bulwark',
-    name: 'Bulwark Mend',
-    description: 'Heal restores +1.',
-    spellId: 'heal',
-    slotIndex: 1,
-    archetype: 'Z',
-    effects: [{ kind: 'castMod', spellId: 'heal', healDelta: 1 }],
+    effects: [{ kind: 'missingHealthBonus', spellId: 'heal', healPer10PctMissing: 1 }],
   },
 
   // ----- mend slot 1 -----
@@ -129,13 +130,13 @@ export const CARD_CHIPS: readonly CardChipDef[] = [
     ],
   },
   {
-    id: 'mend-quick',
-    name: 'Quick Mend',
-    description: 'Mend casts 400ms faster.',
+    id: 'mend-surge',
+    name: 'Surge Mend',
+    description: 'After Mend, your next Heal gains +20%.',
     spellId: 'mend',
     slotIndex: 0,
-    archetype: 'Z',
-    effects: [{ kind: 'castMod', spellId: 'mend', castMsDelta: -400 }],
+    archetype: 'X',
+    effects: [{ kind: 'setCastBuff', spellId: 'mend', castBuff: { kind: 'nextHealPotencyPct', pct: 20 } }],
   },
   // ----- mend slot 2 -----
   {
@@ -157,13 +158,13 @@ export const CARD_CHIPS: readonly CardChipDef[] = [
     effects: [{ kind: 'missingHealthBonus', spellId: 'mend', healPer10PctMissing: 1 }],
   },
   {
-    id: 'mend-spark',
-    name: 'Spark Mend',
-    description: 'Mend restores +1 and casts 200ms faster.',
+    id: 'mend-fullbloom',
+    name: 'Fullbloom',
+    description: 'Mend gains +2 when the target is \u226590% HP.',
     spellId: 'mend',
     slotIndex: 1,
     archetype: 'Z',
-    effects: [{ kind: 'castMod', spellId: 'mend', healDelta: 1, castMsDelta: -200 }],
+    effects: [{ kind: 'fullHealthBonus', spellId: 'mend', hpPctAtLeast: 90, bonusHeal: 2 }],
   },
 
   // ----- bonk slot 1 -----
@@ -202,13 +203,13 @@ export const CARD_CHIPS: readonly CardChipDef[] = [
   },
   // ----- bonk slot 2 -----
   {
-    id: 'bonk-crush',
-    name: 'Crushing Bonk',
-    description: 'Bonk deals +2 damage.',
+    id: 'bonk-vow-link',
+    name: 'Vow Link',
+    description: 'After Bonk, your next spell costs 1 less mana.',
     spellId: 'bonk',
     slotIndex: 1,
     archetype: 'R',
-    effects: [{ kind: 'castMod', spellId: 'bonk', damageDelta: 2 }],
+    effects: [{ kind: 'setCastBuff', spellId: 'bonk', castBuff: { kind: 'nextSpellManaReduction', amount: 1 } }],
   },
   {
     id: 'bonk-reckoning',
@@ -285,22 +286,22 @@ export const CARD_CHIPS: readonly CardChipDef[] = [
   },
   // ----- vowstrike slot 2 -----
   {
-    id: 'vs-ready',
-    name: 'Ready Strike',
-    description: 'Vowstrike cooldown is 2s shorter.',
-    spellId: 'vowstrike',
-    slotIndex: 1,
-    archetype: 'Z',
-    effects: [{ kind: 'castMod', spellId: 'vowstrike', cooldownMsDelta: -2000 }],
-  },
-  {
-    id: 'vs-crush',
-    name: 'Crush',
-    description: 'Vowstrike deals +2 damage.',
+    id: 'vs-harrow',
+    name: 'Harrow Strike',
+    description: 'After Vowstrike, stack +10% on your next heal (cap 2).',
     spellId: 'vowstrike',
     slotIndex: 1,
     archetype: 'R',
-    effects: [{ kind: 'castMod', spellId: 'vowstrike', damageDelta: 2 }],
+    effects: [{ kind: 'setCastBuff', spellId: 'vowstrike', castBuff: { kind: 'stackNextHealPotencyPct', pct: 10, cap: 2 } }],
+  },
+  {
+    id: 'vs-wellspring',
+    name: 'Wellspring',
+    description: 'Vowstrike restores 1 mana on hit.',
+    spellId: 'vowstrike',
+    slotIndex: 1,
+    archetype: 'Z',
+    effects: [{ kind: 'setManaOnHit', spellId: 'vowstrike', amount: 1 }],
   },
   {
     id: 'vs-weight',
@@ -361,14 +362,14 @@ export function chipOffersForSlot(
 export const HEAL_HEAVY_GATE_CHIP1 = 'heal-graven';
 
 /**
- * Slot-2 offer trio for Heal (Wave 7a J25b). Stable order.
- * chip1 === heal-graven → Heavy / Quick / Power; else Quick / Power / Bulwark.
+ * Slot-2 offer trio for Heal (Wave 7a J25b / M7). Stable order.
+ * chip1 === heal-graven → Heavy Cast / Crest / Tempo; else Vigor / Crest / Tempo.
  */
 export function healSlot2Offers(
   chip1Id: string | undefined,
 ): readonly [string, string, string] {
   if (chip1Id === HEAL_HEAVY_GATE_CHIP1) {
-    return ['heal-heavy', 'heal-quick', 'heal-power'];
+    return ['heal-heavy', 'heal-crest', 'heal-tempo'];
   }
-  return ['heal-quick', 'heal-power', 'heal-bulwark'];
+  return ['heal-vigor', 'heal-crest', 'heal-tempo'];
 }

@@ -5,6 +5,7 @@
 
 import Phaser from 'phaser';
 import { SceneKeys } from './keys';
+import { combatOptionsFromLoadout } from './combatOptions';
 import { CombatEngine } from '../combat/engine';
 import { nextPartyTargetId } from '../combat/partyTarget';
 import type {
@@ -299,18 +300,7 @@ export class CombatScene extends Phaser.Scene {
       .reduce((s, e) => s + (e.kind === 'bonusHealing' ? e.amount : 0), 0);
 
     const lo = this.sceneData.loadout;
-    this.engine = new CombatEngine(encounter, spells, {
-      bonusMaxMana: lo.bonusMaxMana,
-      ...(lo.bonusMaxHp !== undefined ? { bonusMaxHp: lo.bonusMaxHp } : {}),
-      ...(lo.manaRegen !== undefined ? { manaRegen: lo.manaRegen } : {}),
-      synergies: lo.synergies,
-      ...(lo.manaSynergies !== undefined ? { manaSynergies: lo.manaSynergies } : {}),
-      missingHealthBonuses: lo.missingHealthBonuses,
-      missingHealthPctBonuses: lo.missingHealthPctBonuses,
-      fullHealthBonuses: lo.fullHealthBonuses,
-      cooldowns: lo.cooldowns,
-      relics: relicsList,
-    });
+    this.engine = new CombatEngine(encounter, spells, combatOptionsFromLoadout(lo, relicsList));
 
     buildBattlefield(this, battlefieldForEncounter(this.sceneData.encounterId), {
       viewWidth: VIEW_WIDTH,

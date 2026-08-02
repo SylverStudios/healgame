@@ -147,13 +147,14 @@ describe('cards Ash Gate balance smoke', () => {
       mend: ['mend-arming'],
       bonk: ['bonk-battle'],
     });
+    // M5: CDs come from explicit choices; pick the canonical Set A + Set B pair.
+    save.chosenCooldownIds = ['still-waters', 'frenzied-liturgy'];
     const mods = loadoutFromCardSave(save);
     expect(mods.spells.some((s) => s.id === 'mend')).toBe(true);
     expect(mods.spells.some((s) => s.id === 'vowstrike')).toBe(true);
     expect(mods.cooldowns.map((c) => c.id).sort()).toEqual([
       'frenzied-liturgy',
       'still-waters',
-      'wrath-ascendant',
     ]);
     expect(mods.synergies.length).toBeGreaterThan(0);
 

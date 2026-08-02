@@ -6,6 +6,10 @@
  * Meta row: Talent Tree + Spellbook, or a single Spells button in cards mode.
  * Run mods (oath + relics) live in the shared top-left RunModsBar. Temp art
  * only — panels + text buttons, dark palette, pixel font (ui/theme.ts).
+ *
+ * M5: When `pendingCooldownSet(save)` is non-null after applying the combat
+ * result, an inline modal overlays the Hub and blocks until the player picks
+ * a major cooldown. Picking saves + re-checks for Set B if applicable.
  */
 
 import Phaser from 'phaser';
@@ -23,16 +27,20 @@ import { loadoutForSave } from '../data/loadout';
 import { runModsFromSave } from '../data/runMods';
 import { levelForXp, SPELLS, xpForLevel } from '../data/constants';
 import { ORDERED_DUNGEONS, hubDungeonTargetName } from '../data/dungeons';
+import { cooldownById, COOLDOWN_SET_A_IDS, COOLDOWN_SET_B_IDS } from '../data/cooldowns';
+import { pendingCooldownSet, applyCooldownChoice } from '../data/cards/cooldownsChoice';
 import { RunModsBar } from '../ui/runModsBar';
 import { buildRunSummary, hasBuildGlyph, runRecordFromSummary } from '../ui/runSummary';
 import { drawBuildGlyph } from '../ui/buildGlyph';
 import type { CombatSceneData } from './CombatScene';
 import type { DungeonDef } from '../data/content/types';
 import { loadTelemetry, recordReset, sendPlaytestMail } from '../telemetry';
-import { FONT, FONT_SIZE_SM, FONT_SIZE_LG, PALETTE, PALETTE_NUM } from '../ui/theme';
+import { FONT, FONT_SIZE_SM, FONT_SIZE_LG, FONT_SIZE_MD, PALETTE, PALETTE_NUM } from '../ui/theme';
 import { addBanner, addButton, addPanel, type FrameState } from '../ui/panels';
 import { COMBAT_ENTRY_FADE_OUT_MS, fadeInOnCreate, fadeToScene } from '../ui/transitions';
 import { KEYCAP_FRAME_TEXTURE_KEY } from '../ui/spellSprites';
+import { buildUpgradePickModal } from '../ui/upgradePickModal';
+import { applyUpgradePick } from '../data/secondaryStats';
 
 type HubSceneData = HubCombatSceneData;
 
@@ -76,6 +84,12 @@ const KEYCAP_DEPTH = 5;
 /** Combat hotkey ink — same as spellBar HOTKEY_COLOR. */
 const KEYCAP_LETTER_COLOR = '#e8d8c8';
 
+// CD picker modal constants
+const MODAL_DEPTH = 2000;
+const CD_CARD_W = 210;
+const CD_CARD_H = 220;
+const CD_CARD_GAP = 20;
+
 export class HubScene extends Phaser.Scene {
   private sceneData: HubSceneData = {};
   /** Restart confirm: idle → armed → chooser (send feedback first?). */
@@ -84,6 +98,12 @@ export class HubScene extends Phaser.Scene {
   private feedbackLabel: Phaser.GameObjects.Text | null = null;
   private wipeChooser: Phaser.GameObjects.GameObject[] = [];
   private statusText: Phaser.GameObjects.Text | null = null;
+
+  /** M5 CD picker state */
+  private cdOverlay: Phaser.GameObjects.Container | null = null;
+  private cdSelectedId: string | null = null;
+  private cdConfirmRect: Phaser.GameObjects.Rectangle | null = null;
+  private cdConfirmLabel: Phaser.GameObjects.Text | null = null;
 
   constructor() {
     super(SceneKeys.Hub);
@@ -96,6 +116,10 @@ export class HubScene extends Phaser.Scene {
     this.feedbackLabel = null;
     this.wipeChooser = [];
     this.statusText = null;
+    this.cdOverlay = null;
+    this.cdSelectedId = null;
+    this.cdConfirmRect = null;
+    this.cdConfirmLabel = null;
   }
 
   create(): void {
@@ -159,6 +183,25 @@ export class HubScene extends Phaser.Scene {
     this.buildButtons(save, this.metaButtonsY(notices.length));
     this.buildLastRunGlyph(save);
     new RunModsBar(this, runModsFromSave(save));
+
+    // M4/M5: cards mode — O8 order: drain Upgrade picks first, then CD modal.
+    if (save.progressionMode === 'cards') {
+      if (save.pendingUpgradePicks > 0) {
+        // M4: one pick per level gained — sequential via scene.restart().
+        buildUpgradePickModal(this, save.pendingUpgradePicks, (id) => {
+          if (applyUpgradePick(save, id)) {
+            saveGame(save);
+            this.scene.restart();
+          }
+        });
+      } else {
+        // M5: CD modal only appears after all upgrade picks are drained.
+        const pending = pendingCooldownSet(save);
+        if (pending !== null) {
+          this.buildCooldownPickModal(save, pending);
+        }
+      }
+    }
   }
 
   /**
@@ -274,17 +317,13 @@ export class HubScene extends Phaser.Scene {
       : unspent > 0
         ? `Talent Tree  •  ${unspent}`
         : 'Talent Tree';
-    // Cards mode: single Spells entry (hubTree → album); hide Spellbook.
-    const treeX = cards ? centerX : centerX - 160;
-    this.makeButton(treeX, metaButtonY, 280, META_BUTTON_H, treeLabel, openTree, 'hubTree', {
+    this.makeButton(centerX - 160, metaButtonY, 280, META_BUTTON_H, treeLabel, openTree, 'hubTree', {
       ...treeHighlight,
       keycap: 'T',
     });
-    if (!cards) {
-      this.makeButton(centerX + 160, metaButtonY, 280, META_BUTTON_H, 'Spellbook', openLoadout, 'hubLoadout', {
-        keycap: 'S',
-      });
-    }
+    this.makeButton(centerX + 160, metaButtonY, 280, META_BUTTON_H, 'Spellbook', openLoadout, 'hubLoadout', {
+      keycap: 'S',
+    });
     // v0.3 chunk H: small Settings entry — sits in the unused margin to the
     // right of the meta-button row (right edge of Spellbook is centerX+300,
     // well clear of the canvas edge at 960) so it never competes with the
@@ -301,13 +340,11 @@ export class HubScene extends Phaser.Scene {
         event.preventDefault();
         openTree();
       });
-      if (!cards) {
-        keyboard.on('keydown-S', (event: KeyboardEvent) => {
-          if (this.restartPhase !== 'idle') return;
-          event.preventDefault();
-          openLoadout();
-        });
-      }
+      keyboard.on('keydown-S', (event: KeyboardEvent) => {
+        if (this.restartPhase !== 'idle') return;
+        event.preventDefault();
+        openLoadout();
+      });
     }
 
     const dungeonStartY = metaButtonY + 52;
@@ -533,6 +570,193 @@ export class HubScene extends Phaser.Scene {
     resetSaveToMode(mode);
     fadeToScene(this, SceneKeys.Tutorial);
   }
+
+  // ---------------------------------------------------------------------------
+  // M5: Cooldown picker modal
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Overlay a blocking modal that lets the player choose one CD from the
+   * pending set. On confirm, applies the choice, saves, and restarts the
+   * scene (which re-checks for Set B if applicable, or renders Hub normally).
+   */
+  private buildCooldownPickModal(save: SaveData, pendingSet: 'A' | 'B'): void {
+    const { width, height } = this.scale;
+    const cx = width / 2;
+    const cy = height / 2;
+
+    const setIds = pendingSet === 'A' ? COOLDOWN_SET_A_IDS : COOLDOWN_SET_B_IDS;
+    const setLabel = pendingSet === 'A' ? 'Set A' : 'Set B';
+
+    const MW = 3 * CD_CARD_W + 2 * CD_CARD_GAP + 60;
+    const MH = CD_CARD_H + 130;
+
+    this.cdSelectedId = null;
+
+    const overlay = this.add.container(0, 0).setDepth(MODAL_DEPTH);
+    this.cdOverlay = overlay;
+
+    // Semi-transparent backdrop — blocks all hub interaction.
+    const backdrop = this.add
+      .rectangle(cx, cy, width, height, 0x000000, 0.78)
+      .setInteractive();
+    overlay.add(backdrop);
+
+    // Modal panel background.
+    overlay.add(
+      this.add.rectangle(cx, cy, MW, MH, PALETTE_NUM.panel).setStrokeStyle(2, 0x0a0605),
+    );
+
+    // Title.
+    overlay.add(
+      this.add
+        .text(cx, cy - MH / 2 + 22, `Choose a Major Cooldown (${setLabel})`, {
+          fontFamily: FONT,
+          fontSize: FONT_SIZE_MD,
+          color: ACCENT_COLOR,
+        })
+        .setOrigin(0.5),
+    );
+    overlay.add(
+      this.add
+        .text(cx, cy - MH / 2 + 46, 'This choice is permanent for this save.', {
+          fontFamily: FONT,
+          fontSize: FONT_SIZE_SM,
+          color: DIM_COLOR,
+        })
+        .setOrigin(0.5),
+    );
+
+    // Offer cards.
+    const totalCardW = setIds.length * CD_CARD_W + (setIds.length - 1) * CD_CARD_GAP;
+    const cardsStartX = cx - totalCardW / 2 + CD_CARD_W / 2;
+    const cardY = cy - 10;
+
+    setIds.forEach((id, i) => {
+      const cd = cooldownById(id);
+      if (!cd) return;
+      const ox = cardsStartX + i * (CD_CARD_W + CD_CARD_GAP);
+
+      const cardBg = this.add
+        .rectangle(ox, cardY, CD_CARD_W, CD_CARD_H, PALETTE_NUM.panelLight)
+        .setStrokeStyle(2, 0x0a0605)
+        .setInteractive({ useHandCursor: true })
+        .setName(`cooldownOffer:${id}`);
+      overlay.add(cardBg);
+
+      cardBg.on('pointerover', () => {
+        if (this.cdSelectedId !== id) cardBg.setStrokeStyle(2, PALETTE_NUM.borderLight);
+      });
+      cardBg.on('pointerout', () => {
+        if (this.cdSelectedId !== id) cardBg.setStrokeStyle(2, 0x0a0605);
+      });
+      cardBg.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+        pointer.event?.stopPropagation?.();
+        this.selectCooldownOffer(id);
+      });
+
+      const top = cardY - CD_CARD_H / 2;
+      overlay.add(
+        this.add
+          .text(ox, top + 18, cd.name, {
+            fontFamily: FONT,
+            fontSize: FONT_SIZE_SM,
+            color: TEXT_COLOR,
+            wordWrap: { width: CD_CARD_W - 16 },
+            align: 'center',
+          })
+          .setOrigin(0.5, 0),
+      );
+      overlay.add(
+        this.add
+          .text(ox, top + 44, 'Major Cooldown', {
+            fontFamily: FONT,
+            fontSize: '10px',
+            color: ACCENT_COLOR,
+          })
+          .setOrigin(0.5, 0),
+      );
+      overlay.add(
+        this.add
+          .text(ox, top + 64, cd.description, {
+            fontFamily: FONT,
+            fontSize: '10px',
+            color: DIM_COLOR,
+            wordWrap: { width: CD_CARD_W - 16 },
+            align: 'center',
+          })
+          .setOrigin(0.5, 0),
+      );
+      const cdSec = (cd.cooldownMs / 1000).toFixed(0);
+      overlay.add(
+        this.add
+          .text(ox, cardY + CD_CARD_H / 2 - 20, `${cdSec}s cooldown`, {
+            fontFamily: FONT,
+            fontSize: '10px',
+            color: DIM_COLOR,
+          })
+          .setOrigin(0.5),
+      );
+    });
+
+    // Confirm button (dimmed until a pick is selected).
+    const confirmY = cy + MH / 2 - 28;
+    this.cdConfirmRect = this.add
+      .rectangle(cx, confirmY, 180, 40, BUTTON_COLOR)
+      .setStrokeStyle(2, BORDER_COLOR)
+      .setInteractive({ useHandCursor: true })
+      .setName('cooldownConfirm')
+      .setAlpha(0.4);
+    overlay.add(this.cdConfirmRect);
+
+    this.cdConfirmLabel = this.add
+      .text(cx, confirmY, 'Confirm', {
+        fontFamily: FONT,
+        fontSize: FONT_SIZE_SM,
+        color: DIM_COLOR,
+      })
+      .setOrigin(0.5);
+    overlay.add(this.cdConfirmLabel);
+
+    this.cdConfirmRect.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      pointer.event?.stopPropagation?.();
+      this.confirmCooldownChoice(save);
+    });
+  }
+
+  private selectCooldownOffer(id: string): void {
+    this.cdSelectedId = id;
+
+    if (!this.cdOverlay) return;
+    for (const child of this.cdOverlay.list) {
+      if (!(child instanceof Phaser.GameObjects.Rectangle)) continue;
+      const name = child.name;
+      if (!name.startsWith('cooldownOffer:')) continue;
+      const childId = name.slice('cooldownOffer:'.length);
+      child.setStrokeStyle(
+        childId === id ? 3 : 2,
+        childId === id ? PALETTE_NUM.gold : 0x0a0605,
+      );
+    }
+
+    if (this.cdConfirmRect) {
+      this.cdConfirmRect.setAlpha(1).setStrokeStyle(2, PALETTE_NUM.gold);
+    }
+    if (this.cdConfirmLabel) {
+      this.cdConfirmLabel.setColor(ACCENT_COLOR);
+    }
+  }
+
+  private confirmCooldownChoice(save: SaveData): void {
+    if (!this.cdSelectedId) return;
+    const ok = applyCooldownChoice(save, this.cdSelectedId);
+    if (!ok) return;
+    saveGame(save);
+    // Restart: re-checks pendingCooldownSet for Set B, or renders Hub normally.
+    this.scene.restart();
+  }
+
+  // ---------------------------------------------------------------------------
 
   private makeButton(
     x: number,
