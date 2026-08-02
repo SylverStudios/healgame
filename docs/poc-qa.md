@@ -1,6 +1,6 @@
 # QA log — journey checklist & verification
 
-Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-07-31
+Status: current · Authority: decided micro-choices + QA log · Last verified: 2026-08-02
 
 Ship summary (newest first): [`CHANGELOG.md`](./CHANGELOG.md).
 
@@ -26,7 +26,7 @@ Status: current · Last verified: 2026-07-31
    authored in `playtest/loadouts.ts` (deterministic — chosen offline, not RNG).
 3. **Baked metadata** — `DungeonDef.playtestLevelRange: { god, basic } | null`.
    Hub shows `Lv low–high` beside the dungeon title. Measured with chips on
-   the enemy-mechanics stack (max Lv20): Ash 2–4, Iron 5–7, Cinder 5–6,
+   the enemy-mechanics stack (max Lv20): Ash 2–4, Cinder 4–5, Iron 6–9,
    Verdant 5–6, Choir 5–8, Gloam 7–9; Maw uncleared. Re-run after retunes.
 4. **Gates unchanged** — `combat/balanceBot.ts` + `balance.test.ts` remain the
    difficulty-shape pins; playtest is the curve signal, not a gate replacement.
@@ -1215,3 +1215,30 @@ Decided micro-choices shipped this phase (full detail: module docs +
    (14×4 frames of 64px; right-facing row, cast columns with golden light)
    and `heal-vfx.png` (6×32px sparkle) replace the healer's Kenney tile and
    accompany heal landings.
+
+---
+
+# Cinder Vault balance retune — order-2 ease (2026-08-02)
+
+Status: current · Last verified: 2026-08-02
+
+U7 retune after U6 swapped dungeon order (Ash → Cinder → Iron). Cinder Vault
+moved from order 3 to order 2; playtest showed god cleared at Lv5 (target Lv4).
+
+**Lever used** — `ember-colossus` HP 240 → 170 (shorter fight, less cumulative
+mana pressure on a Lv4 kit), autoDamage 3 → 4 (compiled 5 → 6 at order 2;
+higher per-swing pressure reinstates threat). Net fight time: ~88s → ~73s.
+
+**Measured playtest (headless, cards-mode kit):**
+
+| Dungeon | Before | After |
+|---------|--------|-------|
+| Ash Gate | god Lv2, basic Lv4 | god Lv2, basic Lv4 (unchanged) |
+| Cinder Vault | god Lv5, basic Lv5 | god Lv4, basic Lv5 ✓ |
+| Iron Pass | god Lv6, basic Lv9 | god Lv6, basic Lv9 (unchanged) |
+
+**Balance gates (33/33 green):** Vigil/Zealot crown kits clear Cinder with ≥3
+survivors, Emberfall fires 3× (fight shortened from 4 to 3 boss Emberfalls).
+Efficiency crown also clears Cinder (order 2 is within its range); Iron Pass
+efficiency still wipes at order-3 floor scaling. Gates tightened from the U6
+`partyDoTStarted ≥ 4` placeholder to `≥ 3` matching the actual shorter fight.

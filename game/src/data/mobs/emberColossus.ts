@@ -4,11 +4,13 @@ export const EMBER_COLOSSUS_MOB = {
   id: 'ember-colossus',
   name: 'Ember Colossus',
   tags: ['boss'],
-  hp: 240,
-  // J26: floor scaling (+4 at order 3) stacks on this. The crown kit's
-  // Graven-Scale heals sustain the tank; the efficiency kit's slow flat heals
-  // lose it, and the lower boss HP ends the fight before the whole party falls.
-  autoDamage: 3,
+  hp: 170,
+  // J26: floor scaling (+2 at order 2) stacks on this (compiled auto = 6).
+  // Raised auto + lower HP: shorter fight with harder per-swing pressure.
+  // Crown kits sustain through the spike; efficiency kit clears with mana
+  // to spare (measured-devotion path design). Lv4 god bot clears at Cinder
+  // order 2 with this trim; playtest: god Lv4, basic Lv5.
+  autoDamage: 4,
   swingIntervalMs: 3_200,
   abilityIds: ['emberfall'],
   visualKey: 'ember-colossus',
