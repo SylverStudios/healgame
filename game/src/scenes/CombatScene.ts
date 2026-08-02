@@ -83,6 +83,7 @@ import {
   type HealerCueHandles,
 } from '../ui/healerCues';
 import { syncSecondaryCues, emptySecondaryCueHandles, spawnCritFloat, spawnBlockFloat, type SecondaryCueHandles } from '../ui/secondaryCues';
+import { syncEnrageCue, emptyEnrageCueHandles, spawnEnrageFloat, type EnrageCueHandles } from '../ui/enrageCue';
 import { portraitTextureKey, revealResultPortrait } from '../ui/portraitSprites';
 import { chunkyWipeIn, fadeToScene } from '../ui/transitions';
 import { EnemyCastBars } from '../ui/enemyCastBars';
@@ -243,6 +244,7 @@ export class CombatScene extends Phaser.Scene {
   // Overhead healer cues (rune + Battle Mend + Blessed Bonk stacks); icon id backs the stack cue.
   private healerCues: HealerCueHandles = emptyHealerCueHandles();
   private secondaryCues: SecondaryCueHandles = emptySecondaryCueHandles();
+  private enrageCue: EnrageCueHandles = emptyEnrageCueHandles();
   private bonkStackIconSpellId = 'bonk';
   /** Presentation-only DBZ-style aura: intensity from mana spent in the last 30s. */
   private manaAura: ManaSpendAura | null = null;
@@ -877,6 +879,7 @@ export class CombatScene extends Phaser.Scene {
           this.rebuildEnemies(this.engine.state.enemies);
           this.showWaveBanner(event.waveIndex);
           break;
+        case 'enrage': { const _b = this.bossUnitId(); if (_b) { const _bs = this.enemySprites.get(_b); if (_bs) spawnEnrageFloat(this, _bs); } this.combatLog.push(`${this.formatTimestamp()} ${this.encounter.boss.name} enrages!`); break; }
         case 'combatEnded':
           // A channel can be live when the fight ends (e.g. boss dies mid-
           // Tunnel-Vision) — the engine stops before emitting bossFocusEnded,
@@ -972,7 +975,7 @@ export class CombatScene extends Phaser.Scene {
     this.spellBar.updateSpellCooldowns(state.spellCooldowns);
     this.spellBar.setGcd(state.gcdRemainingMs, GCD_MS);
     this.syncHealerRune(state);
-    this.secondaryCues = syncSecondaryCues(this, this.secondaryCues, state, this.partySprites.get('healer'), this.partySprites.get('tank'));
+    this.secondaryCues = syncSecondaryCues(this, this.secondaryCues, state, this.partySprites.get('healer'), this.partySprites.get('tank')); { const _bId = this.bossUnitId(); this.enrageCue = syncEnrageCue(this, this.enrageCue, state, _bId ? this.enemySprites.get(_bId) : null); }
     this.syncManaAura();
 
     this.waveText.setText(
