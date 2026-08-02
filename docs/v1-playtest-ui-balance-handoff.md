@@ -186,4 +186,4 @@ or parallel if ownership is clean.
 - [x] Results show damage done per party character
 - [x] Level-up shows HP + mana increases
 - [x] Order Ash→Cinder→Iron; Cinder ~Lv 4–5; gates green
-- [ ] `npm run verify` green; PR with try-steps
+- [x] `npm run verify` green; PR with try-steps
