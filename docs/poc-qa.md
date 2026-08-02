@@ -25,9 +25,9 @@ Status: current · Last verified: 2026-07-31
    left) or efficiency (OOM), retries once, then levels up. Chip picks are
    authored in `playtest/loadouts.ts` (deterministic — chosen offline, not RNG).
 3. **Baked metadata** — `DungeonDef.playtestLevelRange: { god, basic } | null`.
-   Hub shows `Lv low–high` beside the dungeon title. Measured with chips
-   (max Lv20): Ash 2–3, Iron 5–7, Cinder 5, Verdant 5–6, Choir 5–8, Gloam 7–9;
-   Maw uncleared. Re-run after retunes and update the field.
+   Hub shows `Lv low–high` beside the dungeon title. Measured with chips on
+   the enemy-mechanics stack (max Lv20): Ash 2–4, Iron 5–7, Cinder 5–6,
+   Verdant 5–6, Choir 5–8, Gloam 7–9; Maw uncleared. Re-run after retunes.
 4. **Gates unchanged** — `combat/balanceBot.ts` + `balance.test.ts` remain the
    difficulty-shape pins; playtest is the curve signal, not a gate replacement.
 
