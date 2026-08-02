@@ -10,7 +10,27 @@ enforced by automated gates. Later Alpha sections below amend the baseline
 
 ---
 
-<<<<<<< HEAD
+# Headless balance playtest curve (2026-07-31)
+
+Status: current · Last verified: 2026-07-31
+
+1. **Harness** — `game/src/playtest/` drives `CombatEngine` headlessly (no Phaser /
+   animations). `npm run content -- playtest` sweeps player levels with two
+   rule bots on the cards no-chip kit.
+2. **Basic bot** — random affordable heal, injured-target triage, idle gap
+   between casts (overheals freely). **God bot** — queues to never waste GCD,
+   Bonk filler, never overheals, efficiency unless emergency HP% then HPS; on
+   wipe prefers throughput (mana left) or efficiency (OOM), retries once, then
+   levels up.
+3. **Baked metadata** — `DungeonDef.playtestLevelRange: { god, basic } | null`.
+   Hub shows `Lv god–basic` beside the dungeon title. Measured (cards kit,
+   max Lv20): Ash Gate 2–4, Iron Pass 12–17, Cinder Vault 10–16, Verdant Rift
+   10–14, Black Choir 14–19; Gloam/Maw uncleared (null). Re-run after retunes.
+4. **Gates unchanged** — `combat/balanceBot.ts` + `balance.test.ts` remain the
+   difficulty-shape pins; playtest is the curve signal, not a gate replacement.
+
+---
+
 # Enemy mechanics — trash cast curriculum (2026-07-31)
 
 Status: current · Last verified: 2026-07-31
@@ -35,26 +55,6 @@ the louder exam. Locked decisions from
 6. **Balance** — mid-ladder lesser cadence/damage softened after bot
    telemetry so Vigil efficiency / shallow crown scrapes still clear;
    `balance.test.ts` assertion shape unchanged; Ash Gate + Maw untouched.
-=======
-# Headless balance playtest curve (2026-07-31)
-
-Status: current · Last verified: 2026-07-31
-
-1. **Harness** — `game/src/playtest/` drives `CombatEngine` headlessly (no Phaser /
-   animations). `npm run content -- playtest` sweeps player levels with two
-   rule bots on the cards no-chip kit.
-2. **Basic bot** — random affordable heal, injured-target triage, idle gap
-   between casts (overheals freely). **God bot** — queues to never waste GCD,
-   Bonk filler, never overheals, efficiency unless emergency HP% then HPS; on
-   wipe prefers throughput (mana left) or efficiency (OOM), retries once, then
-   levels up.
-3. **Baked metadata** — `DungeonDef.playtestLevelRange: { god, basic } | null`.
-   Hub shows `Lv god–basic` beside the dungeon title. Measured (cards kit,
-   max Lv20): Ash Gate 2–4, Iron Pass 12–17, Cinder Vault 10–16, Verdant Rift
-   10–14, Black Choir 14–19; Gloam/Maw uncleared (null). Re-run after retunes.
-4. **Gates unchanged** — `combat/balanceBot.ts` + `balance.test.ts` remain the
-   difficulty-shape pins; playtest is the curve signal, not a gate replacement.
->>>>>>> 949d8c5 (feat(playtest): headless god/basic bots and dungeon level ranges)
 
 ---
 
