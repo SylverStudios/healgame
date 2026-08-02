@@ -82,6 +82,7 @@ import {
   emptyHealerCueHandles,
   type HealerCueHandles,
 } from '../ui/healerCues';
+import { syncSecondaryCues, emptySecondaryCueHandles, spawnCritFloat, spawnBlockFloat, type SecondaryCueHandles } from '../ui/secondaryCues';
 import { portraitTextureKey, revealResultPortrait } from '../ui/portraitSprites';
 import { chunkyWipeIn, fadeToScene } from '../ui/transitions';
 import { EnemyCastBars } from '../ui/enemyCastBars';
@@ -239,6 +240,7 @@ export class CombatScene extends Phaser.Scene {
   private combatPaceTenths = 10;
   // Overhead healer cues (rune + Battle Mend + Blessed Bonk stacks); icon id backs the stack cue.
   private healerCues: HealerCueHandles = emptyHealerCueHandles();
+  private secondaryCues: SecondaryCueHandles = emptySecondaryCueHandles();
   private bonkStackIconSpellId = 'bonk';
   /** Presentation-only DBZ-style aura: intensity from mana spent in the last 30s. */
   private manaAura: ManaSpendAura | null = null;
@@ -723,6 +725,8 @@ export class CombatScene extends Phaser.Scene {
           this.combatLog.push(
             `${this.formatTimestamp()} ${this.resolveUnitName(event.sourceId)} hits ${this.resolveUnitName(event.targetId)} -${event.amount}`,
           );
+          if (event.crit === true) { const _h = this.partySprites.get('healer'); if (_h) spawnCritFloat(this, _h); }
+          if ((event.blocked ?? 0) > 0) { const _t = this.partySprites.get('tank'); if (_t) spawnBlockFloat(this, _t); }
           break;
         }
         case 'heal': {
@@ -741,6 +745,7 @@ export class CombatScene extends Phaser.Scene {
           this.combatLog.push(
             `${this.formatTimestamp()} ${this.resolveSpellName(event.spellId)} heals ${this.resolveUnitName(event.targetId)} +${rawHeal}`,
           );
+          if (event.crit === true) { const _h = this.partySprites.get('healer'); if (_h) spawnCritFloat(this, _h); }
           break;
         }
         case 'castStarted': {
@@ -965,6 +970,7 @@ export class CombatScene extends Phaser.Scene {
     this.spellBar.updateSpellCooldowns(state.spellCooldowns);
     this.spellBar.setGcd(state.gcdRemainingMs, GCD_MS);
     this.syncHealerRune(state);
+    this.secondaryCues = syncSecondaryCues(this, this.secondaryCues, state, this.partySprites.get('healer'), this.partySprites.get('tank'));
     this.syncManaAura();
 
     this.waveText.setText(
